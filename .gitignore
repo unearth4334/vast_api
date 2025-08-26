@@ -91,7 +91,6 @@ $RECYCLE.BIN/
 .env.*
 .venv/
 
-known_hosts
 
 # Everything in .ssh except the config file
 .ssh/*

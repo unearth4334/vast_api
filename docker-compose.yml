@@ -1,27 +1,38 @@
-version: '3.8'
-
 services:
   media-sync-api:
     build: .
     container_name: media-sync-api
     ports:
       - "5000:5000"
+
     volumes:
-      # Mount SSH keys (create ~/.ssh/id_ed25519 on host first)
-      - ~/.ssh:/root/.ssh:ro
-      # Mount local sync destination (adjust path as needed for QNAP)
-      - /mnt/qnap-sd/SecretFolder:/mnt/qnap-sd/SecretFolder
-      # Mount VastAI API key
+      # ── SSH (project-local) ───────────────────────────────────────────────
+      - ./.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
+      - ./.ssh/id_ed25519.pub:/root/.ssh/id_ed25519.pub:ro
+      - ./.ssh/known_hosts:/root/.ssh/known_hosts:ro
+      - ./.ssh/config:/root/.ssh/config:ro
+      - ./.ssh/vast_known_hosts:/root/.ssh/vast_known_hosts   # writable
+
+      # ── QNAP media share ─────────────────────────────────────────────────
+      - /share/sd/SecretFolder:/media
+
+      # ── App data ─────────────────────────────────────────────────────────
       - ./api_key.txt:/app/api_key.txt:ro
+
     environment:
       - PYTHONUNBUFFERED=1
+      - PUID=0
+      - PGID=0
+
     restart: unless-stopped
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/status"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
     networks:
       - media-sync-network
 
