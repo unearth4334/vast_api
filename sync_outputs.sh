@@ -37,8 +37,8 @@ fi
 
 # ----------- CONFIGURATION -----------
 REMOTE_USER=root
-SSH_KEY=~/.ssh/id_ed25519
-LOCAL_BASE=/mnt/qnap-sd/SecretFolder
+SSH_KEY=/root/.ssh/id_ed25519
+LOCAL_BASE=/media
 FOLDERS=("txt2img-grids" "txt2img-images" "img2img-grids" "img2img-images" "WAN" "extras-images")
 
 # Defaults for XMP tool (can be overridden by flags)

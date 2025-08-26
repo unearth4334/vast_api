@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     openssh-client \
     rsync \
     bash \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -23,10 +24,10 @@ COPY config.yaml ./
 RUN chmod +x *.sh
 
 # Create directory for SSH keys (will be mounted as volume)
-RUN mkdir -p /root/.ssh
+RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
 
 # Create directory for local sync destination (will be mounted as volume)
-RUN mkdir -p /mnt/qnap-sd/SecretFolder
+RUN mkdir -p /media
 
 # Expose port
 EXPOSE 5000
