@@ -11,11 +11,13 @@ KNOWN_HOSTS="$SSH_DIR/known_hosts"
 VAST_KNOWN_HOSTS="$SSH_DIR/vast_known_hosts"
 CONFIG_FILE="$SSH_DIR/config"
 
-echo "🔧 Setting up project-local SSH directory at $SSH_DIR"
+echo "🔧 Setting up SSH directory at $SSH_DIR"
 
-# 1. Ensure .ssh directory exists with correct perms
+# 1. Ensure .ssh directory exists
 mkdir -p "$SSH_DIR"
-chmod 700 "$SSH_DIR"
+
+# Permissions for directory (owner full, group read/exec so SMB user can traverse)
+chmod 750 "$SSH_DIR"
 
 # 2. Generate a keypair if missing
 if [[ ! -f "$KEY_FILE" ]]; then
@@ -25,17 +27,25 @@ else
     echo "✅ Existing SSH keypair found"
 fi
 
-# 3. Touch known_hosts files
+# 3. Ensure public key exists
+if [[ ! -f "$PUB_FILE" ]]; then
+    echo "❌ Missing public key. Generating from private..."
+    ssh-keygen -y -f "$KEY_FILE" > "$PUB_FILE"
+fi
+
+# 4. Create host key files
 touch "$KNOWN_HOSTS" "$VAST_KNOWN_HOSTS"
 
-# 4. Apply correct permissions
-chmod 600 "$KEY_FILE" "$VAST_KNOWN_HOSTS"
-chmod 644 "$PUB_FILE" "$KNOWN_HOSTS"
+# 5. Apply strict permissions
+chmod 600 "$KEY_FILE"                 # private key
+chmod 644 "$PUB_FILE"                 # public key
+chmod 644 "$KNOWN_HOSTS"              # static LAN hosts
+chmod 664 "$VAST_KNOWN_HOSTS"         # writable for VastAI dynamic hosts
 
-# 5. Create a default ssh_config if missing
+# 6. Create default SSH config if missing
 if [[ ! -f "$CONFIG_FILE" ]]; then
     cat > "$CONFIG_FILE" <<'EOF'
-# Static LAN targets
+# ── Forge (LAN) ───────────────────────────────
 Host forge
   HostName 10.0.78.108
   Port 2222
@@ -45,6 +55,7 @@ Host forge
   UserKnownHostsFile /root/.ssh/known_hosts
   StrictHostKeyChecking yes
 
+# ── Comfy (LAN) ───────────────────────────────
 Host comfy
   HostName 10.0.78.108
   Port 2223
@@ -54,7 +65,7 @@ Host comfy
   UserKnownHostsFile /root/.ssh/known_hosts
   StrictHostKeyChecking yes
 
-# VastAI cloud hosts
+# ── VastAI (cloud) ────────────────────────────
 Host vast-*
   User ubuntu
   IdentityFile /root/.ssh/id_ed25519
@@ -70,6 +81,6 @@ fi
 
 echo "🎉 SSH setup complete!"
 echo "Next steps:"
-echo "  - Copy $PUB_FILE to your Forge/Comfy/VastAI hosts using ssh-copy-id"
-echo "  - Mount .ssh into the container via docker-compose.yml"
-
+echo "  1. Copy $PUB_FILE to Forge/Comfy with ssh-copy-id (ports 2222, 2223)."
+echo "  2. For VastAI, copy $PUB_FILE into your instance at launch or via ssh-copy-id."
+echo "  3. Update docker-compose.yml with the .ssh mounts we configured."
