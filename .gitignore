@@ -90,3 +90,9 @@ $RECYCLE.BIN/
 .env
 .env.*
 .venv/
+
+known_hosts
+
+# Everything in .ssh except the config file
+.ssh/*
+!.ssh/config
