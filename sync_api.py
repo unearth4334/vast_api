@@ -10,6 +10,12 @@ import logging
 from flask import Flask, jsonify, render_template_string
 from vast_manager import VastManager
 
+# Import SSH test functionality
+try:
+    from ssh_test import SSHTester
+except ImportError:
+    SSHTester = None
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -112,6 +118,7 @@ def index():
         <button class="button" onclick="sync('forge')">🔥 Sync Forge (10.0.78.108:2222)</button>
         <button class="button" onclick="sync('comfy')">🖼️ Sync Comfy (10.0.78.108:2223)</button>
         <button class="button" onclick="sync('vastai')">☁️ Sync VastAI (Auto-discover)</button>
+        <button class="button" onclick="testSSH()">🔧 Test SSH Connectivity</button>
         
         <div id="result" class="result"></div>
         
@@ -132,6 +139,45 @@ def index():
                     } else {
                         resultDiv.className = 'result error';
                         resultDiv.innerHTML = `<strong>❌ ${data.message}</strong><br><pre>${data.error || data.output || ''}</pre>`;
+                    }
+                } catch (error) {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<strong>❌ Request failed:</strong><br>${error.message}`;
+                }
+            }
+            
+            async function testSSH() {
+                const resultDiv = document.getElementById('result');
+                resultDiv.className = 'result loading';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<strong>Testing SSH connectivity...</strong><br>Checking connections to all configured hosts.';
+                
+                try {
+                    const response = await fetch('/test/ssh', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        let output = `<strong>✅ SSH connectivity test completed</strong><br><br>`;
+                        output += `<strong>Summary:</strong><br>`;
+                        output += `Total hosts: ${data.summary.total_hosts}<br>`;
+                        output += `Successful: ${data.summary.successful}<br>`;
+                        output += `Failed: ${data.summary.failed}<br>`;
+                        output += `Success rate: ${data.summary.success_rate}<br><br>`;
+                        output += `<strong>Results:</strong><br>`;
+                        
+                        for (const [host, result] of Object.entries(data.results)) {
+                            const status = result.success ? '✅' : '❌';
+                            output += `${status} ${host}: ${result.message}<br>`;
+                            if (!result.success && result.error) {
+                                output += `&nbsp;&nbsp;&nbsp;&nbsp;Error: ${result.error}<br>`;
+                            }
+                        }
+                        
+                        resultDiv.className = 'result success';
+                        resultDiv.innerHTML = output;
+                    } else {
+                        resultDiv.className = 'result error';
+                        resultDiv.innerHTML = `<strong>❌ SSH test failed:</strong><br>${data.message}<br><pre>${data.error || ''}</pre>`;
                     }
                 } catch (error) {
                     resultDiv.className = 'result error';
@@ -204,6 +250,53 @@ def sync_vastai():
         return jsonify({
             'success': False,
             'message': f'VastAI sync error: {str(e)}'
+        })
+
+@app.route('/test/ssh', methods=['POST'])
+def test_ssh():
+    """Test SSH connectivity to configured hosts"""
+    try:
+        if SSHTester is None:
+            return jsonify({
+                'success': False,
+                'message': 'SSH test functionality not available'
+            })
+        
+        logger.info("Starting SSH connectivity tests")
+        tester = SSHTester()
+        
+        # Test all default hosts
+        results = tester.test_all_hosts(timeout=10)
+        
+        # Format response
+        response = {
+            'success': True,
+            'message': 'SSH connectivity test completed',
+            'summary': results['summary'],
+            'results': results['results']
+        }
+        
+        # Log results
+        logger.info(f"SSH test summary: {results['summary']}")
+        for host, result in results['results'].items():
+            status = "PASS" if result['success'] else "FAIL"
+            logger.info(f"SSH test {host}: {status} - {result['message']}")
+        
+        return jsonify(response)
+        
+    except FileNotFoundError as e:
+        logger.error(f"SSH configuration error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'SSH configuration files not found',
+            'error': str(e)
+        })
+    except Exception as e:
+        logger.error(f"SSH test error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH test error: {str(e)}',
+            'error': str(e)
         })
 
 @app.route('/status')
