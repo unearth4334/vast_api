@@ -107,4 +107,19 @@ class VastManager:
         response.raise_for_status()
         return response.json()
 
+    def list_instances(self):
+        """List all instances for the current user"""
+        url = f"{VAST_BASE}/instances/"
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        return response.json().get("instances", [])
+
+    def get_running_instance(self):
+        """Get the first running instance (for VastAI sync)"""
+        instances = self.list_instances()
+        for instance in instances:
+            if instance.get("cur_state") == "running":
+                return instance
+        return None
+
 

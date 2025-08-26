@@ -1,0 +1,16 @@
+# Docker ignore file
+.git
+.gitignore
+README.md
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+test/
+output.json
+*.log
+.DS_Store
+.dockerignore

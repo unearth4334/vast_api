@@ -46,3 +46,10 @@ class VastClient:
         resp = requests.delete(url, headers=self.headers)
         resp.raise_for_status()
         return resp.json()
+
+    def list_instances(self):
+        """List all instances for the current user"""
+        url = f"{self.BASE_URL}/instances/"
+        resp = requests.get(url, headers=self.headers)
+        resp.raise_for_status()
+        return resp.json().get("instances", [])
