@@ -26,6 +26,31 @@ class TestSyncAPI(unittest.TestCase):
         self.assertIn(b'Sync Comfy', response.data)
         self.assertIn(b'Sync VastAI', response.data)
 
+    def test_cors_headers(self):
+        """Test that CORS headers are included in responses"""
+        response = self.app.get('/')
+        self.assertEqual(response.status_code, 200)
+        
+        # Check that CORS headers are present
+        self.assertIn('Access-Control-Allow-Origin', response.headers)
+        self.assertIn('Access-Control-Allow-Headers', response.headers)
+        self.assertIn('Access-Control-Allow-Methods', response.headers)
+        
+        # Check header values
+        self.assertEqual(response.headers['Access-Control-Allow-Origin'], '*')
+        self.assertIn('GET', response.headers['Access-Control-Allow-Methods'])
+        self.assertIn('POST', response.headers['Access-Control-Allow-Methods'])
+        
+    def test_options_preflight(self):
+        """Test that OPTIONS preflight requests are handled"""
+        response = self.app.options('/sync/forge')
+        self.assertEqual(response.status_code, 200)
+        
+        # Check that CORS headers are present in OPTIONS response
+        self.assertIn('Access-Control-Allow-Origin', response.headers)
+        self.assertIn('Access-Control-Allow-Headers', response.headers)
+        self.assertIn('Access-Control-Allow-Methods', response.headers)
+
     @patch('sync_api.VastManager')
     def test_status_endpoint_success(self, mock_vast_manager):
         """Test status endpoint with successful VastAI connection"""

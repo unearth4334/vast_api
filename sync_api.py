@@ -7,7 +7,7 @@ Provides web API endpoints for syncing media from local Docker containers and Va
 import os
 import subprocess
 import logging
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 from vast_manager import VastManager
 
 # Import SSH test functionality
@@ -21,6 +21,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Add CORS headers to all responses
+@app.after_request
+def after_request(response):
+    """Add CORS headers to allow cross-origin requests from browsers"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+# Handle preflight OPTIONS requests
+@app.route('/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    """Handle preflight OPTIONS requests for any endpoint"""
+    return '', 200
 
 # Configuration
 SYNC_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), 'sync_outputs.sh')
