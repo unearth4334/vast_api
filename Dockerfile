@@ -12,7 +12,15 @@ WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
+
+# Install system Python dependencies for the main application
 RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
+
+# Create virtual environment for XMP tool
+RUN python -m venv .venv
+
+# Install requirements into the virtual environment
+RUN .venv/bin/pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
 
 # Copy application files
 COPY *.py ./
