@@ -16,18 +16,17 @@ usage() {
   exit 1
 }
 
-# Support flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -p)          REMOTE_PORT="${2:-}"; shift 2 ;;
-    --host)      REMOTE_HOST="${2:-}"; shift 2 ;;
-    --UI_HOME)   UI_HOME_OVERRIDE="${2:-}"; shift 2 ;;
-    --cleanup)   DO_CLEANUP=1; shift ;;
-    --no-xmp)    DO_XMP=0; shift ;;
-    --venv)      XMP_VENV="${2:-}"; shift 2 ;;
-    --xmp-script)XMP_SCRIPT="${2:-}"; shift 2 ;;
-    --ssh-opts)  SSH_OPTS="${2:-}"; shift 2 ;;
-    *)           usage ;;
+    -p)           REMOTE_PORT="${2:-}"; shift 2 ;;
+    --host)       REMOTE_HOST="${2:-}"; shift 2 ;;
+    --UI_HOME)    UI_HOME_OVERRIDE="${2:-}"; shift 2 ;;
+    --cleanup)    DO_CLEANUP=1; shift ;;
+    --no-xmp)     DO_XMP=0; shift ;;
+    --venv)       XMP_VENV="${2:-}"; shift 2 ;;
+    --xmp-script) XMP_SCRIPT="${2:-}"; shift 2 ;;
+    --ssh-opts)   SSH_OPTS="${2:-}"; shift 2 ;;
+    *)            usage ;;
   esac
 done
 
@@ -48,8 +47,16 @@ XMP_VENV="${XMP_VENV:-$DEFAULT_VENV}"
 XMP_SCRIPT="${XMP_SCRIPT:-$DEFAULT_XMP_SCRIPT}"
 VENV_PY="$XMP_VENV/bin/python"
 
-# Build SSH commands
-SSH_BASE=(ssh -p "$REMOTE_PORT")
+# Safer rsync flags for QNAP/eCryptfs:
+# - Do NOT preserve perms/owner/group/times; those cause "Bad address (14)"
+RSYNC_FLAGS=(-rltD --delete --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --human-readable)
+# Add --mkpath if supported (rsync >=3.2)
+if rsync --help 2>&1 | grep -q -- '--mkpath'; then
+  RSYNC_FLAGS+=(--mkpath)
+fi
+
+# Build SSH command defaults (identity + strict LAN trust file)
+SSH_BASE=(ssh -p "$REMOTE_PORT" -i "$SSH_KEY" -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
 if [[ -n "$SSH_OPTS" ]]; then SSH_BASE+=($SSH_OPTS); fi
 SSH_DEST="$REMOTE_USER@$REMOTE_HOST"
 SSH_CMD=("${SSH_BASE[@]}" "$SSH_DEST")
@@ -70,7 +77,6 @@ run_xmp_for_dir() {
     return 0
   fi
 
-  # Count PNG files
   local png_count
   png_count=$(find "$dir" -type f -iname '*.png' | wc -l)
 
@@ -79,7 +85,6 @@ run_xmp_for_dir() {
     return 0
   fi
 
-  # Run the script quietly, capture errors separately
   if find "$dir" -type f -iname '*.png' -print0 \
       | xargs -0 -r -n 50 "$VENV_PY" "$XMP_SCRIPT" >/dev/null 2>&1; then
     echo "📝 XMP: processed $png_count PNG(s) in $dir"
@@ -149,10 +154,9 @@ for folder in "${FOLDERS[@]}"; do
     fi
 
     echo "🔄 Syncing files"
-    RSYNC_SSH=(ssh -p "$REMOTE_PORT")
-    if [[ -n "$SSH_OPTS" ]]; then RSYNC_SSH+=($SSH_OPTS); fi
+    RSYNC_SSH=("${SSH_BASE[@]}")  # reuse base (already has key + known_hosts)
 
-    rsync -av --progress -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
+    rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
       "$SSH_DEST:$remote_path" "$local_path/"
 
     run_xmp_for_dir "$local_path"
