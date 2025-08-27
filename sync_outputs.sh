@@ -61,10 +61,20 @@ run_xmp_for_dir() {
   if [[ "$DO_XMP" -ne 1 ]]; then
     return 0
   fi
-  if [ ! -x "$VENV_PY" ]; then
-    echo "⚠️  XMP skipped ($dir): venv python not found at $VENV_PY"
+  
+  # Determine which Python to use - prefer venv, fallback to system python
+  local python_exe=""
+  if [ -x "$VENV_PY" ]; then
+    python_exe="$VENV_PY"
+  elif command -v python3 >/dev/null 2>&1; then
+    python_exe="python3"
+  elif command -v python >/dev/null 2>&1; then
+    python_exe="python"
+  else
+    echo "⚠️  XMP skipped ($dir): no python executable found"
     return 0
   fi
+  
   if [ ! -f "$XMP_SCRIPT" ]; then
     echo "⚠️  XMP skipped ($dir): script not found at $XMP_SCRIPT"
     return 0
@@ -81,7 +91,7 @@ run_xmp_for_dir() {
 
   # Run the script quietly, capture errors separately
   if find "$dir" -type f -iname '*.png' -print0 \
-      | xargs -0 -r -n 50 "$VENV_PY" "$XMP_SCRIPT" >/dev/null 2>&1; then
+      | xargs -0 -r -n 50 "$python_exe" "$XMP_SCRIPT" >/dev/null 2>&1; then
     echo "📝 XMP: processed $png_count PNG(s) in $dir"
   else
     echo "⚠️  XMP: errors while processing $png_count PNG(s) in $dir"
