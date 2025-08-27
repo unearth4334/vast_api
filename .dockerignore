@@ -14,3 +14,9 @@ output.json
 *.log
 .DS_Store
 .dockerignore
+
+# Ignore secrets and host-mounted assets
+.ssh/
+api_key.txt
+*.pem
+*.key
