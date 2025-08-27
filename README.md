@@ -141,22 +141,45 @@ disk_size_gb: 100
 
 1. **Enable SSH and Container Station** on your QNAP
 2. **Copy project files** to your QNAP
-3. **Adjust volume mounts** in `docker-compose.yml` for your QNAP paths
-4. **Deploy**:
+3. **Setup SSH keys**:
    ```bash
-   docker-compose up -d
+   # Run the setup script to create SSH keys and configuration
+   ./setup_ssh.sh
+   ```
+4. **Create API key file**:
+   ```bash
+   echo "your_vast_api_key_here" > api_key.txt
+   ```
+5. **Adjust volume mounts** in `docker-compose.yml` for your QNAP paths
+6. **Deploy**:
+   ```bash
+   docker compose up -d
    ```
 
 ### QNAP Volume Mapping
 
-Update `docker-compose.yml` volumes for QNAP:
+The `docker-compose.yml` is pre-configured for QNAP with the following volume mappings:
 
 ```yaml
 volumes:
-  - /share/homes/admin/.ssh:/root/.ssh:ro
-  - /share/CACHEDEV1_DATA/SecretFolder:/mnt/qnap-sd/SecretFolder
+  # SSH files (project-local)
+  - ./.ssh/id_ed25519:/root/.ssh/id_ed25519:ro
+  - ./.ssh/id_ed25519.pub:/root/.ssh/id_ed25519.pub:ro
+  - ./.ssh/known_hosts:/root/.ssh/known_hosts:ro
+  - ./.ssh/config:/root/.ssh/config:ro
+  - ./.ssh/vast_known_hosts:/root/.ssh/vast_known_hosts
+
+  # QNAP media share (adjust path as needed)
+  - /share/sd/SecretFolder:/media
+
+  # VastAI API key
   - ./api_key.txt:/app/api_key.txt:ro
 ```
+
+**Important**: 
+- SSH files are stored locally in the project's `.ssh/` directory (run `./setup_ssh.sh` to create them)
+- Adjust `/share/sd/SecretFolder` to match your QNAP media share path
+- Container runs as `PUID=0` and `PGID=0` for media folder access
 
 ## Troubleshooting
 

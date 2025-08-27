@@ -94,4 +94,3 @@ $RECYCLE.BIN/
 
 # Everything in .ssh except the config file
 .ssh/*
-!.ssh/config
