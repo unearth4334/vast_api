@@ -11,23 +11,25 @@ XMP_SCRIPT=""
 SSH_OPTS=""
 UI_HOME_OVERRIDE=""
 
+# Ensure new files default to 0644, dirs to 0755 (group-readable)
+umask 022
+
 usage() {
   echo "Usage: $0 -p <ssh-port> [--host <ip-or-name>] [--UI_HOME <path>] [--cleanup] [--no-xmp] [--venv <path>] [--xmp-script <path>] [--ssh-opts \"<flags>\"]"
   exit 1
 }
 
-# Support flags
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -p)          REMOTE_PORT="${2:-}"; shift 2 ;;
-    --host)      REMOTE_HOST="${2:-}"; shift 2 ;;
-    --UI_HOME)   UI_HOME_OVERRIDE="${2:-}"; shift 2 ;;
-    --cleanup)   DO_CLEANUP=1; shift ;;
-    --no-xmp)    DO_XMP=0; shift ;;
-    --venv)      XMP_VENV="${2:-}"; shift 2 ;;
-    --xmp-script)XMP_SCRIPT="${2:-}"; shift 2 ;;
-    --ssh-opts)  SSH_OPTS="${2:-}"; shift 2 ;;
-    *)           usage ;;
+    -p)           REMOTE_PORT="${2:-}"; shift 2 ;;
+    --host)       REMOTE_HOST="${2:-}"; shift 2 ;;
+    --UI_HOME)    UI_HOME_OVERRIDE="${2:-}"; shift 2 ;;
+    --cleanup)    DO_CLEANUP=1; shift ;;
+    --no-xmp)     DO_XMP=0; shift ;;
+    --venv)       XMP_VENV="${2:-}"; shift 2 ;;
+    --xmp-script) XMP_SCRIPT="${2:-}"; shift 2 ;;
+    --ssh-opts)   SSH_OPTS="${2:-}"; shift 2 ;;
+    *)            usage ;;
   esac
 done
 
@@ -48,38 +50,60 @@ XMP_VENV="${XMP_VENV:-$DEFAULT_VENV}"
 XMP_SCRIPT="${XMP_SCRIPT:-$DEFAULT_XMP_SCRIPT}"
 VENV_PY="$XMP_VENV/bin/python"
 
-# Build SSH commands
-SSH_BASE=(ssh -p "$REMOTE_PORT")
+# Safer rsync flags for QNAP/eCryptfs:
+# - Do NOT preserve perms/owner/group/times; those caused "Bad address (14)" in the past
+RSYNC_FLAGS=(-rltD --delete --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --human-readable)
+if rsync --help 2>&1 | grep -q -- '--mkpath'; then
+  RSYNC_FLAGS+=(--mkpath)
+fi
+
+# SSH base
+SSH_BASE=(ssh -p "$REMOTE_PORT" -i "$SSH_KEY" -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
 if [[ -n "$SSH_OPTS" ]]; then SSH_BASE+=($SSH_OPTS); fi
 SSH_DEST="$REMOTE_USER@$REMOTE_HOST"
 SSH_CMD=("${SSH_BASE[@]}" "$SSH_DEST")
 
-# Helper: run xmp tool for a directory (creates .xmp for *.png)
+# ----------- HELPERS -----------
+# Post-pass normalize: make files 0644 and dirs 0755 without tripping eCryptfs quirks.
+normalize_permissions() {
+  local path="$1"
+
+  # First try chmod quietly; if it fails, we fallback to install(1) trick for files.
+  # Normalize directories (chmod tends to be less problematic for dirs).
+  find "$path" -type d ! -perm -0755 -exec chmod 0755 {} + 2>/dev/null || true
+
+  # Try chmod for files; if any fail, we repair those specific ones via install -m
+  # Gather files that still aren't 0644
+  mapfile -d '' not_ok < <(find "$path" -type f ! -perm -0644 -print0 2>/dev/null || true)
+  if ((${#not_ok[@]})); then
+    # Attempt chmod; failures will remain not 0644 and get fixed below
+    chmod -f 0644 "${not_ok[@]}" 2>/dev/null || true
+  fi
+
+  # Find any files still not 0644 and fix by copy-rename (atomic)
+  find "$path" -type f ! -perm -0644 -print0 2>/dev/null | while IFS= read -r -d '' f; do
+    tmp="${f}.tmp.$$"
+    # Preserve content/ownership by current user; set mode explicitly
+    # install is from coreutils (present on Debian/Ubuntu images)
+    if install -m 0644 -T -- "$f" "$tmp"; then
+      mv -f -- "$tmp" "$f" || rm -f -- "$tmp"
+    else
+      rm -f -- "$tmp" 2>/dev/null || true
+    fi
+  done
+}
+
+# XMP tool
 run_xmp_for_dir() {
   local dir="$1"
+  [[ "$DO_XMP" -eq 1 ]] || return 0
+  [[ -x "$VENV_PY" ]] || { echo "⚠️  XMP skipped ($dir): venv python not found at $VENV_PY"; return 0; }
+  [[ -f "$XMP_SCRIPT" ]] || { echo "⚠️  XMP skipped ($dir): script not found at $XMP_SCRIPT"; return 0; }
 
-  if [[ "$DO_XMP" -ne 1 ]]; then
-    return 0
-  fi
-  if [ ! -x "$VENV_PY" ]; then
-    echo "⚠️  XMP skipped ($dir): venv python not found at $VENV_PY"
-    return 0
-  fi
-  if [ ! -f "$XMP_SCRIPT" ]; then
-    echo "⚠️  XMP skipped ($dir): script not found at $XMP_SCRIPT"
-    return 0
-  fi
-
-  # Count PNG files
   local png_count
   png_count=$(find "$dir" -type f -iname '*.png' | wc -l)
+  [[ "$png_count" -gt 0 ]] || { echo "📝 XMP: no PNGs in $dir"; return 0; }
 
-  if [[ "$png_count" -eq 0 ]]; then
-    echo "📝 XMP: no PNGs in $dir"
-    return 0
-  fi
-
-  # Run the script quietly, capture errors separately
   if find "$dir" -type f -iname '*.png' -print0 \
       | xargs -0 -r -n 50 "$VENV_PY" "$XMP_SCRIPT" >/dev/null 2>&1; then
     echo "📝 XMP: processed $png_count PNG(s) in $dir"
@@ -91,7 +115,7 @@ run_xmp_for_dir() {
 # -------------------------------------
 
 echo "🔗 Remote: $SSH_DEST  (port $REMOTE_PORT)"
-if [[ -n "$SSH_OPTS" ]]; then echo "   SSH extra opts: $SSH_OPTS"; fi
+[[ -n "$SSH_OPTS" ]] && echo "   SSH extra opts: $SSH_OPTS"
 
 # Start ssh-agent and add key
 eval "$(ssh-agent -s)"
@@ -131,7 +155,6 @@ for folder in "${FOLDERS[@]}"; do
   fi
 
   remote_subdirs="$("${SSH_CMD[@]}" "find \"$REMOTE_BASE/$folder\" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null || true")"
-
   if [ -z "$remote_subdirs" ]; then
     echo "⚠️  No subfolders found in $folder — skipping."
     continue
@@ -149,12 +172,16 @@ for folder in "${FOLDERS[@]}"; do
     fi
 
     echo "🔄 Syncing files"
-    RSYNC_SSH=(ssh -p "$REMOTE_PORT")
-    if [[ -n "$SSH_OPTS" ]]; then RSYNC_SSH+=($SSH_OPTS); fi
+    RSYNC_SSH=("${SSH_BASE[@]}")
 
-    rsync -av --progress -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
+    rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
       "$SSH_DEST:$remote_path" "$local_path/"
 
+    # Normalize permissions so SMB users can read
+    echo "🛡  Normalizing permissions under: $local_path"
+    normalize_permissions "$local_path"
+
+    # XMP sidecar generation
     run_xmp_for_dir "$local_path"
   done
 done
@@ -163,14 +190,12 @@ done
 if [[ "$DO_CLEANUP" -eq 1 ]]; then
   CUTOFF_DATE="$(date -d '2 days ago' +%F)"
   echo "🧹 Cleanup enabled. Deleting remote dated folders older than $CUTOFF_DATE ..."
-
   for folder in "${FOLDERS[@]}"; do
     REMOTE_DIR_EXISTS="$("${SSH_CMD[@]}" "[ -d \"$REMOTE_BASE/$folder\" ] && echo yes || echo no" || true)"
     if [[ "$REMOTE_DIR_EXISTS" != "yes" ]]; then
       echo "   • Skipping $folder (remote folder not found)"
       continue
     fi
-
     echo "   • Scanning $folder ..."
     "${SSH_CMD[@]}" "
       set -eu

@@ -155,6 +155,94 @@ class TestSyncAPI(unittest.TestCase):
         self.assertFalse(data['success'])
         self.assertIn('configuration files not found', data['message'])
 
+    @patch('sync_api.SSHTester')
+    def test_ssh_test_endpoint_success(self, mock_ssh_tester):
+        """Test SSH test endpoint with successful connections"""
+        mock_instance = MagicMock()
+        mock_instance.test_all_hosts.return_value = {
+            'summary': {
+                'total_hosts': 2,
+                'successful': 2,
+                'failed': 0,
+                'success_rate': '100.0%'
+            },
+            'results': {
+                'forge': {
+                    'host': 'forge',
+                    'success': True,
+                    'message': 'Connection successful'
+                },
+                'comfy': {
+                    'host': 'comfy',
+                    'success': True,
+                    'message': 'Connection successful'
+                }
+            }
+        }
+        mock_ssh_tester.return_value = mock_instance
+
+        response = self.app.post('/test/ssh')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertIn('summary', data)
+        self.assertIn('results', data)
+        self.assertEqual(data['summary']['total_hosts'], 2)
+        self.assertEqual(data['summary']['successful'], 2)
+
+    @patch('sync_api.SSHTester')
+    def test_ssh_test_endpoint_partial_failure(self, mock_ssh_tester):
+        """Test SSH test endpoint with partial failures"""
+        mock_instance = MagicMock()
+        mock_instance.test_all_hosts.return_value = {
+            'summary': {
+                'total_hosts': 2,
+                'successful': 1,
+                'failed': 1,
+                'success_rate': '50.0%'
+            },
+            'results': {
+                'forge': {
+                    'host': 'forge',
+                    'success': True,
+                    'message': 'Connection successful'
+                },
+                'comfy': {
+                    'host': 'comfy',
+                    'success': False,
+                    'message': 'Connection failed',
+                    'error': 'Connection timeout'
+                }
+            }
+        }
+        mock_ssh_tester.return_value = mock_instance
+
+        response = self.app.post('/test/ssh')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])  # Endpoint succeeded even with partial failures
+        self.assertEqual(data['summary']['successful'], 1)
+        self.assertEqual(data['summary']['failed'], 1)
+
+    def test_ssh_test_endpoint_unavailable(self):
+        """Test SSH test endpoint when SSHTester is not available"""
+        # Temporarily replace SSHTester with None
+        original_ssh_tester = getattr(__import__('sync_api'), 'SSHTester', None)
+        setattr(__import__('sync_api'), 'SSHTester', None)
+        
+        try:
+            response = self.app.post('/test/ssh')
+            self.assertEqual(response.status_code, 200)
+            
+            data = json.loads(response.data)
+            self.assertFalse(data['success'])
+            self.assertIn('SSH test functionality not available', data['message'])
+        finally:
+            # Restore original SSHTester
+            setattr(__import__('sync_api'), 'SSHTester', original_ssh_tester)
+
 
 if __name__ == '__main__':
     unittest.main()
