@@ -94,3 +94,6 @@ $RECYCLE.BIN/
 
 # Everything in .ssh except the config file
 .ssh/*
+
+# Temporary sync progress files
+/tmp/sync_progress_*.json
