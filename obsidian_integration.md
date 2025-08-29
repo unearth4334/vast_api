@@ -2,6 +2,12 @@
 
 This file contains example code for integrating the Media Sync Tool with Obsidian notes using dataviewjs.
 
+## Setup Instructions
+
+1. **Enable the CSS snippet**: Copy the `sync_api.css` file to your Obsidian vault's `.obsidian/snippets/` folder and enable it in Settings > Appearance > CSS snippets.
+
+2. **Copy this dataviewjs code** to any Obsidian note where you want the sync interface.
+
 ## Simple Button Interface
 
 Add this code block to any Obsidian note:
@@ -12,12 +18,14 @@ const API_BASE = "http://10.0.78.66:5000"; // Replace with your QNAP NAS IP
 
 // Create container for buttons
 const container = dv.el("div", "", {
+    class: "sync-tool-container",
     style: "margin: 20px 0; padding: 15px; border-radius: 8px; background-color: #f5f5f5;"
 });
 
 // Add title
 dv.el("h3", "🔄 Media Sync Tool", { 
     container: container,
+    class: "sync-tool-title",
     style: "margin-top: 0; color: #333;"
 });
 
@@ -40,108 +48,10 @@ const syncOperations = [
     }
 ];
 
-// Create buttons
-syncOperations.forEach(operation => {
-    const buttonContainer = dv.el("div", "", {
-        container: container,
-        style: "margin: 10px 0;"
-    });
-    
-    const button = dv.el("button", operation.name, {
-        container: buttonContainer,
-        style: `
-            background: #007cba; 
-            color: white; 
-            border: none; 
-            padding: 10px 20px; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            margin-right: 10px;
-            font-size: 14px;
-        `
-    });
-    
-    const status = dv.el("span", "", {
-        container: buttonContainer,
-        style: "margin-left: 10px; font-style: italic; color: #666;"
-    });
-    
-    dv.el("br", "", { container: buttonContainer });
-    dv.el("small", operation.description, {
-        container: buttonContainer,
-        style: "color: #888; margin-left: 5px;"
-    });
-    
-    // Add click handler
-    button.addEventListener("click", async () => {
-        const originalText = button.textContent;
-        button.textContent = "Syncing...";
-        button.style.background = "#ffa500";
-        status.textContent = "Starting sync operation...";
-        
-        // Show progress pane
-        progressPane.style.display = "block";
-        progressTitle.textContent = `Progress: ${operation.name}`;
-        
-        try {
-            const response = await fetch(API_BASE + operation.endpoint, { 
-                method: "POST",
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            const data = await response.json();
-            
-            if (data.success) {
-                button.style.background = "#28a745";
-                button.textContent = "✅ Success";
-                status.textContent = data.message;
-                if (data.instance_info) {
-                    status.textContent += ` (Instance: ${data.instance_info.id})`;
-                }
-                
-                // Start polling for progress if sync_id is available
-                if (data.sync_id) {
-                    pollProgress(data.sync_id, button, status, originalText);
-                } else {
-                    // Hide progress pane after 3 seconds
-                    setTimeout(() => {
-                        progressPane.style.display = "none";
-                    }, 3000);
-                }
-            } else {
-                button.style.background = "#dc3545";
-                button.textContent = "❌ Failed";
-                status.textContent = data.message || "Sync failed";
-                
-                // Hide progress pane on error
-                setTimeout(() => {
-                    progressPane.style.display = "none";
-                }, 3000);
-            }
-        } catch (error) {
-            button.style.background = "#dc3545";
-            button.textContent = "❌ Error";
-            status.textContent = `Request failed: ${error.message}`;
-            
-            // Hide progress pane on error
-            setTimeout(() => {
-                progressPane.style.display = "none";
-            }, 3000);
-        }
-        
-        // Reset button after 5 seconds
-        setTimeout(() => {
-            button.textContent = originalText;
-            button.style.background = "#007cba";
-            status.textContent = "";
-        }, 5000);
-    });
-});
-
-// Add progress pane
+// Add progress pane (must be defined before the button handlers)
 const progressPane = dv.el("div", "", {
     container: container,
+    class: "sync-progress-pane",
     style: `
         margin-top: 20px; 
         padding: 15px; 
@@ -154,11 +64,13 @@ const progressPane = dv.el("div", "", {
 
 const progressTitle = dv.el("h4", "Progress", {
     container: progressPane,
+    class: "sync-progress-title",
     style: "margin-top: 0; margin-bottom: 10px; color: #333;"
 });
 
 const progressBar = dv.el("div", "", {
     container: progressPane,
+    class: "sync-progress-bar-container",
     style: `
         width: 100%; 
         height: 20px; 
@@ -171,6 +83,7 @@ const progressBar = dv.el("div", "", {
 
 const progressFill = dv.el("div", "", {
     container: progressBar,
+    class: "sync-progress-bar-fill",
     style: `
         height: 100%; 
         background-color: #007cba; 
@@ -182,15 +95,17 @@ const progressFill = dv.el("div", "", {
 
 const progressText = dv.el("div", "Initializing...", {
     container: progressPane,
+    class: "sync-progress-text",
     style: "font-size: 12px; color: #666; margin-bottom: 8px;"
 });
 
 const progressDetails = dv.el("div", "", {
     container: progressPane,
+    class: "sync-progress-details",
     style: "font-size: 11px; color: #888;"
 });
 
-// Progress polling function
+// Progress polling function (must be defined before the button handlers)
 function pollProgress(syncId, button, status, originalText) {
     let pollCount = 0;
     const maxPolls = 60; // 5 minutes at 5-second intervals
@@ -269,14 +184,127 @@ function pollProgress(syncId, button, status, originalText) {
     poll();
 }
 
+// Create buttons
+syncOperations.forEach(operation => {
+    const buttonContainer = dv.el("div", "", {
+        container: container,
+        class: "sync-button-container",
+        style: "margin: 10px 0;"
+    });
+    
+    const button = dv.el("button", operation.name, {
+        container: buttonContainer,
+        class: "sync-button",
+        style: `
+            background: #007cba; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin-right: 10px;
+            font-size: 14px;
+        `
+    });
+    
+    const status = dv.el("span", "", {
+        container: buttonContainer,
+        class: "sync-status",
+        style: "margin-left: 10px; font-style: italic; color: #666;"
+    });
+    
+    dv.el("br", "", { container: buttonContainer });
+    dv.el("small", operation.description, {
+        container: buttonContainer,
+        class: "sync-description",
+        style: "color: #888; margin-left: 5px;"
+    });
+    
+    // Add click handler
+    button.addEventListener("click", async () => {
+        const originalText = button.textContent;
+        button.textContent = "Syncing...";
+        button.className = "sync-button syncing";
+        button.style.background = "#ffa500";
+        status.textContent = "Starting sync operation...";
+        
+        // Show progress pane
+        progressPane.style.display = "block";
+        progressTitle.textContent = `Progress: ${operation.name}`;
+        progressFill.style.width = "0%";
+        progressText.textContent = "Initializing...";
+        progressDetails.textContent = "";
+        
+        try {
+            const response = await fetch(API_BASE + operation.endpoint, { 
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                button.className = "sync-button success";
+                button.style.background = "#28a745";
+                button.textContent = "✅ Success";
+                status.textContent = data.message;
+                if (data.instance_info) {
+                    status.textContent += ` (Instance: ${data.instance_info.id})`;
+                }
+                
+                // Start polling for progress if sync_id is available
+                if (data.sync_id) {
+                    pollProgress(data.sync_id, button, status, originalText);
+                } else {
+                    // Hide progress pane after 3 seconds
+                    setTimeout(() => {
+                        progressPane.style.display = "none";
+                    }, 3000);
+                }
+            } else {
+                button.className = "sync-button error";
+                button.style.background = "#dc3545";
+                button.textContent = "❌ Failed";
+                status.textContent = data.message || "Sync failed";
+                
+                // Hide progress pane on error
+                setTimeout(() => {
+                    progressPane.style.display = "none";
+                }, 3000);
+            }
+        } catch (error) {
+            button.className = "sync-button error";
+            button.style.background = "#dc3545";
+            button.textContent = "❌ Error";
+            status.textContent = `Request failed: ${error.message}`;
+            
+            // Hide progress pane on error
+            setTimeout(() => {
+                progressPane.style.display = "none";
+            }, 3000);
+        }
+        
+        // Reset button after 5 seconds
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.className = "sync-button";
+            button.style.background = "#007cba";
+            status.textContent = "";
+        }, 5000);
+    });
+});
+
 // Add status check
 const statusContainer = dv.el("div", "", {
     container: container,
+    class: "sync-status-container",
     style: "margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;"
 });
 
 const statusButton = dv.el("button", "🔍 Check Status", {
     container: statusContainer,
+    class: "sync-status-button",
     style: `
         background: #6c757d; 
         color: white; 
@@ -290,6 +318,7 @@ const statusButton = dv.el("button", "🔍 Check Status", {
 
 const statusText = dv.el("div", "", {
     container: statusContainer,
+    class: "sync-status-text",
     style: "margin-top: 10px; font-size: 12px; color: #666;"
 });
 
@@ -314,4 +343,20 @@ statusButton.addEventListener("click", async () => {
     }
 });
 ```
+
+## CSS Snippet
+
+For the best visual experience, add the `sync_api.css` file as a CSS snippet in your Obsidian vault:
+
+1. Copy the `sync_api.css` file to your vault's `.obsidian/snippets/` folder
+2. Go to Settings > Appearance > CSS snippets
+3. Toggle on the "sync_api" snippet
+4. The interface will automatically use proper theme colors and responsive design
+
+The CSS snippet provides:
+- Theme-aware colors (light/dark mode support)
+- Animated progress bars with moving stripes
+- Responsive design for mobile devices
+- Accessibility features (focus indicators)
+- Smooth transitions and loading animations
 
