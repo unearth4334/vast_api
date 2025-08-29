@@ -1,0 +1,83 @@
+/* === Media Sync Loading Bar (theme-aware) === */
+
+.msync-bar {
+    position: relative;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--background-modifier-border);
+    overflow: hidden;
+}
+
+.msync-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--interactive-accent);
+    transition: width .25s ease;
+}
+
+/* Running (adds subtle diagonal stripes) */
+.msync-fill.is-running {
+    --msync-stripe-size: 16px;
+    --msync-stripe-alpha: 0.18;
+    background-image:
+    repeating-linear-gradient(
+        45deg,
+        rgba(255,255,255,var(--msync-stripe-alpha)) 0,
+                              rgba(255,255,255,var(--msync-stripe-alpha)) calc(var(--msync-stripe-size) / 2),
+                              transparent calc(var(--msync-stripe-size) / 2),
+                              transparent var(--msync-stripe-size)
+    );
+    animation: msync-stripes 1s linear infinite;
+}
+@keyframes msync-stripes {
+    from { background-position: 0 0; }
+    to   { background-position: var(--msync-stripe-size) 0; }
+}
+
+/* Indeterminate shimmer */
+.msync-fill.is-indeterminate {
+    position: relative;
+    background: transparent;           /* base hidden; we animate the ::after */
+}
+.msync-fill.is-indeterminate::after {
+    content: "";
+    position: absolute;
+    left: -30%;
+    top: 0; bottom: 0;
+    width: 30%;
+    border-radius: 999px;
+    background: var(--interactive-accent);
+    animation: msync-indet 1.1s ease-in-out infinite;
+}
+@keyframes msync-indet {
+    0%   { left: -30%; width: 30%; opacity: 0.85; }
+    50%  { left: 35%;  width: 45%; opacity: 1.0; }
+    100% { left: 100%; width: 30%; opacity: 0.85; }
+}
+
+/* Completed state (subtle success tint) */
+.msync-fill.is-complete {
+    background: linear-gradient(
+        90deg,
+        var(--interactive-accent) 0%,
+                                color-mix(in oklab, var(--interactive-accent) 80%, #00c853) 100%
+    );
+    animation: none;
+}
+
+/* Error state (use theme's error if available; otherwise red) */
+.msync-fill.is-error {
+    background:
+    repeating-linear-gradient(
+        45deg,
+        color-mix(in oklab, var(--text-error, #ff4d4f) 85%, black 0%) 0 8px,
+                              color-mix(in oklab, var(--text-error, #ff4d4f) 65%, black 0%) 8px 16px
+    );
+    animation: none;
+}
+
+/* High-contrast mode support (optional) */
+@media (prefers-contrast: more) {
+    .msync-bar { outline: 1px solid var(--background-modifier-border-hover); }
+    .msync-fill.is-indeterminate::after { opacity: 1; }
+}
