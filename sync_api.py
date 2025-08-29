@@ -521,6 +521,55 @@ def status():
         'vastai': vastai_status
     })
 
+# --- add with the other imports ---
+import glob
+from datetime import datetime
+
+# --- helper: load json safely ---
+def _load_json(path):
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+# --- helper: pick latest, preferring running/starting ---
+def _find_latest_progress():
+    files = sorted(glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True)
+    if not files:
+        return None, None
+    # prefer first file whose status != completed/error
+    for fp in files:
+        data = _load_json(fp)
+        if data and data.get("status") not in ("completed", "error"):
+            return os.path.basename(fp)[len("sync_progress_"):-5], data
+    # otherwise return newest by mtime
+    newest = files[0]
+    return os.path.basename(newest)[len("sync_progress_"):-5], _load_json(newest)
+
+@app.route("/sync/latest")
+def sync_latest():
+    """Return the most recent (prefer running) sync progress + id"""
+    sync_id, data = _find_latest_progress()
+    if not sync_id or not data:
+        return jsonify({"success": False, "message": "No progress files found"}), 404
+    return jsonify({"success": True, "sync_id": sync_id, "progress": data})
+
+@app.route("/sync/active")
+def sync_active():
+    """List all known progress files with brief status for debugging/menus"""
+    out = []
+    for fp in sorted(glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True):
+        data = _load_json(fp) or {}
+        out.append({
+            "sync_id": os.path.basename(fp)[len("sync_progress_"):-5],
+            "status": data.get("status"),
+            "progress_percent": data.get("progress_percent"),
+            "last_update": data.get("last_update"),
+        })
+    return jsonify({"success": True, "items": out})
+
+
 if __name__ == '__main__':
     # Check if sync script exists
     if not os.path.exists(SYNC_SCRIPT_PATH):
