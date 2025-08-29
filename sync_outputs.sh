@@ -10,12 +10,14 @@ XMP_VENV=""
 XMP_SCRIPT=""
 SSH_OPTS=""
 UI_HOME_OVERRIDE=""
+SYNC_ID=""
+PROGRESS_FILE=""
 
 # Ensure new files default to 0644, dirs to 0755 (group-readable)
 umask 022
 
 usage() {
-  echo "Usage: $0 -p <ssh-port> [--host <ip-or-name>] [--UI_HOME <path>] [--cleanup] [--no-xmp] [--venv <path>] [--xmp-script <path>] [--ssh-opts \"<flags>\"]"
+  echo "Usage: $0 -p <ssh-port> [--host <ip-or-name>] [--UI_HOME <path>] [--cleanup] [--no-xmp] [--venv <path>] [--xmp-script <path>] [--ssh-opts \"<flags>\"] [--sync-id <id>]"
   exit 1
 }
 
@@ -29,6 +31,7 @@ while [[ $# -gt 0 ]]; do
     --venv)       XMP_VENV="${2:-}"; shift 2 ;;
     --xmp-script) XMP_SCRIPT="${2:-}"; shift 2 ;;
     --ssh-opts)   SSH_OPTS="${2:-}"; shift 2 ;;
+    --sync-id)    SYNC_ID="${2:-}"; shift 2 ;;
     *)            usage ;;
   esac
 done
@@ -36,6 +39,81 @@ done
 if [ -z "$REMOTE_PORT" ]; then
   echo "❌ Port not specified."; usage
 fi
+
+# Set up progress tracking
+if [[ -n "$SYNC_ID" ]]; then
+  PROGRESS_FILE="/tmp/sync_progress_${SYNC_ID}.json"
+  # Initialize progress file
+  cat > "$PROGRESS_FILE" << EOF
+{
+  "sync_id": "$SYNC_ID",
+  "status": "starting",
+  "current_stage": "initialization",
+  "progress_percent": 0,
+  "total_folders": 0,
+  "completed_folders": 0,
+  "current_folder": "",
+  "messages": [],
+  "start_time": "$(date -Iseconds)",
+  "last_update": "$(date -Iseconds)"
+}
+EOF
+fi
+
+# Progress update function
+update_progress() {
+  if [[ -n "$PROGRESS_FILE" && -f "$PROGRESS_FILE" ]]; then
+    local stage="$1"
+    local percent="$2"
+    local message="$3"
+    local current_folder="${4:-}"
+    
+    # Create a temporary file to update progress atomically
+    local temp_file="${PROGRESS_FILE}.tmp"
+    
+    # Read current progress, update it, and write back
+    python3 -c "
+import json
+import sys
+from datetime import datetime
+
+try:
+    with open('$PROGRESS_FILE', 'r') as f:
+        data = json.load(f)
+except:
+    data = {
+        'sync_id': '$SYNC_ID',
+        'status': 'running',
+        'messages': [],
+        'start_time': datetime.now().isoformat()
+    }
+
+data['current_stage'] = '$stage'
+data['progress_percent'] = $percent
+data['last_update'] = datetime.now().isoformat()
+data['status'] = 'running'
+
+if '$current_folder':
+    data['current_folder'] = '$current_folder'
+
+if '$message':
+    data['messages'].append({
+        'timestamp': datetime.now().isoformat(),
+        'message': '$message'
+    })
+    # Keep only last 20 messages
+    data['messages'] = data['messages'][-20:]
+
+with open('$temp_file', 'w') as f:
+    json.dump(data, f, indent=2)
+" 2>/dev/null || true
+
+    # Atomically replace the progress file
+    if [[ -f "$temp_file" ]]; then
+      mv "$temp_file" "$PROGRESS_FILE"
+    fi
+  fi
+}
 
 # ----------- CONFIGURATION -----------
 REMOTE_USER=root
@@ -140,46 +218,88 @@ run_xmp_for_dir() {
 echo "🔗 Remote: $SSH_DEST  (port $REMOTE_PORT)"
 [[ -n "$SSH_OPTS" ]] && echo "   SSH extra opts: $SSH_OPTS"
 
+update_progress "ssh_setup" 5 "Setting up SSH connection"
+
 # Start ssh-agent and add key
 eval "$(ssh-agent -s)"
 ssh-add "$SSH_KEY" || { echo "❌ Failed to add SSH key. Exiting."; exit 1; }
+
+update_progress "remote_discovery" 10 "Discovering remote UI_HOME"
 
 # ----------- GET UI_HOME FROM REMOTE (or override) -----------
 if [[ -n "$UI_HOME_OVERRIDE" ]]; then
   UI_HOME="$UI_HOME_OVERRIDE"
   echo "📍 Using UI_HOME override: $UI_HOME"
+  update_progress "remote_discovery" 15 "Using UI_HOME override: $UI_HOME"
 else
   UI_HOME="$("${SSH_CMD[@]}" 'source /etc/environment 2>/dev/null || true; echo "${UI_HOME:-}"' || true)"
   if [ -z "$UI_HOME" ]; then
     echo "❌ Failed to retrieve UI_HOME from remote environment. Use --UI_HOME to specify it manually."
+    update_progress "error" 0 "Failed to retrieve UI_HOME from remote"
     exit 1
   fi
   echo "📍 Retrieved UI_HOME from remote: $UI_HOME"
+  update_progress "remote_discovery" 15 "Retrieved UI_HOME: $UI_HOME"
 fi
 
 # Detect outputs dir
 OUTPUT_DIR="$("${SSH_CMD[@]}" "if [ -d \"$UI_HOME/output\" ]; then echo output; elif [ -d \"$UI_HOME/outputs\" ]; then echo outputs; else echo ''; fi" || true)"
 if [ -z "$OUTPUT_DIR" ]; then
   echo "❌ Could not find 'output' or 'outputs' directory under $UI_HOME on the remote."
+  update_progress "error" 0 "Could not find output directory"
   exit 1
 fi
 
 REMOTE_BASE="$UI_HOME/$OUTPUT_DIR"
 echo "📁 Using remote output path: $REMOTE_BASE"
+update_progress "folder_discovery" 20 "Found remote output path: $REMOTE_BASE"
 
 # ----------- SYNC FOLDERS -----------
+# Count total folders to sync
+total_folders=0
+for folder in "${FOLDERS[@]}"; do
+  REMOTE_DIR_EXISTS="$("${SSH_CMD[@]}" "[ -d \"$REMOTE_BASE/$folder\" ] && echo yes || echo no" || true)"
+  if [[ "$REMOTE_DIR_EXISTS" == "yes" ]]; then
+    remote_subdirs="$("${SSH_CMD[@]}" "find \"$REMOTE_BASE/$folder\" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null || true")"
+    if [ -n "$remote_subdirs" ]; then
+      total_folders=$((total_folders + $(echo "$remote_subdirs" | wc -l)))
+    fi
+  fi
+done
+
+# Update progress file with total folders
+if [[ -n "$PROGRESS_FILE" && -f "$PROGRESS_FILE" ]]; then
+  python3 -c "
+import json
+try:
+    with open('$PROGRESS_FILE', 'r') as f:
+        data = json.load(f)
+    data['total_folders'] = $total_folders
+    with open('$PROGRESS_FILE', 'w') as f:
+        json.dump(data, f, indent=2)
+except:
+    pass
+" 2>/dev/null || true
+fi
+
+update_progress "sync_folders" 25 "Starting folder sync (found $total_folders folders)"
+
+completed_folders=0
 for folder in "${FOLDERS[@]}"; do
   echo "📁 Checking: $folder"
+  update_progress "sync_folders" $((25 + (completed_folders * 60 / total_folders))) "Checking folder: $folder" "$folder"
 
   REMOTE_DIR_EXISTS="$("${SSH_CMD[@]}" "[ -d \"$REMOTE_BASE/$folder\" ] && echo yes || echo no" || true)"
   if [[ "$REMOTE_DIR_EXISTS" != "yes" ]]; then
     echo "⚠️  Remote folder missing: $REMOTE_BASE/$folder — skipping."
+    update_progress "sync_folders" $((25 + (completed_folders * 60 / total_folders))) "Remote folder missing: $folder" "$folder"
     continue
   fi
 
   remote_subdirs="$("${SSH_CMD[@]}" "find \"$REMOTE_BASE/$folder\" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null || true")"
   if [ -z "$remote_subdirs" ]; then
     echo "⚠️  No subfolders found in $folder — skipping."
+    update_progress "sync_folders" $((25 + (completed_folders * 60 / total_folders))) "No subfolders in: $folder" "$folder"
     continue
   fi
 
@@ -195,6 +315,8 @@ for folder in "${FOLDERS[@]}"; do
     fi
 
     echo "🔄 Syncing files"
+    update_progress "sync_folders" $((25 + (completed_folders * 60 / total_folders))) "Syncing: $folder/$subdir" "$folder"
+    
     RSYNC_SSH=("${SSH_BASE[@]}")
 
     rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
@@ -206,11 +328,29 @@ for folder in "${FOLDERS[@]}"; do
 
     # XMP sidecar generation
     run_xmp_for_dir "$local_path"
+    
+    completed_folders=$((completed_folders + 1))
+    
+    # Update progress file with completed folders
+    if [[ -n "$PROGRESS_FILE" && -f "$PROGRESS_FILE" ]]; then
+      python3 -c "
+import json
+try:
+    with open('$PROGRESS_FILE', 'r') as f:
+        data = json.load(f)
+    data['completed_folders'] = $completed_folders
+    with open('$PROGRESS_FILE', 'w') as f:
+        json.dump(data, f, indent=2)
+except:
+    pass
+" 2>/dev/null || true
+    fi
   done
 done
 
 # ----------- OPTIONAL REMOTE CLEANUP -----------
 if [[ "$DO_CLEANUP" -eq 1 ]]; then
+  update_progress "cleanup" 90 "Starting remote cleanup"
   CUTOFF_DATE="$(date -d '2 days ago' +%F)"
   echo "🧹 Cleanup enabled. Deleting remote dated folders older than $CUTOFF_DATE ..."
   for folder in "${FOLDERS[@]}"; do
@@ -237,7 +377,30 @@ if [[ "$DO_CLEANUP" -eq 1 ]]; then
     " || true
   done
   echo "✅ Cleanup complete."
+  update_progress "cleanup" 95 "Remote cleanup completed"
 fi
 
+# ----------- COMPLETION -----------
+update_progress "complete" 100 "Sync completed successfully"
+
 # ----------- CLEANUP -----------
+# Mark sync as completed in progress file
+if [[ -n "$PROGRESS_FILE" && -f "$PROGRESS_FILE" ]]; then
+  python3 -c "
+import json
+from datetime import datetime
+try:
+    with open('$PROGRESS_FILE', 'r') as f:
+        data = json.load(f)
+    data['status'] = 'completed'
+    data['end_time'] = datetime.now().isoformat()
+    data['current_stage'] = 'complete'
+    data['progress_percent'] = 100
+    with open('$PROGRESS_FILE', 'w') as f:
+        json.dump(data, f, indent=2)
+except:
+    pass
+" 2>/dev/null || true
+fi
+
 ssh-agent -k

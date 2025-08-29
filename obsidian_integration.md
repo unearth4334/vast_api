@@ -1,10 +1,3 @@
-# Obsidian DataviewJS Integration
-
-This file contains example code for integrating the Media Sync Tool with Obsidian notes using dataviewjs.
-
-## Simple Button Interface
-
-Add this code block to any Obsidian note:
 
 ```dataviewjs
 // Configure your API server address
@@ -159,5 +152,132 @@ statusButton.addEventListener("click", async () => {
         statusText.textContent = `Status check failed: ${error.message}`;
     }
 });
+```
+## Progress
+---
+
+```dataviewjs
+// === Media Sync — Auto Attach + Loading Bar ===
+// Adjust to your NAS API:
+const API_BASE = "http://10.0.78.66:5000";
+
+// --- UI shell ---
+const wrap = dv.el("div","",{style:"padding:12px;border:1px solid var(--background-modifier-border);border-radius:10px"});
+const title = dv.el("div","🔄 Media Sync — Auto Attach",{container:wrap,style:"font-weight:600;margin-bottom:8px"});
+const meta  = dv.el("div","",{container:wrap,style:"font-size:12px;color:var(--text-muted);margin-bottom:8px"});
+
+// Loading bar
+const bar   = dv.el("div","",{container:wrap});
+bar.classList.add("msync-bar");                  // styled by CSS snippet
+const fill  = dv.el("div","",{container:bar});
+fill.classList.add("msync-fill");                // styled by CSS snippet
+fill.setAttribute("role","progressbar");
+fill.setAttribute("aria-valuemin","0");
+fill.setAttribute("aria-valuemax","100");
+
+// Optional small status line (last message)
+const status = dv.el("div","",{container:wrap,style:"margin-top:8px;font-size:12px;color:var(--text-normal)"});
+
+// --- logic ---
+let currentId = null;
+let stopped = false;
+
+async function getLatest() {
+  const r = await fetch(`${API_BASE}/sync/latest`);
+  const j = await r.json();
+  if (!j.success) throw new Error(j.message || "no latest");
+  return j; // { success, sync_id, progress }
+}
+
+async function getProgress(id){
+  try{
+    const r = await fetch(`${API_BASE}/sync/progress/${id}`);
+    const j = await r.json();
+    if (!j.success || !j.progress) return null;
+    return j.progress;
+  }catch(e){ return null; }
+}
+
+function setIndeterminate(on=true){
+  if (on){
+    fill.classList.add("is-indeterminate");
+    fill.removeAttribute("aria-valuenow");
+    fill.style.width = "0%";
+  } else {
+    fill.classList.remove("is-indeterminate");
+  }
+}
+
+function setDeterminate(pct){
+  setIndeterminate(false);
+  const clamped = Math.max(0, Math.min(100, Number(pct)||0));
+  fill.style.width = `${clamped}%`;
+  fill.setAttribute("aria-valuenow", String(clamped));
+}
+
+function setState(statusText, pct, stage, lastMsg){
+  title.textContent = `🔄 Media Sync — ${currentId ? `Tracking ${currentId.slice(0,8)}…` : "Idle"}`;
+
+  // Choose determinate vs indeterminate
+  if (Number.isFinite(pct)) {
+    setDeterminate(pct);
+  } else {
+    setIndeterminate(true);
+  }
+
+  // Style by status
+  fill.classList.remove("is-complete","is-error","is-running");
+  if (statusText === "completed" || (Number.isFinite(pct) && pct >= 100)) {
+    fill.classList.add("is-complete");
+  } else if (statusText === "error") {
+    fill.classList.add("is-error");
+  } else {
+    fill.classList.add("is-running");
+  }
+
+  // Text lines
+  const stageText = stage || "working";
+  const pctText = Number.isFinite(pct) ? `${Math.round(pct)}%` : "…";
+  const msg = lastMsg || "";
+  meta.textContent = `${stageText} • ${pctText}`;
+  status.textContent = msg;
+}
+
+async function loop(){
+  if (stopped) return;
+  try{
+    // 1) discover latest (prefers running)
+    const latest = await getLatest();
+    if (latest.sync_id !== currentId){
+      currentId = latest.sync_id;
+      // Reset visuals when switching runs
+      setIndeterminate(true);
+      status.textContent = "";
+    }
+
+    // 2) progress (use payload from /latest if present; otherwise fetch)
+    const p = latest.progress || await getProgress(currentId);
+
+    if (p){
+      const pct = Number.isFinite(p.progress_percent) ? p.progress_percent : undefined;
+      const last = (p.messages && p.messages.length) ? p.messages[p.messages.length-1].message : "";
+      setState(p.status, pct, p.current_stage, last);
+    } else {
+      setState("idle", undefined, "waiting", "No progress yet…");
+    }
+  } catch (e) {
+    setState("error", undefined, "error", e.message);
+  } finally {
+    setTimeout(loop, 2500);  // poll ~2.5s
+  }
+}
+
+setIndeterminate(true);
+loop();
+
+// Stop polling when note/pane is closed
+this.containerEl?.onunload?.(() => { stopped = true; });
+
+
 ```
 

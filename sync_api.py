@@ -7,6 +7,8 @@ Provides web API endpoints for syncing media from local Docker containers and Va
 import os
 import subprocess
 import logging
+import uuid
+import json
 from flask import Flask, jsonify, request  # request added for after_request hook
 from flask_cors import CORS
 from vast_manager import VastManager
@@ -62,12 +64,16 @@ COMFY_PORT = "2223"
 def run_sync(host, port, sync_type="unknown"):
     """Run the sync_outputs.sh script with specified host and port"""
     try:
-        logger.info(f"Starting {sync_type} sync to {host}:{port}")
+        # Generate unique sync ID
+        sync_id = str(uuid.uuid4())
+        
+        logger.info(f"Starting {sync_type} sync to {host}:{port} with ID {sync_id}")
 
         cmd = [
             'bash', SYNC_SCRIPT_PATH,
             '-p', port,
-            '--host', host
+            '--host', host,
+            '--sync-id', sync_id
         ]
 
         result = subprocess.run(
@@ -82,7 +88,8 @@ def run_sync(host, port, sync_type="unknown"):
             return {
                 'success': True,
                 'message': f'{sync_type} sync completed successfully',
-                'output': result.stdout
+                'output': result.stdout,
+                'sync_id': sync_id
             }
         else:
             logger.error(f"{sync_type} sync failed with return code {result.returncode}")
@@ -90,7 +97,8 @@ def run_sync(host, port, sync_type="unknown"):
                 'success': False,
                 'message': f'{sync_type} sync failed',
                 'error': result.stderr,
-                'output': result.stdout
+                'output': result.stdout,
+                'sync_id': sync_id
             }
 
     except subprocess.TimeoutExpired:
@@ -151,13 +159,32 @@ def index():
         <button class="button" onclick="testSSH()">🔧 Test SSH Connectivity</button>
         
         <div id="result" class="result"></div>
+        <div id="progress" style="display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+            <h3 style="margin-top: 0;">Sync Progress</h3>
+            <div style="width: 100%; height: 20px; background: #e9ecef; border-radius: 10px; margin: 10px 0;">
+                <div id="progressBar" style="height: 100%; background: #007cba; width: 0%; border-radius: 10px; transition: width 0.3s;"></div>
+            </div>
+            <div id="progressText">Initializing...</div>
+            <div id="progressDetails" style="font-size: 12px; color: #666; margin-top: 5px;"></div>
+        </div>
         
         <script>
             async function sync(type) {
                 const resultDiv = document.getElementById('result');
+                const progressDiv = document.getElementById('progress');
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+                const progressDetails = document.getElementById('progressDetails');
+                
                 resultDiv.className = 'result loading';
                 resultDiv.style.display = 'block';
                 resultDiv.innerHTML = `<strong>Starting ${type} sync...</strong><br>This may take several minutes.`;
+                
+                // Show progress bar
+                progressDiv.style.display = 'block';
+                progressBar.style.width = '0%';
+                progressText.textContent = 'Starting sync...';
+                progressDetails.textContent = '';
                 
                 try {
                     const response = await fetch(`/sync/${type}`, { method: 'POST' });
@@ -166,14 +193,106 @@ def index():
                     if (data.success) {
                         resultDiv.className = 'result success';
                         resultDiv.innerHTML = `<strong>✅ ${data.message}</strong><br><pre>${data.output || ''}</pre>`;
+                        
+                        // Start polling for progress if sync_id is available
+                        if (data.sync_id) {
+                            pollProgress(data.sync_id);
+                        } else {
+                            progressDiv.style.display = 'none';
+                        }
                     } else {
                         resultDiv.className = 'result error';
                         resultDiv.innerHTML = `<strong>❌ ${data.message}</strong><br><pre>${data.error || data.output || ''}</pre>`;
+                        progressDiv.style.display = 'none';
                     }
                 } catch (error) {
                     resultDiv.className = 'result error';
                     resultDiv.innerHTML = `<strong>❌ Request failed:</strong><br>${error.message}`;
+                    progressDiv.style.display = 'none';
                 }
+            }
+            
+            function pollProgress(syncId) {
+                let pollCount = 0;
+                const maxPolls = 60; // 5 minutes at 5-second intervals
+                
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+                const progressDetails = document.getElementById('progressDetails');
+                const progressDiv = document.getElementById('progress');
+                
+                const poll = async () => {
+                    try {
+                        const response = await fetch(`/sync/progress/${syncId}`);
+                        const data = await response.json();
+                        
+                        if (data.success && data.progress) {
+                            const progress = data.progress;
+                            
+                            // Update progress bar
+                            progressBar.style.width = `${progress.progress_percent}%`;
+                            
+                            // Update progress text
+                            progressText.textContent = `${progress.current_stage}: ${progress.progress_percent}%`;
+                            
+                            // Update progress details
+                            let details = "";
+                            if (progress.total_folders > 0) {
+                                details += `Folders: ${progress.completed_folders}/${progress.total_folders} `;
+                            }
+                            if (progress.current_folder) {
+                                details += `Current: ${progress.current_folder}`;
+                            }
+                            progressDetails.textContent = details;
+                            
+                            // Show recent messages
+                            if (progress.messages && progress.messages.length > 0) {
+                                const lastMessage = progress.messages[progress.messages.length - 1];
+                                if (lastMessage && lastMessage.message) {
+                                    progressDetails.textContent = lastMessage.message;
+                                }
+                            }
+                            
+                            // Check if completed
+                            if (progress.status === 'completed' || progress.progress_percent >= 100) {
+                                progressText.textContent = "Sync completed successfully!";
+                                setTimeout(() => {
+                                    progressDiv.style.display = 'none';
+                                }, 3000);
+                                return;
+                            }
+                            
+                            // Continue polling if not completed and under max polls
+                            if (pollCount < maxPolls && progress.status !== 'error') {
+                                pollCount++;
+                                setTimeout(poll, 5000); // Poll every 5 seconds
+                            } else {
+                                // Timeout or error
+                                if (pollCount >= maxPolls) {
+                                    progressText.textContent = "Progress polling timed out";
+                                }
+                                setTimeout(() => {
+                                    progressDiv.style.display = 'none';
+                                }, 3000);
+                            }
+                        } else {
+                            // Progress not found or error
+                            progressText.textContent = "Progress tracking unavailable";
+                            setTimeout(() => {
+                                progressDiv.style.display = 'none';
+                            }, 3000);
+                        }
+                    } catch (error) {
+                        console.error("Error polling progress:", error);
+                        progressText.textContent = `Progress error: ${error.message}`;
+                        setTimeout(() => {
+                            progressDiv.style.display = 'none';
+                        }, 3000);
+                    }
+                };
+                
+                // Start polling immediately
+                poll();
             }
             
             async function testSSH() {
@@ -337,6 +456,41 @@ def test_ssh():
             'error': str(e)
         })
 
+@app.route('/sync/progress/<sync_id>')
+def get_sync_progress(sync_id):
+    """Get progress of a sync operation"""
+    try:
+        progress_file = f"/tmp/sync_progress_{sync_id}.json"
+        
+        if not os.path.exists(progress_file):
+            return jsonify({
+                'success': False,
+                'message': 'Progress file not found',
+                'sync_id': sync_id
+            }), 404
+        
+        with open(progress_file, 'r') as f:
+            progress_data = json.load(f)
+        
+        return jsonify({
+            'success': True,
+            'progress': progress_data
+        })
+        
+    except json.JSONDecodeError:
+        return jsonify({
+            'success': False,
+            'message': 'Invalid progress data',
+            'sync_id': sync_id
+        }), 500
+    except Exception as e:
+        logger.error(f"Error reading progress for {sync_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error reading progress: {str(e)}',
+            'sync_id': sync_id
+        }), 500
+
 @app.route('/status')
 def status():
     """Get status of available sync targets"""
@@ -366,6 +520,55 @@ def status():
         },
         'vastai': vastai_status
     })
+
+# --- add with the other imports ---
+import glob
+from datetime import datetime
+
+# --- helper: load json safely ---
+def _load_json(path):
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+# --- helper: pick latest, preferring running/starting ---
+def _find_latest_progress():
+    files = sorted(glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True)
+    if not files:
+        return None, None
+    # prefer first file whose status != completed/error
+    for fp in files:
+        data = _load_json(fp)
+        if data and data.get("status") not in ("completed", "error"):
+            return os.path.basename(fp)[len("sync_progress_"):-5], data
+    # otherwise return newest by mtime
+    newest = files[0]
+    return os.path.basename(newest)[len("sync_progress_"):-5], _load_json(newest)
+
+@app.route("/sync/latest")
+def sync_latest():
+    """Return the most recent (prefer running) sync progress + id"""
+    sync_id, data = _find_latest_progress()
+    if not sync_id or not data:
+        return jsonify({"success": False, "message": "No progress files found"}), 404
+    return jsonify({"success": True, "sync_id": sync_id, "progress": data})
+
+@app.route("/sync/active")
+def sync_active():
+    """List all known progress files with brief status for debugging/menus"""
+    out = []
+    for fp in sorted(glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True):
+        data = _load_json(fp) or {}
+        out.append({
+            "sync_id": os.path.basename(fp)[len("sync_progress_"):-5],
+            "status": data.get("status"),
+            "progress_percent": data.get("progress_percent"),
+            "last_update": data.get("last_update"),
+        })
+    return jsonify({"success": True, "items": out})
+
 
 if __name__ == '__main__':
     # Check if sync script exists
