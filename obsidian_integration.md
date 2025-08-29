@@ -8,12 +8,6 @@ const container = dv.el("div", "", {
     style: "margin: 20px 0; padding: 15px; border-radius: 8px; background-color: #f5f5f5;"
 });
 
-// Add title
-dv.el("h3", "🔄 Media Sync Tool", { 
-    container: container,
-    style: "margin-top: 0; color: #333;"
-});
-
 // Define sync operations
 const syncOperations = [
     { 
@@ -153,49 +147,51 @@ statusButton.addEventListener("click", async () => {
     }
 });
 ```
-## Progress
+
 ---
 
 ```dataviewjs
-// === Media Sync — Auto Attach + Loading Bar ===
-// Adjust to your NAS API:
+// === Media Sync — Auto Attach + Loading Bar + Auto-Hide ===
 const API_BASE = "http://10.0.78.66:5000";
+const POLL_DELAY_MS = 1000;   // throttle
+const HIDE_FADE_MS  = 250;    // CSS fade duration (match snippet below)
 
-// --- UI shell ---
-const wrap = dv.el("div","",{style:"padding:12px;border:1px solid var(--background-modifier-border);border-radius:10px"});
-const title = dv.el("div","🔄 Media Sync — Auto Attach",{container:wrap,style:"font-weight:600;margin-bottom:8px"});
-const meta  = dv.el("div","",{container:wrap,style:"font-size:12px;color:var(--text-muted);margin-bottom:8px"});
+const wrap  = dv.el("div","",{cls:"msync-wrap"});
+const title = dv.el("div","🔄 Media Sync — Auto Attach",{container:wrap, cls:"msync-title"});
+const meta  = dv.el("div","",{container:wrap, cls:"msync-meta"});
+const bar   = dv.el("div","",{container:wrap, cls:"msync-bar"});
+const fill  = dv.el("div","",{container:bar, cls:"msync-fill", attr:{role:"progressbar","aria-valuemin":"0","aria-valuemax":"100"}});
+const status= dv.el("div","",{container:wrap, cls:"msync-status"});
 
-// Loading bar
-const bar   = dv.el("div","",{container:wrap});
-bar.classList.add("msync-bar");                  // styled by CSS snippet
-const fill  = dv.el("div","",{container:bar});
-fill.classList.add("msync-fill");                // styled by CSS snippet
-fill.setAttribute("role","progressbar");
-fill.setAttribute("aria-valuemin","0");
-fill.setAttribute("aria-valuemax","100");
-
-// Optional small status line (last message)
-const status = dv.el("div","",{container:wrap,style:"margin-top:8px;font-size:12px;color:var(--text-normal)"});
-
-// --- logic ---
 let currentId = null;
-let stopped = false;
+let stopped   = false;
+let hidden    = false;
+
+function showPanel() {
+  if (!hidden) return;
+  wrap.style.display = "block";
+  requestAnimationFrame(() => wrap.classList.remove("msync-hidden"));
+  hidden = false;
+}
+function hidePanel() {
+  if (hidden) return;
+  wrap.classList.add("msync-hidden");
+  setTimeout(() => { wrap.style.display = "none"; }, HIDE_FADE_MS);
+  hidden = true;
+}
 
 async function getLatest() {
   const r = await fetch(`${API_BASE}/sync/latest`);
   const j = await r.json();
   if (!j.success) throw new Error(j.message || "no latest");
-  return j; // { success, sync_id, progress }
+  return j; // {success, sync_id, progress}
 }
-
 async function getProgress(id){
   try{
     const r = await fetch(`${API_BASE}/sync/progress/${id}`);
     const j = await r.json();
-    if (!j.success || !j.progress) return null;
-    return j.progress;
-  }catch(e){ return null; }
+    return (j.success && j.progress) ? j.progress : null;
+  }catch{ return null; }
 }
 
 function setIndeterminate(on=true){
@@ -207,25 +203,16 @@ function setIndeterminate(on=true){
     fill.classList.remove("is-indeterminate");
   }
 }
-
 function setDeterminate(pct){
   setIndeterminate(false);
-  const clamped = Math.max(0, Math.min(100, Number(pct)||0));
-  fill.style.width = `${clamped}%`;
-  fill.setAttribute("aria-valuenow", String(clamped));
+  const v = Math.max(0, Math.min(100, Number(pct)||0));
+  fill.style.width = `${v}%`;
+  fill.setAttribute("aria-valuenow", String(v));
 }
-
 function setState(statusText, pct, stage, lastMsg){
   title.textContent = `🔄 Media Sync — ${currentId ? `Tracking ${currentId.slice(0,8)}…` : "Idle"}`;
+  if (Number.isFinite(pct)) setDeterminate(pct); else setIndeterminate(true);
 
-  // Choose determinate vs indeterminate
-  if (Number.isFinite(pct)) {
-    setDeterminate(pct);
-  } else {
-    setIndeterminate(true);
-  }
-
-  // Style by status
   fill.classList.remove("is-complete","is-error","is-running");
   if (statusText === "completed" || (Number.isFinite(pct) && pct >= 100)) {
     fill.classList.add("is-complete");
@@ -235,48 +222,55 @@ function setState(statusText, pct, stage, lastMsg){
     fill.classList.add("is-running");
   }
 
-  // Text lines
-  const stageText = stage || "working";
-  const pctText = Number.isFinite(pct) ? `${Math.round(pct)}%` : "…";
-  const msg = lastMsg || "";
-  meta.textContent = `${stageText} • ${pctText}`;
-  status.textContent = msg;
+  meta.textContent = `${stage || "working"} • ${Number.isFinite(pct) ? Math.round(pct) + "%" : "…"}`;
+  status.textContent = lastMsg || "";
 }
 
 async function loop(){
   if (stopped) return;
   try{
-    // 1) discover latest (prefers running)
     const latest = await getLatest();
-    if (latest.sync_id !== currentId){
+
+    // If a new run appears (or we were hidden), switch and show panel
+    if (latest.sync_id !== currentId) {
       currentId = latest.sync_id;
-      // Reset visuals when switching runs
       setIndeterminate(true);
       status.textContent = "";
     }
 
-    // 2) progress (use payload from /latest if present; otherwise fetch)
     const p = latest.progress || await getProgress(currentId);
 
-    if (p){
-      const pct = Number.isFinite(p.progress_percent) ? p.progress_percent : undefined;
-      const last = (p.messages && p.messages.length) ? p.messages[p.messages.length-1].message : "";
-      setState(p.status, pct, p.current_stage, last);
-    } else {
-      setState("idle", undefined, "waiting", "No progress yet…");
+    // Decide visibility first
+    const isDone = !!p && (p.status === "completed" || (Number.isFinite(p.progress_percent) && p.progress_percent >= 100));
+    if (isDone) hidePanel(); else showPanel();
+
+    // If visible, update the UI
+    if (!hidden) {
+      if (p){
+        const pct  = Number.isFinite(p.progress_percent) ? p.progress_percent : undefined;
+        const last = (p.messages && p.messages.length) ? p.messages[p.messages.length-1].message : "";
+        setState(p.status, pct, p.current_stage, last);
+      } else {
+        setState("idle", undefined, "waiting", "No progress yet…");
+      }
     }
   } catch (e) {
+    // On errors, keep the panel visible to show the error
+    showPanel();
     setState("error", undefined, "error", e.message);
   } finally {
-    setTimeout(loop, 2500);  // poll ~2.5s
+    setTimeout(loop, POLL_DELAY_MS);
   }
 }
 
+// start
+wrap.classList.add("msync-wrap-init","msync-hidden");
+setTimeout(() => { showPanel(); }, 10); // initial fade-in
 setIndeterminate(true);
 loop();
-
-// Stop polling when note/pane is closed
 this.containerEl?.onunload?.(() => { stopped = true; });
+
+
 
 
 ```
