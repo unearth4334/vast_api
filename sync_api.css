@@ -5,6 +5,10 @@
   border-radius: 10px;
   transition: opacity 250ms ease;
   opacity: 1;
+  /* Mobile improvements */
+  -webkit-transform: translateZ(0); /* Force hardware acceleration on mobile */
+  transform: translateZ(0);
+  will-change: opacity; /* Optimize for frequent opacity changes */
 }
 .msync-hidden {
   opacity: 0;
@@ -24,6 +28,9 @@
   margin-top: 8px;
   font-size: 12px;
   color: var(--text-normal);
+  /* Mobile text rendering improvements */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Loading bar (same as before, kept here for completeness) */
@@ -33,12 +40,19 @@
   border-radius: 999px;
   background: var(--background-modifier-border);
   overflow: hidden;
+  /* Mobile performance improvements */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 .msync-fill {
   height: 100%;
   width: 0%;
   background: var(--interactive-accent);
   transition: width .25s ease;
+  /* Mobile hardware acceleration */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: width;
 }
 
 /* Running stripes */

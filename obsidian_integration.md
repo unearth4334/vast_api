@@ -47,7 +47,16 @@ syncOperations.forEach(operation => {
     status.textContent = "Starting sync operation...";
 
     try {
-      const resp = await fetch(API_BASE + operation.endpoint, { method: "POST" }); // <-- no headers
+      // Add timeout for mobile networks
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for sync operations
+      
+      const resp = await fetch(API_BASE + operation.endpoint, { 
+        method: "POST",
+        signal: controller.signal
+      }); // <-- no headers to avoid CORS preflight
+      clearTimeout(timeoutId);
+      
       const data = await resp.json();
 
       if (data.success) {
@@ -62,8 +71,13 @@ syncOperations.forEach(operation => {
       }
     } catch (err) {
       button.style.background = "#dc3545";
-      button.textContent = "❌ Error";
-      status.textContent = `Request failed: ${err.message}`;
+      if (err.name === 'AbortError') {
+        button.textContent = "⏱️ Timeout";
+        status.textContent = "Request timed out - sync may still be running";
+      } else {
+        button.textContent = "❌ Error";
+        status.textContent = `Request failed: ${err.message}`;
+      }
     }
 
     setTimeout(() => {
@@ -93,7 +107,15 @@ const statusText = dv.el("div", "", {
 statusButton.addEventListener("click", async () => {
   statusText.textContent = "Checking status...";
   try {
-    const r = await fetch(API_BASE + "/status");
+    // Add timeout for mobile networks
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const r = await fetch(API_BASE + "/status", {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
     const d = await r.json();
     let html = "<strong>Status:</strong><br>";
     html += `Forge: ${d.forge?.available ? '✅' : '❌'}<br>`;
@@ -102,7 +124,11 @@ statusButton.addEventListener("click", async () => {
     if (d.vastai?.error) html += ` (${d.vastai.error})`;
     statusText.innerHTML = html;
   } catch (e) {
-    statusText.textContent = `Status check failed: ${e.message}`;
+    if (e.name === 'AbortError') {
+      statusText.textContent = "Status check timed out - network may be slow";
+    } else {
+      statusText.textContent = `Status check failed: ${e.message}`;
+    }
   }
 });
 
@@ -145,14 +171,38 @@ function hidePanel() {
 }
 
 async function getLatest() {
-  const r = await fetch(`${API_BASE}/sync/latest`);
-  const j = await r.json();
-  if (!j.success) throw new Error(j.message || "no latest");
-  return j; // { success, sync_id, progress }
+  try {
+    // Add timeout for mobile networks
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const r = await fetch(`${API_BASE}/sync/latest`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
+    const j = await r.json();
+    if (!j.success) return null; // Don't throw error - just return null when no active sync
+    return j; // { success, sync_id, progress }
+  } catch (e) {
+    // Network timeout or abort - return null instead of throwing
+    if (e.name === 'AbortError') {
+      console.warn('Sync status check timed out - mobile network may be slow');
+    }
+    return null;
+  }
 }
 async function getProgress(id){
   try{
-    const r = await fetch(`${API_BASE}/sync/progress/${id}`);
+    // Add timeout for mobile networks
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const r = await fetch(`${API_BASE}/sync/progress/${id}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
     const j = await r.json();
     return (j.success && j.progress) ? j.progress : null;
   }catch{ return null; }
@@ -195,6 +245,22 @@ async function loop(){
   try{
     const latest = await getLatest();
 
+    // If no active sync found, check if we had a current sync that completed
+    if (!latest) {
+      if (currentId) {
+        // Check if the last known sync completed successfully
+        const lastProgress = await getProgress(currentId);
+        if (lastProgress && (lastProgress.status === "completed" || lastProgress.progress_percent >= 100)) {
+          setState("completed", 100, "completed", "Sync completed successfully!");
+          setTimeout(() => hidePanel(), 2000); // Hide after showing success
+        }
+        currentId = null; // Clear the current sync ID
+      }
+      // Hide panel when no active sync and no success message to show
+      if (!currentId) hidePanel();
+      return; // Exit early, no error to show
+    }
+
     // New or different run? switch + reset visuals
     if (latest.sync_id !== currentId) {
       currentId = latest.sync_id;
@@ -206,9 +272,14 @@ async function loop(){
 
     // Hide when done; show when active/new
     const isDone = !!p && (p.status === "completed" || (Number.isFinite(p.progress_percent) && p.progress_percent >= 100));
-    if (isDone) hidePanel(); else showPanel();
+    if (isDone) {
+      setState("completed", 100, "completed", "Sync completed successfully!");
+      setTimeout(() => hidePanel(), 2000); // Hide after showing success
+    } else {
+      showPanel();
+    }
 
-    if (!hidden) {
+    if (!hidden && !isDone) {
       if (p){
         const pct  = Number.isFinite(p.progress_percent) ? p.progress_percent : undefined;
         const last = (p.messages && p.messages.length) ? p.messages[p.messages.length-1].message : "";
@@ -218,8 +289,13 @@ async function loop(){
       }
     }
   } catch (e) {
-    showPanel(); // keep visible to show error
-    setState("error", undefined, "error", e.message);
+    // Only show error panel for actual network/fetch errors, not when sync completes
+    console.warn("Sync progress polling error:", e.message);
+    // Don't show error state for common cases like "no latest sync"
+    if (e.message && !e.message.includes("no latest") && !e.message.includes("404")) {
+      showPanel();
+      setState("error", undefined, "error", `Connection issue: ${e.message}`);
+    }
   } finally {
     setTimeout(loop, POLL_DELAY_MS);
   }
