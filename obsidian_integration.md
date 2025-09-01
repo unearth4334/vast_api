@@ -1,4 +1,12 @@
 
+# Obsidian DataviewJS Integration
+
+This file contains example code for integrating the Media Sync Tool with Obsidian notes using dataviewjs.
+
+> **📱 Mobile Users:** For better mobile performance, see [obsidian_mobile_integration.md](obsidian_mobile_integration.md) which includes mobile-optimized code with enhanced error handling, adaptive polling, and reduced network usage.
+
+## Simple Button Interface
+
 ```dataviewjs
 // =============================
 // Media Sync — Buttons & Status

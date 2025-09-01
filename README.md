@@ -9,6 +9,7 @@ An easy-to-use tool for syncing media from local Docker containers and VastAI cl
 - ☁️ **Sync VastAI**: Auto-discover running VastAI instance and sync
 - 🐳 **Docker Ready**: Containerized for easy deployment on QNAP NAS
 - 🌐 **Web API**: REST endpoints for integration with Obsidian dataviewjs
+- 📱 **Mobile Optimized**: Enhanced mobile support for Obsidian with adaptive polling and better error handling
 
 ## Quick Start
 
@@ -76,6 +77,8 @@ An easy-to-use tool for syncing media from local Docker containers and VastAI cl
 ## Obsidian Integration
 
 Use dataviewjs code in your Obsidian notes:
+
+📱 **For mobile users**: See [obsidian_mobile_integration.md](obsidian_mobile_integration.md) for mobile-optimized code with better error handling and adaptive polling.
 
 ```javascript
 const API_BASE = "http://your-nas-ip:5000";

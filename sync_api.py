@@ -524,6 +524,7 @@ def status():
 # --- add with the other imports ---
 import glob
 from datetime import datetime
+import time
 
 # --- helper: load json safely ---
 def _load_json(path):
@@ -547,13 +548,117 @@ def _find_latest_progress():
     newest = files[0]
     return os.path.basename(newest)[len("sync_progress_"):-5], _load_json(newest)
 
+# --- helper: detect mobile user agent ---
+def _is_mobile_request():
+    """Detect if request is from mobile device based on User-Agent"""
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile_keywords = ['mobile', 'android', 'iphone', 'ipad', 'ipod', 'webos', 'blackberry']
+    return any(keyword in user_agent for keyword in mobile_keywords)
+
+# --- helper: get lightweight progress data for mobile ---
+def _get_mobile_progress_data(data):
+    """Return simplified progress data optimized for mobile networks"""
+    if not data:
+        return None
+    
+    # Return only essential fields to reduce payload size
+    mobile_data = {
+        'status': data.get('status', 'unknown'),
+        'progress_percent': data.get('progress_percent', 0),
+        'current_stage': data.get('current_stage', ''),
+        'last_update': data.get('last_update', ''),
+    }
+    
+    # Include current folder and recent message if available
+    if data.get('current_folder'):
+        mobile_data['current_folder'] = data['current_folder']
+    
+    # Include only the most recent message to reduce payload
+    messages = data.get('messages', [])
+    if messages:
+        mobile_data['latest_message'] = messages[-1].get('message', '')
+    
+    return mobile_data
+
 @app.route("/sync/latest")
 def sync_latest():
     """Return the most recent (prefer running) sync progress + id"""
     sync_id, data = _find_latest_progress()
     if not sync_id or not data:
         return jsonify({"success": False, "message": "No progress files found"}), 404
+    
+    # Return lightweight data for mobile clients
+    if _is_mobile_request():
+        mobile_data = _get_mobile_progress_data(data)
+        return jsonify({"success": True, "sync_id": sync_id, "progress": mobile_data})
+    
     return jsonify({"success": True, "sync_id": sync_id, "progress": data})
+
+@app.route("/sync/mobile/latest")
+def sync_mobile_latest():
+    """Mobile-optimized endpoint for latest sync progress with lightweight payload"""
+    sync_id, data = _find_latest_progress()
+    if not sync_id or not data:
+        return jsonify({"success": False, "message": "No active sync found"}), 404
+    
+    mobile_data = _get_mobile_progress_data(data)
+    response = jsonify({
+        "success": True, 
+        "sync_id": sync_id, 
+        "progress": mobile_data,
+        "timestamp": int(time.time())
+    })
+    
+    # Add cache control headers optimized for mobile
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
+    return response
+
+@app.route("/sync/mobile/progress/<sync_id>")
+def get_mobile_sync_progress(sync_id):
+    """Mobile-optimized progress endpoint with reduced payload"""
+    try:
+        progress_file = f"/tmp/sync_progress_{sync_id}.json"
+        
+        if not os.path.exists(progress_file):
+            return jsonify({
+                'success': False,
+                'message': 'Sync not found',
+                'sync_id': sync_id
+            }), 404
+        
+        with open(progress_file, 'r') as f:
+            progress_data = json.load(f)
+        
+        mobile_data = _get_mobile_progress_data(progress_data)
+        response = jsonify({
+            'success': True,
+            'progress': mobile_data,
+            'timestamp': int(time.time())
+        })
+        
+        # Add mobile-optimized headers
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        return response
+        
+    except json.JSONDecodeError:
+        return jsonify({
+            'success': False,
+            'message': 'Invalid progress data',
+            'sync_id': sync_id
+        }), 500
+    except Exception as e:
+        logger.error(f"Error reading mobile progress for {sync_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Error reading progress',
+            'sync_id': sync_id
+        }), 500
 
 @app.route("/sync/active")
 def sync_active():
