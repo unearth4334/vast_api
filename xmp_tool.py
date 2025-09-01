@@ -41,6 +41,33 @@ def sanitize_xml_string(s):
     """Remove characters illegal in XML 1.0."""
     return _invalid_xml_chars.sub("", s)
 
+# Global XML template to avoid recreating it for each file
+_XMP_TEMPLATE = None
+
+def get_xmp_template():
+    """Get or create the XMP XML template once and reuse it."""
+    global _XMP_TEMPLATE
+    if _XMP_TEMPLATE is None:
+        # Build base XML structure (excluding the CDATA value for now)
+        rdf = Element("x:xmpmeta", {
+            "xmlns:x": "adobe:ns:meta/"
+        })
+        rdf_rdf = SubElement(rdf, "rdf:RDF", {
+            "xmlns:rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+            "xmlns:dc": "http://purl.org/dc/elements/1.1/"
+        })
+        description = SubElement(rdf_rdf, "rdf:Description", {
+            "rdf:about": ""
+        })
+        dc_description = SubElement(description, "dc:description")
+        lang_alt = SubElement(dc_description, "rdf:Alt")
+        li = SubElement(lang_alt, "rdf:li", {"xml:lang": "x-default"})
+        li.text = "__PROMPT_CDATA_PLACEHOLDER__"
+        
+        _XMP_TEMPLATE = tostring(rdf, encoding="unicode")
+    
+    return _XMP_TEMPLATE
+
 def create_or_update_xmp(image_path, prompt, overwrite=False):
     """Create or update a sidecar .xmp file with the given prompt as CDATA description."""
     xmp_path = image_path + ".xmp"
@@ -49,23 +76,8 @@ def create_or_update_xmp(image_path, prompt, overwrite=False):
         print(f"⚠️  Skipping existing file: {xmp_path}")
         return
 
-    # Build base XML structure (excluding the CDATA value for now)
-    rdf = Element("x:xmpmeta", {
-        "xmlns:x": "adobe:ns:meta/"
-    })
-    rdf_rdf = SubElement(rdf, "rdf:RDF", {
-        "xmlns:rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-        "xmlns:dc": "http://purl.org/dc/elements/1.1/"
-    })
-    description = SubElement(rdf_rdf, "rdf:Description", {
-        "rdf:about": ""
-    })
-    dc_description = SubElement(description, "dc:description")
-    lang_alt = SubElement(dc_description, "rdf:Alt")
-    li = SubElement(lang_alt, "rdf:li", {"xml:lang": "x-default"})
-    li.text = "__PROMPT_CDATA_PLACEHOLDER__"
-
-    rough_xml = tostring(rdf, encoding="unicode")
+    # Use cached XML template
+    rough_xml = get_xmp_template()
     prompt = prompt.replace("]]>", "]] >")
     cdata_block = f"<![CDATA[{prompt}]]>"
     xml_with_cdata = rough_xml.replace("__PROMPT_CDATA_PLACEHOLDER__", cdata_block)
@@ -82,6 +94,24 @@ def create_or_update_xmp(image_path, prompt, overwrite=False):
         print(f"✅ Wrote: {xmp_path}")
     except Exception as e:
         print(f"❌ Failed to write {xmp_path}: {e}")
+
+def batch_check_existing_xmp(image_paths, overwrite=False):
+    """Efficiently check which images need XMP processing.
+    
+    Returns:
+        (files_to_process, files_skipped): Lists of image paths
+    """
+    files_to_process = []
+    files_skipped = []
+    
+    for image_path in image_paths:
+        xmp_path = image_path + ".xmp"
+        if os.path.exists(xmp_path) and not overwrite:
+            files_skipped.append(image_path)
+        else:
+            files_to_process.append(image_path)
+    
+    return files_to_process, files_skipped
 
 def main():
     import argparse
@@ -102,12 +132,33 @@ def main():
         print("❌ No valid .png files to process.")
         sys.exit(1)
 
-    for image_path in valid_files:
+    # Batch check which files actually need processing
+    files_to_process, files_skipped = batch_check_existing_xmp(valid_files, args.overwrite)
+    
+    if files_skipped:
+        print(f"⚠️  Skipping {len(files_skipped)} existing XMP files")
+    
+    if not files_to_process:
+        print("✅ All XMP files already exist.")
+        return
+    
+    print(f"📝 Processing {len(files_to_process)} PNG files...")
+    
+    # Process only files that need it
+    processed_count = 0
+    for image_path in files_to_process:
         prompt = extract_prompt(image_path)
         if prompt:
             create_or_update_xmp(image_path, prompt, overwrite=args.overwrite)
+            processed_count += 1
         else:
             print(f"⚠️  No parameters found in: {image_path}")
+        
+        # Show progress for large batches
+        if len(files_to_process) > 50 and (processed_count % 50 == 0 or processed_count == len(files_to_process)):
+            print(f"📊 Progress: {processed_count}/{len(files_to_process)} files processed")
+    
+    print(f"✅ Completed processing {processed_count} files")
 
 if __name__ == "__main__":
     main()

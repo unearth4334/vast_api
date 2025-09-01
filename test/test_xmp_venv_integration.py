@@ -97,6 +97,31 @@ class TestXMPVenvIntegration(unittest.TestCase):
             xmp_file = png_file + '.xmp'
             self.assertTrue(os.path.exists(xmp_file))
 
+    def test_batch_optimization_skips_existing(self):
+        """Test that the batch optimization correctly skips existing XMP files"""
+        # Create test PNG
+        png_file = self.create_test_png('test_optimization.png', 'test prompt for optimization')
+        
+        # First run - should create XMP
+        result1 = subprocess.run([
+            'python', 'xmp_tool.py', png_file
+        ], capture_output=True, text=True, cwd='/home/runner/work/vast_api/vast_api')
+        
+        self.assertEqual(result1.returncode, 0)
+        self.assertIn('Processing 1 PNG files', result1.stdout)
+        self.assertIn('Wrote:', result1.stdout)
+        
+        # Second run - should skip existing XMP
+        result2 = subprocess.run([
+            'python', 'xmp_tool.py', png_file
+        ], capture_output=True, text=True, cwd='/home/runner/work/vast_api/vast_api')
+        
+        self.assertEqual(result2.returncode, 0)
+        self.assertIn('Skipping 1 existing XMP files', result2.stdout)
+        self.assertIn('All XMP files already exist', result2.stdout)
+        # Should NOT contain "Wrote:" in second run
+        self.assertNotIn('Wrote:', result2.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()
