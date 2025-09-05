@@ -9,6 +9,8 @@ import subprocess
 import logging
 import uuid
 import json
+import glob
+from datetime import datetime
 from flask import Flask, jsonify, request  # request added for after_request hook
 from flask_cors import CORS
 from ..vastai.vast_manager import VastManager
@@ -38,6 +40,7 @@ CORS(
         r"/sync/*": {"origins": ALLOWED_ORIGINS},
         r"/status": {"origins": ALLOWED_ORIGINS},
         r"/test/*": {"origins": ALLOWED_ORIGINS},
+        r"/logs/*": {"origins": ALLOWED_ORIGINS},
         r"/": {"origins": ALLOWED_ORIGINS},
     },
     supports_credentials=False,
@@ -56,13 +59,63 @@ def add_pna_header(resp):
 
 # Configuration
 SYNC_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'sync_outputs.sh')
+MEDIA_BASE = '/media'
+SYNC_LOG_DIR = os.path.join(MEDIA_BASE, '.sync_log')
 FORGE_HOST = "10.0.78.108"
 FORGE_PORT = "2222"
 COMFY_HOST = "10.0.78.108"
 COMFY_PORT = "2223"
 
+def ensure_sync_log_dir():
+    """Ensure the sync log directory exists"""
+    try:
+        os.makedirs(SYNC_LOG_DIR, exist_ok=True)
+        logger.info(f"Sync log directory ensured at: {SYNC_LOG_DIR}")
+    except Exception as e:
+        logger.error(f"Failed to create sync log directory {SYNC_LOG_DIR}: {str(e)}")
+
+def save_sync_log(sync_type, result, start_time, end_time):
+    """Save sync result to a timestamped JSON log file"""
+    try:
+        ensure_sync_log_dir()
+        
+        # Format: sync_log_yyyymmdd_hhmm.json
+        timestamp = start_time.strftime("%Y%m%d_%H%M")
+        log_filename = f"sync_log_{timestamp}.json"
+        log_path = os.path.join(SYNC_LOG_DIR, log_filename)
+        
+        # Create structured log data
+        log_data = {
+            "timestamp": start_time.isoformat(),
+            "end_timestamp": end_time.isoformat(),
+            "sync_type": sync_type,
+            "sync_id": result.get('sync_id', ''),
+            "success": result.get('success', False),
+            "message": result.get('message', ''),
+            "output": result.get('output', ''),
+            "error": result.get('error', ''),
+            "duration_seconds": (end_time - start_time).total_seconds()
+        }
+        
+        # Add instance info if available (for VastAI syncs)
+        if 'instance_info' in result:
+            log_data['instance_info'] = result['instance_info']
+        
+        # Save to file
+        with open(log_path, 'w') as f:
+            json.dump(log_data, f, indent=2)
+        
+        logger.info(f"Sync log saved to: {log_path}")
+        return log_filename
+        
+    except Exception as e:
+        logger.error(f"Failed to save sync log: {str(e)}")
+        return None
+
 def run_sync(host, port, sync_type="unknown"):
     """Run the sync_outputs.sh script with specified host and port"""
+    start_time = datetime.now()
+    
     try:
         # Generate unique sync ID
         sync_id = str(uuid.uuid4())
@@ -83,9 +136,11 @@ def run_sync(host, port, sync_type="unknown"):
             timeout=300  # 5 minute timeout
         )
 
+        end_time = datetime.now()
+        
         if result.returncode == 0:
             logger.info(f"{sync_type} sync completed successfully")
-            return {
+            sync_result = {
                 'success': True,
                 'message': f'{sync_type} sync completed successfully',
                 'output': result.stdout,
@@ -93,7 +148,7 @@ def run_sync(host, port, sync_type="unknown"):
             }
         else:
             logger.error(f"{sync_type} sync failed with return code {result.returncode}")
-            return {
+            sync_result = {
                 'success': False,
                 'message': f'{sync_type} sync failed',
                 'error': result.stderr,
@@ -101,18 +156,33 @@ def run_sync(host, port, sync_type="unknown"):
                 'sync_id': sync_id
             }
 
+        # Save sync log
+        log_filename = save_sync_log(sync_type, sync_result, start_time, end_time)
+        if log_filename:
+            sync_result['log_filename'] = log_filename
+            
+        return sync_result
+
     except subprocess.TimeoutExpired:
+        end_time = datetime.now()
         logger.error(f"{sync_type} sync timed out")
-        return {
+        sync_result = {
             'success': False,
             'message': f'{sync_type} sync timed out after 5 minutes'
         }
+        # Save timeout log
+        save_sync_log(sync_type, sync_result, start_time, end_time)
+        return sync_result
     except Exception as e:
+        end_time = datetime.now()
         logger.error(f"{sync_type} sync error: {str(e)}")
-        return {
+        sync_result = {
             'success': False,
             'message': f'{sync_type} sync error: {str(e)}'
         }
+        # Save error log
+        save_sync_log(sync_type, sync_result, start_time, end_time)
+        return sync_result
 
 @app.route('/')
 def index():
@@ -385,13 +455,15 @@ def sync_vastai():
         result = run_sync(ssh_host, ssh_port, "VastAI")
         
         # Add instance details to the result
+        instance_info = {
+            'id': running_instance.get('id'),
+            'gpu': running_instance.get('gpu_name'),
+            'host': ssh_host,
+            'port': ssh_port
+        }
+        
         if result['success']:
-            result['instance_info'] = {
-                'id': running_instance.get('id'),
-                'gpu': running_instance.get('gpu_name'),
-                'host': ssh_host,
-                'port': ssh_port
-            }
+            result['instance_info'] = instance_info
         
         return jsonify(result)
         
@@ -489,6 +561,99 @@ def get_sync_progress(sync_id):
             'success': False,
             'message': f'Error reading progress: {str(e)}',
             'sync_id': sync_id
+        }), 500
+
+@app.route('/logs/manifest', methods=['GET', 'OPTIONS'])
+def get_logs_manifest():
+    """Get manifest of available sync log files"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        ensure_sync_log_dir()
+        
+        # Get all log files sorted by modification time (newest first)
+        log_pattern = os.path.join(SYNC_LOG_DIR, 'sync_log_*.json')
+        log_files = sorted(glob.glob(log_pattern), key=os.path.getmtime, reverse=True)
+        
+        manifest = []
+        for log_file in log_files:
+            try:
+                # Read basic info from each log file
+                with open(log_file, 'r') as f:
+                    log_data = json.load(f)
+                
+                manifest.append({
+                    'filename': os.path.basename(log_file),
+                    'timestamp': log_data.get('timestamp'),
+                    'sync_type': log_data.get('sync_type'),
+                    'success': log_data.get('success', False),
+                    'message': log_data.get('message', ''),
+                    'duration_seconds': log_data.get('duration_seconds')
+                })
+            except Exception as e:
+                logger.warning(f"Failed to read log file {log_file}: {str(e)}")
+                continue
+        
+        return jsonify({
+            'success': True,
+            'logs': manifest
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get logs manifest: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Failed to get logs manifest: {str(e)}'
+        }), 500
+
+@app.route('/logs/<filename>', methods=['GET', 'OPTIONS'])
+def get_log_file(filename):
+    """Get contents of a specific log file"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Validate filename format for security
+        if not filename.startswith('sync_log_') or not filename.endswith('.json'):
+            return jsonify({
+                'success': False,
+                'message': 'Invalid log filename format'
+            }), 400
+        
+        log_path = os.path.join(SYNC_LOG_DIR, filename)
+        
+        if not os.path.exists(log_path):
+            return jsonify({
+                'success': False,
+                'message': 'Log file not found'
+            }), 404
+        
+        # Security check - ensure file is within sync log directory
+        if not os.path.abspath(log_path).startswith(os.path.abspath(SYNC_LOG_DIR)):
+            return jsonify({
+                'success': False,
+                'message': 'Invalid log file path'
+            }), 400
+        
+        with open(log_path, 'r') as f:
+            log_data = json.load(f)
+        
+        return jsonify({
+            'success': True,
+            'log': log_data
+        })
+        
+    except json.JSONDecodeError:
+        return jsonify({
+            'success': False,
+            'message': 'Invalid log file format'
+        }), 500
+    except Exception as e:
+        logger.error(f"Failed to read log file {filename}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Failed to read log file: {str(e)}'
         }), 500
 
 @app.route('/status')
