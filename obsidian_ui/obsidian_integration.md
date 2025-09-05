@@ -298,6 +298,21 @@ dv.el("h3", "📋 Sync Logs", {
     style: "margin-top: 0; color: #333;"
 });
 
+// Add refresh button
+const refreshButton = dv.el("button", "🔄 Refresh Logs", {
+    container: logsContainer,
+    style: `
+        background: #007cba; 
+        color: white; 
+        border: none; 
+        padding: 8px 16px; 
+        border-radius: 5px; 
+        cursor: pointer;
+        font-size: 12px;
+        margin-bottom: 15px;
+    `
+});
+
 // Loading indicator
 const loadingDiv = dv.el("div", "Loading logs...", {
     container: logsContainer,
@@ -492,6 +507,43 @@ async function loadLogs() {
         logListContainer.innerHTML = `<p style='color: #dc3545;'>Failed to load logs: ${error.message}</p>`;
     }
 }
+
+// Refresh button functionality
+refreshButton.addEventListener("click", async () => {
+    const originalText = refreshButton.textContent;
+    refreshButton.textContent = "🔄 Refreshing...";
+    refreshButton.style.background = "#ffa500";
+    refreshButton.disabled = true;
+    
+    // Reset UI state
+    loadingDiv.style.display = "block";
+    loadingDiv.textContent = "Refreshing logs...";
+    logListContainer.style.display = "none";
+    logDetailsContainer.style.display = "none";
+    
+    try {
+        await loadLogs();
+        refreshButton.style.background = "#28a745";
+        refreshButton.textContent = "✅ Refreshed";
+        
+        // Reset button after 2 seconds
+        setTimeout(() => {
+            refreshButton.textContent = originalText;
+            refreshButton.style.background = "#007cba";
+        }, 2000);
+    } catch (error) {
+        refreshButton.style.background = "#dc3545";
+        refreshButton.textContent = "❌ Error";
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+            refreshButton.textContent = originalText;
+            refreshButton.style.background = "#007cba";
+        }, 3000);
+    } finally {
+        refreshButton.disabled = false;
+    }
+});
 
 // Load logs on initialization
 loadLogs();
