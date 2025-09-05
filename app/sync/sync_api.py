@@ -66,6 +66,7 @@ FORGE_PORT = "2222"
 COMFY_HOST = "10.0.78.108"
 COMFY_PORT = "2223"
 
+
 def ensure_sync_log_dir():
     """Ensure the sync log directory exists"""
     try:
@@ -112,7 +113,8 @@ def save_sync_log(sync_type, result, start_time, end_time):
         logger.error(f"Failed to save sync log: {str(e)}")
         return None
 
-def run_sync(host, port, sync_type="unknown"):
+def run_sync(host, port, sync_type="unknown", cleanup=True):
+  
     """Run the sync_outputs.sh script with specified host and port"""
     start_time = datetime.now()
     
@@ -120,7 +122,7 @@ def run_sync(host, port, sync_type="unknown"):
         # Generate unique sync ID
         sync_id = str(uuid.uuid4())
         
-        logger.info(f"Starting {sync_type} sync to {host}:{port} with ID {sync_id}")
+        logger.info(f"Starting {sync_type} sync to {host}:{port} with ID {sync_id} (cleanup: {cleanup})")
 
         cmd = [
             'bash', SYNC_SCRIPT_PATH,
@@ -128,6 +130,10 @@ def run_sync(host, port, sync_type="unknown"):
             '--host', host,
             '--sync-id', sync_id
         ]
+        
+        # Add cleanup flag if enabled
+        if cleanup:
+            cmd.append('--cleanup')
 
         result = subprocess.run(
             cmd,
@@ -223,6 +229,13 @@ def index():
         <h1>🔄 Media Sync Tool</h1>
         <p>Click a button to sync media from the respective source:</p>
         
+        <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="cleanupCheckbox" checked style="margin-right: 8px;">
+                <span>🧹 Enable cleanup (delete remote folders older than 2 days)</span>
+            </label>
+        </div>
+        
         <button class="button" onclick="sync('forge')">🔥 Sync Forge (10.0.78.108:2222)</button>
         <button class="button" onclick="sync('comfy')">🖼️ Sync Comfy (10.0.78.108:2223)</button>
         <button class="button" onclick="sync('vastai')">☁️ Sync VastAI (Auto-discover)</button>
@@ -245,6 +258,7 @@ def index():
                 const progressBar = document.getElementById('progressBar');
                 const progressText = document.getElementById('progressText');
                 const progressDetails = document.getElementById('progressDetails');
+                const cleanupCheckbox = document.getElementById('cleanupCheckbox');
                 
                 resultDiv.className = 'result loading';
                 resultDiv.style.display = 'block';
@@ -257,7 +271,15 @@ def index():
                 progressDetails.textContent = '';
                 
                 try {
-                    const response = await fetch(`/sync/${type}`, { method: 'POST' });
+                    const response = await fetch(`/sync/${type}`, { 
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            cleanup: cleanupCheckbox.checked
+                        })
+                    });
                     const data = await response.json();
                     
                     if (data.success) {
@@ -414,7 +436,14 @@ def sync_forge():
     """Sync from Forge (Stable Diffusion WebUI Forge)"""
     if request.method == 'OPTIONS':
         return ("", 204)
-    result = run_sync(FORGE_HOST, FORGE_PORT, "Forge")
+    
+    # Get cleanup setting from request body, default to True
+    cleanup = True
+    if request.is_json:
+        data = request.get_json()
+        cleanup = data.get('cleanup', True) if data else True
+    
+    result = run_sync(FORGE_HOST, FORGE_PORT, "Forge", cleanup=cleanup)
     return jsonify(result)
 
 @app.route('/sync/comfy', methods=['POST', 'OPTIONS'])
@@ -422,7 +451,14 @@ def sync_comfy():
     """Sync from ComfyUI"""
     if request.method == 'OPTIONS':
         return ("", 204)
-    result = run_sync(COMFY_HOST, COMFY_PORT, "ComfyUI")
+    
+    # Get cleanup setting from request body, default to True
+    cleanup = True
+    if request.is_json:
+        data = request.get_json()
+        cleanup = data.get('cleanup', True) if data else True
+    
+    result = run_sync(COMFY_HOST, COMFY_PORT, "ComfyUI", cleanup=cleanup)
     return jsonify(result)
 
 @app.route('/sync/vastai', methods=['POST', 'OPTIONS'])
@@ -452,7 +488,14 @@ def sync_vastai():
             })
         
         logger.info(f"Found running VastAI instance: {ssh_host}:{ssh_port}")
-        result = run_sync(ssh_host, ssh_port, "VastAI")
+        
+        # Get cleanup setting from request body, default to True
+        cleanup = True
+        if request.is_json:
+            data = request.get_json()
+            cleanup = data.get('cleanup', True) if data else True
+        
+        result = run_sync(ssh_host, ssh_port, "VastAI", cleanup=cleanup)
         
         # Add instance details to the result
         instance_info = {

@@ -82,7 +82,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertTrue(data['success'])
         self.assertIn('Forge sync completed', data['message'])
         
-        mock_run_sync.assert_called_once_with('10.0.78.108', '2222', 'Forge')
+        mock_run_sync.assert_called_once_with('10.0.78.108', '2222', 'Forge', cleanup=True)
 
     @patch('app.sync.sync_api.run_sync')
     def test_sync_comfy_success(self, mock_run_sync):
@@ -100,7 +100,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertTrue(data['success'])
         self.assertIn('ComfyUI sync completed', data['message'])
         
-        mock_run_sync.assert_called_once_with('10.0.78.108', '2223', 'ComfyUI')
+        mock_run_sync.assert_called_once_with('10.0.78.108', '2223', 'ComfyUI', cleanup=True)
 
     @patch('app.sync.sync_api.VastManager')
     @patch('app.sync.sync_api.run_sync')
@@ -133,7 +133,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertEqual(data['instance_info']['id'], 123)
         self.assertEqual(data['instance_info']['host'], 'vast.example.com')
         
-        mock_run_sync.assert_called_once_with('vast.example.com', '12345', 'VastAI')
+        mock_run_sync.assert_called_once_with('vast.example.com', '12345', 'VastAI', cleanup=True)
 
     @patch('app.sync.sync_api.VastManager')
     def test_sync_vastai_no_instance(self, mock_vast_manager):
@@ -249,6 +249,77 @@ class TestSyncAPI(unittest.TestCase):
         finally:
             # Restore original SSHTester
             setattr(sync_api_module, 'SSHTester', original_ssh_tester)
+
+    @patch('app.sync.sync_api.run_sync')
+    def test_sync_forge_with_cleanup_disabled(self, mock_run_sync):
+        """Test Forge sync with cleanup disabled"""
+        mock_run_sync.return_value = {
+            'success': True,
+            'message': 'Forge sync completed successfully',
+            'output': 'test output'
+        }
+
+        response = self.app.post('/sync/forge', 
+                                json={'cleanup': False},
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertIn('Forge sync completed', data['message'])
+        
+        mock_run_sync.assert_called_once_with('10.0.78.108', '2222', 'Forge', cleanup=False)
+
+    @patch('app.sync.sync_api.run_sync')
+    def test_sync_comfy_with_cleanup_enabled(self, mock_run_sync):
+        """Test ComfyUI sync with cleanup explicitly enabled"""
+        mock_run_sync.return_value = {
+            'success': True,
+            'message': 'ComfyUI sync completed successfully',
+            'output': 'test output'
+        }
+
+        response = self.app.post('/sync/comfy', 
+                                json={'cleanup': True},
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertIn('ComfyUI sync completed', data['message'])
+        
+        mock_run_sync.assert_called_once_with('10.0.78.108', '2223', 'ComfyUI', cleanup=True)
+
+    @patch('app.sync.sync_api.VastManager')
+    @patch('app.sync.sync_api.run_sync')
+    def test_sync_vastai_with_cleanup_disabled(self, mock_run_sync, mock_vast_manager):
+        """Test VastAI sync with cleanup disabled"""
+        # Setup VastManager mock
+        mock_instance = MagicMock()
+        mock_instance.get_running_instance.return_value = {
+            'id': 123,
+            'gpu_name': 'RTX 4090',
+            'ssh_host': 'vast.example.com',
+            'ssh_port': 12345
+        }
+        mock_vast_manager.return_value = mock_instance
+
+        mock_run_sync.return_value = {
+            'success': True,
+            'message': 'VastAI sync completed successfully',
+            'output': 'test output'
+        }
+
+        response = self.app.post('/sync/vastai', 
+                                json={'cleanup': False},
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertIn('VastAI sync completed', data['message'])
+        
+        mock_run_sync.assert_called_once_with('vast.example.com', '12345', 'VastAI', cleanup=False)
 
 
 if __name__ == '__main__':
