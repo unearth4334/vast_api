@@ -31,7 +31,7 @@ const cleanupCheckbox = dv.el("input", "", {
     style: "margin-right: 8px;"
 });
 
-dv.el("span", "🧹 Enable cleanup (delete remote folders older than 2 days)", {
+dv.el("span", "🧹 Cleanup", {
     container: checkboxContainer,
     style: "color: #333;"
 });
