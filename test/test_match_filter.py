@@ -1,5 +1,11 @@
 import unittest
-from match_filter import match_filter
+import sys
+import os
+
+# Add the parent directory to the path so we can import from app
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from app.utils.match_filter import match_filter
 
 class TestMatchFilter(unittest.TestCase):
 

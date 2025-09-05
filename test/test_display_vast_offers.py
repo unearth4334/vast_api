@@ -1,7 +1,13 @@
 import unittest
 from io import StringIO
 from contextlib import redirect_stdout
-from vast_display import display_vast_offers
+import sys
+import os
+
+# Add the parent directory to the path so we can import from app
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from app.vastai.vast_display import display_vast_offers
 
 class TestDisplayVastOffers(unittest.TestCase):
 

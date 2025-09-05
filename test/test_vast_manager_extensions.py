@@ -5,7 +5,13 @@ Test the new VastManager functionality
 
 import unittest
 from unittest.mock import patch, MagicMock
-from vast_manager import VastManager
+import sys
+import os
+
+# Add the parent directory to the path so we can import from app
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from app.vastai.vast_manager import VastManager
 
 
 class TestVastManagerExtensions(unittest.TestCase):
@@ -13,8 +19,8 @@ class TestVastManagerExtensions(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures"""
-        with patch('vast_manager.VastManager._load_yaml'), \
-             patch('vast_manager.VastManager._load_api_key'):
+        with patch('app.vastai.vast_manager.VastManager._load_yaml'), \
+             patch('app.vastai.vast_manager.VastManager._load_api_key'):
             self.manager = VastManager()
             self.manager.config = {'test': 'config'}
             self.manager.api_key = 'test_key'
@@ -52,7 +58,7 @@ class TestVastManagerExtensions(unittest.TestCase):
 
         self.assertEqual(len(instances), 0)
 
-    @patch('vast_manager.VastManager.list_instances')
+    @patch('app.vastai.vast_manager.VastManager.list_instances')
     def test_get_running_instance_found(self, mock_list):
         """Test finding a running instance"""
         mock_list.return_value = [
@@ -67,7 +73,7 @@ class TestVastManagerExtensions(unittest.TestCase):
         self.assertEqual(running['id'], 2)
         self.assertEqual(running['cur_state'], 'running')
 
-    @patch('vast_manager.VastManager.list_instances')
+    @patch('app.vastai.vast_manager.VastManager.list_instances')
     def test_get_running_instance_not_found(self, mock_list):
         """Test when no running instance exists"""
         mock_list.return_value = [
@@ -79,7 +85,7 @@ class TestVastManagerExtensions(unittest.TestCase):
 
         self.assertIsNone(running)
 
-    @patch('vast_manager.VastManager.list_instances')
+    @patch('app.vastai.vast_manager.VastManager.list_instances')
     def test_get_running_instance_empty_list(self, mock_list):
         """Test when no instances exist"""
         mock_list.return_value = []

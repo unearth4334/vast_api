@@ -6,7 +6,7 @@ from tabulate import tabulate
 import fnmatch
 import operator
 import re
-from match_filter import match_filter
+from ..utils.match_filter import match_filter
 
 
 def parse_numeric_filter(expr):
