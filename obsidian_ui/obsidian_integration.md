@@ -281,3 +281,219 @@ this.containerEl?.onunload?.(() => { stopped = true; });
 
 ```
 
+## Logs
+
+```dataviewjs
+// Configure your API server address
+const API_BASE = "http://10.0.78.66:5000"; // Replace with your QNAP NAS IP
+
+// Create container for logs
+const logsContainer = dv.el("div", "", {
+    style: "margin: 20px 0; padding: 15px; border-radius: 8px; background-color: #f5f5f5;"
+});
+
+// Add title
+dv.el("h3", "📋 Sync Logs", { 
+    container: logsContainer,
+    style: "margin-top: 0; color: #333;"
+});
+
+// Loading indicator
+const loadingDiv = dv.el("div", "Loading logs...", {
+    container: logsContainer,
+    style: "font-style: italic; color: #666;"
+});
+
+// Container for log list
+const logListContainer = dv.el("div", "", {
+    container: logsContainer,
+    style: "display: none;"
+});
+
+// Container for log details callout (initially hidden)
+const logDetailsContainer = dv.el("div", "", {
+    container: logsContainer,
+    style: "display: none; margin-top: 15px; padding: 15px; border-radius: 8px; border: 2px solid #007cba; background-color: #f8f9fa;"
+});
+
+// Close button for log details
+const closeButton = dv.el("button", "✕ Close", {
+    container: logDetailsContainer,
+    style: `
+        float: right;
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 12px;
+        margin-bottom: 10px;
+    `
+});
+
+// Log details content area
+const logDetailsContent = dv.el("div", "", {
+    container: logDetailsContainer,
+    style: "clear: both;"
+});
+
+// Close button functionality
+closeButton.addEventListener("click", () => {
+    logDetailsContainer.style.display = "none";
+});
+
+// Function to format duration
+function formatDuration(seconds) {
+    if (seconds < 60) {
+        return `${Math.round(seconds)}s`;
+    } else if (seconds < 3600) {
+        return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+    } else {
+        return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+    }
+}
+
+// Function to format timestamp
+function formatTimestamp(isoString) {
+    const date = new Date(isoString);
+    return date.toLocaleString();
+}
+
+// Function to display log details
+async function showLogDetails(filename) {
+    try {
+        logDetailsContent.innerHTML = "Loading log details...";
+        logDetailsContainer.style.display = "block";
+        
+        const response = await fetch(`${API_BASE}/logs/${filename}`);
+        const data = await response.json();
+        
+        if (data.success && data.log) {
+            const log = data.log;
+            const statusIcon = log.success ? "✅" : "❌";
+            const statusText = log.success ? "Success" : "Failed";
+            
+            let detailsHTML = `
+                <h4 style="margin-top: 0; color: #333;">
+                    ${statusIcon} ${log.sync_type} Sync - ${statusText}
+                </h4>
+                <div style="margin-bottom: 10px; font-size: 14px;">
+                    <strong>Timestamp:</strong> ${formatTimestamp(log.timestamp)}<br>
+                    <strong>Duration:</strong> ${formatDuration(log.duration_seconds)}<br>
+                    <strong>Sync ID:</strong> <code>${log.sync_id}</code>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <strong>Message:</strong> ${log.message}
+                </div>
+            `;
+            
+            // Add instance info for VastAI syncs
+            if (log.instance_info) {
+                detailsHTML += `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Instance Info:</strong><br>
+                        ID: ${log.instance_info.id}<br>
+                        GPU: ${log.instance_info.gpu || 'N/A'}<br>
+                        Host: ${log.instance_info.host}:${log.instance_info.port}
+                    </div>
+                `;
+            }
+            
+            // Add output if available
+            if (log.output) {
+                detailsHTML += `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Output:</strong>
+                        <pre style="background: #e9ecef; padding: 10px; border-radius: 4px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; font-size: 12px;">${log.output}</pre>
+                    </div>
+                `;
+            }
+            
+            // Add error if available
+            if (log.error) {
+                detailsHTML += `
+                    <div style="margin-bottom: 10px;">
+                        <strong>Error:</strong>
+                        <pre style="background: #f8d7da; padding: 10px; border-radius: 4px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; font-size: 12px; color: #721c24;">${log.error}</pre>
+                    </div>
+                `;
+            }
+            
+            logDetailsContent.innerHTML = detailsHTML;
+        } else {
+            logDetailsContent.innerHTML = `<p style="color: #dc3545;">Failed to load log details: ${data.message || 'Unknown error'}</p>`;
+        }
+    } catch (error) {
+        logDetailsContent.innerHTML = `<p style="color: #dc3545;">Error loading log details: ${error.message}</p>`;
+    }
+}
+
+// Function to load and display logs
+async function loadLogs() {
+    try {
+        const response = await fetch(`${API_BASE}/logs/manifest`);
+        const data = await response.json();
+        
+        loadingDiv.style.display = "none";
+        
+        if (data.success && data.logs && data.logs.length > 0) {
+            logListContainer.style.display = "block";
+            
+            // Show last 5 logs
+            const recentLogs = data.logs.slice(0, 5);
+            
+            let logListHTML = "<div style='margin-bottom: 10px; font-size: 14px; color: #666;'>Last 5 sync operations:</div>";
+            
+            recentLogs.forEach((log, index) => {
+                const statusIcon = log.success ? "✅" : "❌";
+                const timestamp = formatTimestamp(log.timestamp);
+                const duration = formatDuration(log.duration_seconds || 0);
+                
+                logListHTML += `
+                    <div class="log-item" data-filename="${log.filename}" style="
+                        padding: 10px;
+                        margin: 5px 0;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        background: white;
+                        transition: background-color 0.2s;
+                    " onmouseover="this.style.backgroundColor='#f0f8ff'" onmouseout="this.style.backgroundColor='white'">
+                        <div style="font-weight: bold; color: #333;">
+                            ${statusIcon} ${log.sync_type} - ${timestamp}
+                        </div>
+                        <div style="font-size: 12px; color: #666; margin-top: 2px;">
+                            ${log.message} (${duration})
+                        </div>
+                    </div>
+                `;
+            });
+            
+            logListContainer.innerHTML = logListHTML;
+            
+            // Add click handlers to log items
+            const logItems = logListContainer.querySelectorAll('.log-item');
+            logItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const filename = item.getAttribute('data-filename');
+                    showLogDetails(filename);
+                });
+            });
+            
+        } else {
+            logListContainer.style.display = "block";
+            logListContainer.innerHTML = "<p style='color: #666; font-style: italic;'>No sync logs found.</p>";
+        }
+        
+    } catch (error) {
+        loadingDiv.style.display = "none";
+        logListContainer.style.display = "block";
+        logListContainer.innerHTML = `<p style='color: #dc3545;'>Failed to load logs: ${error.message}</p>`;
+    }
+}
+
+// Load logs on initialization
+loadLogs();
+```
+
