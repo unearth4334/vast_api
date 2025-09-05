@@ -1,4 +1,4 @@
-from vast_manager import VastManager
+from .vast_manager import VastManager
 
 def main():
     vm = VastManager()

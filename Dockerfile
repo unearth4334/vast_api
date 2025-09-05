@@ -24,7 +24,8 @@ RUN python -m venv .venv
 RUN .venv/bin/pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
 
 # Copy application files
-COPY *.py ./
+COPY app/ ./app/
+COPY obsidian_ui/ ./obsidian_ui/
 COPY *.sh ./
 COPY config.yaml ./ 
 
@@ -42,11 +43,11 @@ EXPOSE 5000
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV FLASK_APP=sync_api.py
+ENV FLASK_APP=app.sync.sync_api
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/status || exit 1
 
 # Run the application
-CMD ["python", "sync_api.py"]
+CMD ["python", "-m", "app.sync.sync_api"]

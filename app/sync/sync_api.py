@@ -11,11 +11,11 @@ import uuid
 import json
 from flask import Flask, jsonify, request  # request added for after_request hook
 from flask_cors import CORS
-from vast_manager import VastManager
+from ..vastai.vast_manager import VastManager
 
 # Import SSH test functionality
 try:
-    from ssh_test import SSHTester
+    from .ssh_test import SSHTester
 except ImportError:
     SSHTester = None
 
@@ -55,7 +55,7 @@ def add_pna_header(resp):
     return resp
 
 # Configuration
-SYNC_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), 'sync_outputs.sh')
+SYNC_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'sync_outputs.sh')
 FORGE_HOST = "10.0.78.108"
 FORGE_PORT = "2222"
 COMFY_HOST = "10.0.78.108"

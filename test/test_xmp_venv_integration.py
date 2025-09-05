@@ -39,7 +39,7 @@ class TestXMPVenvIntegration(unittest.TestCase):
         
         # Run xmp_tool
         result = subprocess.run([
-            'python', 'xmp_tool.py', png_file
+            'python', '-m', 'app.utils.xmp_tool', png_file
         ], capture_output=True, text=True, cwd='/home/runner/work/vast_api/vast_api')
         
         self.assertEqual(result.returncode, 0)
@@ -87,7 +87,7 @@ class TestXMPVenvIntegration(unittest.TestCase):
         
         # Run xmp_tool on all files
         result = subprocess.run([
-            'python', 'xmp_tool.py'
+            'python', '-m', 'app.utils.xmp_tool'
         ] + png_files, capture_output=True, text=True, cwd='/home/runner/work/vast_api/vast_api')
         
         self.assertEqual(result.returncode, 0)

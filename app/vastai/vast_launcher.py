@@ -3,7 +3,7 @@ import requests
 import time
 import json
 from tabulate import tabulate
-from vast_display import display_vast_offers
+from .vast_display import display_vast_offers
 
 VAST_BASE = "https://console.vast.ai/api/v0"
 

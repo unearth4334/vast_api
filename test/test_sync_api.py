@@ -6,7 +6,13 @@ Test the sync API endpoints
 import unittest
 from unittest.mock import patch, MagicMock
 import json
-from sync_api import app
+import sys
+import os
+
+# Add the parent directory to the path so we can import from app
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from app.sync.sync_api import app
 
 
 class TestSyncAPI(unittest.TestCase):
@@ -26,7 +32,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertIn(b'Sync Comfy', response.data)
         self.assertIn(b'Sync VastAI', response.data)
 
-    @patch('sync_api.VastManager')
+    @patch('app.sync.sync_api.VastManager')
     def test_status_endpoint_success(self, mock_vast_manager):
         """Test status endpoint with successful VastAI connection"""
         mock_instance = MagicMock()
@@ -48,7 +54,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertEqual(data['forge']['port'], '2222')
         self.assertEqual(data['comfy']['port'], '2223')
 
-    @patch('sync_api.VastManager')
+    @patch('app.sync.sync_api.VastManager')
     def test_status_endpoint_vastai_error(self, mock_vast_manager):
         """Test status endpoint with VastAI connection error"""
         mock_vast_manager.side_effect = Exception("API error")
@@ -60,7 +66,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertFalse(data['vastai']['available'])
         self.assertIn('error', data['vastai'])
 
-    @patch('sync_api.run_sync')
+    @patch('app.sync.sync_api.run_sync')
     def test_sync_forge_success(self, mock_run_sync):
         """Test successful Forge sync"""
         mock_run_sync.return_value = {
@@ -78,7 +84,7 @@ class TestSyncAPI(unittest.TestCase):
         
         mock_run_sync.assert_called_once_with('10.0.78.108', '2222', 'Forge')
 
-    @patch('sync_api.run_sync')
+    @patch('app.sync.sync_api.run_sync')
     def test_sync_comfy_success(self, mock_run_sync):
         """Test successful ComfyUI sync"""
         mock_run_sync.return_value = {
@@ -96,8 +102,8 @@ class TestSyncAPI(unittest.TestCase):
         
         mock_run_sync.assert_called_once_with('10.0.78.108', '2223', 'ComfyUI')
 
-    @patch('sync_api.VastManager')
-    @patch('sync_api.run_sync')
+    @patch('app.sync.sync_api.VastManager')
+    @patch('app.sync.sync_api.run_sync')
     def test_sync_vastai_success(self, mock_run_sync, mock_vast_manager):
         """Test successful VastAI sync"""
         # Mock VastManager
@@ -129,7 +135,7 @@ class TestSyncAPI(unittest.TestCase):
         
         mock_run_sync.assert_called_once_with('vast.example.com', '12345', 'VastAI')
 
-    @patch('sync_api.VastManager')
+    @patch('app.sync.sync_api.VastManager')
     def test_sync_vastai_no_instance(self, mock_vast_manager):
         """Test VastAI sync when no running instance found"""
         mock_instance = MagicMock()
@@ -143,7 +149,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertFalse(data['success'])
         self.assertIn('No running VastAI instance', data['message'])
 
-    @patch('sync_api.VastManager')
+    @patch('app.sync.sync_api.VastManager')
     def test_sync_vastai_config_error(self, mock_vast_manager):
         """Test VastAI sync with configuration error"""
         mock_vast_manager.side_effect = FileNotFoundError("Config not found")
@@ -155,7 +161,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertFalse(data['success'])
         self.assertIn('configuration files not found', data['message'])
 
-    @patch('sync_api.SSHTester')
+    @patch('app.sync.sync_api.SSHTester')
     def test_ssh_test_endpoint_success(self, mock_ssh_tester):
         """Test SSH test endpoint with successful connections"""
         mock_instance = MagicMock()
@@ -191,7 +197,7 @@ class TestSyncAPI(unittest.TestCase):
         self.assertEqual(data['summary']['total_hosts'], 2)
         self.assertEqual(data['summary']['successful'], 2)
 
-    @patch('sync_api.SSHTester')
+    @patch('app.sync.sync_api.SSHTester')
     def test_ssh_test_endpoint_partial_failure(self, mock_ssh_tester):
         """Test SSH test endpoint with partial failures"""
         mock_instance = MagicMock()
@@ -229,8 +235,9 @@ class TestSyncAPI(unittest.TestCase):
     def test_ssh_test_endpoint_unavailable(self):
         """Test SSH test endpoint when SSHTester is not available"""
         # Temporarily replace SSHTester with None
-        original_ssh_tester = getattr(__import__('sync_api'), 'SSHTester', None)
-        setattr(__import__('sync_api'), 'SSHTester', None)
+        sync_api_module = __import__('app.sync.sync_api', fromlist=[''])
+        original_ssh_tester = getattr(sync_api_module, 'SSHTester', None)
+        setattr(sync_api_module, 'SSHTester', None)
         
         try:
             response = self.app.post('/test/ssh')
@@ -241,7 +248,7 @@ class TestSyncAPI(unittest.TestCase):
             self.assertIn('SSH test functionality not available', data['message'])
         finally:
             # Restore original SSHTester
-            setattr(__import__('sync_api'), 'SSHTester', original_ssh_tester)
+            setattr(sync_api_module, 'SSHTester', original_ssh_tester)
 
 
 if __name__ == '__main__':
