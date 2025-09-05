@@ -14,6 +14,28 @@ dv.el("h3", "🔄 Media Sync Tool", {
     style: "margin-top: 0; color: #333;"
 });
 
+// Add cleanup checkbox (enabled by default)
+const optionsContainer = dv.el("div", "", {
+    container: container,
+    style: "margin: 15px 0; padding: 10px; background: #e8f4fd; border-radius: 5px; border: 1px solid #bee5eb;"
+});
+
+const checkboxContainer = dv.el("label", "", {
+    container: optionsContainer,
+    style: "display: flex; align-items: center; cursor: pointer; font-size: 14px;"
+});
+
+const cleanupCheckbox = dv.el("input", "", {
+    container: checkboxContainer,
+    attr: { type: "checkbox", checked: true },
+    style: "margin-right: 8px;"
+});
+
+dv.el("span", "🧹 Enable cleanup (delete remote folders older than 2 days)", {
+    container: checkboxContainer,
+    style: "color: #333;"
+});
+
 // Define sync operations
 const syncOperations = [
     { 
@@ -77,7 +99,10 @@ syncOperations.forEach(operation => {
                 method: "POST",
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({
+                    cleanup: cleanupCheckbox.checked
+                })
             });
             const data = await response.json();
             
