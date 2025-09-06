@@ -123,7 +123,7 @@ FOLDERS=("txt2img-grids" "txt2img-images" "img2img-grids" "img2img-images" "WAN"
 
 # Defaults for XMP tool (can be overridden by flags)
 DEFAULT_VENV="$(dirname "$0")/.venv"
-DEFAULT_XMP_SCRIPT="$(dirname "$0")/xmp_tool.py"
+DEFAULT_XMP_SCRIPT="$(dirname "$0")/app/utils/xmp_tool.py"
 XMP_VENV="${XMP_VENV:-$DEFAULT_VENV}"
 XMP_SCRIPT="${XMP_SCRIPT:-$DEFAULT_XMP_SCRIPT}"
 VENV_PY="$XMP_VENV/bin/python"
