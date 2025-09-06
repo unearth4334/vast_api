@@ -513,6 +513,352 @@ def index():
                 outline: 2px solid var(--interactive-accent);
                 outline-offset: 2px;
             }
+            
+            /* Tab Navigation */
+            .tab-navigation {
+                display: flex;
+                border-radius: var(--radius-m);
+                background: var(--background-secondary);
+                padding: var(--size-4-1);
+                margin-bottom: var(--size-4-6);
+                gap: var(--size-4-1);
+                border: 1px solid var(--background-modifier-border);
+            }
+            
+            .tab-button {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: var(--size-4-2);
+                background: transparent;
+                color: var(--text-muted);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3) var(--size-4-4);
+                font-size: var(--font-ui-medium);
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .tab-button:hover {
+                background: var(--interactive-hover);
+                color: var(--text-normal);
+            }
+            
+            .tab-button.active {
+                background: var(--interactive-accent);
+                color: var(--text-on-accent);
+            }
+            
+            .tab-button:focus {
+                outline: 2px solid var(--interactive-accent);
+                outline-offset: 2px;
+            }
+            
+            /* Tab Content */
+            .tab-content {
+                display: none;
+            }
+            
+            .tab-content.active {
+                display: block;
+            }
+            
+            /* Section Headers */
+            .section-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: var(--size-4-4);
+                flex-wrap: wrap;
+                gap: var(--size-4-2);
+            }
+            
+            .section-header h2 {
+                font-size: var(--font-ui-large);
+                font-weight: 600;
+                margin: 0;
+                color: var(--text-normal);
+            }
+            
+            /* Progress List */
+            .progress-list {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                padding: var(--size-4-4);
+                margin-bottom: var(--size-4-6);
+            }
+            
+            .progress-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: var(--size-4-3);
+                border-bottom: 1px solid var(--background-modifier-border);
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+            
+            .progress-item:last-child {
+                border-bottom: none;
+            }
+            
+            .progress-item:hover {
+                background: var(--background-secondary-alt);
+            }
+            
+            .progress-item-info {
+                flex: 1;
+            }
+            
+            .progress-item-title {
+                font-weight: 500;
+                color: var(--text-normal);
+                margin-bottom: var(--size-4-1);
+            }
+            
+            .progress-item-details {
+                font-size: var(--font-ui-small);
+                color: var(--text-muted);
+            }
+            
+            .progress-item-status {
+                display: flex;
+                align-items: center;
+                gap: var(--size-4-2);
+                font-size: var(--font-ui-small);
+            }
+            
+            .status-badge {
+                padding: var(--size-4-1) var(--size-4-2);
+                border-radius: var(--radius-s);
+                font-size: var(--font-ui-smaller);
+                font-weight: 500;
+            }
+            
+            .status-badge.running {
+                background: rgba(124, 58, 237, 0.1);
+                color: var(--color-accent);
+            }
+            
+            .status-badge.completed {
+                background: var(--background-success);
+                color: var(--text-success);
+            }
+            
+            .status-badge.error {
+                background: var(--background-error);
+                color: var(--text-error);
+            }
+            
+            /* Logs List */
+            .logs-list {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            
+            .log-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: var(--size-4-3);
+                border-bottom: 1px solid var(--background-modifier-border);
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+            
+            .log-item:last-child {
+                border-bottom: none;
+            }
+            
+            .log-item:hover {
+                background: var(--background-secondary-alt);
+            }
+            
+            .log-item-info {
+                flex: 1;
+            }
+            
+            .log-item-title {
+                font-weight: 500;
+                color: var(--text-normal);
+                margin-bottom: var(--size-4-1);
+            }
+            
+            .log-item-details {
+                font-size: var(--font-ui-small);
+                color: var(--text-muted);
+            }
+            
+            .log-item-status {
+                display: flex;
+                align-items: center;
+                gap: var(--size-4-2);
+            }
+            
+            /* Modal */
+            .modal {
+                display: none;
+                position: fixed;
+                z-index: 1000;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(4px);
+            }
+            
+            .modal.show {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: var(--size-4-4);
+            }
+            
+            .modal-content {
+                background: var(--background-primary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                width: 100%;
+                max-width: 600px;
+                max-height: 90vh;
+                overflow: hidden;
+                box-shadow: 0 8px 32px var(--background-modifier-box-shadow);
+            }
+            
+            .modal-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: var(--size-4-4);
+                border-bottom: 1px solid var(--background-modifier-border);
+            }
+            
+            .modal-header h3 {
+                margin: 0;
+                font-size: var(--font-ui-large);
+                font-weight: 600;
+                color: var(--text-normal);
+            }
+            
+            .modal-close {
+                background: transparent;
+                border: none;
+                font-size: 24px;
+                color: var(--text-muted);
+                cursor: pointer;
+                padding: var(--size-4-1);
+                line-height: 1;
+                border-radius: var(--radius-s);
+                transition: all 0.2s ease;
+            }
+            
+            .modal-close:hover {
+                background: var(--interactive-hover);
+                color: var(--text-normal);
+            }
+            
+            .modal-body {
+                padding: var(--size-4-4);
+                max-height: 60vh;
+                overflow-y: auto;
+            }
+            
+            .modal-body pre {
+                white-space: pre-wrap;
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+                background: var(--background-modifier-form-field);
+                padding: var(--size-4-3);
+                border-radius: var(--radius-s);
+                margin: var(--size-4-2) 0;
+                overflow-x: auto;
+            }
+            
+            .log-detail-section {
+                margin-bottom: var(--size-4-4);
+            }
+            
+            .log-detail-section h4 {
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+                margin: 0 0 var(--size-4-2) 0;
+                color: var(--text-normal);
+            }
+            
+            .log-detail-grid {
+                display: grid;
+                grid-template-columns: auto 1fr;
+                gap: var(--size-4-2);
+                font-size: var(--font-ui-small);
+            }
+            
+            .log-detail-label {
+                font-weight: 500;
+                color: var(--text-muted);
+            }
+            
+            .log-detail-value {
+                color: var(--text-normal);
+            }
+            
+            /* Empty State */
+            .empty-state {
+                text-align: center;
+                padding: var(--size-4-8);
+                color: var(--text-muted);
+            }
+            
+            .empty-state-icon {
+                font-size: 48px;
+                margin-bottom: var(--size-4-4);
+                opacity: 0.5;
+            }
+            
+            /* Mobile Responsive */
+            @media (max-width: 768px) {
+                .section-header {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+                
+                .section-header h2 {
+                    text-align: center;
+                }
+                
+                .progress-item,
+                .log-item {
+                    flex-direction: column;
+                    align-items: stretch;
+                    gap: var(--size-4-2);
+                }
+                
+                .progress-item-status,
+                .log-item-status {
+                    justify-content: flex-start;
+                }
+                
+                .modal-content {
+                    margin: var(--size-4-2);
+                    max-height: calc(100vh - var(--size-4-4));
+                }
+                
+                .tab-navigation {
+                    flex-direction: column;
+                    gap: var(--size-4-1);
+                }
+                
+                .tab-button {
+                    flex: none;
+                }
+            }
         </style>
     </head>
     <body>
@@ -532,26 +878,85 @@ def index():
                 </label>
             </div>
             
-            <div class="sync-grid">
-                <button class="sync-button" onclick="sync('forge')">
-                    <span>🔥</span>
-                    Sync Forge
+            <!-- Navigation Tabs -->
+            <div class="tab-navigation">
+                <button class="tab-button active" onclick="showTab('sync')">
+                    <span>🔄</span>
+                    Sync
                 </button>
-                <button class="sync-button" onclick="sync('comfy')">
-                    <span>🖼️</span>
-                    Sync Comfy
+                <button class="tab-button" onclick="showTab('progress')">
+                    <span>📊</span>
+                    Progress
                 </button>
-                <button class="sync-button" onclick="sync('vastai')">
-                    <span>☁️</span>
-                    Sync VastAI
-                </button>
-                <button class="sync-button secondary" onclick="testSSH()">
-                    <span>🔧</span>
-                    Test SSH
+                <button class="tab-button" onclick="showTab('logs')">
+                    <span>📋</span>
+                    Logs
                 </button>
             </div>
             
-            <div id="result" class="result-panel"></div>
+            <!-- Sync Tab -->
+            <div id="sync-tab" class="tab-content active">
+                <div class="sync-grid">
+                    <button class="sync-button" onclick="sync('forge')">
+                        <span>🔥</span>
+                        Sync Forge
+                    </button>
+                    <button class="sync-button" onclick="sync('comfy')">
+                        <span>🖼️</span>
+                        Sync Comfy
+                    </button>
+                    <button class="sync-button" onclick="sync('vastai')">
+                        <span>☁️</span>
+                        Sync VastAI
+                    </button>
+                    <button class="sync-button secondary" onclick="testSSH()">
+                        <span>🔧</span>
+                        Test SSH
+                    </button>
+                </div>
+                
+                <div id="result" class="result-panel"></div>
+            </div>
+            
+            <!-- Progress Tab -->
+            <div id="progress-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Current Progress</h2>
+                    <button class="sync-button secondary" onclick="refreshProgress()">
+                        <span>🔄</span>
+                        Refresh
+                    </button>
+                </div>
+                <div id="current-progress" class="progress-list"></div>
+                
+                <div class="section-header">
+                    <h2>Recent Activity</h2>
+                </div>
+                <div id="active-syncs" class="progress-list"></div>
+            </div>
+            
+            <!-- Logs Tab -->
+            <div id="logs-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Sync Logs</h2>
+                    <button class="sync-button secondary" onclick="refreshLogs()">
+                        <span>🔄</span>
+                        Refresh
+                    </button>
+                </div>
+                <div id="logs-list" class="logs-list"></div>
+                
+                <!-- Log Detail Modal -->
+                <div id="log-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="log-modal-title">Log Details</h3>
+                            <button class="modal-close" onclick="closeLogModal()">&times;</button>
+                        </div>
+                        <div id="log-modal-body" class="modal-body"></div>
+                    </div>
+                </div>
+            </div>
             
             <div id="progress" class="progress-panel">
                 <h3>Sync Progress</h3>
@@ -738,6 +1143,349 @@ def index():
                     resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
                 }
             }
+            
+            // Tab Navigation
+            function showTab(tabName) {
+                // Hide all tab content
+                const tabContents = document.querySelectorAll('.tab-content');
+                tabContents.forEach(tab => tab.classList.remove('active'));
+                
+                // Remove active class from all tab buttons
+                const tabButtons = document.querySelectorAll('.tab-button');
+                tabButtons.forEach(button => button.classList.remove('active'));
+                
+                // Show selected tab content
+                const selectedTab = document.getElementById(`${tabName}-tab`);
+                if (selectedTab) {
+                    selectedTab.classList.add('active');
+                }
+                
+                // Add active class to selected tab button
+                const selectedButton = document.querySelector('.tab-button[onclick*="' + tabName + '"]');
+                if (selectedButton) {
+                    selectedButton.classList.add('active');
+                }
+                
+                // Load data for the selected tab
+                if (tabName === 'progress') {
+                    refreshProgress();
+                } else if (tabName === 'logs') {
+                    refreshLogs();
+                }
+            }
+            
+            // Progress Functions
+            async function refreshProgress() {
+                await Promise.all([
+                    loadCurrentProgress(),
+                    loadActiveSyncs()
+                ]);
+            }
+            
+            async function loadCurrentProgress() {
+                const container = document.getElementById('current-progress');
+                
+                try {
+                    const response = await fetch('/sync/latest');
+                    const data = await response.json();
+                    
+                    if (data.success && data.progress) {
+                        const progress = data.progress;
+                        container.innerHTML = `
+                            <div class="progress-item" onclick="viewProgressDetails('${data.sync_id}')">
+                                <div class="progress-item-info">
+                                    <div class="progress-item-title">
+                                        Current Sync: ${progress.sync_type || 'Unknown'}
+                                    </div>
+                                    <div class="progress-item-details">
+                                        ${progress.current_stage || 'Initializing'} - ${progress.progress_percent || 0}%
+                                    </div>
+                                </div>
+                                <div class="progress-item-status">
+                                    <span class="status-badge ${progress.status === 'completed' ? 'completed' : progress.status === 'error' ? 'error' : 'running'}">
+                                        ${progress.status || 'running'}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        container.innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📊</div>
+                                <p>No active sync operations</p>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">❌</div>
+                            <p>Failed to load current progress</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            async function loadActiveSyncs() {
+                const container = document.getElementById('active-syncs');
+                
+                try {
+                    const response = await fetch('/sync/active');
+                    const data = await response.json();
+                    
+                    if (data.success && data.items && data.items.length > 0) {
+                        container.innerHTML = data.items.map(item => `
+                            <div class="progress-item" onclick="viewProgressDetails('${item.sync_id}')">
+                                <div class="progress-item-info">
+                                    <div class="progress-item-title">
+                                        Sync ID: ${item.sync_id.substring(0, 8)}...
+                                    </div>
+                                    <div class="progress-item-details">
+                                        Progress: ${item.progress_percent || 0}% | Last Update: ${item.last_update ? new Date(item.last_update).toLocaleTimeString() : 'Unknown'}
+                                    </div>
+                                </div>
+                                <div class="progress-item-status">
+                                    <span class="status-badge ${item.status === 'completed' ? 'completed' : item.status === 'error' ? 'error' : 'running'}">
+                                        ${item.status || 'unknown'}
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📈</div>
+                                <p>No recent sync activity</p>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">❌</div>
+                            <p>Failed to load recent activity</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            async function viewProgressDetails(syncId) {
+                try {
+                    const response = await fetch(`/sync/progress/${syncId}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.progress) {
+                        const progress = data.progress;
+                        showLogModal(`Progress Details - ${syncId.substring(0, 8)}...`, `
+                            <div class="log-detail-section">
+                                <h4>Current Status</h4>
+                                <div class="log-detail-grid">
+                                    <span class="log-detail-label">Status:</span>
+                                    <span class="log-detail-value">${progress.status || 'Unknown'}</span>
+                                    <span class="log-detail-label">Stage:</span>
+                                    <span class="log-detail-value">${progress.current_stage || 'Unknown'}</span>
+                                    <span class="log-detail-label">Progress:</span>
+                                    <span class="log-detail-value">${progress.progress_percent || 0}%</span>
+                                    <span class="log-detail-label">Folders:</span>
+                                    <span class="log-detail-value">${progress.completed_folders || 0}/${progress.total_folders || 0}</span>
+                                    <span class="log-detail-label">Current Folder:</span>
+                                    <span class="log-detail-value">${progress.current_folder || 'None'}</span>
+                                </div>
+                            </div>
+                            ${progress.messages && progress.messages.length > 0 ? `
+                                <div class="log-detail-section">
+                                    <h4>Recent Messages</h4>
+                                    <pre>${progress.messages.slice(-10).map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.message}`).join('\n')}</pre>
+                                </div>
+                            ` : ''}
+                        `);
+                    } else {
+                        alert('Progress details not available');
+                    }
+                } catch (error) {
+                    alert(`Failed to load progress details: ${error.message}`);
+                }
+            }
+            
+            // Logs Functions
+            async function refreshLogs() {
+                const container = document.getElementById('logs-list');
+                
+                try {
+                    const response = await fetch('/logs/manifest');
+                    const data = await response.json();
+                    
+                    if (data.success && data.logs && data.logs.length > 0) {
+                        container.innerHTML = data.logs.map(log => `
+                            <div class="log-item" onclick="viewLogDetails('${log.filename}')">
+                                <div class="log-item-info">
+                                    <div class="log-item-title">
+                                        ${log.sync_type || 'Unknown'} Sync
+                                    </div>
+                                    <div class="log-item-details">
+                                        ${new Date(log.timestamp).toLocaleString()} | Duration: ${formatDuration(log.duration_seconds)}
+                                    </div>
+                                </div>
+                                <div class="log-item-status">
+                                    <span class="status-badge ${log.success ? 'completed' : 'error'}">
+                                        ${log.success ? '✅' : '❌'}
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📋</div>
+                                <p>No sync logs available</p>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">❌</div>
+                            <p>Failed to load logs</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            async function viewLogDetails(filename) {
+                try {
+                    const response = await fetch(`/logs/${filename}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.log) {
+                        const log = data.log;
+                        const title = `${log.sync_type || 'Unknown'} Sync - ${new Date(log.timestamp).toLocaleString()}`;
+                        
+                        const content = `
+                            <div class="log-detail-section">
+                                <h4>Summary</h4>
+                                <div class="log-detail-grid">
+                                    <span class="log-detail-label">Type:</span>
+                                    <span class="log-detail-value">${log.sync_type || 'Unknown'}</span>
+                                    <span class="log-detail-label">Status:</span>
+                                    <span class="log-detail-value">${log.success ? '✅ Success' : '❌ Failed'}</span>
+                                    <span class="log-detail-label">Start Time:</span>
+                                    <span class="log-detail-value">${new Date(log.timestamp).toLocaleString()}</span>
+                                    <span class="log-detail-label">End Time:</span>
+                                    <span class="log-detail-value">${new Date(log.end_timestamp).toLocaleString()}</span>
+                                    <span class="log-detail-label">Duration:</span>
+                                    <span class="log-detail-value">${formatDuration(log.duration_seconds)}</span>
+                                    ${log.sync_id ? `
+                                        <span class="log-detail-label">Sync ID:</span>
+                                        <span class="log-detail-value">${log.sync_id}</span>
+                                    ` : ''}
+                                    ${log.cleanup !== undefined ? `
+                                        <span class="log-detail-label">Cleanup:</span>
+                                        <span class="log-detail-value">${log.cleanup ? 'Enabled' : 'Disabled'}</span>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="log-detail-section">
+                                <h4>Message</h4>
+                                <p>${log.message || 'No message available'}</p>
+                            </div>
+                            
+                            ${log.output ? `
+                                <div class="log-detail-section">
+                                    <h4>Output</h4>
+                                    <pre>${log.output}</pre>
+                                </div>
+                            ` : ''}
+                            
+                            ${log.error ? `
+                                <div class="log-detail-section">
+                                    <h4>Error</h4>
+                                    <pre>${log.error}</pre>
+                                </div>
+                            ` : ''}
+                            
+                            ${log.instance_info ? `
+                                <div class="log-detail-section">
+                                    <h4>Instance Info</h4>
+                                    <div class="log-detail-grid">
+                                        <span class="log-detail-label">ID:</span>
+                                        <span class="log-detail-value">${log.instance_info.id || 'Unknown'}</span>
+                                        <span class="log-detail-label">GPU:</span>
+                                        <span class="log-detail-value">${log.instance_info.gpu || 'Unknown'}</span>
+                                        <span class="log-detail-label">Host:</span>
+                                        <span class="log-detail-value">${log.instance_info.host || 'Unknown'}</span>
+                                        <span class="log-detail-label">Port:</span>
+                                        <span class="log-detail-value">${log.instance_info.port || 'Unknown'}</span>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${log.cmd ? `
+                                <div class="log-detail-section">
+                                    <h4>Command</h4>
+                                    <pre>${log.cmd}</pre>
+                                </div>
+                            ` : ''}
+                        `;
+                        
+                        showLogModal(title, content);
+                    } else {
+                        alert('Log details not available');
+                    }
+                } catch (error) {
+                    alert(`Failed to load log details: ${error.message}`);
+                }
+            }
+            
+            // Modal Functions
+            function showLogModal(title, content) {
+                const modal = document.getElementById('log-modal');
+                const modalTitle = document.getElementById('log-modal-title');
+                const modalBody = document.getElementById('log-modal-body');
+                
+                modalTitle.textContent = title;
+                modalBody.innerHTML = content;
+                modal.classList.add('show');
+                
+                // Close modal when clicking outside
+                modal.onclick = function(event) {
+                    if (event.target === modal) {
+                        closeLogModal();
+                    }
+                };
+            }
+            
+            function closeLogModal() {
+                const modal = document.getElementById('log-modal');
+                modal.classList.remove('show');
+            }
+            
+            // Utility Functions
+            function formatDuration(seconds) {
+                if (!seconds) return 'Unknown';
+                if (seconds < 60) return `${Math.round(seconds)}s`;
+                if (seconds < 3600) return `${Math.round(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+                return `${Math.round(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`;
+            }
+            
+            // Initialize on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                // Load initial data for the active tab
+                const activeTab = document.querySelector('.tab-button.active');
+                if (activeTab && activeTab.onclick) {
+                    // Don't reload sync tab as it's the default
+                    if (!activeTab.textContent.includes('Sync')) {
+                        activeTab.onclick();
+                    }
+                }
+                
+                // Add keyboard support for modal
+                document.addEventListener('keydown', function(event) {
+                    if (event.key === 'Escape') {
+                        closeLogModal();
+                    }
+                });
+            });
         </script>
     </body>
     </html>
