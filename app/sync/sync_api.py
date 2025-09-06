@@ -205,63 +205,362 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
 
 @app.route('/')
 def index():
-    """Simple web interface for testing"""
+    """Obsidian-inspired web interface for testing"""
     html = """
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Media Sync Tool</title>
         <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
-            .button { 
-                display: inline-block; 
-                background: #007cba; 
-                color: white; 
-                padding: 15px 30px; 
-                margin: 10px; 
-                text-decoration: none; 
-                border-radius: 5px; 
-                border: none;
-                font-size: 16px;
+            :root {
+                /* Obsidian-inspired color scheme */
+                --color-accent: #7c3aed;
+                --color-accent-hover: #8b5cf6;
+                --color-accent-muted: #a78bfa;
+                
+                /* Backgrounds */
+                --background-primary: #1e1e1e;
+                --background-secondary: #2d2d2d;
+                --background-secondary-alt: #363636;
+                --background-modifier-border: #404040;
+                --background-modifier-form-field: #2d2d2d;
+                --background-modifier-box-shadow: rgba(0, 0, 0, 0.3);
+                
+                /* Text colors */
+                --text-normal: #dcddde;
+                --text-muted: #999999;
+                --text-faint: #666666;
+                --text-on-accent: #ffffff;
+                
+                /* Status colors */
+                --text-success: #00c853;
+                --text-warning: #ffb300;
+                --text-error: #ff5722;
+                --background-success: rgba(0, 200, 83, 0.1);
+                --background-warning: rgba(255, 179, 0, 0.1);
+                --background-error: rgba(255, 87, 34, 0.1);
+                
+                /* Interactive elements */
+                --interactive-normal: #464749;
+                --interactive-hover: #4a4d52;
+                --interactive-accent: var(--color-accent);
+                --interactive-accent-hover: var(--color-accent-hover);
+                
+                /* Sizes */
+                --font-ui-smaller: 12px;
+                --font-ui-small: 13px;
+                --font-ui-medium: 14px;
+                --font-ui-large: 16px;
+                --font-ui-larger: 18px;
+                
+                --size-4-1: 4px;
+                --size-4-2: 8px;
+                --size-4-3: 12px;
+                --size-4-4: 16px;
+                --size-4-5: 20px;
+                --size-4-6: 24px;
+                --size-4-8: 32px;
+                --size-4-12: 48px;
+                
+                --radius-s: 6px;
+                --radius-m: 8px;
+                --radius-l: 10px;
+            }
+            
+            /* Light theme (default) */
+            @media (prefers-color-scheme: light) {
+                :root {
+                    --background-primary: #ffffff;
+                    --background-secondary: #f7f7f7;
+                    --background-secondary-alt: #e3e3e3;
+                    --background-modifier-border: #e3e3e3;
+                    --background-modifier-form-field: #ffffff;
+                    --background-modifier-box-shadow: rgba(0, 0, 0, 0.05);
+                    
+                    --text-normal: #2e3338;
+                    --text-muted: #7c7c7c;
+                    --text-faint: #b3b3b3;
+                    
+                    --interactive-normal: #f3f3f3;
+                    --interactive-hover: #e8e8e8;
+                }
+            }
+            
+            * {
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                background: var(--background-primary);
+                color: var(--text-normal);
+                margin: 0;
+                padding: var(--size-4-4);
+                line-height: 1.6;
+                min-height: 100vh;
+            }
+            
+            .container {
+                max-width: 600px;
+                margin: 0 auto;
+                padding: var(--size-4-6);
+            }
+            
+            .header {
+                text-align: center;
+                margin-bottom: var(--size-4-8);
+            }
+            
+            .header h1 {
+                font-size: var(--font-ui-larger);
+                font-weight: 600;
+                margin: 0 0 var(--size-4-2) 0;
+                color: var(--text-normal);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: var(--size-4-2);
+            }
+            
+            .header p {
+                color: var(--text-muted);
+                font-size: var(--font-ui-medium);
+                margin: 0;
+            }
+            
+            .options-panel {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                padding: var(--size-4-4);
+                margin-bottom: var(--size-4-6);
+                box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+            }
+            
+            .checkbox-container {
+                display: flex;
+                align-items: center;
+                gap: var(--size-4-2);
+                cursor: pointer;
+                user-select: none;
+            }
+            
+            .checkbox-container input[type="checkbox"] {
+                width: 16px;
+                height: 16px;
+                accent-color: var(--interactive-accent);
                 cursor: pointer;
             }
-            .button:hover { background: #005a8b; }
-            .result { 
-                margin: 20px 0; 
-                padding: 15px; 
-                border-radius: 5px; 
+            
+            .checkbox-container span {
+                font-size: var(--font-ui-medium);
+                color: var(--text-normal);
+            }
+            
+            .sync-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: var(--size-4-4);
+                margin-bottom: var(--size-4-6);
+            }
+            
+            @media (max-width: 768px) {
+                .sync-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+            
+            .sync-button {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: var(--size-4-2);
+                background: var(--interactive-accent);
+                color: var(--text-on-accent);
+                border: none;
+                border-radius: var(--radius-m);
+                padding: var(--size-4-4) var(--size-4-6);
+                font-size: var(--font-ui-medium);
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                box-shadow: 0 2px 4px var(--background-modifier-box-shadow);
+                min-height: 48px;
+                text-decoration: none;
+            }
+            
+            .sync-button:hover {
+                background: var(--interactive-accent-hover);
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px var(--background-modifier-box-shadow);
+            }
+            
+            .sync-button:active {
+                transform: translateY(0);
+                box-shadow: 0 2px 4px var(--background-modifier-box-shadow);
+            }
+            
+            .sync-button.secondary {
+                background: var(--interactive-normal);
+                color: var(--text-normal);
+            }
+            
+            .sync-button.secondary:hover {
+                background: var(--interactive-hover);
+            }
+            
+            .result-panel {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                padding: var(--size-4-4);
+                margin: var(--size-4-4) 0;
+                box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
                 display: none;
             }
-            .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-            .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
-            .loading { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
-            pre { white-space: pre-wrap; }
+            
+            .result-panel.success {
+                border-color: var(--text-success);
+                background: var(--background-success);
+            }
+            
+            .result-panel.error {
+                border-color: var(--text-error);
+                background: var(--background-error);
+            }
+            
+            .result-panel.loading {
+                border-color: var(--color-accent);
+                background: rgba(124, 58, 237, 0.1);
+            }
+            
+            .result-panel h3 {
+                margin: 0 0 var(--size-4-2) 0;
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+            }
+            
+            .result-panel pre {
+                white-space: pre-wrap;
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+                background: var(--background-modifier-form-field);
+                padding: var(--size-4-3);
+                border-radius: var(--radius-s);
+                margin: var(--size-4-2) 0 0 0;
+                overflow-x: auto;
+            }
+            
+            .progress-panel {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                padding: var(--size-4-4);
+                margin: var(--size-4-4) 0;
+                box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+                display: none;
+            }
+            
+            .progress-panel h3 {
+                margin: 0 0 var(--size-4-3) 0;
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+            }
+            
+            .progress-bar {
+                position: relative;
+                height: 8px;
+                background: var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                overflow: hidden;
+                margin: var(--size-4-2) 0;
+            }
+            
+            .progress-fill {
+                height: 100%;
+                background: var(--interactive-accent);
+                width: 0%;
+                transition: width 0.3s ease;
+                border-radius: var(--radius-s);
+            }
+            
+            .progress-text {
+                font-size: var(--font-ui-small);
+                color: var(--text-muted);
+                margin: var(--size-4-1) 0;
+            }
+            
+            /* Loading animation */
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+            
+            .loading .sync-button {
+                animation: pulse 2s infinite;
+                pointer-events: none;
+            }
+            
+            /* Focus styles for accessibility */
+            .sync-button:focus {
+                outline: 2px solid var(--interactive-accent);
+                outline-offset: 2px;
+            }
+            
+            .checkbox-container input:focus {
+                outline: 2px solid var(--interactive-accent);
+                outline-offset: 2px;
+            }
         </style>
     </head>
     <body>
-        <h1>🔄 Media Sync Tool</h1>
-        <p>Click a button to sync media from the respective source:</p>
-        
-        <div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="cleanupCheckbox" checked style="margin-right: 8px;">
-                <span>🧹 Enable cleanup (delete remote folders older than 2 days)</span>
-            </label>
-        </div>
-        
-        <button class="button" onclick="sync('forge')">🔥 Sync Forge (10.0.78.108:2222)</button>
-        <button class="button" onclick="sync('comfy')">🖼️ Sync Comfy (10.0.78.108:2223)</button>
-        <button class="button" onclick="sync('vastai')">☁️ Sync VastAI (Auto-discover)</button>
-        <button class="button" onclick="testSSH()">🔧 Test SSH Connectivity</button>
-        
-        <div id="result" class="result"></div>
-        <div id="progress" style="display: none; margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-            <h3 style="margin-top: 0;">Sync Progress</h3>
-            <div style="width: 100%; height: 20px; background: #e9ecef; border-radius: 10px; margin: 10px 0;">
-                <div id="progressBar" style="height: 100%; background: #007cba; width: 0%; border-radius: 10px; transition: width 0.3s;"></div>
+        <div class="container">
+            <div class="header">
+                <h1>
+                    <span>🔄</span>
+                    Media Sync Tool
+                </h1>
+                <p>Sync media from your configured sources</p>
             </div>
-            <div id="progressText">Initializing...</div>
-            <div id="progressDetails" style="font-size: 12px; color: #666; margin-top: 5px;"></div>
+            
+            <div class="options-panel">
+                <label class="checkbox-container">
+                    <input type="checkbox" id="cleanupCheckbox" checked>
+                    <span>🧹 Enable cleanup (delete remote folders older than 2 days)</span>
+                </label>
+            </div>
+            
+            <div class="sync-grid">
+                <button class="sync-button" onclick="sync('forge')">
+                    <span>🔥</span>
+                    Sync Forge
+                </button>
+                <button class="sync-button" onclick="sync('comfy')">
+                    <span>🖼️</span>
+                    Sync Comfy
+                </button>
+                <button class="sync-button" onclick="sync('vastai')">
+                    <span>☁️</span>
+                    Sync VastAI
+                </button>
+                <button class="sync-button secondary" onclick="testSSH()">
+                    <span>🔧</span>
+                    Test SSH
+                </button>
+            </div>
+            
+            <div id="result" class="result-panel"></div>
+            
+            <div id="progress" class="progress-panel">
+                <h3>Sync Progress</h3>
+                <div class="progress-bar">
+                    <div id="progressBar" class="progress-fill"></div>
+                </div>
+                <div id="progressText" class="progress-text">Initializing...</div>
+                <div id="progressDetails" class="progress-text"></div>
+            </div>
         </div>
         
         <script>
@@ -273,9 +572,9 @@ def index():
                 const progressDetails = document.getElementById('progressDetails');
                 const cleanupCheckbox = document.getElementById('cleanupCheckbox');
                 
-                resultDiv.className = 'result loading';
+                resultDiv.className = 'result-panel loading';
                 resultDiv.style.display = 'block';
-                resultDiv.innerHTML = `<strong>Starting ${type} sync...</strong><br>This may take several minutes.`;
+                resultDiv.innerHTML = `<h3>Starting ${type} sync...</h3><p>This may take several minutes.</p>`;
                 
                 // Show progress bar
                 progressDiv.style.display = 'block';
@@ -296,8 +595,8 @@ def index():
                     const data = await response.json();
                     
                     if (data.success) {
-                        resultDiv.className = 'result success';
-                        resultDiv.innerHTML = `<strong>✅ ${data.message}</strong><br><pre>${data.output || ''}</pre>`;
+                        resultDiv.className = 'result-panel success';
+                        resultDiv.innerHTML = `<h3>✅ ${data.message}</h3><pre>${data.output || ''}</pre>`;
                         
                         // Start polling for progress if sync_id is available
                         if (data.sync_id) {
@@ -306,13 +605,13 @@ def index():
                             progressDiv.style.display = 'none';
                         }
                     } else {
-                        resultDiv.className = 'result error';
-                        resultDiv.innerHTML = `<strong>❌ ${data.message}</strong><br><pre>${data.error || data.output || ''}</pre>`;
+                        resultDiv.className = 'result-panel error';
+                        resultDiv.innerHTML = `<h3>❌ ${data.message}</h3><pre>${data.error || data.output || ''}</pre>`;
                         progressDiv.style.display = 'none';
                     }
                 } catch (error) {
-                    resultDiv.className = 'result error';
-                    resultDiv.innerHTML = `<strong>❌ Request failed:</strong><br>${error.message}`;
+                    resultDiv.className = 'result-panel error';
+                    resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
                     progressDiv.style.display = 'none';
                 }
             }
@@ -402,40 +701,41 @@ def index():
             
             async function testSSH() {
                 const resultDiv = document.getElementById('result');
-                resultDiv.className = 'result loading';
+                resultDiv.className = 'result-panel loading';
                 resultDiv.style.display = 'block';
-                resultDiv.innerHTML = '<strong>Testing SSH connectivity...</strong><br>Checking connections to all configured hosts.';
+                resultDiv.innerHTML = '<h3>Testing SSH connectivity...</h3><p>Checking connections to all configured hosts.</p>';
                 
                 try {
                     const response = await fetch('/test/ssh', { method: 'POST' });
                     const data = await response.json();
                     
                     if (data.success) {
-                        let output = `<strong>✅ SSH connectivity test completed</strong><br><br>`;
-                        output += `<strong>Summary:</strong><br>`;
+                        let output = `<h3>✅ SSH connectivity test completed</h3>`;
+                        output += `<p><strong>Summary:</strong><br>`;
                         output += `Total hosts: ${data.summary.total_hosts}<br>`;
                         output += `Successful: ${data.summary.successful}<br>`;
                         output += `Failed: ${data.summary.failed}<br>`;
-                        output += `Success rate: ${data.summary.success_rate}<br><br>`;
-                        output += `<strong>Results:</strong><br>`;
+                        output += `Success rate: ${data.summary.success_rate}</p>`;
+                        output += `<p><strong>Results:</strong></p><pre>`;
                         
                         for (const [host, result] of Object.entries(data.results)) {
                             const status = result.success ? '✅' : '❌';
-                            output += `${status} ${host}: ${result.message}<br>`;
+                            output += `${status} ${host}: ${result.message}\n`;
                             if (!result.success && result.error) {
-                                output += `&nbsp;&nbsp;&nbsp;&nbsp;Error: ${result.error}<br>`;
+                                output += `    Error: ${result.error}\n`;
                             }
                         }
+                        output += `</pre>`;
                         
-                        resultDiv.className = 'result success';
+                        resultDiv.className = 'result-panel success';
                         resultDiv.innerHTML = output;
                     } else {
-                        resultDiv.className = 'result error';
-                        resultDiv.innerHTML = `<strong>❌ SSH test failed:</strong><br>${data.message}<br><pre>${data.error || ''}</pre>`;
+                        resultDiv.className = 'result-panel error';
+                        resultDiv.innerHTML = `<h3>❌ SSH test failed</h3><p>${data.message}</p><pre>${data.error || ''}</pre>`;
                     }
                 } catch (error) {
-                    resultDiv.className = 'result error';
-                    resultDiv.innerHTML = `<strong>❌ Request failed:</strong><br>${error.message}`;
+                    resultDiv.className = 'result-panel error';
+                    resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
                 }
             }
         </script>
