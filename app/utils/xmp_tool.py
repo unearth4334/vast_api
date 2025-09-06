@@ -45,9 +45,8 @@ def create_or_update_xmp(image_path, prompt, overwrite=False):
     """Create or update a sidecar .xmp file with the given prompt as CDATA description."""
     xmp_path = image_path + ".xmp"
 
-    if os.path.exists(xmp_path) and not overwrite:
-        print(f"⚠️  Skipping existing file: {xmp_path}")
-        return
+    # Note: XMP existence check is now done in main() for performance
+    # This function assumes it should create/update the XMP file
 
     # Build base XML structure (excluding the CDATA value for now)
     rdf = Element("x:xmpmeta", {
@@ -85,12 +84,15 @@ def create_or_update_xmp(image_path, prompt, overwrite=False):
 
 def main():
     import argparse
+    import time
 
     parser = argparse.ArgumentParser(description="Extract prompt metadata from PNG and write to XMP notes.")
     parser.add_argument("images", nargs="+", help="Input image files")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing .xmp files")
     args = parser.parse_args()
 
+    start_time = time.time()
+    
     valid_files = []
     for image_path in args.images:
         if is_valid_image(image_path):
@@ -102,12 +104,30 @@ def main():
         print("❌ No valid .png files to process.")
         sys.exit(1)
 
+    processed_count = 0
+    skipped_count = 0
+    
     for image_path in valid_files:
+        xmp_path = image_path + ".xmp"
+        
+        # Early check: skip PNG processing if XMP already exists and not overwriting
+        if os.path.exists(xmp_path) and not args.overwrite:
+            print(f"⚠️  Skipping existing file: {xmp_path}")
+            skipped_count += 1
+            continue
+            
         prompt = extract_prompt(image_path)
         if prompt:
             create_or_update_xmp(image_path, prompt, overwrite=args.overwrite)
+            processed_count += 1
         else:
             print(f"⚠️  No parameters found in: {image_path}")
+    
+    end_time = time.time()
+    total_time = end_time - start_time
+    
+    if processed_count > 0 or skipped_count > 0:
+        print(f"📊 Processed {processed_count} files, skipped {skipped_count} existing files in {total_time:.3f}s")
 
 if __name__ == "__main__":
     main()
