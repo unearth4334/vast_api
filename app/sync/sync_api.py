@@ -85,7 +85,6 @@ def save_sync_log(sync_type, result, start_time, end_time):
         log_filename = f"sync_log_{timestamp}.json"
         log_path = os.path.join(SYNC_LOG_DIR, log_filename)
         
-        # Create structured log data
         log_data = {
             "timestamp": start_time.isoformat(),
             "end_timestamp": end_time.isoformat(),
@@ -95,8 +94,12 @@ def save_sync_log(sync_type, result, start_time, end_time):
             "message": result.get('message', ''),
             "output": result.get('output', ''),
             "error": result.get('error', ''),
-            "duration_seconds": (end_time - start_time).total_seconds()
+            "duration_seconds": (end_time - start_time).total_seconds(),
+            # NEW:
+            "cleanup": result.get('cleanup', None),
+            "cmd": result.get('cmd', None),
         }
+
         
         # Add instance info if available (for VastAI syncs)
         if 'instance_info' in result:
@@ -114,59 +117,66 @@ def save_sync_log(sync_type, result, start_time, end_time):
         return None
 
 def run_sync(host, port, sync_type="unknown", cleanup=True):
-  
-    """Run the sync_outputs.sh script with specified host and port"""
     start_time = datetime.now()
-    
+
     try:
-        # Generate unique sync ID
         sync_id = str(uuid.uuid4())
-        
         logger.info(f"Starting {sync_type} sync to {host}:{port} with ID {sync_id} (cleanup: {cleanup})")
+
+        # Always pass an explicit cleanup argument
+        cleanup_arg = "--cleanup" if cleanup else "--no-cleanup"
 
         cmd = [
             'bash', SYNC_SCRIPT_PATH,
-            '-p', port,
-            '--host', host,
-            '--sync-id', sync_id
+            '-p', str(port),
+            '--host', str(host),
+            '--sync-id', sync_id,
+            cleanup_arg,
         ]
-        
-        # Add cleanup flag if enabled
-        if cleanup:
-            cmd.append('--cleanup')
+
+        # Also export an env var in case your script prefers it
+        env = os.environ.copy()
+        env["SYNC_CLEANUP"] = "1" if cleanup else "0"
+        env["SYNC_ID"] = sync_id  # often handy on the script side
 
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=300,
+            env=env,
         )
-
         end_time = datetime.now()
-        
+
+        # Build common payload
+        base = {
+            'cleanup': bool(cleanup),
+            'sync_id': sync_id,
+            'cmd': " ".join(cmd),  # visible in logs for debugging
+        }
+
         if result.returncode == 0:
             logger.info(f"{sync_type} sync completed successfully")
             sync_result = {
+                **base,
                 'success': True,
                 'message': f'{sync_type} sync completed successfully',
                 'output': result.stdout,
-                'sync_id': sync_id
             }
         else:
             logger.error(f"{sync_type} sync failed with return code {result.returncode}")
             sync_result = {
+                **base,
                 'success': False,
                 'message': f'{sync_type} sync failed',
                 'error': result.stderr,
                 'output': result.stdout,
-                'sync_id': sync_id
             }
 
-        # Save sync log
         log_filename = save_sync_log(sync_type, sync_result, start_time, end_time)
         if log_filename:
             sync_result['log_filename'] = log_filename
-            
+
         return sync_result
 
     except subprocess.TimeoutExpired:
@@ -174,9 +184,10 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
         logger.error(f"{sync_type} sync timed out")
         sync_result = {
             'success': False,
-            'message': f'{sync_type} sync timed out after 5 minutes'
+            'message': f'{sync_type} sync timed out after 5 minutes',
+            'cleanup': bool(cleanup),
+            'sync_id': sync_id,
         }
-        # Save timeout log
         save_sync_log(sync_type, sync_result, start_time, end_time)
         return sync_result
     except Exception as e:
@@ -184,11 +195,13 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
         logger.error(f"{sync_type} sync error: {str(e)}")
         sync_result = {
             'success': False,
-            'message': f'{sync_type} sync error: {str(e)}'
+            'message': f'{sync_type} sync error: {str(e)}',
+            'cleanup': bool(cleanup),
+            'sync_id': sync_id,
         }
-        # Save error log
         save_sync_log(sync_type, sync_result, start_time, end_time)
         return sync_result
+
 
 @app.route('/')
 def index():

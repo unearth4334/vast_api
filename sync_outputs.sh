@@ -242,6 +242,8 @@ else
   update_progress "remote_discovery" 15 "Retrieved UI_HOME: $UI_HOME"
 fi
 
+echo "🧪 Cleanup flag state: DO_CLEANUP=$DO_CLEANUP"
+
 # Detect outputs dir
 OUTPUT_DIR="$("${SSH_CMD[@]}" "if [ -d \"$UI_HOME/output\" ]; then echo output; elif [ -d \"$UI_HOME/outputs\" ]; then echo outputs; else echo ''; fi" || true)"
 if [ -z "$OUTPUT_DIR" ]; then
