@@ -1191,38 +1191,18 @@ def index():
                     
                     if (data.success && data.progress) {
                         const progress = data.progress;
-                        container.innerHTML = `
-                            <div class="progress-item" onclick="viewProgressDetails('${data.sync_id}')">
-                                <div class="progress-item-info">
-                                    <div class="progress-item-title">
-                                        Current Sync: ${progress.sync_type || 'Unknown'}
-                                    </div>
-                                    <div class="progress-item-details">
-                                        ${progress.current_stage || 'Initializing'} - ${progress.progress_percent || 0}%
-                                    </div>
-                                </div>
-                                <div class="progress-item-status">
-                                    <span class="status-badge ${progress.status === 'completed' ? 'completed' : progress.status === 'error' ? 'error' : 'running'}">
-                                        ${progress.status || 'running'}
-                                    </span>
-                                </div>
-                            </div>
-                        `;
+                        const syncType = progress.sync_type || 'Unknown';
+                        const currentStage = progress.current_stage || 'Initializing';
+                        const progressPercent = progress.progress_percent || 0;
+                        const status = progress.status === 'completed' ? 'completed' : progress.status === 'error' ? 'error' : 'running';
+                        const statusText = progress.status || 'running';
+                        
+                        container.innerHTML = '<div class="progress-item" onclick="viewProgressDetails(\\'' + data.sync_id + '\\')"><div class="progress-item-info"><div class="progress-item-title">Current Sync: ' + syncType + '</div><div class="progress-item-details">' + currentStage + ' - ' + progressPercent + '%</div></div><div class="progress-item-status"><span class="status-badge ' + status + '">' + statusText + '</span></div></div>';
                     } else {
-                        container.innerHTML = `
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📊</div>
-                                <p>No active sync operations</p>
-                            </div>
-                        `;
+                        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><p>No active sync operations</p></div>';
                     }
                 } catch (error) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">❌</div>
-                            <p>Failed to load current progress</p>
-                        </div>
-                    `;
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❌</div><p>Failed to load current progress</p></div>';
                 }
             }
             
@@ -1234,38 +1214,21 @@ def index():
                     const data = await response.json();
                     
                     if (data.success && data.items && data.items.length > 0) {
-                        container.innerHTML = data.items.map(item => `
-                            <div class="progress-item" onclick="viewProgressDetails('${item.sync_id}')">
-                                <div class="progress-item-info">
-                                    <div class="progress-item-title">
-                                        Sync ID: ${item.sync_id.substring(0, 8)}...
-                                    </div>
-                                    <div class="progress-item-details">
-                                        Progress: ${item.progress_percent || 0}% | Last Update: ${item.last_update ? new Date(item.last_update).toLocaleTimeString() : 'Unknown'}
-                                    </div>
-                                </div>
-                                <div class="progress-item-status">
-                                    <span class="status-badge ${item.status === 'completed' ? 'completed' : item.status === 'error' ? 'error' : 'running'}">
-                                        ${item.status || 'unknown'}
-                                    </span>
-                                </div>
-                            </div>
-                        `).join('');
+                        const itemsHtml = data.items.map(function(item) {
+                            const syncId = item.sync_id.substring(0, 8);
+                            const progressPercent = item.progress_percent || 0;
+                            const lastUpdate = item.last_update ? new Date(item.last_update).toLocaleTimeString() : 'Unknown';
+                            const status = item.status === 'completed' ? 'completed' : item.status === 'error' ? 'error' : 'running';
+                            const statusText = item.status || 'unknown';
+                            
+                            return '<div class="progress-item" onclick="viewProgressDetails(\\'' + item.sync_id + '\\')"><div class="progress-item-info"><div class="progress-item-title">Sync ID: ' + syncId + '...</div><div class="progress-item-details">Progress: ' + progressPercent + '% | Last Update: ' + lastUpdate + '</div></div><div class="progress-item-status"><span class="status-badge ' + status + '">' + statusText + '</span></div></div>';
+                        }).join('');
+                        container.innerHTML = itemsHtml;
                     } else {
-                        container.innerHTML = `
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📈</div>
-                                <p>No recent sync activity</p>
-                            </div>
-                        `;
+                        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📈</div><p>No recent sync activity</p></div>';
                     }
                 } catch (error) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">❌</div>
-                            <p>Failed to load recent activity</p>
-                        </div>
-                    `;
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❌</div><p>Failed to load recent activity</p></div>';
                 }
             }
             
@@ -1276,29 +1239,31 @@ def index():
                     
                     if (data.success && data.progress) {
                         const progress = data.progress;
-                        showLogModal(`Progress Details - ${syncId.substring(0, 8)}...`, `
-                            <div class="log-detail-section">
-                                <h4>Current Status</h4>
-                                <div class="log-detail-grid">
-                                    <span class="log-detail-label">Status:</span>
-                                    <span class="log-detail-value">${progress.status || 'Unknown'}</span>
-                                    <span class="log-detail-label">Stage:</span>
-                                    <span class="log-detail-value">${progress.current_stage || 'Unknown'}</span>
-                                    <span class="log-detail-label">Progress:</span>
-                                    <span class="log-detail-value">${progress.progress_percent || 0}%</span>
-                                    <span class="log-detail-label">Folders:</span>
-                                    <span class="log-detail-value">${progress.completed_folders || 0}/${progress.total_folders || 0}</span>
-                                    <span class="log-detail-label">Current Folder:</span>
-                                    <span class="log-detail-value">${progress.current_folder || 'None'}</span>
-                                </div>
-                            </div>
-                            ${progress.messages && progress.messages.length > 0 ? `
-                                <div class="log-detail-section">
-                                    <h4>Recent Messages</h4>
-                                    <pre>${progress.messages.slice(-10).map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.message}`).join('\n')}</pre>
-                                </div>
-                            ` : ''}
-                        `);
+                        const syncIdShort = syncId.substring(0, 8);
+                        const status = progress.status || 'Unknown';
+                        const currentStage = progress.current_stage || 'Unknown';
+                        const progressPercent = progress.progress_percent || 0;
+                        const completedFolders = progress.completed_folders || 0;
+                        const totalFolders = progress.total_folders || 0;
+                        const currentFolder = progress.current_folder || 'None';
+                        
+                        let content = '<div class="log-detail-section"><h4>Current Status</h4><div class="log-detail-grid">';
+                        content += '<span class="log-detail-label">Status:</span><span class="log-detail-value">' + status + '</span>';
+                        content += '<span class="log-detail-label">Stage:</span><span class="log-detail-value">' + currentStage + '</span>';
+                        content += '<span class="log-detail-label">Progress:</span><span class="log-detail-value">' + progressPercent + '%</span>';
+                        content += '<span class="log-detail-label">Folders:</span><span class="log-detail-value">' + completedFolders + '/' + totalFolders + '</span>';
+                        content += '<span class="log-detail-label">Current Folder:</span><span class="log-detail-value">' + currentFolder + '</span>';
+                        content += '</div></div>';
+                        
+                        if (progress.messages && progress.messages.length > 0) {
+                            content += '<div class="log-detail-section"><h4>Recent Messages</h4><pre>';
+                            const recentMessages = progress.messages.slice(-10).map(function(m) {
+                                return '[' + new Date(m.timestamp).toLocaleTimeString() + '] ' + m.message;
+                            }).join('\\n');
+                            content += recentMessages + '</pre></div>';
+                        }
+                        
+                        showLogModal('Progress Details - ' + syncIdShort + '...', content);
                     } else {
                         alert('Progress details not available');
                     }
@@ -1316,124 +1281,79 @@ def index():
                     const data = await response.json();
                     
                     if (data.success && data.logs && data.logs.length > 0) {
-                        container.innerHTML = data.logs.map(log => `
-                            <div class="log-item" onclick="viewLogDetails('${log.filename}')">
-                                <div class="log-item-info">
-                                    <div class="log-item-title">
-                                        ${log.sync_type || 'Unknown'} Sync
-                                    </div>
-                                    <div class="log-item-details">
-                                        ${new Date(log.timestamp).toLocaleString()} | Duration: ${formatDuration(log.duration_seconds)}
-                                    </div>
-                                </div>
-                                <div class="log-item-status">
-                                    <span class="status-badge ${log.success ? 'completed' : 'error'}">
-                                        ${log.success ? '✅' : '❌'}
-                                    </span>
-                                </div>
-                            </div>
-                        `).join('');
+                        const logsHtml = data.logs.map(function(log) {
+                            const syncType = log.sync_type || 'Unknown';
+                            const timestamp = new Date(log.timestamp).toLocaleString();
+                            const duration = formatDuration(log.duration_seconds);
+                            const statusBadge = log.success ? 'completed' : 'error';
+                            const statusIcon = log.success ? '✅' : '❌';
+                            
+                            return '<div class="log-item" onclick="viewLogDetails(\\'' + log.filename + '\\')"><div class="log-item-info"><div class="log-item-title">' + syncType + ' Sync</div><div class="log-item-details">' + timestamp + ' | Duration: ' + duration + '</div></div><div class="log-item-status"><span class="status-badge ' + statusBadge + '">' + statusIcon + '</span></div></div>';
+                        }).join('');
+                        container.innerHTML = logsHtml;
                     } else {
-                        container.innerHTML = `
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📋</div>
-                                <p>No sync logs available</p>
-                            </div>
-                        `;
+                        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No sync logs available</p></div>';
                     }
                 } catch (error) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">❌</div>
-                            <p>Failed to load logs</p>
-                        </div>
-                    `;
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">❌</div><p>Failed to load logs</p></div>';
                 }
             }
             
             async function viewLogDetails(filename) {
                 try {
-                    const response = await fetch(`/logs/${filename}`);
+                    const response = await fetch('/logs/' + filename);
                     const data = await response.json();
                     
                     if (data.success && data.log) {
                         const log = data.log;
-                        const title = `${log.sync_type || 'Unknown'} Sync - ${new Date(log.timestamp).toLocaleString()}`;
+                        const syncType = log.sync_type || 'Unknown';
+                        const timestamp = new Date(log.timestamp).toLocaleString();
+                        const title = syncType + ' Sync - ' + timestamp;
                         
-                        const content = `
-                            <div class="log-detail-section">
-                                <h4>Summary</h4>
-                                <div class="log-detail-grid">
-                                    <span class="log-detail-label">Type:</span>
-                                    <span class="log-detail-value">${log.sync_type || 'Unknown'}</span>
-                                    <span class="log-detail-label">Status:</span>
-                                    <span class="log-detail-value">${log.success ? '✅ Success' : '❌ Failed'}</span>
-                                    <span class="log-detail-label">Start Time:</span>
-                                    <span class="log-detail-value">${new Date(log.timestamp).toLocaleString()}</span>
-                                    <span class="log-detail-label">End Time:</span>
-                                    <span class="log-detail-value">${new Date(log.end_timestamp).toLocaleString()}</span>
-                                    <span class="log-detail-label">Duration:</span>
-                                    <span class="log-detail-value">${formatDuration(log.duration_seconds)}</span>
-                                    ${log.sync_id ? `
-                                        <span class="log-detail-label">Sync ID:</span>
-                                        <span class="log-detail-value">${log.sync_id}</span>
-                                    ` : ''}
-                                    ${log.cleanup !== undefined ? `
-                                        <span class="log-detail-label">Cleanup:</span>
-                                        <span class="log-detail-value">${log.cleanup ? 'Enabled' : 'Disabled'}</span>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            
-                            <div class="log-detail-section">
-                                <h4>Message</h4>
-                                <p>${log.message || 'No message available'}</p>
-                            </div>
-                            
-                            ${log.output ? `
-                                <div class="log-detail-section">
-                                    <h4>Output</h4>
-                                    <pre>${log.output}</pre>
-                                </div>
-                            ` : ''}
-                            
-                            ${log.error ? `
-                                <div class="log-detail-section">
-                                    <h4>Error</h4>
-                                    <pre>${log.error}</pre>
-                                </div>
-                            ` : ''}
-                            
-                            ${log.instance_info ? `
-                                <div class="log-detail-section">
-                                    <h4>Instance Info</h4>
-                                    <div class="log-detail-grid">
-                                        <span class="log-detail-label">ID:</span>
-                                        <span class="log-detail-value">${log.instance_info.id || 'Unknown'}</span>
-                                        <span class="log-detail-label">GPU:</span>
-                                        <span class="log-detail-value">${log.instance_info.gpu || 'Unknown'}</span>
-                                        <span class="log-detail-label">Host:</span>
-                                        <span class="log-detail-value">${log.instance_info.host || 'Unknown'}</span>
-                                        <span class="log-detail-label">Port:</span>
-                                        <span class="log-detail-value">${log.instance_info.port || 'Unknown'}</span>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            
-                            ${log.cmd ? `
-                                <div class="log-detail-section">
-                                    <h4>Command</h4>
-                                    <pre>${log.cmd}</pre>
-                                </div>
-                            ` : ''}
-                        `;
+                        let content = '<div class="log-detail-section"><h4>Summary</h4><div class="log-detail-grid">';
+                        content += '<span class="log-detail-label">Type:</span><span class="log-detail-value">' + syncType + '</span>';
+                        content += '<span class="log-detail-label">Status:</span><span class="log-detail-value">' + (log.success ? '✅ Success' : '❌ Failed') + '</span>';
+                        content += '<span class="log-detail-label">Start Time:</span><span class="log-detail-value">' + new Date(log.timestamp).toLocaleString() + '</span>';
+                        content += '<span class="log-detail-label">End Time:</span><span class="log-detail-value">' + new Date(log.end_timestamp).toLocaleString() + '</span>';
+                        content += '<span class="log-detail-label">Duration:</span><span class="log-detail-value">' + formatDuration(log.duration_seconds) + '</span>';
+                        
+                        if (log.sync_id) {
+                            content += '<span class="log-detail-label">Sync ID:</span><span class="log-detail-value">' + log.sync_id + '</span>';
+                        }
+                        if (log.cleanup !== undefined) {
+                            content += '<span class="log-detail-label">Cleanup:</span><span class="log-detail-value">' + (log.cleanup ? 'Enabled' : 'Disabled') + '</span>';
+                        }
+                        content += '</div></div>';
+                        
+                        content += '<div class="log-detail-section"><h4>Message</h4><p>' + (log.message || 'No message available') + '</p></div>';
+                        
+                        if (log.output) {
+                            content += '<div class="log-detail-section"><h4>Output</h4><pre>' + log.output + '</pre></div>';
+                        }
+                        
+                        if (log.error) {
+                            content += '<div class="log-detail-section"><h4>Error</h4><pre>' + log.error + '</pre></div>';
+                        }
+                        
+                        if (log.instance_info) {
+                            content += '<div class="log-detail-section"><h4>Instance Info</h4><div class="log-detail-grid">';
+                            content += '<span class="log-detail-label">ID:</span><span class="log-detail-value">' + (log.instance_info.id || 'Unknown') + '</span>';
+                            content += '<span class="log-detail-label">GPU:</span><span class="log-detail-value">' + (log.instance_info.gpu || 'Unknown') + '</span>';
+                            content += '<span class="log-detail-label">Host:</span><span class="log-detail-value">' + (log.instance_info.host || 'Unknown') + '</span>';
+                            content += '<span class="log-detail-label">Port:</span><span class="log-detail-value">' + (log.instance_info.port || 'Unknown') + '</span>';
+                            content += '</div></div>';
+                        }
+                        
+                        if (log.cmd) {
+                            content += '<div class="log-detail-section"><h4>Command</h4><pre>' + log.cmd + '</pre></div>';
+                        }
                         
                         showLogModal(title, content);
                     } else {
                         alert('Log details not available');
                     }
                 } catch (error) {
-                    alert(`Failed to load log details: ${error.message}`);
+                    alert('Failed to load log details: ' + error.message);
                 }
             }
             
