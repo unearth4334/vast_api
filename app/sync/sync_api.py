@@ -13,13 +13,24 @@ import glob
 from datetime import datetime
 from flask import Flask, jsonify, request  # request added for after_request hook
 from flask_cors import CORS
-from ..vastai.vast_manager import VastManager
+
+# Handle imports for both module and direct execution
+try:
+    from ..vastai.vast_manager import VastManager
+except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from vastai.vast_manager import VastManager
 
 # Import SSH test functionality
 try:
     from .ssh_test import SSHTester
 except ImportError:
-    SSHTester = None
+    try:
+        from ssh_test import SSHTester
+    except ImportError:
+        SSHTester = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -513,6 +524,183 @@ def index():
                 outline: 2px solid var(--interactive-accent);
                 outline-offset: 2px;
             }
+            
+            /* Logs panel styles */
+            .logs-panel {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                padding: var(--size-4-4);
+                margin: var(--size-4-4) 0;
+                box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+            }
+            
+            .logs-panel h3 {
+                margin: 0 0 var(--size-4-3) 0;
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            
+            .refresh-logs-btn {
+                background: var(--interactive-normal);
+                color: var(--text-normal);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-1) var(--size-4-3);
+                font-size: var(--font-ui-small);
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+            
+            .refresh-logs-btn:hover {
+                background: var(--interactive-hover);
+            }
+            
+            .logs-list {
+                display: flex;
+                flex-direction: column;
+                gap: var(--size-4-2);
+                margin-top: var(--size-4-3);
+            }
+            
+            .log-item {
+                background: var(--background-primary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                box-shadow: 0 1px 3px var(--background-modifier-box-shadow);
+            }
+            
+            .log-item:hover {
+                background: var(--background-modifier-hover);
+                transform: translateY(-1px);
+                box-shadow: 0 2px 6px var(--background-modifier-box-shadow);
+            }
+            
+            .log-item.success {
+                border-left: 4px solid var(--text-success);
+            }
+            
+            .log-item.error {
+                border-left: 4px solid var(--text-error);
+            }
+            
+            .log-summary {
+                font-size: var(--font-ui-small);
+                color: var(--text-normal);
+                margin: 0;
+                line-height: 1.4;
+            }
+            
+            .log-meta {
+                font-size: var(--font-ui-smaller);
+                color: var(--text-muted);
+                margin-top: var(--size-4-1);
+            }
+            
+            /* Log overlay modal */
+            .log-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+                backdrop-filter: blur(2px);
+            }
+            
+            .log-modal {
+                background: var(--background-primary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                width: 90vw;
+                max-width: 800px;
+                max-height: 80vh;
+                box-shadow: 0 8px 32px var(--background-modifier-box-shadow);
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .log-modal-header {
+                padding: var(--size-4-4);
+                border-bottom: 1px solid var(--background-modifier-border);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: var(--background-secondary);
+            }
+            
+            .log-modal-title {
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+                margin: 0;
+                color: var(--text-normal);
+            }
+            
+            .close-modal-btn {
+                background: var(--interactive-normal);
+                color: var(--text-normal);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-2);
+                cursor: pointer;
+                font-size: var(--font-ui-medium);
+                line-height: 1;
+                transition: background 0.2s ease;
+            }
+            
+            .close-modal-btn:hover {
+                background: var(--interactive-hover);
+            }
+            
+            .log-modal-content {
+                padding: var(--size-4-4);
+                overflow-y: auto;
+                flex: 1;
+            }
+            
+            .log-detail-section {
+                margin-bottom: var(--size-4-4);
+            }
+            
+            .log-detail-section h4 {
+                margin: 0 0 var(--size-4-2) 0;
+                font-size: var(--font-ui-small);
+                font-weight: 600;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            .log-detail-content {
+                background: var(--background-modifier-form-field);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3);
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+            
+            .no-logs-message {
+                text-align: center;
+                color: var(--text-muted);
+                font-style: italic;
+                padding: var(--size-4-6);
+            }
         </style>
     </head>
     <body>
@@ -560,6 +748,29 @@ def index():
                 </div>
                 <div id="progressText" class="progress-text">Initializing...</div>
                 <div id="progressDetails" class="progress-text"></div>
+            </div>
+            
+            <div id="logs" class="logs-panel">
+                <h3>
+                    Recent Sync Logs
+                    <button class="refresh-logs-btn" onclick="refreshLogs()">🔄 Refresh</button>
+                </h3>
+                <div id="logsList" class="logs-list">
+                    <div class="no-logs-message">Click refresh to load recent logs</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Log detail overlay -->
+        <div id="logOverlay" class="log-overlay">
+            <div class="log-modal">
+                <div class="log-modal-header">
+                    <h3 id="logModalTitle" class="log-modal-title">Log Details</h3>
+                    <button class="close-modal-btn" onclick="closeLogModal()">✕</button>
+                </div>
+                <div id="logModalContent" class="log-modal-content">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
             </div>
         </div>
         
@@ -750,6 +961,165 @@ def index():
                     resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
                 }
             }
+            
+            // Logs functionality
+            async function refreshLogs() {
+                const logsList = document.getElementById('logsList');
+                const refreshBtn = document.querySelector('.refresh-logs-btn');
+                
+                // Show loading state
+                refreshBtn.textContent = '⟳ Loading...';
+                refreshBtn.disabled = true;
+                logsList.innerHTML = '<div class="no-logs-message">Loading logs...</div>';
+                
+                try {
+                    const response = await fetch('/logs/manifest');
+                    const data = await response.json();
+                    
+                    if (data.success && data.logs && data.logs.length > 0) {
+                        // Get latest 5 logs
+                        const recentLogs = data.logs.slice(0, 5);
+                        displayLogs(recentLogs);
+                    } else {
+                        logsList.innerHTML = '<div class="no-logs-message">No logs available</div>';
+                    }
+                } catch (error) {
+                    logsList.innerHTML = '<div class="no-logs-message">Failed to load logs: ' + error.message + '</div>';
+                } finally {
+                    refreshBtn.textContent = '🔄 Refresh';
+                    refreshBtn.disabled = false;
+                }
+            }
+            
+            function displayLogs(logs) {
+                const logsList = document.getElementById('logsList');
+                logsList.innerHTML = '';
+                
+                logs.forEach(log => {
+                    const logItem = document.createElement('div');
+                    logItem.className = `log-item ${log.success ? 'success' : 'error'}`;
+                    logItem.onclick = () => showLogDetails(log.filename);
+                    
+                    // Format timestamp
+                    const date = new Date(log.timestamp);
+                    const formattedDate = date.toLocaleDateString('en-US', { 
+                        month: '2-digit', 
+                        day: '2-digit', 
+                        year: 'numeric' 
+                    });
+                    const formattedTime = date.toLocaleTimeString('en-US', { 
+                        hour12: false,
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit' 
+                    });
+                    
+                    // Format duration
+                    const duration = log.duration_seconds ? `(${log.duration_seconds}s)` : '';
+                    
+                    // Create log summary in the requested format
+                    const statusIcon = log.success ? '✅' : '❌';
+                    const syncType = log.sync_type ? log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1) : 'Unknown';
+                    
+                    logItem.innerHTML = `
+                        <div class="log-summary">
+                            ${statusIcon} ${syncType} - ${formattedDate}, ${formattedTime}<br>
+                            ${log.message} ${duration}
+                        </div>
+                        <div class="log-meta">Click to view details</div>
+                    `;
+                    
+                    logsList.appendChild(logItem);
+                });
+            }
+            
+            async function showLogDetails(filename) {
+                const overlay = document.getElementById('logOverlay');
+                const modalTitle = document.getElementById('logModalTitle');
+                const modalContent = document.getElementById('logModalContent');
+                
+                // Show loading state
+                modalTitle.textContent = 'Loading log details...';
+                modalContent.innerHTML = '<div class="no-logs-message">Loading...</div>';
+                overlay.style.display = 'flex';
+                
+                try {
+                    const response = await fetch(`/logs/${filename}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.log) {
+                        const log = data.log;
+                        
+                        // Update modal title
+                        const syncType = log.sync_type ? log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1) : 'Unknown';
+                        const date = new Date(log.timestamp);
+                        const formattedDateTime = date.toLocaleString('en-US');
+                        modalTitle.textContent = `${syncType} Sync - ${formattedDateTime}`;
+                        
+                        // Build modal content
+                        let content = '';
+                        
+                        // Basic info section
+                        content += '<div class="log-detail-section">';
+                        content += '<h4>Summary</h4>';
+                        content += '<div class="log-detail-content">';
+                        content += `Status: ${log.success ? '✅ Success' : '❌ Failed'}\n`;
+                        content += `Type: ${syncType}\n`;
+                        content += `Message: ${log.message}\n`;
+                        if (log.duration_seconds) {
+                            content += `Duration: ${log.duration_seconds} seconds\n`;
+                        }
+                        if (log.sync_id) {
+                            content += `Sync ID: ${log.sync_id}\n`;
+                        }
+                        content += '</div>';
+                        content += '</div>';
+                        
+                        // Output section (scrollable callout as requested)
+                        if (log.output) {
+                            content += '<div class="log-detail-section">';
+                            content += '<h4>Output</h4>';
+                            content += '<div class="log-detail-content">';
+                            content += log.output;
+                            content += '</div>';
+                            content += '</div>';
+                        }
+                        
+                        // Error section if there's an error
+                        if (log.error) {
+                            content += '<div class="log-detail-section">';
+                            content += '<h4>Error</h4>';
+                            content += '<div class="log-detail-content">';
+                            content += log.error;
+                            content += '</div>';
+                            content += '</div>';
+                        }
+                        
+                        modalContent.innerHTML = content;
+                    } else {
+                        modalTitle.textContent = 'Error';
+                        modalContent.innerHTML = '<div class="no-logs-message">Failed to load log details</div>';
+                    }
+                } catch (error) {
+                    modalTitle.textContent = 'Error';
+                    modalContent.innerHTML = '<div class="no-logs-message">Failed to load log details: ' + error.message + '</div>';
+                }
+            }
+            
+            function closeLogModal() {
+                const overlay = document.getElementById('logOverlay');
+                overlay.style.display = 'none';
+            }
+            
+            // Close modal when clicking outside of it
+            document.addEventListener('DOMContentLoaded', function() {
+                const overlay = document.getElementById('logOverlay');
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) {
+                        closeLogModal();
+                    }
+                });
+            });
         </script>
     </body>
     </html>
