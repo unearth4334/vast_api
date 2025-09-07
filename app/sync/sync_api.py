@@ -594,24 +594,24 @@ def index():
                     });
                     const data = await response.json();
                     
+                    // Start polling for progress if sync_id is available (regardless of initial success)
+                    if (data.sync_id) {
+                        pollProgress(data.sync_id);
+                    } else {
+                        progressDiv.style.display = 'none';
+                    }
+                    
                     if (data.success) {
                         resultDiv.className = 'result-panel success';
                         resultDiv.innerHTML = `<h3>✅ ${data.message}</h3><pre>${data.output || ''}</pre>`;
-                        
-                        // Start polling for progress if sync_id is available
-                        if (data.sync_id) {
-                            pollProgress(data.sync_id);
-                        } else {
-                            progressDiv.style.display = 'none';
-                        }
                     } else {
                         resultDiv.className = 'result-panel error';
                         resultDiv.innerHTML = `<h3>❌ ${data.message}</h3><pre>${data.error || data.output || ''}</pre>`;
-                        progressDiv.style.display = 'none';
                     }
                 } catch (error) {
                     resultDiv.className = 'result-panel error';
                     resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
+                    // Keep progress bar visible if we might have a sync running
                     progressDiv.style.display = 'none';
                 }
             }
@@ -657,9 +657,21 @@ def index():
                                 }
                             }
                             
-                            // Check if completed
+                            // Check if completed or failed
                             if (progress.status === 'completed' || progress.progress_percent >= 100) {
                                 progressText.textContent = "Sync completed successfully!";
+                                setTimeout(() => {
+                                    progressDiv.style.display = 'none';
+                                }, 3000);
+                                return;
+                            } else if (progress.status === 'error' || progress.status === 'failed') {
+                                progressText.textContent = "Sync failed";
+                                if (progress.messages && progress.messages.length > 0) {
+                                    const lastMessage = progress.messages[progress.messages.length - 1];
+                                    if (lastMessage && lastMessage.message) {
+                                        progressDetails.textContent = lastMessage.message;
+                                    }
+                                }
                                 setTimeout(() => {
                                     progressDiv.style.display = 'none';
                                 }, 3000);
