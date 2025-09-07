@@ -513,6 +513,214 @@ def index():
                 outline: 2px solid var(--interactive-accent);
                 outline-offset: 2px;
             }
+            
+            /* Logs Panel Styles */
+            .logs-panel {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                padding: var(--size-4-4);
+                margin-top: var(--size-4-6);
+                box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+            }
+            
+            .logs-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: var(--size-4-4);
+                gap: var(--size-4-4);
+            }
+            
+            .logs-header h3 {
+                margin: 0;
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+                color: var(--text-normal);
+                display: flex;
+                align-items: center;
+                gap: var(--size-4-2);
+            }
+            
+            .logs-header .sync-button {
+                min-height: auto;
+                padding: var(--size-4-2) var(--size-4-3);
+                font-size: var(--font-ui-small);
+            }
+            
+            .logs-loading {
+                text-align: center;
+                color: var(--text-muted);
+                font-style: italic;
+                padding: var(--size-4-4);
+            }
+            
+            .logs-list {
+                max-height: 300px;
+                overflow-y: auto;
+            }
+            
+            .log-item {
+                background: var(--background-modifier-form-field);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3);
+                margin-bottom: var(--size-4-2);
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .log-item:hover {
+                background: var(--interactive-hover);
+                border-color: var(--interactive-accent);
+                transform: translateY(-1px);
+                box-shadow: 0 2px 4px var(--background-modifier-box-shadow);
+            }
+            
+            .log-item:active {
+                transform: translateY(0);
+            }
+            
+            .log-item-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: var(--size-4-2);
+                margin-bottom: var(--size-4-1);
+            }
+            
+            .log-item-title {
+                font-weight: 600;
+                color: var(--text-normal);
+                font-size: var(--font-ui-medium);
+                display: flex;
+                align-items: center;
+                gap: var(--size-4-1);
+            }
+            
+            .log-item-timestamp {
+                font-size: var(--font-ui-smaller);
+                color: var(--text-muted);
+            }
+            
+            .log-item-details {
+                font-size: var(--font-ui-small);
+                color: var(--text-muted);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .log-details {
+                background: var(--background-primary);
+                border: 2px solid var(--interactive-accent);
+                border-radius: var(--radius-m);
+                margin-top: var(--size-4-4);
+                box-shadow: 0 4px 12px var(--background-modifier-box-shadow);
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            
+            .log-details-header {
+                background: var(--background-secondary-alt);
+                padding: var(--size-4-3);
+                border-bottom: 1px solid var(--background-modifier-border);
+                display: flex;
+                justify-content: flex-end;
+                border-radius: var(--radius-m) var(--radius-m) 0 0;
+            }
+            
+            .close-button {
+                background: var(--text-error);
+                color: var(--text-on-accent);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-1) var(--size-4-2);
+                font-size: var(--font-ui-smaller);
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .close-button:hover {
+                background: #e53e3e;
+                transform: translateY(-1px);
+            }
+            
+            .log-details-content {
+                padding: var(--size-4-4);
+            }
+            
+            .log-details-content h4 {
+                margin: 0 0 var(--size-4-3) 0;
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+                color: var(--text-normal);
+                display: flex;
+                align-items: center;
+                gap: var(--size-4-1);
+            }
+            
+            .log-details-section {
+                margin-bottom: var(--size-4-3);
+            }
+            
+            .log-details-section strong {
+                color: var(--text-normal);
+                font-weight: 600;
+            }
+            
+            .log-details-section pre {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3);
+                margin: var(--size-4-2) 0 0 0;
+                overflow-x: auto;
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+                white-space: pre-wrap;
+                max-height: 150px;
+                overflow-y: auto;
+            }
+            
+            .log-details-section.error pre {
+                background: var(--background-error);
+                border-color: var(--text-error);
+                color: var(--text-error);
+            }
+            
+            .log-details-meta {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: var(--size-4-2);
+                margin-bottom: var(--size-4-3);
+                font-size: var(--font-ui-small);
+            }
+            
+            .log-details-meta-item {
+                display: flex;
+                flex-direction: column;
+                gap: var(--size-4-1);
+            }
+            
+            .log-details-meta-label {
+                font-weight: 600;
+                color: var(--text-normal);
+            }
+            
+            .log-details-meta-value {
+                color: var(--text-muted);
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                word-break: break-all;
+            }
+            
+            .empty-logs {
+                text-align: center;
+                color: var(--text-muted);
+                font-style: italic;
+                padding: var(--size-4-6);
+            }
         </style>
     </head>
     <body>
@@ -560,6 +768,28 @@ def index():
                 </div>
                 <div id="progressText" class="progress-text">Initializing...</div>
                 <div id="progressDetails" class="progress-text"></div>
+            </div>
+            
+            <!-- Logs Panel -->
+            <div class="logs-panel">
+                <div class="logs-header">
+                    <h3>
+                        <span>📋</span>
+                        Sync Logs
+                    </h3>
+                    <button id="refreshLogsBtn" class="sync-button secondary">
+                        <span>🔄</span>
+                        Refresh
+                    </button>
+                </div>
+                <div id="logsLoading" class="logs-loading">Loading logs...</div>
+                <div id="logsList" class="logs-list" style="display: none;"></div>
+                <div id="logDetails" class="log-details" style="display: none;">
+                    <div class="log-details-header">
+                        <button id="closeLogBtn" class="close-button">✕ Close</button>
+                    </div>
+                    <div id="logDetailsContent" class="log-details-content"></div>
+                </div>
             </div>
         </div>
         
@@ -750,6 +980,220 @@ def index():
                     resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
                 }
             }
+            
+            // Logs functionality
+            function formatDuration(seconds) {
+                if (!seconds) return '0s';
+                if (seconds < 60) {
+                    return `${Math.round(seconds)}s`;
+                } else if (seconds < 3600) {
+                    return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+                } else {
+                    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+                }
+            }
+            
+            function formatTimestamp(isoString) {
+                try {
+                    const date = new Date(isoString);
+                    return date.toLocaleString();
+                } catch (e) {
+                    return 'Invalid date';
+                }
+            }
+            
+            async function loadLogs() {
+                const logsLoading = document.getElementById('logsLoading');
+                const logsList = document.getElementById('logsList');
+                const logDetails = document.getElementById('logDetails');
+                
+                logsLoading.style.display = 'block';
+                logsList.style.display = 'none';
+                logDetails.style.display = 'none';
+                logsLoading.textContent = 'Loading logs...';
+                
+                try {
+                    const response = await fetch('/logs/manifest');
+                    const data = await response.json();
+                    
+                    logsLoading.style.display = 'none';
+                    
+                    if (data.success && data.logs && data.logs.length > 0) {
+                        // Show last 5 logs
+                        const recentLogs = data.logs.slice(0, 5);
+                        
+                        let logsHTML = '';
+                        if (recentLogs.length === 0) {
+                            logsHTML = '<div class="empty-logs">No sync logs found.</div>';
+                        } else {
+                            recentLogs.forEach((log) => {
+                                const statusIcon = log.success ? '✅' : '❌';
+                                const timestamp = formatTimestamp(log.timestamp);
+                                const duration = formatDuration(log.duration_seconds);
+                                
+                                logsHTML += `
+                                    <div class="log-item" data-filename="${log.filename}">
+                                        <div class="log-item-header">
+                                            <div class="log-item-title">
+                                                ${statusIcon} ${log.sync_type}
+                                            </div>
+                                            <div class="log-item-timestamp">${timestamp}</div>
+                                        </div>
+                                        <div class="log-item-details">
+                                            <span>${log.message}</span>
+                                            <span>${duration}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        }
+                        
+                        logsList.innerHTML = logsHTML;
+                        logsList.style.display = 'block';
+                        
+                        // Add click handlers to log items
+                        const logItems = logsList.querySelectorAll('.log-item');
+                        logItems.forEach(item => {
+                            item.addEventListener('click', () => {
+                                const filename = item.getAttribute('data-filename');
+                                showLogDetails(filename);
+                            });
+                        });
+                        
+                    } else {
+                        logsList.innerHTML = '<div class="empty-logs">No sync logs found.</div>';
+                        logsList.style.display = 'block';
+                    }
+                    
+                } catch (error) {
+                    logsLoading.style.display = 'none';
+                    logsList.innerHTML = `<div class="empty-logs" style="color: var(--text-error);">Failed to load logs: ${error.message}</div>`;
+                    logsList.style.display = 'block';
+                }
+            }
+            
+            async function showLogDetails(filename) {
+                const logDetails = document.getElementById('logDetails');
+                const logDetailsContent = document.getElementById('logDetailsContent');
+                
+                logDetailsContent.innerHTML = 'Loading log details...';
+                logDetails.style.display = 'block';
+                
+                try {
+                    const response = await fetch(`/logs/${filename}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.log) {
+                        const log = data.log;
+                        const statusIcon = log.success ? '✅' : '❌';
+                        const statusText = log.success ? 'Success' : 'Failed';
+                        
+                        let detailsHTML = `
+                            <h4>${statusIcon} ${log.sync_type} Sync - ${statusText}</h4>
+                            
+                            <div class="log-details-meta">
+                                <div class="log-details-meta-item">
+                                    <div class="log-details-meta-label">Timestamp</div>
+                                    <div class="log-details-meta-value">${formatTimestamp(log.timestamp)}</div>
+                                </div>
+                                <div class="log-details-meta-item">
+                                    <div class="log-details-meta-label">Duration</div>
+                                    <div class="log-details-meta-value">${formatDuration(log.duration_seconds)}</div>
+                                </div>
+                                <div class="log-details-meta-item">
+                                    <div class="log-details-meta-label">Sync ID</div>
+                                    <div class="log-details-meta-value">${log.sync_id || 'N/A'}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="log-details-section">
+                                <strong>Message:</strong> ${log.message}
+                            </div>
+                        `;
+                        
+                        // Add instance info for VastAI syncs
+                        if (log.instance_info) {
+                            detailsHTML += `
+                                <div class="log-details-section">
+                                    <strong>Instance Info:</strong><br>
+                                    ID: ${log.instance_info.id}<br>
+                                    GPU: ${log.instance_info.gpu || 'N/A'}<br>
+                                    Host: ${log.instance_info.host}:${log.instance_info.port}
+                                </div>
+                            `;
+                        }
+                        
+                        // Add output if available
+                        if (log.output) {
+                            detailsHTML += `
+                                <div class="log-details-section">
+                                    <strong>Output:</strong>
+                                    <pre>${log.output}</pre>
+                                </div>
+                            `;
+                        }
+                        
+                        // Add error if available
+                        if (log.error) {
+                            detailsHTML += `
+                                <div class="log-details-section error">
+                                    <strong>Error:</strong>
+                                    <pre>${log.error}</pre>
+                                </div>
+                            `;
+                        }
+                        
+                        logDetailsContent.innerHTML = detailsHTML;
+                    } else {
+                        logDetailsContent.innerHTML = `<p style="color: var(--text-error);">Failed to load log details: ${data.message || 'Unknown error'}</p>`;
+                    }
+                } catch (error) {
+                    logDetailsContent.innerHTML = `<p style="color: var(--text-error);">Error loading log details: ${error.message}</p>`;
+                }
+            }
+            
+            async function refreshLogs() {
+                const refreshBtn = document.getElementById('refreshLogsBtn');
+                const originalHTML = refreshBtn.innerHTML;
+                
+                refreshBtn.innerHTML = '<span>🔄</span>Refreshing...';
+                refreshBtn.disabled = true;
+                refreshBtn.style.background = 'var(--text-warning)';
+                
+                try {
+                    await loadLogs();
+                    refreshBtn.style.background = 'var(--text-success)';
+                    refreshBtn.innerHTML = '<span>✅</span>Refreshed';
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        refreshBtn.innerHTML = originalHTML;
+                        refreshBtn.style.background = '';
+                        refreshBtn.disabled = false;
+                    }, 2000);
+                } catch (error) {
+                    refreshBtn.style.background = 'var(--text-error)';
+                    refreshBtn.innerHTML = '<span>❌</span>Error';
+                    
+                    // Reset button after 3 seconds
+                    setTimeout(() => {
+                        refreshBtn.innerHTML = originalHTML;
+                        refreshBtn.style.background = '';
+                        refreshBtn.disabled = false;
+                    }, 3000);
+                }
+            }
+            
+            // Initialize logs on page load
+            document.addEventListener('DOMContentLoaded', () => {
+                loadLogs();
+                
+                // Add event listeners
+                document.getElementById('refreshLogsBtn').addEventListener('click', refreshLogs);
+                document.getElementById('closeLogBtn').addEventListener('click', () => {
+                    document.getElementById('logDetails').style.display = 'none';
+                });
+            });
         </script>
     </body>
     </html>
