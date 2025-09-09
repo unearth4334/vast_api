@@ -249,7 +249,7 @@ def index():
                 --text-success: #00c853;
                 --text-warning: #ffb300;
                 --text-error: #ff5722;
-                --background-success: rgba(0, 200, 83, 0.1);
+                --background-success: rgba(0, 200, 83, 0.15);
                 --background-warning: rgba(255, 179, 0, 0.1);
                 --background-error: rgba(255, 87, 34, 0.1);
                 
@@ -435,6 +435,8 @@ def index():
             .result-panel.success {
                 border-color: var(--text-success);
                 background: var(--background-success);
+                box-shadow: 0 4px 12px rgba(0, 200, 83, 0.2);
+                border-left-width: 6px;
             }
             
             .result-panel.error {
@@ -451,6 +453,11 @@ def index():
                 margin: 0 0 var(--size-4-2) 0;
                 font-size: var(--font-ui-medium);
                 font-weight: 600;
+            }
+            
+            .result-panel.success h3 {
+                color: var(--text-success);
+                font-weight: 700;
             }
             
             .result-panel pre {
