@@ -86,6 +86,41 @@ def ensure_sync_log_dir():
     except Exception as e:
         logger.error(f"Failed to create sync log directory {SYNC_LOG_DIR}: {str(e)}")
 
+def parse_sync_stats(output):
+    """Parse sync statistics from script output"""
+    stats = {
+        'files_transferred': 0,
+        'folders_synced': 0,
+        'bytes_transferred': 0
+    }
+    
+    if not output:
+        return stats
+    
+    # Look for the summary line format: "SYNC_SUMMARY: Files transferred: X, Folders synced: Y, Data transferred: Z bytes"
+    for line in output.split('\n'):
+        if 'SYNC_SUMMARY:' in line:
+            try:
+                # Extract numbers from the summary line
+                import re
+                files_match = re.search(r'Files transferred:\s*(\d+)', line)
+                folders_match = re.search(r'Folders synced:\s*(\d+)', line)
+                bytes_match = re.search(r'Data transferred:\s*(\d+)', line)
+                
+                if files_match:
+                    stats['files_transferred'] = int(files_match.group(1))
+                if folders_match:
+                    stats['folders_synced'] = int(folders_match.group(1))
+                if bytes_match:
+                    stats['bytes_transferred'] = int(bytes_match.group(1))
+                    
+                break
+            except (ValueError, AttributeError):
+                # If parsing fails, keep defaults
+                pass
+    
+    return stats
+
 def save_sync_log(sync_type, result, start_time, end_time):
     """Save sync result to a timestamped JSON log file"""
     try:
@@ -95,6 +130,9 @@ def save_sync_log(sync_type, result, start_time, end_time):
         timestamp = start_time.strftime("%Y%m%d_%H%M")
         log_filename = f"sync_log_{timestamp}.json"
         log_path = os.path.join(SYNC_LOG_DIR, log_filename)
+        
+        # Parse sync statistics from output
+        sync_stats = parse_sync_stats(result.get('output', ''))
         
         log_data = {
             "timestamp": start_time.isoformat(),
@@ -109,6 +147,10 @@ def save_sync_log(sync_type, result, start_time, end_time):
             # NEW:
             "cleanup": result.get('cleanup', None),
             "cmd": result.get('cmd', None),
+            # File transfer statistics
+            "files_transferred": sync_stats['files_transferred'],
+            "folders_synced": sync_stats['folders_synced'],
+            "bytes_transferred": sync_stats['bytes_transferred'],
         }
 
         
@@ -168,11 +210,22 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
 
         if result.returncode == 0:
             logger.info(f"{sync_type} sync completed successfully")
+            # Parse sync statistics for summary
+            sync_stats = parse_sync_stats(result.stdout)
+            
             sync_result = {
                 **base,
                 'success': True,
                 'message': f'{sync_type} sync completed successfully',
                 'output': result.stdout,
+                # Add condensed summary for UI display
+                'summary': {
+                    'files_transferred': sync_stats['files_transferred'],
+                    'folders_synced': sync_stats['folders_synced'],
+                    'bytes_transferred': sync_stats['bytes_transferred'],
+                    'cleanup_enabled': bool(cleanup),
+                    'duration_seconds': None  # Will be calculated and added later
+                }
             }
         else:
             logger.error(f"{sync_type} sync failed with return code {result.returncode}")
@@ -183,6 +236,10 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
                 'error': result.stderr,
                 'output': result.stdout,
             }
+
+        # Add duration to summary if it exists
+        if 'summary' in sync_result:
+            sync_result['summary']['duration_seconds'] = (end_time - start_time).total_seconds()
 
         log_filename = save_sync_log(sync_type, sync_result, start_time, end_time)
         if log_filename:
@@ -814,7 +871,30 @@ def index():
                     
                     if (data.success) {
                         resultDiv.className = 'result-panel success';
-                        resultDiv.innerHTML = `<h3>✅ ${data.message}</h3><pre>${data.output || ''}</pre>`;
+                        
+                        // Show condensed summary if available, otherwise fall back to message
+                        if (data.summary) {
+                            const duration = data.summary.duration_seconds ? 
+                                `${Math.round(data.summary.duration_seconds)}s` : 'Unknown';
+                            const bytesFormatted = data.summary.bytes_transferred > 0 ?
+                                formatBytes(data.summary.bytes_transferred) : '0 bytes';
+                            const cleanupStatus = data.summary.cleanup_enabled ? 'enabled' : 'disabled';
+                            
+                            resultDiv.innerHTML = `
+                                <h3>✅ ${data.message}</h3>
+                                <div style="margin-top: 12px;">
+                                    <strong>Summary:</strong><br>
+                                    📁 Folders synced: ${data.summary.folders_synced}<br>
+                                    📄 Files transferred: ${data.summary.files_transferred}<br>
+                                    💾 Data transferred: ${bytesFormatted}<br>
+                                    ⏱️ Duration: ${duration}<br>
+                                    🧹 Cleanup: ${cleanupStatus}
+                                </div>
+                            `;
+                        } else {
+                            // Fallback for older format
+                            resultDiv.innerHTML = `<h3>✅ ${data.message}</h3><pre>${data.output || ''}</pre>`;
+                        }
                     } else {
                         resultDiv.className = 'result-panel error';
                         resultDiv.innerHTML = `<h3>❌ ${data.message}</h3><pre>${data.error || data.output || ''}</pre>`;
@@ -825,6 +905,15 @@ def index():
                     // Keep progress bar visible if we might have a sync running
                     progressDiv.style.display = 'none';
                 }
+            }
+            
+            // Helper function to format bytes
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 bytes';
+                const k = 1024;
+                const sizes = ['bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
             }
             
             function pollProgress(syncId) {
@@ -1017,14 +1106,24 @@ def index():
                     // Format duration
                     const duration = log.duration_seconds ? `(${log.duration_seconds}s)` : '';
                     
-                    // Create log summary in the requested format
+                    // Create log summary with file transfer info if available
                     const statusIcon = log.success ? '✅' : '❌';
                     const syncType = log.sync_type ? log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1) : 'Unknown';
+                    
+                    // Add file transfer summary if available
+                    let transferInfo = '';
+                    if (log.files_transferred !== undefined || log.folders_synced !== undefined) {
+                        const filesCount = log.files_transferred || 0;
+                        const foldersCount = log.folders_synced || 0;
+                        if (filesCount > 0 || foldersCount > 0) {
+                            transferInfo = `<br>📄 ${filesCount} files, 📁 ${foldersCount} folders`;
+                        }
+                    }
                     
                     logItem.innerHTML = `
                         <div class="log-summary">
                             ${statusIcon} ${syncType} - ${formattedDate}, ${formattedTime}<br>
-                            ${log.message} ${duration}
+                            ${log.message} ${duration}${transferInfo}
                         </div>
                         <div class="log-meta">Click to view details</div>
                     `;
@@ -1069,6 +1168,20 @@ def index():
                         if (log.duration_seconds) {
                             content += `Duration: ${log.duration_seconds} seconds\n`;
                         }
+                        
+                        // Add file transfer statistics if available
+                        if (log.files_transferred !== undefined) {
+                            content += `Files transferred: ${log.files_transferred}\n`;
+                        }
+                        if (log.folders_synced !== undefined) {
+                            content += `Folders synced: ${log.folders_synced}\n`;
+                        }
+                        if (log.bytes_transferred !== undefined && log.bytes_transferred > 0) {
+                            // Format bytes using JavaScript
+                            const bytesFormatted = formatBytes(log.bytes_transferred);
+                            content += `Data transferred: ${bytesFormatted}\n`;
+                        }
+                        
                         if (log.sync_id) {
                             content += `Sync ID: ${log.sync_id}\n`;
                         }
@@ -1327,7 +1440,10 @@ def get_logs_manifest():
                     'sync_type': log_data.get('sync_type'),
                     'success': log_data.get('success', False),
                     'message': log_data.get('message', ''),
-                    'duration_seconds': log_data.get('duration_seconds')
+                    'duration_seconds': log_data.get('duration_seconds'),
+                    'files_transferred': log_data.get('files_transferred', 0),
+                    'folders_synced': log_data.get('folders_synced', 0),
+                    'bytes_transferred': log_data.get('bytes_transferred', 0)
                 })
             except Exception as e:
                 logger.warning(f"Failed to read log file {log_file}: {str(e)}")

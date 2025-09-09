@@ -257,8 +257,12 @@ echo "📁 Using remote output path: $REMOTE_BASE"
 update_progress "folder_discovery" 20 "Found remote output path: $REMOTE_BASE"
 
 # ----------- SYNC FOLDERS -----------
-# Count total folders to sync
+# Count total folders to sync and initialize file counters
 total_folders=0
+total_files_synced=0
+total_bytes_transferred=0
+sync_stats=""
+
 for folder in "${FOLDERS[@]}"; do
   REMOTE_DIR_EXISTS="$("${SSH_CMD[@]}" "[ -d \"$REMOTE_BASE/$folder\" ] && echo yes || echo no" || true)"
   if [[ "$REMOTE_DIR_EXISTS" == "yes" ]]; then
@@ -321,8 +325,28 @@ for folder in "${FOLDERS[@]}"; do
     
     RSYNC_SSH=("${SSH_BASE[@]}")
 
-    rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
-      "$SSH_DEST:$remote_path" "$local_path/"
+    # Capture rsync output with detailed stats
+    rsync_output=$(mktemp)
+    if rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
+      "$SSH_DEST:$remote_path" "$local_path/" 2>&1 | tee "$rsync_output"; then
+      
+      # Parse rsync stats for file counts and bytes transferred
+      if grep -q "Number of files:" "$rsync_output"; then
+        files_transferred=$(grep "Number of files transferred:" "$rsync_output" | awk '{print $5}' | tr -d ',')
+        bytes_transferred=$(grep "Total transferred file size:" "$rsync_output" | awk '{print $5}' | tr -d ',')
+        
+        # Add to running totals (handle empty values)
+        if [[ -n "$files_transferred" && "$files_transferred" =~ ^[0-9]+$ ]]; then
+          total_files_synced=$((total_files_synced + files_transferred))
+        fi
+        if [[ -n "$bytes_transferred" && "$bytes_transferred" =~ ^[0-9]+$ ]]; then
+          total_bytes_transferred=$((total_bytes_transferred + bytes_transferred))
+        fi
+        
+        echo "📊 Files transferred: ${files_transferred:-0}, Bytes: ${bytes_transferred:-0}"
+      fi
+    fi
+    rm -f "$rsync_output" 2>/dev/null || true
 
     # Normalize permissions so SMB users can read
     echo "🛡  Normalizing permissions under: $local_path"
@@ -383,6 +407,12 @@ if [[ "$DO_CLEANUP" -eq 1 ]]; then
 fi
 
 # ----------- COMPLETION -----------
+# Generate summary statistics
+sync_stats="SYNC_SUMMARY: Files transferred: $total_files_synced, Folders synced: $completed_folders, Data transferred: $total_bytes_transferred bytes"
+echo ""
+echo "📈 $sync_stats"
+echo ""
+
 update_progress "complete" 100 "Sync completed successfully"
 
 # ----------- CLEANUP -----------
