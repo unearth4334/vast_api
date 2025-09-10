@@ -10,6 +10,7 @@ import logging
 import uuid
 import json
 import glob
+import re
 from datetime import datetime
 from flask import Flask, jsonify, request  # request added for after_request hook
 from flask_cors import CORS
@@ -86,6 +87,53 @@ def ensure_sync_log_dir():
     except Exception as e:
         logger.error(f"Failed to create sync log directory {SYNC_LOG_DIR}: {str(e)}")
 
+def _parse_int(s, default=0):
+    try:
+        return int(s)
+    except Exception:
+        return default
+
+def parse_sync_stats(output):
+    """
+    Parse sync statistics from script output. Supports:
+      SYNC_SUMMARY: Files transferred: X, Folders synced: Y, Data transferred: Z bytes; BY_EXT: jpg=10,png=5,mp4=2
+    Falls back gracefully if BY_EXT is absent.
+    """
+    stats = {
+        'files_transferred': 0,
+        'folders_synced': 0,
+        'bytes_transferred': 0,
+        'by_ext': {}
+    }
+    if not output:
+        return stats
+
+    for line in output.split('\n'):
+        if 'SYNC_SUMMARY:' not in line:
+            continue
+
+        files_match = re.search(r'Files transferred:\s*(\d+)', line)
+        folders_match = re.search(r'Folders synced:\s*(\d+)', line)
+        bytes_match = re.search(r'Data transferred:\s*(\d+)', line)
+        if files_match:   stats['files_transferred'] = _parse_int(files_match.group(1))
+        if folders_match: stats['folders_synced']   = _parse_int(folders_match.group(1))
+        if bytes_match:   stats['bytes_transferred'] = _parse_int(bytes_match.group(1))
+
+        m_ext = re.search(r'BY_EXT:\s*([^\n]+)', line)
+        if m_ext:
+            by_ext = {}
+            for pair in [p.strip() for p in m_ext.group(1).split(',') if p.strip()]:
+                if '=' in pair:
+                    k, v = pair.split('=', 1)
+                    k = k.strip().lower()
+                    v = _parse_int(v.strip())
+                    if k:
+                        by_ext[k] = v
+            stats['by_ext'] = by_ext
+        break
+
+    return stats
+
 def save_sync_log(sync_type, result, start_time, end_time):
     """Save sync result to a timestamped JSON log file"""
     try:
@@ -95,6 +143,9 @@ def save_sync_log(sync_type, result, start_time, end_time):
         timestamp = start_time.strftime("%Y%m%d_%H%M")
         log_filename = f"sync_log_{timestamp}.json"
         log_path = os.path.join(SYNC_LOG_DIR, log_filename)
+        
+        # Parse sync statistics from output
+        sync_stats = parse_sync_stats(result.get('output', ''))
         
         log_data = {
             "timestamp": start_time.isoformat(),
@@ -106,9 +157,13 @@ def save_sync_log(sync_type, result, start_time, end_time):
             "output": result.get('output', ''),
             "error": result.get('error', ''),
             "duration_seconds": (end_time - start_time).total_seconds(),
-            # NEW:
             "cleanup": result.get('cleanup', None),
             "cmd": result.get('cmd', None),
+            # File transfer statistics
+            "files_transferred": sync_stats['files_transferred'],
+            "folders_synced": sync_stats['folders_synced'],
+            "bytes_transferred": sync_stats['bytes_transferred'],
+            "files_by_type": sync_stats['by_ext'],
         }
 
         
@@ -166,6 +221,9 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
             'cmd': " ".join(cmd),  # visible in logs for debugging
         }
 
+        # Parse summary even on failure so UI can still show metrics
+        sync_stats = parse_sync_stats(result.stdout)
+
         if result.returncode == 0:
             logger.info(f"{sync_type} sync completed successfully")
             sync_result = {
@@ -173,16 +231,38 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
                 'success': True,
                 'message': f'{sync_type} sync completed successfully',
                 'output': result.stdout,
+                'summary': {
+                    'files_transferred': sync_stats['files_transferred'],
+                    'folders_synced': sync_stats['folders_synced'],
+                    'bytes_transferred': sync_stats['bytes_transferred'],
+                    'by_ext': sync_stats['by_ext'],
+                    'cleanup_enabled': bool(cleanup),
+                    'duration_seconds': None  # Will be calculated and added later
+                }
             }
         else:
             logger.error(f"{sync_type} sync failed with return code {result.returncode}")
+            # Prefer stderr; if empty, show trimmed stdout to avoid the "Identity added…" confusion
+            err = (result.stderr or "").strip() or (result.stdout or "").strip()
             sync_result = {
                 **base,
                 'success': False,
                 'message': f'{sync_type} sync failed',
-                'error': result.stderr,
+                'error': err,
                 'output': result.stdout,
+                'summary': {
+                    'files_transferred': sync_stats['files_transferred'],
+                    'folders_synced': sync_stats['folders_synced'],
+                    'bytes_transferred': sync_stats['bytes_transferred'],
+                    'by_ext': sync_stats['by_ext'],
+                    'cleanup_enabled': bool(cleanup),
+                    'duration_seconds': None
+                }
             }
+
+        # Add duration to summary if it exists
+        if 'summary' in sync_result:
+            sync_result['summary']['duration_seconds'] = (end_time - start_time).total_seconds()
 
         log_filename = save_sync_log(sync_type, sync_result, start_time, end_time)
         if log_filename:
@@ -225,7 +305,7 @@ def index():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Media Sync Tool</title>
         <style>
-            :root {
+                        :root {
                 /* Obsidian-inspired color scheme */
                 --color-accent: #7c3aed;
                 --color-accent-hover: #8b5cf6;
@@ -739,7 +819,7 @@ def index():
                 </button>
             </div>
             
-            <div id="result" class="result-panel"></div>
+            <div id="result" class="result-panel" title="Click to view full report"></div>
             
             <div id="progress" class="progress-panel">
                 <h3>Sync Progress</h3>
@@ -775,6 +855,9 @@ def index():
         </div>
         
         <script>
+            // Keep a copy of the last API response to show full output on click
+            let lastFullReport = null;
+
             async function sync(type) {
                 const resultDiv = document.getElementById('result');
                 const progressDiv = document.getElementById('progress');
@@ -783,6 +866,7 @@ def index():
                 const progressDetails = document.getElementById('progressDetails');
                 const cleanupCheckbox = document.getElementById('cleanupCheckbox');
                 
+                lastFullReport = null;
                 resultDiv.className = 'result-panel loading';
                 resultDiv.style.display = 'block';
                 resultDiv.innerHTML = `<h3>Starting ${type} sync...</h3><p>This may take several minutes.</p>`;
@@ -804,6 +888,9 @@ def index():
                         })
                     });
                     const data = await response.json();
+
+                    // remember full response for the overlay
+                    lastFullReport = data;
                     
                     // Start polling for progress if sync_id is available (regardless of initial success)
                     if (data.sync_id) {
@@ -814,10 +901,45 @@ def index():
                     
                     if (data.success) {
                         resultDiv.className = 'result-panel success';
-                        resultDiv.innerHTML = `<h3>✅ ${data.message}</h3><pre>${data.output || ''}</pre>`;
+                        
+                        // Show condensed summary if available, otherwise fall back to message
+                        if (data.summary) {
+                            const duration = data.summary.duration_seconds ? 
+                                `${Math.round(data.summary.duration_seconds)}s` : 'Unknown';
+                            const bytesFormatted = data.summary.bytes_transferred > 0 ?
+                                formatBytes(data.summary.bytes_transferred) : '0 bytes';
+                            const cleanupStatus = data.summary.cleanup_enabled ? 'enabled' : 'disabled';
+
+                            // optional per-extension line (top 4)
+                            let byExtLine = '';
+                            if (data.summary.by_ext) {
+                                const pairs = Object.entries(data.summary.by_ext)
+                                  .sort((a,b)=>b[1]-a[1]).slice(0,4)
+                                  .map(([k,v]) => `${k}:${v}`).join(' · ');
+                                if (pairs) byExtLine = `<br>🧩 By type: ${pairs}`;
+                            }
+                            
+                            resultDiv.innerHTML = `
+                                <h3>✅ ${data.message}</h3>
+                                <div style="margin-top: 12px;">
+                                    <strong>Summary:</strong><br>
+                                    📁 Folders synced: ${data.summary.folders_synced}<br>
+                                    📄 Files transferred: ${data.summary.files_transferred}<br>
+                                    💾 Data transferred: ${bytesFormatted}<br>
+                                    ⏱️ Duration: ${duration}<br>
+                                    🧹 Cleanup: ${cleanupStatus}
+                                    ${byExtLine}
+                                    <div style="margin-top:8px;color:var(--text-muted);font-size:12px;">Click to view full report</div>
+                                </div>
+                            `;
+                        } else {
+                            // Fallback for older format
+                            resultDiv.innerHTML = `<h3>✅ ${data.message}</h3><pre>${data.output || ''}</pre>`;
+                        }
                     } else {
                         resultDiv.className = 'result-panel error';
-                        resultDiv.innerHTML = `<h3>❌ ${data.message}</h3><pre>${data.error || data.output || ''}</pre>`;
+                        const brief = (data.error || data.output || '').split('\\n').slice(0,6).join('\\n');
+                        resultDiv.innerHTML = `<h3>❌ ${data.message}</h3><pre>${brief}\\n\\n(Click for full report)</pre>`;
                     }
                 } catch (error) {
                     resultDiv.className = 'result-panel error';
@@ -825,6 +947,15 @@ def index():
                     // Keep progress bar visible if we might have a sync running
                     progressDiv.style.display = 'none';
                 }
+            }
+            
+            // Helper function to format bytes
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 bytes';
+                const k = 1024;
+                const sizes = ['bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
             }
             
             function pollProgress(syncId) {
@@ -921,6 +1052,51 @@ def index():
                 // Start polling immediately
                 poll();
             }
+
+            // Clicking the green/red callout opens the full overlay with all output
+            (function attachResultClick(){
+              const resultDiv = document.getElementById('result');
+              resultDiv.addEventListener('click', () => {
+                if (!lastFullReport) return;
+
+                const overlay = document.getElementById('logOverlay');
+                const modalTitle = document.getElementById('logModalTitle');
+                const modalContent = document.getElementById('logModalContent');
+
+                modalTitle.textContent = 'Sync Report';
+
+                let content = '';
+                // summary
+                content += '<div class="log-detail-section"><h4>Summary</h4><div class="log-detail-content">';
+                content += (lastFullReport.message || '') + '\\n';
+                if (lastFullReport.summary) {
+                    const s = lastFullReport.summary;
+                    const bytes = s.bytes_transferred > 0 ? formatBytes(s.bytes_transferred) : '0 bytes';
+                    content += `Files: ${s.files_transferred}\\nFolders: ${s.folders_synced}\\nBytes: ${bytes}\\n`;
+                    if (s.by_ext) {
+                        const extLine = Object.entries(s.by_ext).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+': '+v).join(', ');
+                        if (extLine) content += `By type: ${extLine}\\n`;
+                    }
+                }
+                content += '</div></div>';
+
+                // stdout
+                if (lastFullReport.output) {
+                    content += '<div class="log-detail-section"><h4>Output</h4><div class="log-detail-content">';
+                    content += String(lastFullReport.output).replace(/</g,'&lt;');
+                    content += '</div></div>';
+                }
+                // stderr
+                if (lastFullReport.error) {
+                    content += '<div class="log-detail-section"><h4>Error</h4><div class="log-detail-content">';
+                    content += String(lastFullReport.error).replace(/</g,'&lt;');
+                    content += '</div></div>';
+                }
+
+                modalContent.innerHTML = content;
+                overlay.style.display = 'flex';
+              });
+            })();
             
             async function testSSH() {
                 const resultDiv = document.getElementById('result');
@@ -943,9 +1119,9 @@ def index():
                         
                         for (const [host, result] of Object.entries(data.results)) {
                             const status = result.success ? '✅' : '❌';
-                            output += `${status} ${host}: ${result.message}\n`;
+                            output += `${status} ${host}: ${result.message}\\n`;
                             if (!result.success && result.error) {
-                                output += `    Error: ${result.error}\n`;
+                                output += `    Error: ${result.error}\\n`;
                             }
                         }
                         output += `</pre>`;
@@ -962,8 +1138,8 @@ def index():
                 }
             }
             
-            // Logs functionality
-            async function refreshLogs() {
+            // Logs functionality (unchanged)
+ async function refreshLogs() {
                 const logsList = document.getElementById('logsList');
                 const refreshBtn = document.querySelector('.refresh-logs-btn');
                 
@@ -1105,13 +1281,10 @@ def index():
                     modalContent.innerHTML = '<div class="no-logs-message">Failed to load log details: ' + error.message + '</div>';
                 }
             }
-            
             function closeLogModal() {
                 const overlay = document.getElementById('logOverlay');
                 overlay.style.display = 'none';
             }
-            
-            // Close modal when clicking outside of it
             document.addEventListener('DOMContentLoaded', function() {
                 const overlay = document.getElementById('logOverlay');
                 overlay.addEventListener('click', function(e) {
@@ -1327,7 +1500,10 @@ def get_logs_manifest():
                     'sync_type': log_data.get('sync_type'),
                     'success': log_data.get('success', False),
                     'message': log_data.get('message', ''),
-                    'duration_seconds': log_data.get('duration_seconds')
+                    'duration_seconds': log_data.get('duration_seconds'),
+                    'files_transferred': log_data.get('files_transferred', 0),
+                    'folders_synced': log_data.get('folders_synced', 0),
+                    'bytes_transferred': log_data.get('bytes_transferred', 0)
                 })
             except Exception as e:
                 logger.warning(f"Failed to read log file {log_file}: {str(e)}")
@@ -1425,8 +1601,8 @@ def status():
     })
 
 # --- add with the other imports ---
-import glob
-from datetime import datetime
+import glob as _glob  # avoid shadowing
+from datetime import datetime as _dt
 
 # --- helper: load json safely ---
 def _load_json(path):
@@ -1438,7 +1614,7 @@ def _load_json(path):
 
 # --- helper: pick latest, preferring running/starting ---
 def _find_latest_progress():
-    files = sorted(glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True)
+    files = sorted(_glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True)
     if not files:
         return None, None
     # prefer first file whose status != completed/error
@@ -1462,7 +1638,7 @@ def sync_latest():
 def sync_active():
     """List all known progress files with brief status for debugging/menus"""
     out = []
-    for fp in sorted(glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True):
+    for fp in sorted(_glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True):
         data = _load_json(fp) or {}
         out.append({
             "sync_id": os.path.basename(fp)[len("sync_progress_"):-5],
