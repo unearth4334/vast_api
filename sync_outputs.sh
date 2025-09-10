@@ -379,8 +379,8 @@ for folder in "${FOLDERS[@]}"; do
       echo "📊 Files transferred (itemized): ${count_sent_itemized}, Bytes: ${bytes_transferred}"
 
       # Per-extension counts from itemized lines (>f … filename)
+      # (input is already filtered by grep -E '^[[:space:]]*>f')
       while IFS= read -r line; do
-        [[ "$line" =~ ^[[:space:]]*>f ]] || continue
         fname="${line#* }"
         fname="${fname%% -> *}"
         ext="${fname##*.}"; ext="${ext,,}"
