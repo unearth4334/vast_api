@@ -74,13 +74,12 @@ update_progress() {
     # Read current progress, update it, and write back
     python3 -c "
 import json
-import sys
 from datetime import datetime
 
 try:
     with open('$PROGRESS_FILE', 'r') as f:
         data = json.load(f)
-except:
+except Exception:
     data = {
         'sync_id': '$SYNC_ID',
         'status': 'running',
@@ -130,9 +129,10 @@ VENV_PY="$XMP_VENV/bin/python"
 
 # Safer rsync flags for QNAP/eCryptfs:
 # - Do NOT preserve perms/owner/group/times; those caused "Bad address (14)" in the past
-# - Use exact sizes (no human-readable) so we can sum bytes accurately
-# - Add --itemize-changes so we can count per-extension on sent files
-RSYNC_FLAGS=(-rltD --delete --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --itemize-changes)
+# - Use --itemize-changes so we can count files actually sent (>f)
+# - Add --stats so summary lines are guaranteed
+# - Avoid --human-readable so bytes are raw numbers for easy parsing
+RSYNC_FLAGS=(-rltD --delete --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --itemize-changes --stats)
 if rsync --help 2>&1 | grep -q -- '--mkpath'; then
   RSYNC_FLAGS+=(--mkpath)
 fi
@@ -148,13 +148,16 @@ SSH_CMD=("${SSH_BASE[@]}" "$SSH_DEST")
 normalize_permissions() {
   local path="$1"
 
+  # Directories first
   find "$path" -type d ! -perm -0755 -exec chmod 0755 {} + 2>/dev/null || true
 
+  # Try chmod for files; if any fail, repair via install(1)
   mapfile -d '' not_ok < <(find "$path" -type f ! -perm -0644 -print0 2>/dev/null || true)
   if ((${#not_ok[@]})); then
     chmod -f 0644 "${not_ok[@]}" 2>/dev/null || true
   fi
 
+  # Fix any remaining via copy-rename trick (atomic)
   find "$path" -type f ! -perm -0644 -print0 2>/dev/null | while IFS= read -r -d '' f; do
     tmp="${f}.tmp.$$"
     if install -m 0644 -T -- "$f" "$tmp"; then
@@ -276,7 +279,7 @@ try:
     data['total_folders'] = $total_folders
     with open('$PROGRESS_FILE', 'w') as f:
         json.dump(data, f, indent=2)
-except:
+except Exception:
     pass
 " 2>/dev/null || true
 fi
@@ -296,7 +299,7 @@ try:
     with open('$PROGRESS_FILE','r') as f: data=json.load(f)
     data['status']='completed'; data['end_time']=datetime.now().isoformat(); data['current_stage']='complete'; data['progress_percent']=100
     with open('$PROGRESS_FILE','w') as f: json.dump(data,f,indent=2)
-except: pass
+except Exception: pass
 " 2>/dev/null || true
   fi
   ssh-agent -k >/dev/null 2>&1 || true
@@ -349,19 +352,30 @@ for folder in "${FOLDERS[@]}"; do
     if rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
       "$SSH_DEST:$remote_path" "$local_path/" 2>&1 | tee "$rsync_output"; then
 
-      # Files transferred (rsync says "Number of regular files transferred:")
-      files_transferred="$(grep -E '^Number of regular files transferred:' "$rsync_output" | awk '{print $NF}' | tr -d ',' || true)"
-      [[ -n "${files_transferred:-}" && "$files_transferred" =~ ^[0-9]+$ ]] || files_transferred=0
+      # Count files actually sent to the receiver in this run:
+      # itemized lines that begin with ">f"
+      count_sent_itemized="$(grep -cE '^\>f' "$rsync_output" || true)"
+      [[ -n "${count_sent_itemized:-}" ]] || count_sent_itemized=0
+
+      # Summary fallback (if present)
+      files_transferred_summary="$(grep -E '^Number of files transferred:' "$rsync_output" | awk '{print $5}' | tr -d ',' || true)"
+      [[ "$files_transferred_summary" =~ ^[0-9]+$ ]] || files_transferred_summary=0
+
+      # Prefer itemized count for "new/updated files synced"
+      files_transferred="$count_sent_itemized"
+      if [[ "$files_transferred" -eq 0 ]]; then
+        files_transferred="$files_transferred_summary"
+      fi
       total_files_synced=$(( total_files_synced + files_transferred ))
 
-      # Bytes transferred (rsync says "Total transferred file size: X bytes", we want X)
-      bytes_transferred="$(grep -E '^Total transferred file size:' "$rsync_output" | awk '{print $(NF-1)}' | tr -d ',' || true)"
-      [[ -n "${bytes_transferred:-}" && "$bytes_transferred" =~ ^[0-9]+$ ]] || bytes_transferred=0
+      # Bytes transferred (raw number; rsync prints "...: 12345 bytes")
+      bytes_transferred="$(grep -E '^Total transferred file size:' "$rsync_output" | awk '{print $(NF-1)}' | tr -d ',' | tr -cd '0-9' || true)"
+      [[ "$bytes_transferred" =~ ^[0-9]+$ ]] || bytes_transferred=0
       total_bytes_transferred=$(( total_bytes_transferred + bytes_transferred ))
 
-      echo "📊 Files transferred: ${files_transferred}, Bytes: ${bytes_transferred}"
+      echo "📊 Files transferred (itemized): ${count_sent_itemized}, Bytes: ${bytes_transferred}"
 
-      # Per-extension counts from itemized lines (>f…)
+      # Per-extension counts from itemized lines (>f … filename)
       while IFS= read -r line; do
         [[ "$line" =~ ^\>f ]] || continue
         fname="${line#* }"
@@ -370,7 +384,7 @@ for folder in "${FOLDERS[@]}"; do
         [[ "$ext" == "$fname" ]] && ext=""   # no dot in name
         [[ -z "$ext" ]] && continue
         EXT_COUNTS["$ext"]=$(( ${EXT_COUNTS["$ext"]:-0} + 1 ))
-      done < <(grep '^>f' "$rsync_output" || true)
+      done < <(grep -E '^\>f' "$rsync_output" || true)
 
     fi
     rm -f "$rsync_output" 2>/dev/null || true
@@ -394,7 +408,7 @@ try:
     data['completed_folders'] = $completed_folders
     with open('$PROGRESS_FILE', 'w') as f:
         json.dump(data, f, indent=2)
-except:
+except Exception:
     pass
 " 2>/dev/null || true
     fi
@@ -462,7 +476,7 @@ try:
     data['progress_percent'] = 100
     with open('$PROGRESS_FILE', 'w') as f:
         json.dump(data, f, indent=2)
-except:
+except Exception:
     pass
 " 2>/dev/null || true
 fi
