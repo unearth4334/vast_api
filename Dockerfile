@@ -35,6 +35,20 @@ RUN chmod +x *.sh
 # Create directory for SSH keys (will be mounted as volume)
 RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
 
+# Create a script to fix SSH permissions at runtime
+RUN echo '#!/bin/bash\n\
+# Fix SSH directory and file permissions if needed\n\
+if [ -d "/root/.ssh" ]; then\n\
+    chmod 700 /root/.ssh 2>/dev/null || true\n\
+    [ -f "/root/.ssh/id_ed25519" ] && chmod 600 /root/.ssh/id_ed25519 2>/dev/null || true\n\
+    [ -f "/root/.ssh/id_ed25519.pub" ] && chmod 644 /root/.ssh/id_ed25519.pub 2>/dev/null || true\n\
+    [ -f "/root/.ssh/config" ] && chmod 644 /root/.ssh/config 2>/dev/null || true\n\
+    [ -f "/root/.ssh/known_hosts" ] && chmod 644 /root/.ssh/known_hosts 2>/dev/null || true\n\
+    [ -f "/root/.ssh/vast_known_hosts" ] && chmod 664 /root/.ssh/vast_known_hosts 2>/dev/null || true\n\
+fi\n\
+exec "$@"' > /usr/local/bin/fix-ssh-permissions.sh && \
+    chmod +x /usr/local/bin/fix-ssh-permissions.sh
+
 # Create directory for local sync destination (will be mounted as volume)
 RUN mkdir -p /media
 
@@ -49,5 +63,6 @@ ENV FLASK_APP=app.sync.sync_api
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/status || exit 1
 
-# Run the application
+# Run the application with permission fix
+ENTRYPOINT ["/usr/local/bin/fix-ssh-permissions.sh"]
 CMD ["python", "-m", "app.sync.sync_api"]

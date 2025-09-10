@@ -32,6 +32,15 @@ except ImportError:
     except ImportError:
         SSHTester = None
 
+# Import SSH identity manager
+try:
+    from .ssh_manager import SSHIdentityManager
+except ImportError:
+    try:
+        from ssh_manager import SSHIdentityManager
+    except ImportError:
+        SSHIdentityManager = None
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,6 +60,7 @@ CORS(
         r"/sync/*": {"origins": ALLOWED_ORIGINS},
         r"/status": {"origins": ALLOWED_ORIGINS},
         r"/test/*": {"origins": ALLOWED_ORIGINS},
+        r"/ssh/*": {"origins": ALLOWED_ORIGINS},
         r"/logs/*": {"origins": ALLOWED_ORIGINS},
         r"/": {"origins": ALLOWED_ORIGINS},
     },
@@ -175,6 +185,29 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
     try:
         sync_id = str(uuid.uuid4())
         logger.info(f"Starting {sync_type} sync to {host}:{port} with ID {sync_id} (cleanup: {cleanup})")
+
+        # Pre-validate SSH setup if SSH manager is available
+        if SSHIdentityManager is not None:
+            ssh_manager = SSHIdentityManager()
+            ssh_status = ssh_manager.get_ssh_status()
+            
+            if not ssh_status['ready_for_sync']:
+                logger.warning(f"SSH not ready for sync: {ssh_status}")
+                # Attempt to set up SSH automatically
+                setup_result = ssh_manager.setup_ssh_agent()
+                if not setup_result['success']:
+                    end_time = datetime.now()
+                    sync_result = {
+                        'success': False,
+                        'message': f'{sync_type} sync failed: SSH setup required',
+                        'error': f"SSH setup failed: {setup_result['message']}",
+                        'ssh_setup_required': True,
+                        'requires_user_confirmation': setup_result.get('requires_user_confirmation', False),
+                        'cleanup': bool(cleanup),
+                        'sync_id': sync_id,
+                    }
+                    save_sync_log(sync_type, sync_result, start_time, end_time)
+                    return sync_result
 
         # Always pass an explicit cleanup argument
         cleanup_arg = "--cleanup" if cleanup else "--no-cleanup"
@@ -758,6 +791,195 @@ def index():
                 font-style: italic;
                 padding: var(--size-4-6);
             }
+            
+            /* SSH Status Panel */
+            .ssh-status-panel {
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                padding: var(--size-4-4);
+                margin: var(--size-4-4) 0;
+                box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+            }
+            
+            .ssh-status-panel h3 {
+                margin: 0 0 var(--size-4-3) 0;
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            
+            .refresh-ssh-btn {
+                background: var(--interactive-normal);
+                color: var(--text-normal);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-1) var(--size-4-3);
+                font-size: var(--font-ui-small);
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+            
+            .refresh-ssh-btn:hover {
+                background: var(--interactive-hover);
+            }
+            
+            .ssh-status-content {
+                margin-top: var(--size-4-3);
+            }
+            
+            .ssh-status-loading {
+                text-align: center;
+                color: var(--text-muted);
+                font-style: italic;
+                padding: var(--size-4-3);
+            }
+            
+            .ssh-status-item {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: var(--size-4-2);
+                border-radius: var(--radius-s);
+                margin-bottom: var(--size-4-1);
+                background: var(--background-primary);
+                border: 1px solid var(--background-modifier-border);
+            }
+            
+            .ssh-status-item.success {
+                border-left: 4px solid var(--text-success);
+            }
+            
+            .ssh-status-item.warning {
+                border-left: 4px solid var(--text-warning);
+            }
+            
+            .ssh-status-item.error {
+                border-left: 4px solid var(--text-error);
+            }
+            
+            .ssh-status-label {
+                font-size: var(--font-ui-small);
+                color: var(--text-normal);
+                font-weight: 500;
+            }
+            
+            .ssh-status-value {
+                font-size: var(--font-ui-small);
+                color: var(--text-muted);
+            }
+            
+            .ssh-setup-btn {
+                background: var(--interactive-accent);
+                color: var(--text-on-accent);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-2) var(--size-4-4);
+                font-size: var(--font-ui-small);
+                cursor: pointer;
+                transition: background 0.2s ease;
+                margin-top: var(--size-4-2);
+                width: 100%;
+            }
+            
+            .ssh-setup-btn:hover {
+                background: var(--interactive-accent-hover);
+            }
+            
+            .ssh-confirmation-dialog {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.5);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                z-index: 1001;
+                backdrop-filter: blur(2px);
+            }
+            
+            .ssh-confirmation-modal {
+                background: var(--background-primary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m);
+                width: 90vw;
+                max-width: 500px;
+                box-shadow: 0 8px 32px var(--background-modifier-box-shadow);
+                overflow: hidden;
+            }
+            
+            .ssh-confirmation-header {
+                padding: var(--size-4-4);
+                border-bottom: 1px solid var(--background-modifier-border);
+                background: var(--background-secondary);
+            }
+            
+            .ssh-confirmation-title {
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+                margin: 0;
+                color: var(--text-normal);
+                display: flex;
+                align-items: center;
+                gap: var(--size-4-2);
+            }
+            
+            .ssh-confirmation-content {
+                padding: var(--size-4-4);
+            }
+            
+            .ssh-confirmation-message {
+                margin-bottom: var(--size-4-4);
+                color: var(--text-normal);
+                line-height: 1.5;
+            }
+            
+            .ssh-confirmation-details {
+                background: var(--background-modifier-form-field);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3);
+                margin-bottom: var(--size-4-4);
+                font-size: var(--font-ui-small);
+                color: var(--text-muted);
+            }
+            
+            .ssh-confirmation-buttons {
+                display: flex;
+                gap: var(--size-4-2);
+                justify-content: flex-end;
+            }
+            
+            .ssh-confirmation-btn {
+                padding: var(--size-4-2) var(--size-4-4);
+                border: none;
+                border-radius: var(--radius-s);
+                font-size: var(--font-ui-small);
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+            
+            .ssh-confirmation-btn.primary {
+                background: var(--interactive-accent);
+                color: var(--text-on-accent);
+            }
+            
+            .ssh-confirmation-btn.primary:hover {
+                background: var(--interactive-accent-hover);
+            }
+            
+            .ssh-confirmation-btn.secondary {
+                background: var(--interactive-normal);
+                color: var(--text-normal);
+            }
+            
+            .ssh-confirmation-btn.secondary:hover {
+                background: var(--interactive-hover);
+            }
         </style>
     </head>
     <body>
@@ -796,6 +1018,18 @@ def index():
                 </button>
             </div>
             
+            <!-- SSH Status Panel -->
+            <div id="sshStatus" class="ssh-status-panel">
+                <h3>
+                    <span>🔐</span>
+                    SSH Connection Status
+                    <button class="refresh-ssh-btn" onclick="refreshSSHStatus()">🔄 Refresh</button>
+                </h3>
+                <div id="sshStatusContent" class="ssh-status-content">
+                    <div class="ssh-status-loading">Click refresh to check SSH status</div>
+                </div>
+            </div>
+            
             <div id="result" class="result-panel"></div>
             
             <div id="progress" class="progress-panel">
@@ -818,6 +1052,30 @@ def index():
             </div>
         </div>
         
+        <!-- SSH confirmation dialog -->
+        <div id="sshConfirmationDialog" class="ssh-confirmation-dialog">
+            <div class="ssh-confirmation-modal">
+                <div class="ssh-confirmation-header">
+                    <h3 class="ssh-confirmation-title">
+                        <span>🔐</span>
+                        SSH Identity Setup Required
+                    </h3>
+                </div>
+                <div class="ssh-confirmation-content">
+                    <div id="sshConfirmationMessage" class="ssh-confirmation-message">
+                        Do you want to set up SSH identity for media sync? This will enable secure connections to your sync targets.
+                    </div>
+                    <div id="sshConfirmationDetails" class="ssh-confirmation-details">
+                        <!-- Details will be populated by JavaScript -->
+                    </div>
+                    <div class="ssh-confirmation-buttons">
+                        <button class="ssh-confirmation-btn secondary" onclick="cancelSSHSetup()">Cancel</button>
+                        <button class="ssh-confirmation-btn primary" onclick="confirmSSHSetup()">Yes, Set Up SSH</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Log detail overlay -->
         <div id="logOverlay" class="log-overlay">
             <div class="log-modal">
@@ -832,6 +1090,170 @@ def index():
         </div>
         
         <script>
+            // SSH Management Functions
+            async function refreshSSHStatus() {
+                const statusContent = document.getElementById('sshStatusContent');
+                const refreshBtn = document.querySelector('.refresh-ssh-btn');
+                
+                // Show loading state
+                refreshBtn.textContent = '⟳ Loading...';
+                refreshBtn.disabled = true;
+                statusContent.innerHTML = '<div class="ssh-status-loading">Checking SSH status...</div>';
+                
+                try {
+                    const response = await fetch('/ssh/status');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        displaySSHStatus(data.status);
+                    } else {
+                        statusContent.innerHTML = '<div class="ssh-status-loading">Failed to load SSH status: ' + data.message + '</div>';
+                    }
+                } catch (error) {
+                    statusContent.innerHTML = '<div class="ssh-status-loading">Failed to load SSH status: ' + error.message + '</div>';
+                } finally {
+                    refreshBtn.textContent = '🔄 Refresh';
+                    refreshBtn.disabled = false;
+                }
+            }
+            
+            function displaySSHStatus(status) {
+                const statusContent = document.getElementById('sshStatusContent');
+                let html = '';
+                
+                // Overall readiness
+                const readyClass = status.ready_for_sync ? 'success' : 'error';
+                const readyIcon = status.ready_for_sync ? '✅' : '❌';
+                const readyText = status.ready_for_sync ? 'Ready for sync' : 'Setup required';
+                
+                html += `<div class="ssh-status-item ${readyClass}">
+                    <span class="ssh-status-label">${readyIcon} Overall Status</span>
+                    <span class="ssh-status-value">${readyText}</span>
+                </div>`;
+                
+                // Individual status items
+                const validation = status.validation;
+                
+                // SSH key
+                const keyClass = validation.ssh_key_exists && validation.ssh_key_readable ? 'success' : 'error';
+                const keyIcon = validation.ssh_key_exists && validation.ssh_key_readable ? '✅' : '❌';
+                const keyText = validation.ssh_key_exists ? 
+                    (validation.ssh_key_readable ? 'Available' : 'Not readable') : 'Not found';
+                
+                html += `<div class="ssh-status-item ${keyClass}">
+                    <span class="ssh-status-label">${keyIcon} SSH Key</span>
+                    <span class="ssh-status-value">${keyText}</span>
+                </div>`;
+                
+                // SSH agent
+                const agentClass = validation.ssh_agent_running ? 'success' : 'warning';
+                const agentIcon = validation.ssh_agent_running ? '✅' : '⚠️';
+                const agentText = validation.ssh_agent_running ? 'Running' : 'Not running';
+                
+                html += `<div class="ssh-status-item ${agentClass}">
+                    <span class="ssh-status-label">${agentIcon} SSH Agent</span>
+                    <span class="ssh-status-value">${agentText}</span>
+                </div>`;
+                
+                // Identity loaded
+                const identityClass = validation.identity_loaded ? 'success' : 'warning';
+                const identityIcon = validation.identity_loaded ? '✅' : '⚠️';
+                const identityText = validation.identity_loaded ? 'Loaded' : 'Not loaded';
+                
+                html += `<div class="ssh-status-item ${identityClass}">
+                    <span class="ssh-status-label">${identityIcon} SSH Identity</span>
+                    <span class="ssh-status-value">${identityText}</span>
+                </div>`;
+                
+                // Permissions
+                const permClass = validation.permissions_ok ? 'success' : 'warning';
+                const permIcon = validation.permissions_ok ? '✅' : '⚠️';
+                const permText = validation.permissions_ok ? 'Correct' : 'Needs fixing';
+                
+                html += `<div class="ssh-status-item ${permClass}">
+                    <span class="ssh-status-label">${permIcon} Permissions</span>
+                    <span class="ssh-status-value">${permText}</span>
+                </div>`;
+                
+                // Add setup button if not ready
+                if (!status.ready_for_sync) {
+                    html += '<button class="ssh-setup-btn" onclick="setupSSH()">🔧 Set Up SSH</button>';
+                }
+                
+                statusContent.innerHTML = html;
+            }
+            
+            async function setupSSH(confirmed = false) {
+                try {
+                    const response = await fetch('/ssh/setup', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            confirmed: confirmed
+                        })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.requires_confirmation && !confirmed) {
+                        // Show confirmation dialog
+                        showSSHConfirmationDialog(data);
+                    } else if (data.success) {
+                        // Show success message
+                        const resultDiv = document.getElementById('result');
+                        resultDiv.className = 'result-panel success';
+                        resultDiv.style.display = 'block';
+                        
+                        let message = `<h3>✅ ${data.message}</h3>`;
+                        if (data.permissions_fixed && data.permissions_fixed.length > 0) {
+                            message += '<p><strong>Permissions fixed:</strong><br>';
+                            message += data.permissions_fixed.map(fix => `• ${fix}`).join('<br>');
+                            message += '</p>';
+                        }
+                        
+                        resultDiv.innerHTML = message;
+                        
+                        // Refresh SSH status
+                        refreshSSHStatus();
+                    } else {
+                        // Show error
+                        const resultDiv = document.getElementById('result');
+                        resultDiv.className = 'result-panel error';
+                        resultDiv.style.display = 'block';
+                        resultDiv.innerHTML = `<h3>❌ SSH Setup Failed</h3><p>${data.message}</p>`;
+                    }
+                } catch (error) {
+                    const resultDiv = document.getElementById('result');
+                    resultDiv.className = 'result-panel error';
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = `<h3>❌ SSH Setup Error</h3><p>${error.message}</p>`;
+                }
+            }
+            
+            function showSSHConfirmationDialog(data) {
+                const dialog = document.getElementById('sshConfirmationDialog');
+                const messageEl = document.getElementById('sshConfirmationMessage');
+                const detailsEl = document.getElementById('sshConfirmationDetails');
+                
+                messageEl.textContent = data.confirmation_message || 'Do you want to set up SSH identity for media sync?';
+                detailsEl.textContent = data.details || '';
+                
+                dialog.style.display = 'flex';
+            }
+            
+            function confirmSSHSetup() {
+                const dialog = document.getElementById('sshConfirmationDialog');
+                dialog.style.display = 'none';
+                setupSSH(true);
+            }
+            
+            function cancelSSHSetup() {
+                const dialog = document.getElementById('sshConfirmationDialog');
+                dialog.style.display = 'none';
+            }
+            
+            // Enhanced sync function with SSH validation
             async function sync(type) {
                 const resultDiv = document.getElementById('result');
                 const progressDiv = document.getElementById('progress');
@@ -861,6 +1283,19 @@ def index():
                         })
                     });
                     const data = await response.json();
+                    
+                    // Check if SSH setup is required
+                    if (data.ssh_setup_required && data.requires_user_confirmation) {
+                        progressDiv.style.display = 'none';
+                        resultDiv.className = 'result-panel error';
+                        resultDiv.innerHTML = `
+                            <h3>🔐 SSH Setup Required</h3>
+                            <p>${data.message}</p>
+                            <p>Please set up SSH identity before syncing.</p>
+                            <button class="ssh-setup-btn" onclick="setupSSH()" style="margin-top: 12px;">🔧 Set Up SSH Now</button>
+                        `;
+                        return;
+                    }
                     
                     // Start polling for progress if sync_id is available (regardless of initial success)
                     if (data.sync_id) {
@@ -1232,6 +1667,14 @@ def index():
                         closeLogModal();
                     }
                 });
+                
+                // Close SSH confirmation dialog when clicking outside
+                const sshDialog = document.getElementById('sshConfirmationDialog');
+                sshDialog.addEventListener('click', function(e) {
+                    if (e.target === sshDialog) {
+                        cancelSSHSetup();
+                    }
+                });
             });
         </script>
     </body>
@@ -1329,6 +1772,176 @@ def sync_vastai():
             'success': False,
             'message': f'VastAI sync error: {str(e)}'
         })
+
+@app.route('/ssh/status', methods=['GET', 'OPTIONS'])
+def get_ssh_status():
+    """Get SSH setup status and validation"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        if SSHIdentityManager is None:
+            return jsonify({
+                'success': False,
+                'message': 'SSH identity manager not available'
+            }), 500
+        
+        ssh_manager = SSHIdentityManager()
+        status = ssh_manager.get_ssh_status()
+        
+        return jsonify({
+            'success': True,
+            'status': status
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting SSH status: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH status error: {str(e)}'
+        }), 500
+
+@app.route('/ssh/setup', methods=['POST', 'OPTIONS'])
+def setup_ssh():
+    """Setup SSH agent and add identity with user confirmation if needed"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        if SSHIdentityManager is None:
+            return jsonify({
+                'success': False,
+                'message': 'SSH identity manager not available'
+            }), 500
+        
+        # Get user confirmation if provided
+        user_confirmed = False
+        if request.is_json:
+            data = request.get_json()
+            user_confirmed = data.get('confirmed', False)
+        
+        ssh_manager = SSHIdentityManager()
+        
+        # First, ensure permissions are correct
+        perm_result = ssh_manager.ensure_ssh_permissions()
+        if not perm_result['success']:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to fix SSH permissions',
+                'errors': perm_result['errors']
+            }), 500
+        
+        # Setup SSH agent and identity
+        setup_result = ssh_manager.setup_ssh_agent()
+        
+        if setup_result['requires_user_confirmation'] and not user_confirmed:
+            # Return a response indicating user confirmation is needed
+            return jsonify({
+                'success': False,
+                'requires_confirmation': True,
+                'message': 'SSH key setup requires user confirmation',
+                'confirmation_message': 'Do you want to add the SSH identity for media sync? This will enable secure connections to your sync targets.',
+                'details': setup_result['message']
+            }), 200
+        
+        if setup_result['success']:
+            response = {
+                'success': True,
+                'message': setup_result['message'],
+                'identity_added': setup_result['identity_added']
+            }
+            
+            if perm_result['changes_made']:
+                response['permissions_fixed'] = perm_result['changes_made']
+            
+            return jsonify(response)
+        else:
+            return jsonify({
+                'success': False,
+                'message': setup_result['message']
+            }), 400
+        
+    except Exception as e:
+        logger.error(f"Error setting up SSH: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH setup error: {str(e)}'
+        }), 500
+
+@app.route('/ssh/test', methods=['POST', 'OPTIONS'])
+def test_ssh_connection():
+    """Test SSH connection to a specific host"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        if SSHIdentityManager is None:
+            return jsonify({
+                'success': False,
+                'message': 'SSH identity manager not available'
+            }), 500
+        
+        # Get connection parameters from request
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'message': 'JSON request body required'
+            }), 400
+        
+        data = request.get_json()
+        host = data.get('host')
+        port = data.get('port', 22)
+        user = data.get('user', 'root')
+        timeout = data.get('timeout', 10)
+        
+        if not host:
+            return jsonify({
+                'success': False,
+                'message': 'Host parameter required'
+            }), 400
+        
+        ssh_manager = SSHIdentityManager()
+        test_result = ssh_manager.test_ssh_connection(host, port, user, timeout)
+        
+        return jsonify({
+            'success': test_result['success'],
+            'result': test_result
+        })
+        
+    except Exception as e:
+        logger.error(f"Error testing SSH connection: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH test error: {str(e)}'
+        }), 500
+
+@app.route('/ssh/cleanup', methods=['POST', 'OPTIONS'])
+def cleanup_ssh():
+    """Clean up SSH agent"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        if SSHIdentityManager is None:
+            return jsonify({
+                'success': False,
+                'message': 'SSH identity manager not available'
+            }), 500
+        
+        ssh_manager = SSHIdentityManager()
+        success = ssh_manager.cleanup_ssh_agent()
+        
+        return jsonify({
+            'success': success,
+            'message': 'SSH agent cleaned up' if success else 'Failed to clean up SSH agent'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error cleaning up SSH: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH cleanup error: {str(e)}'
+        }), 500
 
 @app.route('/test/ssh', methods=['POST', 'OPTIONS'])
 def test_ssh():
