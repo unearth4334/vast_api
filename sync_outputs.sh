@@ -349,13 +349,13 @@ for folder in "${FOLDERS[@]}"; do
     if rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
       "$SSH_DEST:$remote_path" "$local_path/" 2>&1 | tee "$rsync_output"; then
 
-      # Files transferred
-      files_transferred="$(grep -E '^Number of files transferred:' "$rsync_output" | awk '{print $5}' | tr -d ',' || true)"
+      # Files transferred (rsync says "Number of regular files transferred:")
+      files_transferred="$(grep -E '^Number of regular files transferred:' "$rsync_output" | awk '{print $NF}' | tr -d ',' || true)"
       [[ -n "${files_transferred:-}" && "$files_transferred" =~ ^[0-9]+$ ]] || files_transferred=0
       total_files_synced=$(( total_files_synced + files_transferred ))
 
-      # Bytes transferred (last numeric column; rsync prints raw number with --info=stats2)
-      bytes_transferred="$(grep -E '^Total transferred file size:' "$rsync_output" | awk '{print $NF}' | tr -d ',' | tr -cd '0-9' || true)"
+      # Bytes transferred (rsync says "Total transferred file size: X bytes", we want X)
+      bytes_transferred="$(grep -E '^Total transferred file size:' "$rsync_output" | awk '{print $(NF-1)}' | tr -d ',' || true)"
       [[ -n "${bytes_transferred:-}" && "$bytes_transferred" =~ ^[0-9]+$ ]] || bytes_transferred=0
       total_bytes_transferred=$(( total_bytes_transferred + bytes_transferred ))
 
@@ -370,7 +370,7 @@ for folder in "${FOLDERS[@]}"; do
         [[ "$ext" == "$fname" ]] && ext=""   # no dot in name
         [[ -z "$ext" ]] && continue
         EXT_COUNTS["$ext"]=$(( ${EXT_COUNTS["$ext"]:-0} + 1 ))
-      done < <(grep -E '^\>f' "$rsync_output" || true)
+      done < <(grep '^>f' "$rsync_output" || true)
 
     fi
     rm -f "$rsync_output" 2>/dev/null || true
