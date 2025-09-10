@@ -132,7 +132,7 @@ VENV_PY="$XMP_VENV/bin/python"
 
 # Safer rsync flags for QNAP/eCryptfs:
 # - Do NOT preserve perms/owner/group/times; those caused "Bad address (14)" in the past
-# - Use --itemize-changes so we can count files actually sent (>f)
+# - Use --itemize-changes so we can detect newly-created files (>f+++++++++)
 # - Add --stats so summary lines are guaranteed
 # - Avoid --human-readable so bytes are raw numbers for easy parsing
 RSYNC_FLAGS=(-rltD --delete --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --itemize-changes --stats)
@@ -312,9 +312,9 @@ fi
 update_progress "sync_folders" 25 "Starting folder sync (found $total_folders folders)"
 
 completed_folders=0
-total_files_synced=0
+total_files_new=0              # NEW: count only newly-created files
 total_bytes_transferred=0
-declare -A EXT_COUNTS=()
+declare -A EXT_COUNTS=()       # by-ext counts for newly-created files only
 
 for folder in "${FOLDERS[@]}"; do
   echo "📁 Checking: $folder"
@@ -355,31 +355,31 @@ for folder in "${FOLDERS[@]}"; do
     if rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
       "$SSH_DEST:$remote_path" "$local_path/" 2>&1 | tee "$rsync_output"; then
 
-      # Count files actually sent to the receiver in this run:
-      # itemized lines that begin with ">f" (allow possible leading spaces)
-      count_sent_itemized="$(grep -cE '^[[:space:]]*>f' "$rsync_output" || true)"
-      [[ -n "${count_sent_itemized:-}" ]] || count_sent_itemized=0
+      # NEW FILES ONLY:
+      # Itemized lines for newly created files are of the form:
+      #   >f+++++++++ <filename>
+      new_itemized_count="$(grep -cE '^[[:space:]]*>f\+{1,}' "$rsync_output" || true)"
+      [[ -n "${new_itemized_count:-}" ]] || new_itemized_count=0
 
-      # Summary fallback (if present)
-      files_transferred_summary="$(grep -E '^Number of regular files transferred:' "$rsync_output" | awk '{print $6}' | tr -d ',' || true)"
-      [[ "$files_transferred_summary" =~ ^[0-9]+$ ]] || files_transferred_summary=0
+      # Fallback: parse rsync summary "Number of created files:" when itemized count is zero
+      created_summary="$(grep -E '^Number of created files:' "$rsync_output" | awk '{print $5}' | tr -d ',' || true)"
+      [[ "$created_summary" =~ ^[0-9]+$ ]] || created_summary=0
 
-      # Prefer itemized count for "new/updated files synced"
-      files_transferred="$count_sent_itemized"
-      if [[ "$files_transferred" -eq 0 ]]; then
-        files_transferred="$files_transferred_summary"
+      files_new="$new_itemized_count"
+      if [[ "$files_new" -eq 0 ]]; then
+        files_new="$created_summary"
       fi
-      total_files_synced=$(( total_files_synced + files_transferred ))
+      total_files_new=$(( total_files_new + files_new ))
 
       # Bytes transferred (raw number; rsync prints "...: N bytes")
       bytes_transferred="$(grep -E '^Total transferred file size:' "$rsync_output" | awk '{print $(NF-1)}' | tr -d ',' | tr -cd '0-9' || true)"
       [[ "$bytes_transferred" =~ ^[0-9]+$ ]] || bytes_transferred=0
       total_bytes_transferred=$(( total_bytes_transferred + bytes_transferred ))
 
-      echo "📊 Files transferred (itemized): ${count_sent_itemized}, Bytes: ${bytes_transferred}"
+      echo "📊 New files (created): ${files_new}, Bytes: ${bytes_transferred}"
 
-      # Per-extension counts from itemized lines (>f … filename)
-      # (input is already filtered by grep -E '^[[:space:]]*>f')
+      # Per-extension counts for NEW files only
+      # Filter to the >f+++++++++ lines, then extract filenames
       while IFS= read -r line; do
         fname="${line#* }"
         fname="${fname%% -> *}"
@@ -387,7 +387,7 @@ for folder in "${FOLDERS[@]}"; do
         [[ "$ext" == "$fname" ]] && ext=""   # no dot in name
         [[ -z "$ext" ]] && continue
         EXT_COUNTS["$ext"]=$(( ${EXT_COUNTS["$ext"]:-0} + 1 ))
-      done < <(grep -E '^[[:space:]]*>f' "$rsync_output" || true)
+      done < <(grep -E '^[[:space:]]*>f\+{1,}' "$rsync_output" || true)
 
     fi
     rm -f "$rsync_output" 2>/dev/null || true
@@ -451,7 +451,7 @@ if [[ "$DO_CLEANUP" -eq 1 ]]; then
 fi
 
 # ----------- COMPLETION -----------
-# Build BY_EXT string
+# Build BY_EXT string (for newly-created files only)
 by_ext=""
 for k in "${!EXT_COUNTS[@]}"; do
   v="${EXT_COUNTS[$k]}"
@@ -459,7 +459,7 @@ for k in "${!EXT_COUNTS[@]}"; do
 done
 
 echo ""
-echo "📈 SYNC_SUMMARY: Files transferred: ${total_files_synced}, Folders synced: ${completed_folders}, Data transferred: ${total_bytes_transferred} bytes; BY_EXT: ${by_ext}"
+echo "📈 SYNC_SUMMARY: Files transferred: ${total_files_new}, Folders synced: ${completed_folders}, Data transferred: ${total_bytes_transferred} bytes; BY_EXT: ${by_ext}"
 echo ""
 
 update_progress "complete" 100 "Sync completed successfully"
