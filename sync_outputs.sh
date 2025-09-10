@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Make parsing deterministic
+export LC_ALL=C
+
 # ----------- ARG PARSING -----------
 REMOTE_PORT=""
 REMOTE_HOST="localhost"
@@ -353,12 +356,12 @@ for folder in "${FOLDERS[@]}"; do
       "$SSH_DEST:$remote_path" "$local_path/" 2>&1 | tee "$rsync_output"; then
 
       # Count files actually sent to the receiver in this run:
-      # itemized lines that begin with ">f"
-      count_sent_itemized="$(grep -cE '^\>f' "$rsync_output" || true)"
+      # itemized lines that begin with ">f" (allow possible leading spaces)
+      count_sent_itemized="$(grep -cE '^[[:space:]]*>f' "$rsync_output" || true)"
       [[ -n "${count_sent_itemized:-}" ]] || count_sent_itemized=0
 
       # Summary fallback (if present)
-      files_transferred_summary="$(grep -E '^Number of files transferred:' "$rsync_output" | awk '{print $5}' | tr -d ',' || true)"
+      files_transferred_summary="$(grep -E '^Number of regular files transferred:' "$rsync_output" | awk '{print $6}' | tr -d ',' || true)"
       [[ "$files_transferred_summary" =~ ^[0-9]+$ ]] || files_transferred_summary=0
 
       # Prefer itemized count for "new/updated files synced"
@@ -368,7 +371,7 @@ for folder in "${FOLDERS[@]}"; do
       fi
       total_files_synced=$(( total_files_synced + files_transferred ))
 
-      # Bytes transferred (raw number; rsync prints "...: 12345 bytes")
+      # Bytes transferred (raw number; rsync prints "...: N bytes")
       bytes_transferred="$(grep -E '^Total transferred file size:' "$rsync_output" | awk '{print $(NF-1)}' | tr -d ',' | tr -cd '0-9' || true)"
       [[ "$bytes_transferred" =~ ^[0-9]+$ ]] || bytes_transferred=0
       total_bytes_transferred=$(( total_bytes_transferred + bytes_transferred ))
@@ -377,14 +380,14 @@ for folder in "${FOLDERS[@]}"; do
 
       # Per-extension counts from itemized lines (>f … filename)
       while IFS= read -r line; do
-        [[ "$line" =~ ^\>f ]] || continue
+        [[ "$line" =~ ^[[:space:]]*>f ]] || continue
         fname="${line#* }"
         fname="${fname%% -> *}"
         ext="${fname##*.}"; ext="${ext,,}"
         [[ "$ext" == "$fname" ]] && ext=""   # no dot in name
         [[ -z "$ext" ]] && continue
         EXT_COUNTS["$ext"]=$(( ${EXT_COUNTS["$ext"]:-0} + 1 ))
-      done < <(grep -E '^\>f' "$rsync_output" || true)
+      done < <(grep -E '^[[:space:]]*>f' "$rsync_output" || true)
 
     fi
     rm -f "$rsync_output" 2>/dev/null || true
