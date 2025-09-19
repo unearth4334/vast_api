@@ -1,6 +1,6 @@
 # Media Sync Tool
 
-An easy-to-use tool for syncing media from local Docker containers and VastAI cloud VMs. Provides a web API interface designed for deployment on QNAP NAS and integration with Obsidian notes via dataviewjs.
+An easy-to-use tool for syncing media from local Docker containers and VastAI cloud VMs. Provides a web API interface designed for deployment on QNAP NAS.
 
 ## Features
 
@@ -8,7 +8,7 @@ An easy-to-use tool for syncing media from local Docker containers and VastAI cl
 - 🖼️ **Sync ComfyUI**: Sync from ComfyUI (10.0.78.108:2223)  
 - ☁️ **Sync VastAI**: Auto-discover running VastAI instance and sync
 - 🐳 **Docker Ready**: Containerized for easy deployment on QNAP NAS
-- 🌐 **Web API**: REST endpoints for integration with Obsidian dataviewjs
+- 🌐 **Web API**: REST endpoints for web interface
 
 ## Quick Start
 
@@ -71,37 +71,6 @@ An easy-to-use tool for syncing media from local Docker containers and VastAI cl
   "message": "Forge sync completed successfully",
   "output": "sync operation details..."
 }
-```
-
-## Obsidian Integration
-
-Use dataviewjs code in your Obsidian notes:
-
-```javascript
-const API_BASE = "http://your-nas-ip:5000";
-
-// Create sync buttons
-const buttons = [
-    { name: "🔥 Sync Forge", endpoint: "/sync/forge" },
-    { name: "🖼️ Sync Comfy", endpoint: "/sync/comfy" },
-    { name: "☁️ Sync VastAI", endpoint: "/sync/vastai" }
-];
-
-buttons.forEach(button => {
-    const btn = dv.el("button", button.name);
-    btn.addEventListener("click", async () => {
-        btn.textContent = "Syncing...";
-        try {
-            const response = await fetch(API_BASE + button.endpoint, { method: "POST" });
-            const data = await response.json();
-            btn.textContent = data.success ? "✅ Done" : "❌ Failed";
-            setTimeout(() => btn.textContent = button.name, 3000);
-        } catch (error) {
-            btn.textContent = "❌ Error";
-            setTimeout(() => btn.textContent = button.name, 3000);
-        }
-    });
-});
 ```
 
 ## Configuration
