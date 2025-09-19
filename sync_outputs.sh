@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# Make parsing deterministic
+export LC_ALL=C
+
 # ----------- ARG PARSING -----------
 REMOTE_PORT=""
 REMOTE_HOST="localhost"
@@ -65,7 +68,7 @@ update_progress() {
   if [[ -n "$PROGRESS_FILE" && -f "$PROGRESS_FILE" ]]; then
     local stage="$1"
     local percent="$2"
-    local message="$3"
+    local message="${3:-}"
     local current_folder="${4:-}"
     
     # Create a temporary file to update progress atomically
@@ -74,13 +77,12 @@ update_progress() {
     # Read current progress, update it, and write back
     python3 -c "
 import json
-import sys
 from datetime import datetime
 
 try:
     with open('$PROGRESS_FILE', 'r') as f:
         data = json.load(f)
-except:
+except Exception:
     data = {
         'sync_id': '$SYNC_ID',
         'status': 'running',
@@ -130,7 +132,10 @@ VENV_PY="$XMP_VENV/bin/python"
 
 # Safer rsync flags for QNAP/eCryptfs:
 # - Do NOT preserve perms/owner/group/times; those caused "Bad address (14)" in the past
-RSYNC_FLAGS=(-rltD --delete --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --human-readable)
+# - Use --itemize-changes so we can detect newly-created files (>f+++++++++)
+# - Add --stats so summary lines are guaranteed
+# - Avoid --human-readable so bytes are raw numbers for easy parsing
+RSYNC_FLAGS=(-rltD --delete --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --itemize-changes --stats)
 if rsync --help 2>&1 | grep -q -- '--mkpath'; then
   RSYNC_FLAGS+=(--mkpath)
 fi
@@ -146,23 +151,18 @@ SSH_CMD=("${SSH_BASE[@]}" "$SSH_DEST")
 normalize_permissions() {
   local path="$1"
 
-  # First try chmod quietly; if it fails, we fallback to install(1) trick for files.
-  # Normalize directories (chmod tends to be less problematic for dirs).
+  # Directories first
   find "$path" -type d ! -perm -0755 -exec chmod 0755 {} + 2>/dev/null || true
 
-  # Try chmod for files; if any fail, we repair those specific ones via install -m
-  # Gather files that still aren't 0644
+  # Try chmod for files; if any fail, repair via install(1)
   mapfile -d '' not_ok < <(find "$path" -type f ! -perm -0644 -print0 2>/dev/null || true)
   if ((${#not_ok[@]})); then
-    # Attempt chmod; failures will remain not 0644 and get fixed below
     chmod -f 0644 "${not_ok[@]}" 2>/dev/null || true
   fi
 
-  # Find any files still not 0644 and fix by copy-rename (atomic)
+  # Fix any remaining via copy-rename trick (atomic)
   find "$path" -type f ! -perm -0644 -print0 2>/dev/null | while IFS= read -r -d '' f; do
     tmp="${f}.tmp.$$"
-    # Preserve content/ownership by current user; set mode explicitly
-    # install is from coreutils (present on Debian/Ubuntu images)
     if install -m 0644 -T -- "$f" "$tmp"; then
       mv -f -- "$tmp" "$f" || rm -f -- "$tmp"
     else
@@ -175,14 +175,7 @@ normalize_permissions() {
 run_xmp_for_dir() {
   local dir="$1"
   [[ "$DO_XMP" -eq 1 ]] || return 0
-  [[ -x "$VENV_PY" ]] || { echo "⚠️  XMP skipped ($dir): venv python not found at $VENV_PY"; return 0; }
-  [[ -f "$XMP_SCRIPT" ]] || { echo "⚠️  XMP skipped ($dir): script not found at $XMP_SCRIPT"; return 0; }
 
-  if [[ "$DO_XMP" -ne 1 ]]; then
-    return 0
-  fi
-  
-  # Determine which Python to use - prefer venv, fallback to system python
   local python_exe=""
   if [ -x "$VENV_PY" ]; then
     python_exe="$VENV_PY"
@@ -200,7 +193,6 @@ run_xmp_for_dir() {
     return 0
   fi
 
-  # Count PNG files
   local png_count
   png_count=$(find "$dir" -type f -iname '*.png' | wc -l)
   [[ "$png_count" -gt 0 ]] || { echo "📝 XMP: no PNGs in $dir"; return 0; }
@@ -213,6 +205,17 @@ run_xmp_for_dir() {
   fi
 }
 
+# Progress math helper (prevents division-by-zero)
+safe_pct() {
+  # args: base, completed, total
+  local base="$1" completed="$2" total="$3"
+  if [[ "$total" -le 0 ]]; then
+    echo "$base"
+  else
+    echo $(( base + (completed * 60 / total) ))
+  fi
+}
+
 # -------------------------------------
 
 echo "🔗 Remote: $SSH_DEST  (port $REMOTE_PORT)"
@@ -222,7 +225,7 @@ update_progress "ssh_setup" 5 "Setting up SSH connection"
 
 # Start ssh-agent and add key
 eval "$(ssh-agent -s)"
-ssh-add "$SSH_KEY" || { echo "❌ Failed to add SSH key. Exiting."; exit 1; }
+ssh-add "$SSH_KEY" >/dev/null 2>&1 || { echo "❌ Failed to add SSH key. Exiting."; exit 1; }
 
 update_progress "remote_discovery" 10 "Discovering remote UI_HOME"
 
@@ -279,29 +282,55 @@ try:
     data['total_folders'] = $total_folders
     with open('$PROGRESS_FILE', 'w') as f:
         json.dump(data, f, indent=2)
-except:
+except Exception:
     pass
 " 2>/dev/null || true
+fi
+
+# If no work, succeed with a summary and exit cleanly
+if [[ "$total_folders" -le 0 ]]; then
+  echo "ℹ️  Nothing to sync: no dated subfolders found."
+  echo ""
+  echo "📈 SYNC_SUMMARY: Files transferred: 0, Folders synced: 0, Data transferred: 0 bytes; BY_EXT: "
+  echo ""
+  update_progress "complete" 100 "No changes"
+  if [[ -n "$PROGRESS_FILE" && -f "$PROGRESS_FILE" ]]; then
+    python3 -c "
+import json
+from datetime import datetime
+try:
+    with open('$PROGRESS_FILE','r') as f: data=json.load(f)
+    data['status']='completed'; data['end_time']=datetime.now().isoformat(); data['current_stage']='complete'; data['progress_percent']=100
+    with open('$PROGRESS_FILE','w') as f: json.dump(data,f,indent=2)
+except Exception: pass
+" 2>/dev/null || true
+  fi
+  ssh-agent -k >/dev/null 2>&1 || true
+  exit 0
 fi
 
 update_progress "sync_folders" 25 "Starting folder sync (found $total_folders folders)"
 
 completed_folders=0
+total_files_new=0              # NEW: count only newly-created files
+total_bytes_transferred=0
+declare -A EXT_COUNTS=()       # by-ext counts for newly-created files only
+
 for folder in "${FOLDERS[@]}"; do
   echo "📁 Checking: $folder"
-  update_progress "sync_folders" $((25 + (completed_folders * 60 / total_folders))) "Checking folder: $folder" "$folder"
+  update_progress "sync_folders" "$(safe_pct 25 "$completed_folders" "$total_folders")" "Checking folder: $folder" "$folder"
 
   REMOTE_DIR_EXISTS="$("${SSH_CMD[@]}" "[ -d \"$REMOTE_BASE/$folder\" ] && echo yes || echo no" || true)"
   if [[ "$REMOTE_DIR_EXISTS" != "yes" ]]; then
     echo "⚠️  Remote folder missing: $REMOTE_BASE/$folder — skipping."
-    update_progress "sync_folders" $((25 + (completed_folders * 60 / total_folders))) "Remote folder missing: $folder" "$folder"
+    update_progress "sync_folders" "$(safe_pct 25 "$completed_folders" "$total_folders")" "Remote folder missing: $folder" "$folder"
     continue
   fi
 
   remote_subdirs="$("${SSH_CMD[@]}" "find \"$REMOTE_BASE/$folder\" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null || true")"
   if [ -z "$remote_subdirs" ]; then
     echo "⚠️  No subfolders found in $folder — skipping."
-    update_progress "sync_folders" $((25 + (completed_folders * 60 / total_folders))) "No subfolders in: $folder" "$folder"
+    update_progress "sync_folders" "$(safe_pct 25 "$completed_folders" "$total_folders")" "No subfolders in: $folder" "$folder"
     continue
   fi
 
@@ -317,12 +346,51 @@ for folder in "${FOLDERS[@]}"; do
     fi
 
     echo "🔄 Syncing files"
-    update_progress "sync_folders" $((25 + (completed_folders * 60 / total_folders))) "Syncing: $folder/$subdir" "$folder"
+    update_progress "sync_folders" "$(safe_pct 25 "$completed_folders" "$total_folders")" "Syncing: $folder/$subdir" "$folder"
     
     RSYNC_SSH=("${SSH_BASE[@]}")
 
-    rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
-      "$SSH_DEST:$remote_path" "$local_path/"
+    # Capture rsync output to parse stats and per-extension counts
+    rsync_output="$(mktemp)"
+    if rsync "${RSYNC_FLAGS[@]}" -e "$(printf '%q ' "${RSYNC_SSH[@]}")" \
+      "$SSH_DEST:$remote_path" "$local_path/" 2>&1 | tee "$rsync_output"; then
+
+      # NEW FILES ONLY:
+      # Itemized lines for newly created files are of the form:
+      #   >f+++++++++ <filename>
+      new_itemized_count="$(grep -cE '^[[:space:]]*>f\+{1,}' "$rsync_output" || true)"
+      [[ -n "${new_itemized_count:-}" ]] || new_itemized_count=0
+
+      # Fallback: parse rsync summary "Number of created files:" when itemized count is zero
+      created_summary="$(grep -E '^Number of created files:' "$rsync_output" | awk '{print $5}' | tr -d ',' || true)"
+      [[ "$created_summary" =~ ^[0-9]+$ ]] || created_summary=0
+
+      files_new="$new_itemized_count"
+      if [[ "$files_new" -eq 0 ]]; then
+        files_new="$created_summary"
+      fi
+      total_files_new=$(( total_files_new + files_new ))
+
+      # Bytes transferred (raw number; rsync prints "...: N bytes")
+      bytes_transferred="$(grep -E '^Total transferred file size:' "$rsync_output" | awk '{print $(NF-1)}' | tr -d ',' | tr -cd '0-9' || true)"
+      [[ "$bytes_transferred" =~ ^[0-9]+$ ]] || bytes_transferred=0
+      total_bytes_transferred=$(( total_bytes_transferred + bytes_transferred ))
+
+      echo "📊 New files (created): ${files_new}, Bytes: ${bytes_transferred}"
+
+      # Per-extension counts for NEW files only
+      # Filter to the >f+++++++++ lines, then extract filenames
+      while IFS= read -r line; do
+        fname="${line#* }"
+        fname="${fname%% -> *}"
+        ext="${fname##*.}"; ext="${ext,,}"
+        [[ "$ext" == "$fname" ]] && ext=""   # no dot in name
+        [[ -z "$ext" ]] && continue
+        EXT_COUNTS["$ext"]=$(( ${EXT_COUNTS["$ext"]:-0} + 1 ))
+      done < <(grep -E '^[[:space:]]*>f\+{1,}' "$rsync_output" || true)
+
+    fi
+    rm -f "$rsync_output" 2>/dev/null || true
 
     # Normalize permissions so SMB users can read
     echo "🛡  Normalizing permissions under: $local_path"
@@ -343,7 +411,7 @@ try:
     data['completed_folders'] = $completed_folders
     with open('$PROGRESS_FILE', 'w') as f:
         json.dump(data, f, indent=2)
-except:
+except Exception:
     pass
 " 2>/dev/null || true
     fi
@@ -383,6 +451,17 @@ if [[ "$DO_CLEANUP" -eq 1 ]]; then
 fi
 
 # ----------- COMPLETION -----------
+# Build BY_EXT string (for newly-created files only)
+by_ext=""
+for k in "${!EXT_COUNTS[@]}"; do
+  v="${EXT_COUNTS[$k]}"
+  if [[ -z "$by_ext" ]]; then by_ext="${k}=${v}"; else by_ext="${by_ext},${k}=${v}"; fi
+done
+
+echo ""
+echo "📈 SYNC_SUMMARY: Files transferred: ${total_files_new}, Folders synced: ${completed_folders}, Data transferred: ${total_bytes_transferred} bytes; BY_EXT: ${by_ext}"
+echo ""
+
 update_progress "complete" 100 "Sync completed successfully"
 
 # ----------- CLEANUP -----------
@@ -400,9 +479,9 @@ try:
     data['progress_percent'] = 100
     with open('$PROGRESS_FILE', 'w') as f:
         json.dump(data, f, indent=2)
-except:
+except Exception:
     pass
 " 2>/dev/null || true
 fi
 
-ssh-agent -k
+ssh-agent -k >/dev/null 2>&1 || true
