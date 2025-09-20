@@ -1083,9 +1083,12 @@ def index():
                     <button class="setup-button secondary" onclick="loadVastaiInstances()">
                         🔄 Load Instances
                     </button>
+                    <button class="setup-button secondary" onclick="loadVastaiInstanceIds()">
+                        🆔 Fetch Instance IDs
+                    </button>
                     <div id="vastai-instances-list" class="instances-list">
                         <!-- Instances will be displayed here -->
-                        <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances</div>
+                        <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances or "Fetch Instance IDs" to see just the IDs</div>
                     </div>
                 </div>
                 
@@ -1825,6 +1828,57 @@ def index():
                 instancesList.innerHTML = html;
             }
             
+            async function loadVastaiInstanceIds() {
+                const instancesList = document.getElementById('vastai-instances-list');
+                instancesList.innerHTML = '<div class="no-instances-message">Loading instance IDs...</div>';
+                
+                try {
+                    const response = await fetch('/vastai/instance-ids', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        displayVastaiInstanceIds(data.instance_ids);
+                    } else {
+                        instancesList.innerHTML = '<div class="no-instances-message" style="color: var(--text-error);">Error: ' + data.message + '</div>';
+                    }
+                } catch (error) {
+                    instancesList.innerHTML = '<div class="no-instances-message" style="color: var(--text-error);">Request failed: ' + error.message + '</div>';
+                }
+            }
+            
+            function displayVastaiInstanceIds(instanceIds) {
+                const instancesList = document.getElementById('vastai-instances-list');
+                
+                if (!instanceIds || instanceIds.length === 0) {
+                    instancesList.innerHTML = '<div class="no-instances-message">No VastAI instances found</div>';
+                    return;
+                }
+                
+                let html = '<div style="padding: 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-s); background: var(--background-secondary);">';
+                html += '<h5 style="margin: 0 0 10px 0; color: var(--text-normal);">Instance IDs:</h5>';
+                html += '<div style="font-family: monospace; font-size: 14px; line-height: 1.6;">';
+                
+                instanceIds.forEach((id, index) => {
+                    html += `<div style="padding: 4px 8px; margin: 2px 0; background: var(--background-primary); border-radius: 4px; border-left: 3px solid var(--interactive-accent);">
+                        <span style="color: var(--text-accent);">#${id}</span>
+                    </div>`;
+                });
+                
+                html += '</div>';
+                html += `<div style="margin-top: 10px; font-size: 12px; color: var(--text-muted);">
+                    Total: ${instanceIds.length} instance${instanceIds.length !== 1 ? 's' : ''}
+                </div>`;
+                html += '</div>';
+                
+                instancesList.innerHTML = html;
+            }
+            
             function useInstance(sshConnection) {
                 const sshInput = document.getElementById('sshConnectionString');
                 sshInput.value = sshConnection;
@@ -2426,6 +2480,54 @@ def get_vastai_instances():
             'success': True,
             'instances': formatted_instances,
             'count': len(formatted_instances)
+        })
+        
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'message': 'VastAI configuration files not found (config.yaml or api_key.txt)'
+        })
+    except Exception as e:
+        logger.error(f"Error getting VastAI instances: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting VastAI instances: {str(e)}'
+        })
+
+@app.route('/vastai/instance-ids', methods=['GET', 'OPTIONS'])
+def get_vastai_instance_ids():
+    """Get list of VastAI instance IDs only"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Initialize VastManager to get instances
+        vast_manager = VastManager()
+        instances = vast_manager.list_instances()
+        
+        # Extract just the instance IDs
+        instance_ids = []
+        for instance in instances:
+            instance_id = instance.get('id')
+            if instance_id is not None:
+                instance_ids.append(instance_id)
+        
+        return jsonify({
+            'success': True,
+            'instance_ids': instance_ids,
+            'count': len(instance_ids)
+        })
+        
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'message': 'VastAI configuration files not found (config.yaml or api_key.txt)'
+        })
+    except Exception as e:
+        logger.error(f"Error getting VastAI instance IDs: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting VastAI instance IDs: {str(e)}'
         })
         
     except FileNotFoundError:
