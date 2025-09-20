@@ -463,6 +463,35 @@ class TestSyncAPI(unittest.TestCase):
         result = parse_ssh_connection('invalid string')
         self.assertIsNone(result)
 
+    def test_sync_vastai_connection_endpoint(self):
+        """Test the new VastAI connection sync endpoint"""
+        # Test with valid SSH connection string
+        response = self.app.post('/sync/vastai-connection', 
+                                json={'ssh_connection': 'ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080'})
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        # The sync will fail because we can't actually connect, but the endpoint should work
+        self.assertFalse(data['success'])  # Expected to fail in test environment
+        self.assertIn('message', data)
+        
+        # Test with invalid SSH connection string
+        response = self.app.post('/sync/vastai-connection', 
+                                json={'ssh_connection': 'invalid'})
+        self.assertEqual(response.status_code, 400)
+        
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid SSH connection string format', data['message'])
+        
+        # Test with missing SSH connection string
+        response = self.app.post('/sync/vastai-connection', json={})
+        self.assertEqual(response.status_code, 400)
+        
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('SSH connection string is required', data['message'])
+
 
 if __name__ == '__main__':
     unittest.main()
