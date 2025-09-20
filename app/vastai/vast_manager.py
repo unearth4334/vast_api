@@ -2,9 +2,13 @@ import requests
 import yaml
 import time
 import json
+import logging
 from .vast_display import display_vast_offers
 
 VAST_BASE = "https://console.vast.ai/api/v0"
+
+# Set up logging for SSH data tracking
+logger = logging.getLogger(__name__)
 
 class VastManager:
     def __init__(self, config_path="config.yaml", api_key_path="api_key.txt"):
@@ -80,11 +84,40 @@ class VastManager:
 
         return response.json()
 
+    def _validate_ssh_data(self, instance_data, instance_id=None):
+        """Validate SSH data integrity and log any inconsistencies"""
+        ssh_host = instance_data.get("ssh_host")
+        ssh_port = instance_data.get("ssh_port")
+        
+        # Log SSH data for debugging
+        instance_ref = f"instance {instance_id}" if instance_id else "instance data"
+        logger.info(f"SSH data for {instance_ref}: host='{ssh_host}', port={ssh_port}")
+        
+        # Check for suspicious SSH host patterns that might indicate incorrect data
+        if ssh_host and isinstance(ssh_host, str):
+            if ssh_host.startswith("ssh") and ".vast.ai" in ssh_host:
+                logger.warning(f"Suspicious SSH host detected for {instance_ref}: {ssh_host} - this might be incorrect")
+                logger.warning(f"Expected format: IP address, got: {ssh_host}")
+        
+        # Check for suspicious SSH port patterns
+        if ssh_port and isinstance(ssh_port, (int, str)):
+            try:
+                port_num = int(ssh_port)
+                if port_num > 30000:  # Ports above 30000 might be mapped/forwarded ports
+                    logger.warning(f"High SSH port detected for {instance_ref}: {port_num} - verify this is correct")
+            except (ValueError, TypeError):
+                logger.error(f"Invalid SSH port format for {instance_ref}: {ssh_port}")
+        
+        return ssh_host, ssh_port
+
     def show_instance(self, instance_id):
         url = f"{VAST_BASE}/instances/{instance_id}/"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
         instance = response.json().get("instances", {})
+
+        # Validate SSH data for consistency
+        ssh_host, ssh_port = self._validate_ssh_data(instance, instance_id)
 
         from tabulate import tabulate
         summary = {
@@ -99,8 +132,8 @@ class VastManager:
             "Download (Mbps)": instance.get("inet_down"),
             "Upload (Mbps)": instance.get("inet_up"),
             "Public IP": instance.get("public_ipaddr"),
-            "SSH Host": instance.get("ssh_host"),
-            "SSH Port": instance.get("ssh_port"),
+            "SSH Host": ssh_host,
+            "SSH Port": ssh_port,
             "Template": instance.get("template_name"),
             "Geolocation": instance.get("geolocation"),
             "OS": instance.get("os_version"),
@@ -121,7 +154,14 @@ class VastManager:
         url = f"{VAST_BASE}/instances/"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
-        return response.json().get("instances", [])
+        instances = response.json().get("instances", [])
+        
+        # Validate SSH data for each instance
+        for instance in instances:
+            if isinstance(instance, dict) and instance.get("id"):
+                self._validate_ssh_data(instance, instance.get("id"))
+        
+        return instances
 
     def get_running_instance(self):
         """Get the first running instance (for VastAI sync)"""
