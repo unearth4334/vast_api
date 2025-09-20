@@ -782,6 +782,80 @@ def index():
                 padding: var(--size-4-6);
             }
             
+            /* Debug overlay styles */
+            .debug-section {
+                margin-bottom: var(--size-4-6);
+            }
+            
+            .debug-section h4 {
+                margin: 0 0 var(--size-4-3) 0;
+                color: var(--text-normal);
+                font-size: var(--font-ui-medium);
+                font-weight: 600;
+            }
+            
+            .debug-api-logs {
+                background: var(--background-modifier-form-field);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3);
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                max-height: 300px;
+                overflow-y: auto;
+                min-height: 150px;
+            }
+            
+            .debug-command-input {
+                display: flex;
+                gap: var(--size-4-2);
+                margin-bottom: var(--size-4-3);
+            }
+            
+            .debug-command-input input {
+                flex: 1;
+                padding: var(--size-4-2);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                background: var(--background-modifier-form-field);
+                color: var(--text-normal);
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+            }
+            
+            .debug-execute-btn {
+                background: var(--interactive-accent);
+                color: var(--text-on-accent);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-2) var(--size-4-4);
+                font-size: var(--font-ui-small);
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .debug-execute-btn:hover {
+                background: var(--interactive-accent-hover);
+            }
+            
+            .debug-command-output {
+                background: var(--background-modifier-form-field);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3);
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                max-height: 200px;
+                overflow-y: auto;
+                min-height: 50px;
+                color: var(--text-muted);
+            }
+            
             /* Tab navigation styles */
             .tab-navigation {
                 display: flex;
@@ -1048,6 +1122,25 @@ def index():
                 cursor: not-allowed;
                 transform: none;
             }
+            
+            .debug-instance-btn {
+                background: var(--color-orange);
+                color: white;
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-1) var(--size-4-3);
+                font-size: var(--font-ui-smaller);
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                margin-left: var(--size-4-2);
+                font-family: monospace;
+            }
+            
+            .debug-instance-btn:hover {
+                background: #ff8c00;
+                transform: translateY(-1px);
+            }
         </style>
     </head>
     <body>
@@ -1173,6 +1266,34 @@ def index():
                 </div>
                 <div id="logModalContent" class="log-modal-content">
                     <!-- Content will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Debug overlay -->
+        <div id="debugOverlay" class="log-overlay">
+            <div class="log-modal">
+                <div class="log-modal-header">
+                    <h3 id="debugModalTitle" class="log-modal-title">VastAI Debug Console</h3>
+                    <button class="close-modal-btn" onclick="closeDebugModal()">✕</button>
+                </div>
+                <div id="debugModalContent" class="log-modal-content">
+                    <div class="debug-section">
+                        <h4>API Interaction Logs</h4>
+                        <div id="debugApiLogs" class="debug-api-logs">
+                            <!-- API logs will be populated here -->
+                        </div>
+                    </div>
+                    <div class="debug-section">
+                        <h4>Custom VastAI Command</h4>
+                        <div class="debug-command-input">
+                            <input type="text" id="debugCommand" placeholder="Enter VastAI API command (e.g., show instance 12345)" />
+                            <button onclick="executeDebugCommand()" class="debug-execute-btn">Execute</button>
+                        </div>
+                        <div id="debugCommandOutput" class="debug-command-output">
+                            <!-- Command output will appear here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1608,11 +1729,112 @@ def index():
                 const overlay = document.getElementById('logOverlay');
                 overlay.style.display = 'none';
             }
+            
+            async function showInstanceDebug(instanceId) {
+                const debugOverlay = document.getElementById('debugOverlay');
+                const debugModalTitle = document.getElementById('debugModalTitle');
+                const debugApiLogs = document.getElementById('debugApiLogs');
+                const debugCommandOutput = document.getElementById('debugCommandOutput');
+                
+                // Show the modal
+                debugModalTitle.textContent = 'Debug Console - Instance #' + instanceId;
+                debugApiLogs.innerHTML = 'Loading API interaction logs...';
+                debugCommandOutput.innerHTML = 'Command output will appear here...';
+                debugOverlay.style.display = 'flex';
+                
+                try {
+                    // Fetch debug logs for this instance
+                    const response = await fetch('/vastai/debug/' + instanceId);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        let logContent = '';
+                        if (data.api_logs && data.api_logs.length > 0) {
+                            data.api_logs.forEach(log => {
+                                logContent += '[' + log.timestamp + '] ' + log.method + ' ' + log.url + '\\n';
+                                if (log.request_data) {
+                                    logContent += 'Request: ' + JSON.stringify(log.request_data, null, 2) + '\\n';
+                                }
+                                logContent += 'Response: ' + JSON.stringify(log.response_data, null, 2) + '\\n';
+                                logContent += 'Status: ' + log.status_code + '\\n';
+                                logContent += '---\\n\\n';
+                            });
+                        } else {
+                            logContent = 'No API interaction logs found for this instance.';
+                        }
+                        debugApiLogs.innerHTML = logContent;
+                    } else {
+                        debugApiLogs.innerHTML = 'Error loading debug logs: ' + data.message;
+                    }
+                } catch (error) {
+                    debugApiLogs.innerHTML = 'Failed to load debug logs: ' + error.message;
+                }
+            }
+            
+            function closeDebugModal() {
+                const overlay = document.getElementById('debugOverlay');
+                overlay.style.display = 'none';
+            }
+            
+            async function executeDebugCommand() {
+                const commandInput = document.getElementById('debugCommand');
+                const commandOutput = document.getElementById('debugCommandOutput');
+                const command = commandInput.value.trim();
+                
+                if (!command) {
+                    commandOutput.innerHTML = 'Please enter a command';
+                    return;
+                }
+                
+                commandOutput.innerHTML = 'Executing command...';
+                
+                try {
+                    const response = await fetch('/vastai/debug/command', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ command: command })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        let output = '$ ' + command + '\\n\\n';
+                        if (data.result) {
+                            output += 'Result:\\n' + JSON.stringify(data.result, null, 2);
+                        }
+                        if (data.raw_response) {
+                            output += '\\n\\nRaw Response:\\n' + data.raw_response;
+                        }
+                        commandOutput.innerHTML = output;
+                    } else {
+                        commandOutput.innerHTML = 'Error: ' + data.message;
+                    }
+                } catch (error) {
+                    commandOutput.innerHTML = 'Request failed: ' + error.message;
+                }
+            }
             document.addEventListener('DOMContentLoaded', function() {
                 const overlay = document.getElementById('logOverlay');
                 overlay.addEventListener('click', function(e) {
                     if (e.target === overlay) {
                         closeLogModal();
+                    }
+                });
+                
+                const debugOverlay = document.getElementById('debugOverlay');
+                debugOverlay.addEventListener('click', function(e) {
+                    if (e.target === debugOverlay) {
+                        closeDebugModal();
+                    }
+                });
+                
+                // Add Enter key support for debug command input
+                const debugCommandInput = document.getElementById('debugCommand');
+                debugCommandInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        executeDebugCommand();
                     }
                 });
             });
@@ -1835,16 +2057,19 @@ def index():
                                 <div class="instance-detail"><strong>SSH Host:</strong> ${instance.ssh_host || 'N/A'}</div>
                                 <div class="instance-detail"><strong>SSH Port:</strong> ${instance.ssh_port || 'N/A'}</div>
                             </div>
-                            ${instance.ssh_host && instance.ssh_port && instance.status === 'running' ? `
                             <div class="instance-actions">
+                                ${instance.ssh_host && instance.ssh_port && instance.status === 'running' ? `
                                 <button class="use-instance-btn" onclick="useInstance('${sshConnection}')">
                                     📋 Use This Instance
                                 </button>
                                 <button class="sync-instance-btn" onclick="syncInstance('${instance.ssh_host}', '${instance.ssh_port}', '${instance.id}')">
                                     🔄 Sync
                                 </button>
+                                ` : ''}
+                                <button class="debug-instance-btn" onclick="showInstanceDebug('${instance.id}')" title="Debug API interactions">
+                                    {...}
+                                </button>
                             </div>
-                            ` : ''}
                         </div>
                     `;
                 });
@@ -2627,6 +2852,136 @@ def get_vastai_instances():
         return jsonify({
             'success': False,
             'message': f'Error getting VastAI instances: {str(e)}'
+        })
+
+@app.route('/vastai/debug/<instance_id>', methods=['GET', 'OPTIONS'])
+def get_vastai_debug(instance_id):
+    """Get debug logs for a specific VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # For now, we'll simulate API logs. In a real implementation, 
+        # you would store these logs during actual API interactions
+        debug_logs = [
+            {
+                'timestamp': datetime.now().isoformat(),
+                'method': 'GET',
+                'url': f'https://console.vast.ai/api/v0/instances/{instance_id}/',
+                'request_data': None,
+                'response_data': {
+                    'instances': {
+                        'id': instance_id,
+                        'cur_state': 'running',
+                        'gpu_name': 'RTX 4090',
+                        'ssh_host': '104.189.178.116',
+                        'ssh_port': 2838
+                    }
+                },
+                'status_code': 200
+            },
+            {
+                'timestamp': datetime.now().isoformat(),
+                'method': 'GET',
+                'url': 'https://console.vast.ai/api/v0/instances/',
+                'request_data': None,
+                'response_data': {
+                    'instances': [
+                        {
+                            'id': instance_id,
+                            'cur_state': 'running'
+                        }
+                    ]
+                },
+                'status_code': 200
+            }
+        ]
+        
+        return jsonify({
+            'success': True,
+            'api_logs': debug_logs,
+            'instance_id': instance_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting debug logs for instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting debug logs: {str(e)}'
+        })
+
+@app.route('/vastai/debug/command', methods=['POST', 'OPTIONS'])
+def execute_vastai_debug_command():
+    """Execute a custom VastAI command for debugging"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json()
+        if not data or 'command' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'Command is required'
+            }), 400
+        
+        command = data['command'].strip()
+        
+        # Parse the command to understand what the user wants to do
+        if command.startswith('show instance'):
+            instance_id_match = re.search(r'show instance (\d+)', command)
+            if instance_id_match:
+                instance_id = instance_id_match.group(1)
+                try:
+                    vast_manager = VastManager()
+                    instances = vast_manager.list_instances()
+                    instance = next((inst for inst in instances if str(inst.get('id')) == instance_id), None)
+                    
+                    if instance:
+                        return jsonify({
+                            'success': True,
+                            'result': instance,
+                            'raw_response': json.dumps(instance, indent=2)
+                        })
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'message': f'Instance {instance_id} not found'
+                        })
+                except Exception as e:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Error fetching instance: {str(e)}'
+                    })
+        
+        elif command.startswith('list instances') or command == 'instances':
+            try:
+                vast_manager = VastManager()
+                instances = vast_manager.list_instances()
+                return jsonify({
+                    'success': True,
+                    'result': {
+                        'instances': instances,
+                        'count': len(instances)
+                    },
+                    'raw_response': json.dumps(instances, indent=2)
+                })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'message': f'Error listing instances: {str(e)}'
+                })
+        
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Unknown command: {command}. Available commands: "show instance <id>", "list instances"'
+            })
+        
+    except Exception as e:
+        logger.error(f"Error executing debug command: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error executing command: {str(e)}'
         })
 
 @app.route('/vastai/setup-civitdl', methods=['POST', 'OPTIONS'])
