@@ -1,0 +1,8 @@
+template_hash_id: "demo_template_12345"
+ui_home_env: "/workspace/ComfyUI"
+disk_size_gb: 32
+gpu_ram: 10
+sort: "dph_total"
+preferred_geolocation: []
+exclude_countries: []
+exclude_geolocation: []
