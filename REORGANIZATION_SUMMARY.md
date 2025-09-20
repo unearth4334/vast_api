@@ -25,10 +25,6 @@ app/
     ├── vast_instance.py
     ├── vast_launcher.py
     └── vast_manager.py
-
-obsidian_ui/
-├── obsidian_integration.md
-└── sync_api.css
 ```
 
 ### File Movements
@@ -48,10 +44,6 @@ obsidian_ui/
 #### Utility Files → `app/utils/`
 - `match_filter.py`
 - `xmp_tool.py`
-
-#### Obsidian/UI Files → `obsidian_ui/`
-- `obsidian_integration.md`
-- `sync_api.css`
 
 ### Updated Components
 
@@ -109,6 +101,6 @@ All tests pass and functionality is preserved:
 - ✅ Utility functions work as expected
 - ✅ All imports resolved correctly
 - ✅ Docker build updated
-- ✅ Obsidian UI files properly separated
+- ✅ Web UI functionality preserved
 
 This reorganization provides a clean, logical structure while maintaining full backward compatibility through convenience scripts.

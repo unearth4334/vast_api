@@ -39,10 +39,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# --- CORS setup (allow Obsidian + local HTTP origins) ---
+# --- CORS setup (allow local HTTP origins) ---
 ALLOWED_ORIGINS = [
-    "app://obsidian.md",
-    "http://10.0.78.66",  # your NAS/API base used in Obsidian
+    "http://10.0.78.66",  # your NAS/API base
     "http://localhost",
     "http://127.0.0.1",
 ]
@@ -296,7 +295,7 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
 
 @app.route('/')
 def index():
-    """Obsidian-inspired web interface for testing"""
+    """Web interface for testing"""
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -306,7 +305,7 @@ def index():
         <title>Media Sync Tool</title>
         <style>
                         :root {
-                /* Obsidian-inspired color scheme */
+                /* Modern dark theme color scheme */
                 --color-accent: #7c3aed;
                 --color-accent-hover: #8b5cf6;
                 --color-accent-muted: #a78bfa;

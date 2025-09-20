@@ -25,7 +25,6 @@ RUN .venv/bin/pip install --no-cache-dir --trusted-host pypi.org --trusted-host 
 
 # Copy application files
 COPY app/ ./app/
-COPY obsidian_ui/ ./obsidian_ui/
 COPY *.sh ./
 COPY config.yaml ./ 
 
