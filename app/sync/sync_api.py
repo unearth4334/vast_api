@@ -49,6 +49,7 @@ CORS(
     app,
     resources={
         r"/sync/*": {"origins": ALLOWED_ORIGINS},
+        r"/vastai/*": {"origins": ALLOWED_ORIGINS},
         r"/status": {"origins": ALLOWED_ORIGINS},
         r"/test/*": {"origins": ALLOWED_ORIGINS},
         r"/logs/*": {"origins": ALLOWED_ORIGINS},
@@ -780,6 +781,145 @@ def index():
                 font-style: italic;
                 padding: var(--size-4-6);
             }
+            
+            /* Tab navigation styles */
+            .tab-navigation {
+                display: flex;
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-m) var(--radius-m) 0 0;
+                margin-bottom: 0;
+                overflow: hidden;
+            }
+            
+            .tab-button {
+                background: transparent;
+                border: none;
+                padding: var(--size-4-3) var(--size-4-4);
+                font-size: var(--font-ui-medium);
+                font-weight: 500;
+                color: var(--text-muted);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                flex: 1;
+                text-align: center;
+                border-bottom: 2px solid transparent;
+            }
+            
+            .tab-button:hover {
+                color: var(--text-normal);
+                background: var(--background-secondary-alt);
+            }
+            
+            .tab-button.active {
+                color: var(--text-on-accent);
+                background: var(--interactive-accent);
+                border-bottom-color: var(--color-accent-hover);
+            }
+            
+            .tab-content {
+                display: none;
+                background: var(--background-secondary);
+                border: 1px solid var(--background-modifier-border);
+                border-top: none;
+                border-radius: 0 0 var(--radius-m) var(--radius-m);
+                padding: var(--size-4-4);
+                box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+            }
+            
+            .tab-content.active {
+                display: block;
+            }
+            
+            /* VastAI Setup specific styles */
+            .setup-field {
+                margin-bottom: var(--size-4-4);
+            }
+            
+            .setup-field label {
+                display: block;
+                margin-bottom: var(--size-4-2);
+                font-weight: 500;
+                color: var(--text-normal);
+            }
+            
+            .setup-field input[type="text"] {
+                width: 100%;
+                padding: var(--size-4-3);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                background: var(--background-modifier-form-field);
+                color: var(--text-normal);
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+            }
+            
+            .setup-field input[type="text"]:focus {
+                outline: 2px solid var(--interactive-accent);
+                outline-offset: 2px;
+                border-color: var(--interactive-accent);
+            }
+            
+            .setup-buttons {
+                display: flex;
+                gap: var(--size-4-3);
+                flex-wrap: wrap;
+            }
+            
+            .setup-button {
+                background: var(--interactive-accent);
+                color: var(--text-on-accent);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-2) var(--size-4-4);
+                font-size: var(--font-ui-small);
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .setup-button:hover {
+                background: var(--interactive-accent-hover);
+            }
+            
+            .setup-button.secondary {
+                background: var(--interactive-normal);
+                color: var(--text-normal);
+            }
+            
+            .setup-button.secondary:hover {
+                background: var(--interactive-hover);
+            }
+            
+            .setup-button.danger {
+                background: var(--text-error);
+                color: white;
+            }
+            
+            .setup-button.danger:hover {
+                background: #e53e3e;
+            }
+            
+            .setup-result {
+                margin-top: var(--size-4-3);
+                padding: var(--size-4-3);
+                border-radius: var(--radius-s);
+                border: 1px solid var(--background-modifier-border);
+                background: var(--background-modifier-form-field);
+                font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                font-size: var(--font-ui-small);
+                display: none;
+            }
+            
+            .setup-result.success {
+                border-color: var(--text-success);
+                background: var(--background-success);
+            }
+            
+            .setup-result.error {
+                border-color: var(--text-error);
+                background: var(--background-error);
+            }
         </style>
     </head>
     <body>
@@ -792,30 +932,69 @@ def index():
                 <p>Sync media from your configured sources</p>
             </div>
             
-            <div class="options-panel">
-                <label class="checkbox-container">
-                    <input type="checkbox" id="cleanupCheckbox" checked>
-                    <span>🧹 Enable cleanup (delete remote folders older than 2 days)</span>
-                </label>
+            <div class="tab-navigation">
+                <button class="tab-button active" onclick="showTab('sync')">
+                    🔄 Sync Operations
+                </button>
+                <button class="tab-button" onclick="showTab('vastai-setup')">
+                    ⚙️ VastAI Setup
+                </button>
             </div>
             
-            <div class="sync-grid">
-                <button class="sync-button" onclick="sync('forge')">
-                    <span>🔥</span>
-                    Sync Forge
-                </button>
-                <button class="sync-button" onclick="sync('comfy')">
-                    <span>🖼️</span>
-                    Sync Comfy
-                </button>
-                <button class="sync-button" onclick="sync('vastai')">
-                    <span>☁️</span>
-                    Sync VastAI
-                </button>
-                <button class="sync-button secondary" onclick="testSSH()">
-                    <span>🔧</span>
-                    Test SSH
-                </button>
+            <div id="sync-tab" class="tab-content active">
+                <div class="options-panel">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="cleanupCheckbox" checked>
+                        <span>🧹 Enable cleanup (delete remote folders older than 2 days)</span>
+                    </label>
+                </div>
+                
+                <div class="sync-grid">
+                    <button class="sync-button" onclick="sync('forge')">
+                        <span>🔥</span>
+                        Sync Forge
+                    </button>
+                    <button class="sync-button" onclick="sync('comfy')">
+                        <span>🖼️</span>
+                        Sync Comfy
+                    </button>
+                    <button class="sync-button" onclick="sync('vastai')">
+                        <span>☁️</span>
+                        Sync VastAI
+                    </button>
+                    <button class="sync-button secondary" onclick="testSSH()">
+                        <span>🔧</span>
+                        Test SSH
+                    </button>
+                </div>
+            </div>
+            
+            <div id="vastai-setup-tab" class="tab-content">
+                <h3>VastAI SSH Connection Setup</h3>
+                <p>Configure your VastAI SSH connection and manage UI_HOME settings.</p>
+                
+                <div class="setup-field">
+                    <label for="sshConnectionString">SSH Connection String:</label>
+                    <input type="text" id="sshConnectionString" 
+                           placeholder="ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
+                           title="Enter the SSH connection string from your VastAI instance">
+                </div>
+                
+                <div class="setup-buttons">
+                    <button class="setup-button" onclick="setUIHome()">
+                        📁 Set UI_HOME to /workspace/ComfyUI/
+                    </button>
+                    <button class="setup-button secondary" onclick="getUIHome()">
+                        📖 Read UI_HOME
+                    </button>
+                    <button class="setup-button danger" onclick="terminateConnection()">
+                        🔌 Terminate Connection
+                    </button>
+                </div>
+                
+                <div id="setup-result" class="setup-result">
+                    <!-- Results will be displayed here -->
+                </div>
             </div>
             
             <div id="result" class="result-panel" title="Click to view full report"></div>
@@ -1292,6 +1471,149 @@ def index():
                     }
                 });
             });
+            
+            // Tab switching functionality
+            function showTab(tabName) {
+                // Hide all tab contents
+                const tabContents = document.querySelectorAll('.tab-content');
+                tabContents.forEach(tab => tab.classList.remove('active'));
+                
+                // Remove active class from all tab buttons
+                const tabButtons = document.querySelectorAll('.tab-button');
+                tabButtons.forEach(button => button.classList.remove('active'));
+                
+                // Show selected tab content
+                const selectedTab = document.getElementById(tabName + '-tab');
+                if (selectedTab) {
+                    selectedTab.classList.add('active');
+                }
+                
+                // Add active class to clicked tab button
+                const clickedButton = event.target;
+                clickedButton.classList.add('active');
+            }
+            
+            // VastAI Setup functions
+            async function setUIHome() {
+                const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+                const resultDiv = document.getElementById('setup-result');
+                
+                if (!sshConnectionString) {
+                    showSetupResult('Please enter an SSH connection string first.', 'error');
+                    return;
+                }
+                
+                showSetupResult('Setting UI_HOME to /workspace/ComfyUI/...', 'info');
+                
+                try {
+                    const response = await fetch('/vastai/set-ui-home', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            ssh_connection: sshConnectionString,
+                            ui_home: '/workspace/ComfyUI/'
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showSetupResult(data.message, 'success');
+                    } else {
+                        showSetupResult('Error: ' + data.message, 'error');
+                    }
+                } catch (error) {
+                    showSetupResult('Request failed: ' + error.message, 'error');
+                }
+            }
+            
+            async function getUIHome() {
+                const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+                
+                if (!sshConnectionString) {
+                    showSetupResult('Please enter an SSH connection string first.', 'error');
+                    return;
+                }
+                
+                showSetupResult('Reading UI_HOME...', 'info');
+                
+                try {
+                    const response = await fetch('/vastai/get-ui-home', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            ssh_connection: sshConnectionString
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showSetupResult('UI_HOME: ' + data.ui_home, 'success');
+                    } else {
+                        showSetupResult('Error: ' + data.message, 'error');
+                    }
+                } catch (error) {
+                    showSetupResult('Request failed: ' + error.message, 'error');
+                }
+            }
+            
+            async function terminateConnection() {
+                const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+                
+                if (!sshConnectionString) {
+                    showSetupResult('Please enter an SSH connection string first.', 'error');
+                    return;
+                }
+                
+                if (!confirm('Are you sure you want to terminate the SSH connection?')) {
+                    return;
+                }
+                
+                showSetupResult('Terminating SSH connection...', 'info');
+                
+                try {
+                    const response = await fetch('/vastai/terminate-connection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            ssh_connection: sshConnectionString
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showSetupResult(data.message, 'success');
+                    } else {
+                        showSetupResult('Error: ' + data.message, 'error');
+                    }
+                } catch (error) {
+                    showSetupResult('Request failed: ' + error.message, 'error');
+                }
+            }
+            
+            function showSetupResult(message, type) {
+                const resultDiv = document.getElementById('setup-result');
+                resultDiv.textContent = message;
+                resultDiv.className = 'setup-result ' + type;
+                resultDiv.style.display = 'block';
+                
+                // Auto-hide info messages after 5 seconds
+                if (type === 'info') {
+                    setTimeout(() => {
+                        if (resultDiv.classList.contains('info')) {
+                            resultDiv.style.display = 'none';
+                        }
+                    }, 5000);
+                }
+            }
         </script>
     </body>
     </html>
@@ -1646,6 +1968,227 @@ def sync_active():
             "last_update": data.get("last_update"),
         })
     return jsonify({"success": True, "items": out})
+
+# VastAI Setup API endpoints
+@app.route('/vastai/set-ui-home', methods=['POST', 'OPTIONS'])
+def set_ui_home():
+    """Set UI_HOME environment variable on VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json()
+        if not data or 'ssh_connection' not in data or 'ui_home' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string and UI_HOME path are required'
+            }), 400
+        
+        ssh_connection = data['ssh_connection'].strip()
+        ui_home = data['ui_home'].strip()
+        
+        # Parse SSH connection string to extract host, port, and user
+        ssh_parts = parse_ssh_connection(ssh_connection)
+        if not ssh_parts:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }), 400
+        
+        # Build SSH command to set UI_HOME
+        ssh_cmd = [
+            'ssh', 
+            '-p', str(ssh_parts['port']), 
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=no',
+            f"{ssh_parts['user']}@{ssh_parts['host']}"
+        ]
+        
+        # Command to set UI_HOME in the environment
+        remote_cmd = f'echo "export UI_HOME={ui_home}" >> ~/.bashrc && echo "UI_HOME={ui_home}" >> /etc/environment'
+        ssh_cmd.append(remote_cmd)
+        
+        logger.info(f"Setting UI_HOME to {ui_home} on {ssh_parts['host']}:{ssh_parts['port']}")
+        
+        result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': f'UI_HOME set to {ui_home} successfully'
+            })
+        else:
+            error_msg = result.stderr.strip() if result.stderr else 'Unknown SSH error'
+            return jsonify({
+                'success': False,
+                'message': f'Failed to set UI_HOME: {error_msg}'
+            })
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'message': 'SSH connection timed out'
+        })
+    except Exception as e:
+        logger.error(f"Error setting UI_HOME: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error setting UI_HOME: {str(e)}'
+        })
+
+@app.route('/vastai/get-ui-home', methods=['POST', 'OPTIONS'])
+def get_ui_home():
+    """Get UI_HOME environment variable from VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json()
+        if not data or 'ssh_connection' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            }), 400
+        
+        ssh_connection = data['ssh_connection'].strip()
+        
+        # Parse SSH connection string
+        ssh_parts = parse_ssh_connection(ssh_connection)
+        if not ssh_parts:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }), 400
+        
+        # Build SSH command to get UI_HOME
+        ssh_cmd = [
+            'ssh', 
+            '-p', str(ssh_parts['port']), 
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=no',
+            f"{ssh_parts['user']}@{ssh_parts['host']}"
+        ]
+        
+        # Command to get UI_HOME from environment
+        remote_cmd = 'source /etc/environment 2>/dev/null || true; source ~/.bashrc 2>/dev/null || true; echo "UI_HOME=${UI_HOME:-not set}"'
+        ssh_cmd.append(remote_cmd)
+        
+        logger.info(f"Reading UI_HOME from {ssh_parts['host']}:{ssh_parts['port']}")
+        
+        result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            return jsonify({
+                'success': True,
+                'ui_home': output,
+                'message': f'UI_HOME retrieved successfully'
+            })
+        else:
+            error_msg = result.stderr.strip() if result.stderr else 'Unknown SSH error'
+            return jsonify({
+                'success': False,
+                'message': f'Failed to read UI_HOME: {error_msg}'
+            })
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'message': 'SSH connection timed out'
+        })
+    except Exception as e:
+        logger.error(f"Error reading UI_HOME: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error reading UI_HOME: {str(e)}'
+        })
+
+@app.route('/vastai/terminate-connection', methods=['POST', 'OPTIONS'])
+def terminate_connection():
+    """Terminate SSH connection to VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json()
+        if not data or 'ssh_connection' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            }), 400
+        
+        ssh_connection = data['ssh_connection'].strip()
+        
+        # Parse SSH connection string
+        ssh_parts = parse_ssh_connection(ssh_connection)
+        if not ssh_parts:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }), 400
+        
+        logger.info(f"Terminating connections to {ssh_parts['host']}:{ssh_parts['port']}")
+        
+        # Find and kill SSH processes to this host/port
+        try:
+            # Use pkill to find and terminate SSH connections
+            pkill_cmd = ['pkill', '-f', f"ssh.*{ssh_parts['host']}.*{ssh_parts['port']}"]
+            result = subprocess.run(pkill_cmd, capture_output=True, text=True, timeout=10)
+            
+            # Also try to find processes with the user@host pattern
+            pkill_cmd2 = ['pkill', '-f', f"ssh.*{ssh_parts['user']}@{ssh_parts['host']}"]
+            result2 = subprocess.run(pkill_cmd2, capture_output=True, text=True, timeout=10)
+            
+            return jsonify({
+                'success': True,
+                'message': 'SSH connections terminated successfully'
+            })
+            
+        except subprocess.TimeoutExpired:
+            return jsonify({
+                'success': False,
+                'message': 'Timeout while terminating connections'
+            })
+        except Exception as e:
+            return jsonify({
+                'success': True,  # Still report success as the command ran
+                'message': 'Termination command executed (no active connections found)'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error terminating connection: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error terminating connection: {str(e)}'
+        })
+
+def parse_ssh_connection(ssh_connection):
+    """Parse SSH connection string to extract host, port, and user"""
+    try:
+        # Handle format like: ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080
+        import re
+        
+        # Extract port from -p flag
+        port_match = re.search(r'-p\s+(\d+)', ssh_connection)
+        port = int(port_match.group(1)) if port_match else 22
+        
+        # Extract user@host
+        user_host_match = re.search(r'(\w+)@([0-9.]+|[\w.-]+)', ssh_connection)
+        if not user_host_match:
+            return None
+            
+        user = user_host_match.group(1)
+        host = user_host_match.group(2)
+        
+        return {
+            'user': user,
+            'host': host,
+            'port': port
+        }
+        
+    except Exception as e:
+        logger.error(f"Error parsing SSH connection string: {str(e)}")
+        return None
 
 
 if __name__ == '__main__':

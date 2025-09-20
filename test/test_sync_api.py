@@ -321,6 +321,148 @@ class TestSyncAPI(unittest.TestCase):
         
         mock_run_sync.assert_called_once_with('vast.example.com', '12345', 'VastAI', cleanup=False)
 
+    @patch('app.sync.sync_api.subprocess.run')
+    def test_vastai_set_ui_home_success(self, mock_subprocess):
+        """Test successful VastAI UI_HOME setting"""
+        # Mock successful subprocess execution
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stderr = ''
+        mock_subprocess.return_value = mock_result
+
+        response = self.app.post('/vastai/set-ui-home',
+                                json={
+                                    'ssh_connection': 'ssh -p 2838 root@104.189.178.116',
+                                    'ui_home': '/workspace/ComfyUI/'
+                                },
+                                content_type='application/json')
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertIn('UI_HOME set to /workspace/ComfyUI/ successfully', data['message'])
+        
+        # Verify SSH command was called correctly
+        mock_subprocess.assert_called_once()
+        call_args = mock_subprocess.call_args[0][0]
+        self.assertIn('ssh', call_args)
+        self.assertIn('-p', call_args)
+        self.assertIn('2838', call_args)
+        self.assertIn('root@104.189.178.116', call_args)
+
+    @patch('app.sync.sync_api.subprocess.run')
+    def test_vastai_set_ui_home_invalid_connection(self, mock_subprocess):
+        """Test VastAI UI_HOME setting with invalid SSH connection"""
+        response = self.app.post('/vastai/set-ui-home',
+                                json={
+                                    'ssh_connection': 'invalid connection string',
+                                    'ui_home': '/workspace/ComfyUI/'
+                                },
+                                content_type='application/json')
+        
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid SSH connection string format', data['message'])
+        
+        # Verify subprocess was not called
+        mock_subprocess.assert_not_called()
+
+    @patch('app.sync.sync_api.subprocess.run')
+    def test_vastai_get_ui_home_success(self, mock_subprocess):
+        """Test successful VastAI UI_HOME retrieval"""
+        # Mock successful subprocess execution
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = 'UI_HOME=/workspace/ComfyUI/'
+        mock_result.stderr = ''
+        mock_subprocess.return_value = mock_result
+
+        response = self.app.post('/vastai/get-ui-home',
+                                json={'ssh_connection': 'ssh -p 2838 root@104.189.178.116'},
+                                content_type='application/json')
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertEqual(data['ui_home'], 'UI_HOME=/workspace/ComfyUI/')
+        self.assertIn('UI_HOME retrieved successfully', data['message'])
+
+    @patch('app.sync.sync_api.subprocess.run')
+    def test_vastai_get_ui_home_ssh_failure(self, mock_subprocess):
+        """Test VastAI UI_HOME retrieval with SSH failure"""
+        # Mock failed subprocess execution
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = 'Connection refused'
+        mock_subprocess.return_value = mock_result
+
+        response = self.app.post('/vastai/get-ui-home',
+                                json={'ssh_connection': 'ssh -p 2838 root@104.189.178.116'},
+                                content_type='application/json')
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('Failed to read UI_HOME: Connection refused', data['message'])
+
+    @patch('app.sync.sync_api.subprocess.run')
+    def test_vastai_terminate_connection_success(self, mock_subprocess):
+        """Test successful VastAI connection termination"""
+        # Mock successful subprocess execution
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_subprocess.return_value = mock_result
+
+        response = self.app.post('/vastai/terminate-connection',
+                                json={'ssh_connection': 'ssh -p 2838 root@104.189.178.116'},
+                                content_type='application/json')
+        
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertIn('SSH connections terminated successfully', data['message'])
+
+    def test_vastai_endpoints_missing_data(self):
+        """Test VastAI endpoints with missing request data"""
+        # Test set-ui-home without data
+        response = self.app.post('/vastai/set-ui-home',
+                                json={},
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        
+        # Test get-ui-home without data
+        response = self.app.post('/vastai/get-ui-home',
+                                json={},
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        
+        # Test terminate-connection without data
+        response = self.app.post('/vastai/terminate-connection',
+                                json={},
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_parse_ssh_connection_function(self):
+        """Test SSH connection string parsing function"""
+        from app.sync.sync_api import parse_ssh_connection
+        
+        # Test valid connection string
+        result = parse_ssh_connection('ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080')
+        self.assertIsNotNone(result)
+        self.assertEqual(result['user'], 'root')
+        self.assertEqual(result['host'], '104.189.178.116')
+        self.assertEqual(result['port'], 2838)
+        
+        # Test connection string without port (should default to 22)
+        result = parse_ssh_connection('ssh user@example.com')
+        self.assertIsNotNone(result)
+        self.assertEqual(result['port'], 22)
+        
+        # Test invalid connection string
+        result = parse_ssh_connection('invalid string')
+        self.assertIsNone(result)
+
 
 if __name__ == '__main__':
     unittest.main()
