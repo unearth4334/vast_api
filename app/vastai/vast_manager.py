@@ -154,14 +154,33 @@ class VastManager:
         url = f"{VAST_BASE}/instances/"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
-        instances = response.json().get("instances", [])
+        basic_instances = response.json().get("instances", [])
         
-        # Validate SSH data for each instance
-        for instance in instances:
-            if isinstance(instance, dict) and instance.get("id"):
-                self._validate_ssh_data(instance, instance.get("id"))
+        # Fetch detailed data for each instance to get SSH host/port and other details
+        detailed_instances = []
+        for basic_instance in basic_instances:
+            instance_id = basic_instance.get("id")
+            if instance_id:
+                try:
+                    # Get detailed instance data
+                    detail_url = f"{VAST_BASE}/instances/{instance_id}/"
+                    detail_response = requests.get(detail_url, headers=self.headers)
+                    detail_response.raise_for_status()
+                    detailed_data = detail_response.json().get("instances", {})
+                    
+                    # Validate SSH data for consistency
+                    self._validate_ssh_data(detailed_data, instance_id)
+                    
+                    detailed_instances.append(detailed_data)
+                except Exception as e:
+                    # If we can't get detailed data, fall back to basic data
+                    logger.warning(f"Failed to get detailed data for instance {instance_id}: {e}")
+                    self._validate_ssh_data(basic_instance, instance_id)
+                    detailed_instances.append(basic_instance)
+            else:
+                detailed_instances.append(basic_instance)
         
-        return instances
+        return detailed_instances
 
     def get_running_instance(self):
         """Get the first running instance (for VastAI sync)"""
