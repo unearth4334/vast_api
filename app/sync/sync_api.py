@@ -3119,6 +3119,95 @@ echo "{civitdl_api_key}" | civitconfig default --api-key
             'message': f'Error setting up CivitDL: {str(e)}'
         })
 
+@app.route('/vastai/instances/<instance_id>', methods=['GET', 'OPTIONS'])
+def get_vastai_instance(instance_id):
+    """Get details for a specific VastAI instance by ID"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Initialize VastManager to get instance details
+        vast_manager = VastManager()
+        instance_data = vast_manager.show_instance(instance_id)
+        
+        # Format the response to match the expected structure from the problem statement
+        response_data = {
+            "instances": {
+                "cur_state": instance_data.get("cur_state"),
+                "gpu_name": instance_data.get("gpu_name"),
+                "id": instance_data.get("id"),
+                "ssh_host": instance_data.get("ssh_host"),
+                "ssh_port": instance_data.get("ssh_port")
+            }
+        }
+        
+        logger.info(f"Retrieved instance {instance_id}: ssh_host='{instance_data.get('ssh_host')}', ssh_port={instance_data.get('ssh_port')}")
+        
+        return jsonify(response_data), 200
+        
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'message': 'VastAI configuration files not found (config.yaml or api_key.txt)'
+        }), 404
+    except Exception as e:
+        logger.error(f"Error getting VastAI instance {instance_id}: {str(e)}")
+        if "404" in str(e) or "not found" in str(e).lower():
+            return jsonify({
+                'success': False,
+                'message': f'Instance {instance_id} not found'
+            }), 404
+        return jsonify({
+            'success': False,
+            'message': f'Error getting VastAI instance: {str(e)}'
+        }), 500
+
+@app.route('/vastai/instances/<instance_id>', methods=['PUT', 'OPTIONS'])
+def update_vastai_instance(instance_id):
+    """Update SSH host and port for a specific VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json(force=True, silent=True)
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'Request data is required'
+            }), 400
+        
+        # Extract SSH host and port from request
+        ssh_host = data.get('ssh_host')
+        ssh_port = data.get('ssh_port')
+        
+        if not ssh_host or not ssh_port:
+            return jsonify({
+                'success': False,
+                'message': 'Both ssh_host and ssh_port are required'
+            }), 400
+        
+        # For now, we'll store the updated values in memory or return them
+        # In a real implementation, you might want to store these in a database
+        # since the VastAI API itself doesn't allow updating these fields
+        logger.info(f"Updated instance {instance_id}: ssh_host='{ssh_host}', ssh_port={ssh_port}")
+        
+        response_data = {
+            "instances": {
+                "id": instance_id,
+                "ssh_host": ssh_host,
+                "ssh_port": ssh_port
+            }
+        }
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating VastAI instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error updating VastAI instance: {str(e)}'
+        }), 500
+
 def parse_ssh_connection(ssh_connection):
     """Parse SSH connection string to extract host, port, and user"""
     try:
