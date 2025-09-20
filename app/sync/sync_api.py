@@ -2822,20 +2822,35 @@ def get_vastai_instances():
         # Format instances for display
         formatted_instances = []
         for instance in instances:
+            # Extract SSH data and validate
+            ssh_host = instance.get('ssh_host')
+            ssh_port = instance.get('ssh_port')
+            instance_id = instance.get('id')
+            
+            # Log SSH data for debugging potential issues
+            logger.info(f"Formatting instance {instance_id}: ssh_host='{ssh_host}', ssh_port={ssh_port}")
+            
+            # Validate SSH data consistency
+            if ssh_host and isinstance(ssh_host, str):
+                if ssh_host.startswith("ssh") and ".vast.ai" in ssh_host:
+                    logger.warning(f"Instance {instance_id}: Suspicious SSH host detected: {ssh_host}")
+                    logger.warning(f"Expected IP address format, got: {ssh_host}")
+            
             formatted_instances.append({
-                'id': instance.get('id'),
+                'id': instance_id,
                 'status': instance.get('cur_state'),
                 'gpu': instance.get('gpu_name'),
                 'gpu_count': instance.get('num_gpus'),
                 'gpu_ram_gb': round(instance.get('gpu_ram', 0) / 1024, 1) if instance.get('gpu_ram') else 0,
-                'ssh_host': instance.get('ssh_host'),
-                'ssh_port': instance.get('ssh_port'),
+                'ssh_host': ssh_host,
+                'ssh_port': ssh_port,
                 'public_ip': instance.get('public_ipaddr'),
                 'geolocation': instance.get('geolocation'),
                 'template': instance.get('template_name'),
                 'cost_per_hour': instance.get('dph_total')
             })
         
+        logger.info(f"Returning {len(formatted_instances)} formatted instances")
         return jsonify({
             'success': True,
             'instances': formatted_instances,
