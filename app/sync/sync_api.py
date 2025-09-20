@@ -1024,6 +1024,30 @@ def index():
             .use-instance-btn:hover {
                 background: var(--interactive-accent-hover);
             }
+            
+            .sync-instance-btn {
+                background: var(--color-green);
+                color: white;
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-1) var(--size-4-3);
+                font-size: var(--font-ui-smaller);
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                margin-left: var(--size-4-2);
+            }
+            
+            .sync-instance-btn:hover {
+                background: #4caf50;
+                transform: translateY(-1px);
+            }
+            
+            .sync-instance-btn:disabled {
+                background: var(--text-muted);
+                cursor: not-allowed;
+                transform: none;
+            }
         </style>
     </head>
     <body>
@@ -1816,6 +1840,9 @@ def index():
                                 <button class="use-instance-btn" onclick="useInstance('${sshConnection}')">
                                     📋 Use This Instance
                                 </button>
+                                <button class="sync-instance-btn" onclick="syncInstance('${instance.ssh_host}', '${instance.ssh_port}', '${instance.id}')">
+                                    🔄 Sync
+                                </button>
                             </div>
                             ` : ''}
                         </div>
@@ -1829,6 +1856,112 @@ def index():
                 const sshInput = document.getElementById('sshConnectionString');
                 sshInput.value = sshConnection;
                 showSetupResult('SSH connection string copied to input field', 'success');
+            }
+            
+            async function syncInstance(sshHost, sshPort, instanceId) {
+                const resultDiv = document.getElementById('result');
+                const progressDiv = document.getElementById('progress');
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+                const progressDetails = document.getElementById('progressDetails');
+                const cleanupCheckbox = document.getElementById('cleanupCheckbox');
+                
+                // Clear previous results
+                lastFullReport = null;
+                resultDiv.className = 'result-panel loading';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<h3>Starting sync for VastAI Instance #${instanceId}...</h3><p>This may take several minutes.</p>`;
+                
+                // Show progress bar
+                progressDiv.style.display = 'block';
+                progressBar.style.width = '0%';
+                progressText.textContent = 'Starting instance sync...';
+                progressDetails.textContent = '';
+                
+                // Disable the sync button for this instance
+                const syncButton = document.querySelector(`button[onclick="syncInstance('${sshHost}', '${sshPort}', '${instanceId}')"]`);
+                if (syncButton) {
+                    syncButton.disabled = true;
+                    syncButton.textContent = '⏳ Syncing...';
+                }
+                
+                try {
+                    const response = await fetch('/sync/vastai/instance', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            ssh_host: sshHost,
+                            ssh_port: parseInt(sshPort),
+                            instance_id: instanceId,
+                            cleanup: cleanupCheckbox.checked
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Store full response for overlay
+                    lastFullReport = data;
+                    
+                    // Start polling for progress if sync_id is available
+                    if (data.sync_id) {
+                        pollProgress(data.sync_id);
+                    } else {
+                        progressDiv.style.display = 'none';
+                    }
+                    
+                    if (data.success) {
+                        resultDiv.className = 'result-panel success';
+                        
+                        // Show condensed summary if available
+                        if (data.summary) {
+                            const duration = data.summary.duration_seconds ? 
+                                `${Math.round(data.summary.duration_seconds)}s` : 'Unknown';
+                            const bytesFormatted = data.summary.bytes_transferred > 0 ?
+                                formatBytes(data.summary.bytes_transferred) : '0 bytes';
+                            const cleanupStatus = data.summary.cleanup_enabled ? 'enabled' : 'disabled';
+
+                            let byExtLine = '';
+                            if (data.summary.by_ext) {
+                                const pairs = Object.entries(data.summary.by_ext)
+                                  .sort((a,b)=>b[1]-a[1]).slice(0,4)
+                                  .map(([k,v]) => `${k}:${v}`).join(' · ');
+                                if (pairs) byExtLine = `<br>🧩 By type: ${pairs}`;
+                            }
+                            
+                            resultDiv.innerHTML = `
+                                <h3>✅ ${data.message}</h3>
+                                <div style="margin-top: 12px;">
+                                    <strong>Summary:</strong><br>
+                                    📁 Folders synced: ${data.summary.folders_synced}<br>
+                                    📄 Files transferred: ${data.summary.files_transferred}<br>
+                                    💾 Data transferred: ${bytesFormatted}<br>
+                                    ⏱️ Duration: ${duration}<br>
+                                    🧹 Cleanup: ${cleanupStatus}
+                                    ${byExtLine}
+                                    <div style="margin-top:8px;color:var(--text-muted);font-size:12px;">Click to view full report</div>
+                                </div>
+                            `;
+                        } else {
+                            resultDiv.innerHTML = `<h3>✅ ${data.message}</h3><pre>${data.output || ''}</pre>`;
+                        }
+                    } else {
+                        resultDiv.className = 'result-panel error';
+                        const brief = (data.error || data.output || '').split('\\n').slice(0,6).join('\\n');
+                        resultDiv.innerHTML = `<h3>❌ ${data.message}</h3><pre>${brief}\\n\\n(Click for full report)</pre>`;
+                    }
+                } catch (error) {
+                    resultDiv.className = 'result-panel error';
+                    resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
+                    progressDiv.style.display = 'none';
+                } finally {
+                    // Re-enable the sync button
+                    if (syncButton) {
+                        syncButton.disabled = false;
+                        syncButton.textContent = '🔄 Sync';
+                    }
+                }
             }
             
             function showSetupResult(message, type) {
@@ -1941,6 +2074,62 @@ def sync_vastai():
         return jsonify({
             'success': False,
             'message': f'VastAI sync error: {str(e)}'
+        })
+
+@app.route('/sync/vastai/instance', methods=['POST', 'OPTIONS'])
+def sync_vastai_instance():
+    """Sync from specific VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'message': 'Request must contain JSON data'
+            })
+        
+        data = request.get_json()
+        
+        # Extract required instance details
+        ssh_host = data.get('ssh_host')
+        ssh_port = str(data.get('ssh_port', 22))
+        instance_id = data.get('instance_id')
+        cleanup = data.get('cleanup', True)
+        
+        if not ssh_host:
+            return jsonify({
+                'success': False,
+                'message': 'SSH host is required'
+            })
+        
+        if not instance_id:
+            return jsonify({
+                'success': False,
+                'message': 'Instance ID is required'
+            })
+        
+        logger.info(f"Syncing VastAI instance {instance_id}: {ssh_host}:{ssh_port}")
+        
+        result = run_sync(ssh_host, ssh_port, f"VastAI Instance #{instance_id}", cleanup=cleanup)
+        
+        # Add instance details to the result
+        instance_info = {
+            'id': instance_id,
+            'host': ssh_host,
+            'port': ssh_port
+        }
+        
+        if result['success']:
+            result['instance_info'] = instance_info
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"VastAI instance sync error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'VastAI instance sync error: {str(e)}'
         })
 
 @app.route('/test/ssh', methods=['POST', 'OPTIONS'])
