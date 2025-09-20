@@ -987,6 +987,9 @@ def index():
                     <button class="setup-button secondary" onclick="getUIHome()">
                         📖 Read UI_HOME
                     </button>
+                    <button class="setup-button" onclick="setupCivitDL()">
+                        🎨 Setup CivitDL
+                    </button>
                     <button class="setup-button danger" onclick="terminateConnection()">
                         🔌 Terminate Connection
                     </button>
@@ -1599,6 +1602,45 @@ def index():
                 }
             }
             
+            async function setupCivitDL() {
+                const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+                
+                if (!sshConnectionString) {
+                    showSetupResult('Please enter an SSH connection string first.', 'error');
+                    return;
+                }
+                
+                showSetupResult('Installing and configuring CivitDL...', 'info');
+                
+                try {
+                    const response = await fetch('/vastai/setup-civitdl', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            ssh_connection: sshConnectionString
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Show output with newlines preserved
+                        const outputDiv = document.getElementById('setup-result');
+                        outputDiv.innerHTML = '<strong>CivitDL Setup Completed Successfully!</strong><br><br>' +
+                                            '<strong>Output:</strong><pre style="white-space: pre-wrap; margin-top: 8px;">' + 
+                                            (data.output || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+                        outputDiv.className = 'setup-result success';
+                        outputDiv.style.display = 'block';
+                    } else {
+                        showSetupResult('Error: ' + data.message + (data.output ? '\\n\\nOutput:\\n' + data.output : ''), 'error');
+                    }
+                } catch (error) {
+                    showSetupResult('Request failed: ' + error.message, 'error');
+                }
+            }
+            
             function showSetupResult(message, type) {
                 const resultDiv = document.getElementById('setup-result');
                 resultDiv.textContent = message;
@@ -2162,6 +2204,126 @@ def terminate_connection():
             'message': f'Error terminating connection: {str(e)}'
         })
 
+@app.route('/vastai/setup-civitdl', methods=['POST', 'OPTIONS'])
+def setup_civitdl():
+    """Install and configure CivitDL on VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json()
+        if not data or 'ssh_connection' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            }), 400
+        
+        ssh_connection = data['ssh_connection'].strip()
+        
+        # Parse SSH connection string
+        ssh_parts = parse_ssh_connection(ssh_connection)
+        if not ssh_parts:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }), 400
+        
+        # Read CivitDL API key from file
+        civitdl_api_key = read_api_key_from_file()
+        if not civitdl_api_key:
+            return jsonify({
+                'success': False,
+                'message': 'CivitDL API key not found in api_key.txt. Please ensure the file contains a line like "civitdl: your_api_key"'
+            }), 400
+        
+        logger.info(f"Setting up CivitDL on {ssh_parts['host']}:{ssh_parts['port']}")
+        
+        # Build SSH command base
+        ssh_cmd_base = [
+            'ssh', 
+            '-p', str(ssh_parts['port']), 
+            '-o', 'ConnectTimeout=30',
+            '-o', 'StrictHostKeyChecking=no',
+            f"{ssh_parts['user']}@{ssh_parts['host']}"
+        ]
+        
+        all_output = []
+        
+        # Step 1: Install civitdl
+        all_output.append("=== Installing CivitDL ===")
+        install_cmd = ssh_cmd_base + ['pip3 install civitdl']
+        
+        result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=120)
+        
+        if result.returncode != 0:
+            error_output = f"Install failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            all_output.append(error_output)
+            return jsonify({
+                'success': False,
+                'message': 'Failed to install CivitDL',
+                'output': '\n'.join(all_output)
+            })
+        
+        all_output.append(f"Install output: {result.stdout}")
+        if result.stderr:
+            all_output.append(f"Install stderr: {result.stderr}")
+        
+        # Step 2: Configure civitdl with API key
+        all_output.append("\n=== Configuring CivitDL ===")
+        
+        # Use expect or printf to automate the API key input
+        config_script = f'''
+echo "{civitdl_api_key}" | civitconfig default --api-key
+'''
+        
+        config_cmd = ssh_cmd_base + [f'bash -c "{config_script}"']
+        
+        result = subprocess.run(config_cmd, capture_output=True, text=True, timeout=60)
+        
+        if result.returncode != 0:
+            error_output = f"Configuration failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            all_output.append(error_output)
+            return jsonify({
+                'success': False,
+                'message': 'Failed to configure CivitDL',
+                'output': '\n'.join(all_output)
+            })
+        
+        all_output.append(f"Config output: {result.stdout}")
+        if result.stderr:
+            all_output.append(f"Config stderr: {result.stderr}")
+        
+        # Step 3: Verify installation
+        all_output.append("\n=== Verifying Installation ===")
+        verify_cmd = ssh_cmd_base + ['civitconfig list']
+        
+        result = subprocess.run(verify_cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            all_output.append(f"Verification output: {result.stdout}")
+            all_output.append("\nCivitDL setup completed successfully!")
+        else:
+            all_output.append(f"Verification warning: {result.stderr}")
+            all_output.append("CivitDL installed but verification had issues.")
+        
+        return jsonify({
+            'success': True,
+            'message': 'CivitDL setup completed successfully',
+            'output': '\n'.join(all_output)
+        })
+        
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'message': 'SSH command timed out during CivitDL setup'
+        })
+    except Exception as e:
+        logger.error(f"Error setting up CivitDL: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error setting up CivitDL: {str(e)}'
+        })
+
 def parse_ssh_connection(ssh_connection):
     """Parse SSH connection string to extract host, port, and user"""
     try:
@@ -2188,6 +2350,34 @@ def parse_ssh_connection(ssh_connection):
         
     except Exception as e:
         logger.error(f"Error parsing SSH connection string: {str(e)}")
+        return None
+
+def read_api_key_from_file():
+    """Read CivitDL API key from api_key.txt file"""
+    try:
+        api_key_path = os.path.join(os.path.dirname(__file__), '..', '..', 'api_key.txt')
+        if not os.path.exists(api_key_path):
+            logger.warning(f"API key file not found at {api_key_path}")
+            return None
+        
+        with open(api_key_path, 'r') as f:
+            content = f.read().strip()
+        
+        # Parse file content to find civitdl API key
+        # Expected format: "civitdl: api_key_abcdef"
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('civitdl:'):
+                # Extract the key after "civitdl:"
+                key = line.split(':', 1)[1].strip()
+                logger.info("Found CivitDL API key in api_key.txt")
+                return key
+        
+        logger.warning("CivitDL API key not found in api_key.txt")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error reading API key file: {str(e)}")
         return None
 
 
