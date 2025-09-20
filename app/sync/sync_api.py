@@ -1080,6 +1080,12 @@ def index():
                 <!-- VastAI Instances Section -->
                 <div class="vastai-instances-section">
                     <h4>🖥️ Active VastAI Instances</h4>
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px;">
+                            <input type="checkbox" id="showAllInstances" style="margin: 0;">
+                            Show all instances (including stopped)
+                        </label>
+                    </div>
                     <button class="setup-button secondary" onclick="loadVastaiInstances()">
                         🔄 Load Instances
                     </button>
@@ -1761,10 +1767,14 @@ def index():
             
             async function loadVastaiInstances() {
                 const instancesList = document.getElementById('vastai-instances-list');
+                const showAllCheckbox = document.getElementById('showAllInstances');
+                const showAll = showAllCheckbox && showAllCheckbox.checked;
+                
                 instancesList.innerHTML = '<div class="no-instances-message">Loading instances...</div>';
                 
                 try {
-                    const response = await fetch('/vastai/instances', {
+                    const url = showAll ? '/vastai/instances?all=true' : '/vastai/instances';
+                    const response = await fetch(url, {
                         method: 'GET',
                         headers: {
                             'Content-Type': 'application/json'
@@ -1774,7 +1784,7 @@ def index():
                     const data = await response.json();
                     
                     if (data.success) {
-                        displayVastaiInstances(data.instances);
+                        displayVastaiInstances(data.instances, data.filtered);
                     } else {
                         instancesList.innerHTML = '<div class="no-instances-message" style="color: var(--text-error);">Error: ' + data.message + '</div>';
                     }
@@ -1783,15 +1793,24 @@ def index():
                 }
             }
             
-            function displayVastaiInstances(instances) {
+            function displayVastaiInstances(instances, filtered) {
                 const instancesList = document.getElementById('vastai-instances-list');
                 
                 if (!instances || instances.length === 0) {
-                    instancesList.innerHTML = '<div class="no-instances-message">No active VastAI instances found</div>';
+                    const message = filtered ? 'No active VastAI instances found' : 'No VastAI instances found';
+                    instancesList.innerHTML = `<div class="no-instances-message">${message}</div>`;
                     return;
                 }
                 
                 let html = '';
+                
+                // Add filter status message
+                if (filtered) {
+                    html += '<div class="filter-notice" style="padding: 8px; margin-bottom: 10px; background: #e3f2fd; border-left: 4px solid #2196f3; font-size: 14px; color: #1976d2;">Showing only active (running) instances. Uncheck "Show all instances" to see all.</div>';
+                } else {
+                    html += '<div class="filter-notice" style="padding: 8px; margin-bottom: 10px; background: #f3e5f5; border-left: 4px solid #9c27b0; font-size: 14px; color: #7b1fa2;">Showing all instances (active and inactive).</div>';
+                }
+                
                 instances.forEach(instance => {
                     const statusClass = instance.status ? instance.status.toLowerCase() : 'unknown';
                     const sshConnection = instance.ssh_host && instance.ssh_port ? 
@@ -2396,14 +2415,21 @@ def terminate_connection():
 
 @app.route('/vastai/instances', methods=['GET', 'OPTIONS'])
 def get_vastai_instances():
-    """Get list of active VastAI instances"""
+    """Get list of VastAI instances (active only by default)"""
     if request.method == 'OPTIONS':
         return ("", 204)
     
     try:
+        # Get query parameter to determine if we should show all instances or just active ones
+        show_all = request.args.get('all', 'false').lower() == 'true'
+        
         # Initialize VastManager to get instances
         vast_manager = VastManager()
         instances = vast_manager.list_instances()
+        
+        # Filter for active instances only (unless show_all is requested)
+        if not show_all:
+            instances = [instance for instance in instances if instance.get('cur_state') == 'running']
         
         # Format instances for display
         formatted_instances = []
@@ -2425,7 +2451,8 @@ def get_vastai_instances():
         return jsonify({
             'success': True,
             'instances': formatted_instances,
-            'count': len(formatted_instances)
+            'count': len(formatted_instances),
+            'filtered': not show_all  # Indicate if results were filtered
         })
         
     except FileNotFoundError:

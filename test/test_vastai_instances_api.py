@@ -71,27 +71,19 @@ class TestVastAIInstancesAPI(unittest.TestCase):
         data = json.loads(response.data)
         
         self.assertTrue(data['success'])
-        self.assertEqual(data['count'], 2)
-        self.assertEqual(len(data['instances']), 2)
+        self.assertEqual(data['count'], 1)  # Only running instance should be returned by default
+        self.assertEqual(len(data['instances']), 1)
+        self.assertTrue(data['filtered'])  # Should indicate filtering was applied
         
-        # Check first instance formatting
-        instance1 = data['instances'][0]
-        self.assertEqual(instance1['id'], 123456)
-        self.assertEqual(instance1['status'], 'running')
-        self.assertEqual(instance1['gpu'], 'RTX A6000')
-        self.assertEqual(instance1['gpu_count'], 1)
-        self.assertEqual(instance1['gpu_ram_gb'], 48.0)
-        self.assertEqual(instance1['ssh_host'], 'ssh1.example.com')
-        self.assertEqual(instance1['ssh_port'], 12345)
-        
-        # Check second instance formatting
-        instance2 = data['instances'][1]
-        self.assertEqual(instance2['id'], 789012)
-        self.assertEqual(instance2['status'], 'stopped')
-        self.assertEqual(instance2['gpu'], 'RTX 4090')
-        self.assertEqual(instance2['gpu_count'], 2)
-        self.assertEqual(instance2['gpu_ram_gb'], 24.0)
-        self.assertEqual(instance2['ssh_host'], None)
+        # Check that only the running instance is returned
+        instance = data['instances'][0]
+        self.assertEqual(instance['id'], 123456)
+        self.assertEqual(instance['status'], 'running')
+        self.assertEqual(instance['gpu'], 'RTX A6000')
+        self.assertEqual(instance['gpu_count'], 1)
+        self.assertEqual(instance['gpu_ram_gb'], 48.0)
+        self.assertEqual(instance['ssh_host'], 'ssh1.example.com')
+        self.assertEqual(instance['ssh_port'], 12345)
 
     @patch('app.sync.sync_api.VastManager')
     def test_get_instances_empty(self, mock_vast_manager_class):
@@ -145,6 +137,116 @@ class TestVastAIInstancesAPI(unittest.TestCase):
         self.assertFalse(data['success'])
         self.assertIn('Error getting VastAI instances', data['message'])
         self.assertIn('API Error: Unauthorized', data['message'])
+
+    @patch('app.sync.sync_api.VastManager')
+    def test_get_instances_active_only_filtering(self, mock_vast_manager_class):
+        """Test filtering for active instances only (default behavior)"""
+        # Mock VastManager instance
+        mock_vm = MagicMock()
+        mock_vast_manager_class.return_value = mock_vm
+        
+        # Mock mixed instance data (running and stopped)
+        mock_instances = [
+            {
+                'id': 123456,
+                'cur_state': 'running',
+                'gpu_name': 'RTX A6000',
+                'num_gpus': 1,
+                'gpu_ram': 49152,
+                'ssh_host': 'ssh1.example.com',
+                'ssh_port': 12345,
+                'public_ipaddr': '192.168.1.100',
+                'geolocation': 'US-CA-1',
+                'template_name': 'pytorch/pytorch:latest',
+                'dph_total': 0.75
+            },
+            {
+                'id': 789012,
+                'cur_state': 'stopped',
+                'gpu_name': 'RTX 3090',
+                'num_gpus': 1,
+                'gpu_ram': 24576,
+                'ssh_host': None,
+                'ssh_port': None,
+                'public_ipaddr': None,
+                'geolocation': 'US-TX-1',
+                'template_name': 'pytorch/pytorch:latest',
+                'dph_total': 0.50
+            }
+        ]
+        mock_vm.list_instances.return_value = mock_instances
+        
+        # Make request (default should filter for active only)
+        response = self.app.get('/vastai/instances')
+        
+        # Assertions
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        
+        self.assertTrue(data['success'])
+        self.assertEqual(data['count'], 1)  # Only 1 running instance
+        self.assertEqual(len(data['instances']), 1)
+        self.assertTrue(data['filtered'])  # Should indicate filtering was applied
+        
+        # Check that only the running instance is returned
+        instance = data['instances'][0]
+        self.assertEqual(instance['id'], 123456)
+        self.assertEqual(instance['status'], 'running')
+
+    @patch('app.sync.sync_api.VastManager')
+    def test_get_instances_all_instances(self, mock_vast_manager_class):
+        """Test getting all instances when all=true parameter is used"""
+        # Mock VastManager instance
+        mock_vm = MagicMock()
+        mock_vast_manager_class.return_value = mock_vm
+        
+        # Mock mixed instance data (running and stopped)
+        mock_instances = [
+            {
+                'id': 123456,
+                'cur_state': 'running',
+                'gpu_name': 'RTX A6000',
+                'num_gpus': 1,
+                'gpu_ram': 49152,
+                'ssh_host': 'ssh1.example.com',
+                'ssh_port': 12345,
+                'public_ipaddr': '192.168.1.100',
+                'geolocation': 'US-CA-1',
+                'template_name': 'pytorch/pytorch:latest',
+                'dph_total': 0.75
+            },
+            {
+                'id': 789012,
+                'cur_state': 'stopped',
+                'gpu_name': 'RTX 3090',
+                'num_gpus': 1,
+                'gpu_ram': 24576,
+                'ssh_host': None,
+                'ssh_port': None,
+                'public_ipaddr': None,
+                'geolocation': 'US-TX-1',
+                'template_name': 'pytorch/pytorch:latest',
+                'dph_total': 0.50
+            }
+        ]
+        mock_vm.list_instances.return_value = mock_instances
+        
+        # Make request with all=true parameter
+        response = self.app.get('/vastai/instances?all=true')
+        
+        # Assertions
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        
+        self.assertTrue(data['success'])
+        self.assertEqual(data['count'], 2)  # Both instances should be returned
+        self.assertEqual(len(data['instances']), 2)
+        self.assertFalse(data['filtered'])  # Should indicate no filtering was applied
+        
+        # Check that both instances are returned
+        instance_ids = [instance['id'] for instance in data['instances']]
+        self.assertIn(123456, instance_ids)
+        self.assertIn(789012, instance_ids)
 
     def test_get_instances_options_request(self):
         """Test CORS OPTIONS request"""
