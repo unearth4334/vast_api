@@ -22,7 +22,16 @@ class VastManager:
 
     def _load_api_key(self, path):
         with open(path, 'r') as f:
-            return f.read().strip()
+            content = f.read().strip()
+            
+        # Handle multi-line format: "vastai: <key>"
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('vastai:'):
+                return line.split(':', 1)[1].strip()
+        
+        # Fallback to entire content if no "vastai:" prefix found
+        return content
 
     def query_offers(self):
         params = {

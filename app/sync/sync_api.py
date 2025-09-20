@@ -920,6 +920,110 @@ def index():
                 border-color: var(--text-error);
                 background: var(--background-error);
             }
+            
+            /* VastAI Instances Display */
+            .vastai-instances-section {
+                margin-bottom: var(--size-4-6);
+                padding: var(--size-4-4);
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                background: var(--background-modifier-form-field);
+            }
+            
+            .vastai-instances-section h4 {
+                margin: 0 0 var(--size-4-3) 0;
+                color: var(--text-normal);
+            }
+            
+            .instances-list {
+                margin-top: var(--size-4-3);
+            }
+            
+            .no-instances-message {
+                color: var(--text-muted);
+                font-style: italic;
+                text-align: center;
+                padding: var(--size-4-4);
+            }
+            
+            .instance-item {
+                border: 1px solid var(--background-modifier-border);
+                border-radius: var(--radius-s);
+                padding: var(--size-4-3);
+                margin-bottom: var(--size-4-2);
+                background: var(--background-primary);
+            }
+            
+            .instance-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: var(--size-4-2);
+            }
+            
+            .instance-title {
+                font-weight: 600;
+                color: var(--text-normal);
+            }
+            
+            .instance-status {
+                padding: var(--size-4-1) var(--size-4-2);
+                border-radius: var(--radius-s);
+                font-size: var(--font-ui-smaller);
+                font-weight: 500;
+            }
+            
+            .instance-status.running {
+                background: var(--background-success);
+                color: var(--text-success);
+            }
+            
+            .instance-status.stopped {
+                background: var(--background-error);
+                color: var(--text-error);
+            }
+            
+            .instance-status.starting {
+                background: var(--background-warning);
+                color: var(--text-warning);
+            }
+            
+            .instance-details {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: var(--size-4-2);
+                font-size: var(--font-ui-small);
+            }
+            
+            .instance-detail {
+                color: var(--text-muted);
+            }
+            
+            .instance-detail strong {
+                color: var(--text-normal);
+            }
+            
+            .instance-actions {
+                margin-top: var(--size-4-3);
+                display: flex;
+                gap: var(--size-4-2);
+            }
+            
+            .use-instance-btn {
+                background: var(--interactive-accent);
+                color: var(--text-on-accent);
+                border: none;
+                border-radius: var(--radius-s);
+                padding: var(--size-4-1) var(--size-4-3);
+                font-size: var(--font-ui-smaller);
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .use-instance-btn:hover {
+                background: var(--interactive-accent-hover);
+            }
         </style>
     </head>
     <body>
@@ -972,6 +1076,20 @@ def index():
             <div id="vastai-setup-tab" class="tab-content">
                 <h3>VastAI SSH Connection Setup</h3>
                 <p>Configure your VastAI SSH connection and manage UI_HOME settings.</p>
+                
+                <!-- VastAI Instances Section -->
+                <div class="vastai-instances-section">
+                    <h4>🖥️ Active VastAI Instances</h4>
+                    <button class="setup-button secondary" onclick="loadVastaiInstances()">
+                        🔄 Load Instances
+                    </button>
+                    <div id="vastai-instances-list" class="instances-list">
+                        <!-- Instances will be displayed here -->
+                        <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances</div>
+                    </div>
+                </div>
+                
+                <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
                 
                 <div class="setup-field">
                     <label for="sshConnectionString">SSH Connection String:</label>
@@ -1641,6 +1759,78 @@ def index():
                 }
             }
             
+            async function loadVastaiInstances() {
+                const instancesList = document.getElementById('vastai-instances-list');
+                instancesList.innerHTML = '<div class="no-instances-message">Loading instances...</div>';
+                
+                try {
+                    const response = await fetch('/vastai/instances', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        displayVastaiInstances(data.instances);
+                    } else {
+                        instancesList.innerHTML = '<div class="no-instances-message" style="color: var(--text-error);">Error: ' + data.message + '</div>';
+                    }
+                } catch (error) {
+                    instancesList.innerHTML = '<div class="no-instances-message" style="color: var(--text-error);">Request failed: ' + error.message + '</div>';
+                }
+            }
+            
+            function displayVastaiInstances(instances) {
+                const instancesList = document.getElementById('vastai-instances-list');
+                
+                if (!instances || instances.length === 0) {
+                    instancesList.innerHTML = '<div class="no-instances-message">No active VastAI instances found</div>';
+                    return;
+                }
+                
+                let html = '';
+                instances.forEach(instance => {
+                    const statusClass = instance.status ? instance.status.toLowerCase() : 'unknown';
+                    const sshConnection = instance.ssh_host && instance.ssh_port ? 
+                        `ssh -p ${instance.ssh_port} root@${instance.ssh_host} -L 8080:localhost:8080` : 'N/A';
+                    
+                    html += `
+                        <div class="instance-item">
+                            <div class="instance-header">
+                                <div class="instance-title">Instance #${instance.id}</div>
+                                <div class="instance-status ${statusClass}">${instance.status || 'Unknown'}</div>
+                            </div>
+                            <div class="instance-details">
+                                <div class="instance-detail"><strong>GPU:</strong> ${instance.gpu || 'N/A'} ${instance.gpu_count ? '(' + instance.gpu_count + 'x)' : ''}</div>
+                                <div class="instance-detail"><strong>GPU RAM:</strong> ${instance.gpu_ram_gb || 0} GB</div>
+                                <div class="instance-detail"><strong>Location:</strong> ${instance.geolocation || 'N/A'}</div>
+                                <div class="instance-detail"><strong>Cost:</strong> $${instance.cost_per_hour || 0}/hr</div>
+                                <div class="instance-detail"><strong>SSH Host:</strong> ${instance.ssh_host || 'N/A'}</div>
+                                <div class="instance-detail"><strong>SSH Port:</strong> ${instance.ssh_port || 'N/A'}</div>
+                            </div>
+                            ${instance.ssh_host && instance.ssh_port && instance.status === 'running' ? `
+                            <div class="instance-actions">
+                                <button class="use-instance-btn" onclick="useInstance('${sshConnection}')">
+                                    📋 Use This Instance
+                                </button>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                instancesList.innerHTML = html;
+            }
+            
+            function useInstance(sshConnection) {
+                const sshInput = document.getElementById('sshConnectionString');
+                sshInput.value = sshConnection;
+                showSetupResult('SSH connection string copied to input field', 'success');
+            }
+            
             function showSetupResult(message, type) {
                 const resultDiv = document.getElementById('setup-result');
                 resultDiv.textContent = message;
@@ -2202,6 +2392,52 @@ def terminate_connection():
         return jsonify({
             'success': False,
             'message': f'Error terminating connection: {str(e)}'
+        })
+
+@app.route('/vastai/instances', methods=['GET', 'OPTIONS'])
+def get_vastai_instances():
+    """Get list of active VastAI instances"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Initialize VastManager to get instances
+        vast_manager = VastManager()
+        instances = vast_manager.list_instances()
+        
+        # Format instances for display
+        formatted_instances = []
+        for instance in instances:
+            formatted_instances.append({
+                'id': instance.get('id'),
+                'status': instance.get('cur_state'),
+                'gpu': instance.get('gpu_name'),
+                'gpu_count': instance.get('num_gpus'),
+                'gpu_ram_gb': round(instance.get('gpu_ram', 0) / 1024, 1) if instance.get('gpu_ram') else 0,
+                'ssh_host': instance.get('ssh_host'),
+                'ssh_port': instance.get('ssh_port'),
+                'public_ip': instance.get('public_ipaddr'),
+                'geolocation': instance.get('geolocation'),
+                'template': instance.get('template_name'),
+                'cost_per_hour': instance.get('dph_total')
+            })
+        
+        return jsonify({
+            'success': True,
+            'instances': formatted_instances,
+            'count': len(formatted_instances)
+        })
+        
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'message': 'VastAI configuration files not found (config.yaml or api_key.txt)'
+        })
+    except Exception as e:
+        logger.error(f"Error getting VastAI instances: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting VastAI instances: {str(e)}'
         })
 
 @app.route('/vastai/setup-civitdl', methods=['POST', 'OPTIONS'])
