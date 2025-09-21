@@ -11,7 +11,48 @@ logger = logging.getLogger(__name__)
 
 def parse_ssh_connection(ssh_connection):
     """
-    Parse SSH connection string into host and port components.
+    Parse SSH connection string to extract host, port, and user.
+    
+    Args:
+        ssh_connection (str): SSH connection string in full SSH command format
+        
+    Returns:
+        dict or None: Dictionary with user, host, port for valid SSH commands, 
+                     None for invalid input
+    """
+    try:
+        if not ssh_connection:
+            return None
+        
+        # Handle full SSH command format like "ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
+        import re
+        
+        # Extract port from -p flag
+        port_match = re.search(r'-p\s+(\d+)', ssh_connection)
+        port = int(port_match.group(1)) if port_match else 22
+        
+        # Extract user@host
+        user_host_match = re.search(r'(\w+)@([0-9.]+|[\w.-]+)', ssh_connection)
+        if not user_host_match:
+            return None
+            
+        user = user_host_match.group(1)
+        host = user_host_match.group(2)
+        
+        return {
+            'user': user,
+            'host': host,
+            'port': port
+        }
+        
+    except Exception as e:
+        logger.error(f"Error parsing SSH connection string: {str(e)}")
+        return None
+
+
+def parse_host_port(ssh_connection):
+    """
+    Parse SSH connection string into host and port components for sync operations.
     
     Args:
         ssh_connection (str): SSH connection string in format "host:port" or full SSH command
@@ -27,20 +68,10 @@ def parse_ssh_connection(ssh_connection):
     
     # Handle full SSH command format like "ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
     if ssh_connection.startswith('ssh '):
-        import re
-        # Extract port from -p flag
-        port_match = re.search(r'-p\s+(\d+)', ssh_connection)
-        if not port_match:
-            raise ValueError("No port found in SSH command. Expected format with -p flag")
-        
-        port = port_match.group(1)
-        
-        # Extract host from user@host format
-        host_match = re.search(r'root@([^\s]+)', ssh_connection)
-        if not host_match:
-            raise ValueError("No host found in SSH command. Expected format with root@host")
-        
-        host = host_match.group(1)
+        result = parse_ssh_connection(ssh_connection)
+        if not result:
+            raise ValueError("Invalid SSH command format")
+        return result['host'], str(result['port'])
     else:
         # Handle simple host:port format
         if ':' not in ssh_connection:
@@ -51,20 +82,20 @@ def parse_ssh_connection(ssh_connection):
             raise ValueError("Invalid SSH connection format. Expected 'host:port'")
         
         host, port = parts
-    
-    # Validate host (basic validation)
-    if not host.strip():
-        raise ValueError("Host cannot be empty")
-    
-    # Validate port
-    try:
-        port_int = int(port)
-        if port_int < 1 or port_int > 65535:
-            raise ValueError("Port must be between 1 and 65535")
-    except ValueError:
-        raise ValueError("Port must be a valid integer")
-    
-    return host.strip(), port.strip()
+        
+        # Validate host (basic validation)
+        if not host.strip():
+            raise ValueError("Host cannot be empty")
+        
+        # Validate port
+        try:
+            port_int = int(port)
+            if port_int < 1 or port_int > 65535:
+                raise ValueError("Port must be between 1 and 65535")
+        except ValueError:
+            raise ValueError("Port must be a valid integer")
+        
+        return host.strip(), port.strip()
 
 
 def read_api_key_from_file(api_key_path='api_key.txt'):

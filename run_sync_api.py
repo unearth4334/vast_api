@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app.sync.sync_api import app
+from app.sync.sync_utils import SYNC_SCRIPT_PATH
 import logging
 
 if __name__ == '__main__':
@@ -17,7 +18,6 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
     
     # Check if sync script exists
-    from app.sync.sync_api import SYNC_SCRIPT_PATH
     if not os.path.exists(SYNC_SCRIPT_PATH):
         logger.error(f"Sync script not found at {SYNC_SCRIPT_PATH}")
         sys.exit(1)

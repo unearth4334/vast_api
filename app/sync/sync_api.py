@@ -14,7 +14,7 @@ from flask_cors import CORS
 try:
     from .sync_utils import run_sync, FORGE_HOST, FORGE_PORT, COMFY_HOST, COMFY_PORT
     from ..vastai.vast_manager import VastManager
-    from ..vastai.vastai_utils import parse_ssh_connection, read_api_key_from_file
+    from ..vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file
     from ..utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from ..webui.templates import get_index_template
     from .ssh_test import SSHTester
@@ -25,7 +25,7 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from sync_utils import run_sync, FORGE_HOST, FORGE_PORT, COMFY_HOST, COMFY_PORT
     from vastai.vast_manager import VastManager
-    from vastai.vastai_utils import parse_ssh_connection, read_api_key_from_file
+    from vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file
     from utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from webui.templates import get_index_template
     try:
@@ -68,6 +68,11 @@ def add_pna_header(resp):
         resp.headers["Access-Control-Allow-Private-Network"] = "true"
         resp.headers["Vary"] = "Origin"
     return resp
+
+
+def _extract_host_port(ssh_connection):
+    """Helper function to extract host and port from SSH connection string"""
+    return parse_host_port(ssh_connection)
 
 
 # --- Web UI Routes ---
@@ -192,7 +197,7 @@ def sync_vastai_connection():
             })
         
         try:
-            ssh_host, ssh_port = parse_ssh_connection(ssh_connection)
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
             return jsonify({
                 'success': False,
@@ -334,7 +339,7 @@ def set_ui_home():
             })
         
         try:
-            ssh_host, ssh_port = parse_ssh_connection(ssh_connection)
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
             return jsonify({
                 'success': False,
@@ -395,7 +400,7 @@ def get_ui_home():
             })
         
         try:
-            ssh_host, ssh_port = parse_ssh_connection(ssh_connection)
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
             return jsonify({
                 'success': False,
@@ -457,7 +462,7 @@ def terminate_connection():
             })
         
         try:
-            ssh_host, ssh_port = parse_ssh_connection(ssh_connection)
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
             return jsonify({
                 'success': False,
@@ -523,7 +528,7 @@ def setup_civitdl():
             })
         
         try:
-            ssh_host, ssh_port = parse_ssh_connection(ssh_connection)
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
             return jsonify({
                 'success': False,
