@@ -369,7 +369,7 @@ function displayVastaiInstances(instances) {
         ${sshConnection && instance.status === 'running' ? `
         <div class="instance-actions">
           <button class="use-instance-btn" onclick="useInstance('${sshConnection.replace(/'/g, "\\'")}')">
-            📋 Use This Instance
+            🔗 Connect to SSH Connection Field
           </button>
         </div>
         ` : ''}
@@ -384,7 +384,7 @@ function useInstance(sshConnection) {
   const sshInput = document.getElementById('sshConnectionString');
   if (sshInput) {
     sshInput.value = sshConnection;
-    showSetupResult('SSH connection string copied to input field', 'success');
+    showSetupResult('✅ SSH connection parameters copied to SSH Connection String field', 'success');
   }
 }
 
