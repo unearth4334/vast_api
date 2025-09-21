@@ -1,0 +1,73 @@
+:root {
+    /* Modern dark theme color scheme */
+    --color-accent: #7c3aed;
+    --color-accent-hover: #8b5cf6;
+    --color-accent-muted: #a78bfa;
+    
+    /* Backgrounds */
+    --background-primary: #1e1e1e;
+    --background-secondary: #2d2d2d;
+    --background-secondary-alt: #363636;
+    --background-modifier-border: #404040;
+    --background-modifier-form-field: #2d2d2d;
+    --background-modifier-box-shadow: rgba(0, 0, 0, 0.3);
+    
+    /* Text colors */
+    --text-normal: #dcddde;
+    --text-muted: #999999;
+    --text-faint: #666666;
+    --text-on-accent: #ffffff;
+    
+    /* Status colors */
+    --text-success: #00c853;
+    --text-warning: #ffb300;
+    --text-error: #ff5722;
+    --background-success: rgba(0, 200, 83, 0.1);
+    --background-warning: rgba(255, 179, 0, 0.1);
+    --background-error: rgba(255, 87, 34, 0.1);
+    
+    /* Interactive elements */
+    --interactive-normal: #464749;
+    --interactive-hover: #4a4d52;
+    --interactive-accent: var(--color-accent);
+    --interactive-accent-hover: var(--color-accent-hover);
+    
+    /* Sizes */
+    --font-ui-smaller: 12px;
+    --font-ui-small: 13px;
+    --font-ui-medium: 14px;
+    --font-ui-large: 16px;
+    --font-ui-larger: 18px;
+    
+    --size-4-1: 4px;
+    --size-4-2: 8px;
+    --size-4-3: 12px;
+    --size-4-4: 16px;
+    --size-4-5: 20px;
+    --size-4-6: 24px;
+    --size-4-8: 32px;
+    --size-4-12: 48px;
+    
+    --radius-s: 6px;
+    --radius-m: 8px;
+    --radius-l: 10px;
+}
+
+/* Light theme (default) */
+@media (prefers-color-scheme: light) {
+    :root {
+        --background-primary: #ffffff;
+        --background-secondary: #f7f7f7;
+        --background-secondary-alt: #e3e3e3;
+        --background-modifier-border: #e3e3e3;
+        --background-modifier-form-field: #ffffff;
+        --background-modifier-box-shadow: rgba(0, 0, 0, 0.05);
+        
+        --text-normal: #2e3338;
+        --text-muted: #7c7c7c;
+        --text-faint: #b3b3b3;
+        
+        --interactive-normal: #f3f3f3;
+        --interactive-hover: #e8e8e8;
+    }
+}

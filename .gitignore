@@ -1,6 +1,10 @@
 
 api_key.txt
 
+# Backup files
+*.backup
+*_original.*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
