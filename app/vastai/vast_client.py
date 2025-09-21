@@ -1,5 +1,13 @@
 import requests
 import json
+from ..utils.vastai_api import (
+    query_offers as api_query_offers,
+    create_instance as api_create_instance,
+    show_instance as api_show_instance,
+    destroy_instance as api_destroy_instance,
+    list_instances as api_list_instances,
+    VastAIAPIError
+)
 
 class VastClient:
     BASE_URL = "https://console.vast.ai/api/v0"
@@ -13,43 +21,33 @@ class VastClient:
         }
 
     def query_offers(self, gpu_ram=10, sort="dph_total"):
-        params = {
-            "gpu_ram": gpu_ram,
-            "sort": sort,
-            "api_key": self.api_key
-        }
-        resp = requests.get(f"{self.BASE_URL}/bundles", params=params)
-        resp.raise_for_status()
-        return resp.json().get("offers", [])
+        try:
+            result = api_query_offers(self.api_key, gpu_ram, sort)
+            return result.get("offers", [])
+        except VastAIAPIError:
+            return []
 
     def create_instance(self, offer_id, template_hash_id, ui_home_env, disk_size_gb=32):
-        url = f"{self.BASE_URL}/asks/{offer_id}/"
-        payload = json.dumps({
-            "template_hash_id": template_hash_id,
-            "disk": disk_size_gb,
-            "extra_env": f'{{"UI_HOME": "{ui_home_env}"}}',
-            "target_state": "running",
-            "cancel_unavail": True
-        })
-        resp = requests.put(url, headers=self.headers, data=payload)
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            return api_create_instance(self.api_key, offer_id, template_hash_id, ui_home_env, disk_size_gb)
+        except VastAIAPIError:
+            raise
 
     def show_instance(self, instance_id):
-        url = f"{self.BASE_URL}/instances/{instance_id}/"
-        resp = requests.get(url, headers=self.headers)
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            return api_show_instance(self.api_key, instance_id)
+        except VastAIAPIError:
+            raise
 
     def destroy_instance(self, instance_id):
-        url = f"{self.BASE_URL}/instances/{instance_id}/"
-        resp = requests.delete(url, headers=self.headers)
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            return api_destroy_instance(self.api_key, instance_id)
+        except VastAIAPIError:
+            raise
 
     def list_instances(self):
         """List all instances for the current user"""
-        url = f"{self.BASE_URL}/instances/"
-        resp = requests.get(url, headers=self.headers)
-        resp.raise_for_status()
-        return resp.json().get("instances", [])
+        try:
+            return api_list_instances(self.api_key)
+        except VastAIAPIError:
+            return []

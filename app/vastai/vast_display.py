@@ -7,6 +7,7 @@ import fnmatch
 import operator
 import re
 from ..utils.match_filter import match_filter
+from ..utils.vastai_api import query_offers as api_query_offers, VastAIAPIError
 
 
 def parse_numeric_filter(expr):
@@ -77,19 +78,15 @@ if __name__ == "__main__":
     with open('config.yaml', 'r') as f:
         config = yaml.safe_load(f)
 
-    # Query Vast.ai
-    params = {
-        'gpu_ram': 10,
-        'sort': 'score',
-        'api_key': api_key
-    }
+    # Query Vast.ai using the new API module
+    try:
+        resp_json = api_query_offers(api_key, gpu_ram=10, sort='score')
+        
+        # Save raw response (optional)
+        with open('output.json', 'w') as outfile:
+            json.dump(resp_json, outfile)
 
-    resp = requests.get("https://vast.ai/api/v0/bundles", params=params)
-    resp_json = resp.json()
-
-    # Save raw response (optional)
-    with open('output.json', 'w') as outfile:
-        json.dump(resp_json, outfile)
-
-    # Display formatted output
-    display_vast_offers(resp_json, config)
+        # Display formatted output
+        display_vast_offers(resp_json, config)
+    except VastAIAPIError as e:
+        print(f"❌ Failed to query offers: {e}")
