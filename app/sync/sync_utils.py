@@ -141,10 +141,19 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
         json.dump(progress_data, f)
     
     try:
-        # Build the command
-        cmd = [SYNC_SCRIPT_PATH, host, port]
-        if cleanup:
-            cmd.append("cleanup")
+        # Build the command - use proper argument format expected by sync_outputs.sh
+        cleanup_arg = "--cleanup" if cleanup else ""
+        
+        cmd = [
+            'bash', SYNC_SCRIPT_PATH,
+            '-p', str(port),
+            '--host', str(host),
+            '--sync-id', sync_id
+        ]
+        
+        # Add cleanup argument if needed
+        if cleanup_arg:
+            cmd.append(cleanup_arg)
         
         # Run the sync
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
