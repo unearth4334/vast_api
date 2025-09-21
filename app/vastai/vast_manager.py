@@ -117,11 +117,37 @@ class VastManager:
         return response.json()
 
     def list_instances(self):
-        """List all instances for the current user"""
+        """List all instances for the current user with detailed information"""
         url = f"{VAST_BASE}/instances/"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
-        return response.json().get("instances", [])
+        instances = response.json().get("instances", [])
+        
+        # Fetch detailed information for each instance to get correct SSH host/port
+        detailed_instances = []
+        for instance in instances:
+            instance_id = instance.get("id")
+            if instance_id:
+                try:
+                    # Get detailed instance information
+                    detail_url = f"{VAST_BASE}/instances/{instance_id}/"
+                    detail_response = requests.get(detail_url, headers=self.headers)
+                    detail_response.raise_for_status()
+                    detailed_instance = detail_response.json().get("instances", {})
+                    
+                    # Use detailed instance data if available, otherwise fall back to list data
+                    if detailed_instance:
+                        detailed_instances.append(detailed_instance)
+                    else:
+                        detailed_instances.append(instance)
+                except Exception as e:
+                    # If we can't get detailed info, use the original instance data
+                    print(f"Warning: Could not fetch detailed info for instance {instance_id}: {e}")
+                    detailed_instances.append(instance)
+            else:
+                detailed_instances.append(instance)
+        
+        return detailed_instances
 
     def get_running_instance(self):
         """Get the first running instance (for VastAI sync)"""

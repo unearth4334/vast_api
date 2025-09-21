@@ -5,6 +5,7 @@ Provides web API endpoints for syncing media from local Docker containers and Va
 """
 
 import os
+import requests
 import subprocess
 import logging
 import uuid
@@ -1884,46 +1885,57 @@ def index():
             }
             
             function displayVastaiInstances(instances) {
-                const instancesList = document.getElementById('vastai-instances-list');
-                
-                if (!instances || instances.length === 0) {
-                    instancesList.innerHTML = '<div class="no-instances-message">No active VastAI instances found</div>';
-                    return;
-                }
-                
-                let html = '';
-                instances.forEach(instance => {
-                    const statusClass = instance.status ? instance.status.toLowerCase() : 'unknown';
-                    const sshConnection = instance.ssh_host && instance.ssh_port ? 
-                        `ssh -p ${instance.ssh_port} root@${instance.ssh_host} -L 8080:localhost:8080` : 'N/A';
-                    
-                    html += `
-                        <div class="instance-item">
-                            <div class="instance-header">
-                                <div class="instance-title">Instance #${instance.id}</div>
-                                <div class="instance-status ${statusClass}">${instance.status || 'Unknown'}</div>
-                            </div>
-                            <div class="instance-details">
-                                <div class="instance-detail"><strong>GPU:</strong> ${instance.gpu || 'N/A'} ${instance.gpu_count ? '(' + instance.gpu_count + 'x)' : ''}</div>
-                                <div class="instance-detail"><strong>GPU RAM:</strong> ${instance.gpu_ram_gb || 0} GB</div>
-                                <div class="instance-detail"><strong>Location:</strong> ${instance.geolocation || 'N/A'}</div>
-                                <div class="instance-detail"><strong>Cost:</strong> $${instance.cost_per_hour || 0}/hr</div>
-                                <div class="instance-detail"><strong>SSH Host:</strong> ${instance.ssh_host || 'N/A'}</div>
-                                <div class="instance-detail"><strong>SSH Port:</strong> ${instance.ssh_port || 'N/A'}</div>
-                            </div>
-                            ${instance.ssh_host && instance.ssh_port && instance.status === 'running' ? `
-                            <div class="instance-actions">
-                                <button class="use-instance-btn" onclick="useInstance('${sshConnection}')">
-                                    📋 Use This Instance
-                                </button>
-                            </div>
-                            ` : ''}
-                        </div>
-                    `;
-                });
-                
-                instancesList.innerHTML = html;
+            const instancesList = document.getElementById('vastai-instances-list');
+
+            if (!instances || instances.length === 0) {
+                instancesList.innerHTML = '<div class="no-instances-message">No active VastAI instances found</div>';
+                return;
             }
+
+            let html = '';
+            instances.forEach(instance => {
+                const statusClass = instance.status ? instance.status.toLowerCase() : 'unknown';
+                const sshConnection = instance.ssh_host && instance.ssh_port
+                ? `ssh -p ${instance.ssh_port} root@${instance.ssh_host} -L 8080:localhost:8080`
+                : 'N/A';
+
+                html += `
+                <div class="instance-item" data-instance-id="${instance.id}">
+                    <div class="instance-header">
+                    <div class="instance-title">Instance #${instance.id}</div>
+                    <div class="instance-status ${statusClass}" data-field="status">${instance.status || 'Unknown'}</div>
+                    </div>
+                    <div class="instance-details">
+                    <div class="instance-detail"><strong>GPU:</strong> ${instance.gpu || 'N/A'} ${instance.gpu_count ? '(' + instance.gpu_count + 'x)' : ''}</div>
+                    <div class="instance-detail"><strong>GPU RAM:</strong> ${instance.gpu_ram_gb || 0} GB</div>
+                    <div class="instance-detail"><strong>Location:</strong> <span data-field="geolocation">${instance.geolocation || 'N/A'}</span></div>
+                    <div class="instance-detail"><strong>Cost:</strong> $${instance.cost_per_hour || 0}/hr</div>
+                    <div class="instance-detail"><strong>SSH Host:</strong> <span data-field="ssh_host">${instance.ssh_host || 'N/A'}</span></div>
+                    <div class="instance-detail"><strong>SSH Port:</strong> <span data-field="ssh_port">${instance.ssh_port || 'N/A'}</span></div>
+                    </div>
+                    <div class="instance-actions">
+                    ${instance.ssh_host && instance.ssh_port && (instance.status || '').toLowerCase() === 'running' ? `
+                        <button class="use-instance-btn" onclick="useInstance('${sshConnection}')">
+                        📋 Use This Instance
+                        </button>
+                    ` : ``}
+                    <button class="use-instance-btn" onclick="resolveInstanceParams(${instance.id})">
+                        🔄 Refresh details
+                    </button>
+                    </div>
+                </div>
+                `;
+            });
+
+            instancesList.innerHTML = html;
+
+            // OPTIONAL: auto-refresh each card once, to pull authoritative ssh_host/ssh_port
+            instances.forEach(i => {
+                // Fire-and-forget; errors surface through showSetupResult
+                resolveInstanceParams(i.id);
+            });
+            }
+
             
             function useInstance(sshConnection) {
                 const sshInput = document.getElementById('sshConnectionString');
@@ -1946,6 +1958,75 @@ def index():
                     }, 5000);
                 }
             }
+
+            async function fetchVastaiInstanceDetails(instanceId) {
+            const resp = await fetch(`/vastai/instances/${instanceId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.message || `Failed to fetch details for ${instanceId}`);
+            }
+            return data.instance;
+            }
+
+            async function resolveInstanceParams(instanceId) {
+            try {
+                const inst = await fetchVastaiInstanceDetails(instanceId);
+
+                const sshHost = inst.ssh_host || inst.public_ipaddr || null;
+                const sshPort = inst.ssh_port || 22;
+                const sshConnection = (sshHost && sshPort)
+                ? `ssh -p ${sshPort} root@${sshHost} -L 8080:localhost:8080`
+                : 'N/A';
+
+                // Find the already-rendered card
+                const card = document.querySelector(`[data-instance-id="${instanceId}"]`);
+                if (card) {
+                const hostEl = card.querySelector('[data-field="ssh_host"]');
+                const portEl = card.querySelector('[data-field="ssh_port"]');
+                const statEl = card.querySelector('[data-field="status"]');
+                const locEl  = card.querySelector('[data-field="geolocation"]');
+
+                if (hostEl) hostEl.textContent = sshHost || 'N/A';
+                if (portEl) portEl.textContent = sshPort || 'N/A';
+                if (statEl) {
+                    const state = inst.cur_state || 'Unknown';
+                    statEl.textContent = state;
+                    statEl.className = `instance-status ${String(state).toLowerCase()}`;
+                }
+                if (locEl) locEl.textContent = inst.geolocation || 'N/A';
+
+                const actions = card.querySelector('.instance-actions');
+                if (actions) {
+                    if (sshHost && sshPort && String(inst.cur_state).toLowerCase() === 'running') {
+                    actions.innerHTML = `
+                        <button class="use-instance-btn" onclick="useInstance('${sshConnection}')">
+                        📋 Use This Instance
+                        </button>
+                        <button class="use-instance-btn" onclick="resolveInstanceParams(${instanceId})">
+                        🔄 Refresh details
+                        </button>
+                    `;
+                    } else {
+                    actions.innerHTML = `
+                        <button class="use-instance-btn" onclick="resolveInstanceParams(${instanceId})">
+                        🔄 Refresh details
+                        </button>
+                    `;
+                    }
+                }
+                }
+
+                showSetupResult(`Instance #${instanceId} details refreshed.`, 'success');
+                return inst;
+            } catch (err) {
+                showSetupResult(`Failed to refresh instance #${instanceId}: ${err.message}`, 'error');
+                throw err;
+            }
+            }
+
         </script>
     </body>
     </html>
@@ -2713,6 +2794,26 @@ echo "{civitdl_api_key}" | civitconfig default --api-key
             'message': f'Error setting up CivitDL: {str(e)}'
         })
 
+@app.route('/vastai/instances/<int:instance_id>', methods=['GET', 'OPTIONS'])
+def get_vastai_instance_detail(instance_id):
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    try:
+        vast_key = load_vast_api_key_from_file()
+        url = f"https://console.vast.ai/api/v0/instances/{instance_id}/"
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {vast_key}",
+        }
+        r = requests.get(url, headers=headers, timeout=20)
+        r.raise_for_status()
+        data = r.json()
+        instance = data.get("instances", {}) or {}
+        return jsonify({"success": True, "instance": instance})
+    except Exception as e:
+        logger.error(f"Error fetching instance {instance_id}: {str(e)}")
+        return jsonify({"success": False, "message": f"{e}"}), 500
+
 def parse_ssh_connection(ssh_connection):
     """Parse SSH connection string to extract host, port, and user"""
     try:
@@ -2768,6 +2869,16 @@ def read_api_key_from_file():
     except Exception as e:
         logger.error(f"Error reading API key file: {str(e)}")
         return None
+
+def load_vast_api_key_from_file():
+    """Read VastAI API key from ../../api_key.txt (line 'vastai: <key>')"""
+    api_key_path = os.path.join(os.path.dirname(__file__), '..', '..', 'api_key.txt')
+    with open(api_key_path, 'r') as f:
+        for line in f:
+            s = line.strip()
+            if s.startswith('vastai:'):
+                return s.split(':', 1)[1].strip()
+    raise FileNotFoundError(f"VastAI key not found in {api_key_path}")
 
 
 if __name__ == '__main__':

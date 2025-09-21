@@ -29,22 +29,41 @@ class TestVastManagerExtensions(unittest.TestCase):
     @patch('requests.get')
     def test_list_instances_success(self, mock_get):
         """Test successful instance listing"""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
+        # Mock responses for list call and detail calls
+        list_response = MagicMock()
+        list_response.json.return_value = {
             'instances': [
                 {'id': 1, 'cur_state': 'running'},
                 {'id': 2, 'cur_state': 'stopped'}
             ]
         }
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
+        list_response.raise_for_status.return_value = None
+        
+        detail_response_1 = MagicMock()
+        detail_response_1.json.return_value = {
+            'instances': {'id': 1, 'cur_state': 'running', 'ssh_host': 'host1.example.com', 'ssh_port': 22001}
+        }
+        detail_response_1.raise_for_status.return_value = None
+        
+        detail_response_2 = MagicMock()
+        detail_response_2.json.return_value = {
+            'instances': {'id': 2, 'cur_state': 'stopped', 'ssh_host': 'host2.example.com', 'ssh_port': 22002}
+        }
+        detail_response_2.raise_for_status.return_value = None
+        
+        # Return list response first, then detail responses
+        mock_get.side_effect = [list_response, detail_response_1, detail_response_2]
 
         instances = self.manager.list_instances()
 
         self.assertEqual(len(instances), 2)
         self.assertEqual(instances[0]['id'], 1)
+        self.assertEqual(instances[0]['ssh_host'], 'host1.example.com')
+        self.assertEqual(instances[0]['ssh_port'], 22001)
         self.assertEqual(instances[1]['id'], 2)
-        mock_get.assert_called_once()
+        self.assertEqual(instances[1]['ssh_host'], 'host2.example.com')
+        self.assertEqual(instances[1]['ssh_port'], 22002)
+        self.assertEqual(mock_get.call_count, 3)  # 1 list call + 2 detail calls
 
     @patch('requests.get')
     def test_list_instances_empty(self, mock_get):
