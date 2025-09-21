@@ -23,5 +23,5 @@ if __name__ == '__main__':
         sys.exit(1)
     
     logger.info("Starting Media Sync API Server")
-    port = int(sys.argv[1].replace('--port=', '').replace('--port', '')) if len(sys.argv) > 1 and '--port' in sys.argv[1] else 5001
+    port = int(sys.argv[1].replace('--port=', '').replace('--port', '')) if len(sys.argv) > 1 and '--port' in sys.argv[1] else 5000
     app.run(host='0.0.0.0', port=port, debug=False)
