@@ -471,6 +471,9 @@ function useInstance(sshConnection) {
   }
 }
 
+// Global offer storage to prevent XSS vulnerabilities
+window.offerStore = new Map();
+
 // Expose the functions you call from HTML or other scripts
 window.setUIHome = setUIHome;
 window.getUIHome = getUIHome;
@@ -539,8 +542,15 @@ function displaySearchResults(offers) {
     return;
   }
   
+  // Clear previous offers from store
+  window.offerStore.clear();
+  
   let html = '';
   offers.forEach((offer, index) => {
+    // Create a unique offer key and store the offer safely
+    const offerKey = `offer_${offer.id || index}_${Date.now()}`;
+    window.offerStore.set(offerKey, offer);
+    
     const gpuInfo = offer.gpu_name || 'Unknown GPU';
     const gpuCount = offer.num_gpus || 1;
     const gpuRam = offer.gpu_ram ? `${Math.round(offer.gpu_ram / 1024)} GB` : 'N/A';
@@ -568,7 +578,7 @@ function displaySearchResults(offers) {
         </div>
         
         <div class="offer-actions">
-          <button class="offer-action-btn secondary" onclick="viewOfferDetails(${JSON.stringify(offer).replace(/"/g, '&quot;')})">
+          <button class="offer-action-btn secondary" onclick="viewOfferDetails('${offerKey}')">
             📋 View Details
           </button>
           <button class="offer-action-btn" onclick="createInstanceFromOffer('${offer.id}', '${offer.gpu_name || 'GPU'}')">
@@ -698,7 +708,14 @@ function showOfferDetailsModal(details) {
   });
 }
 
-function viewOfferDetails(offer) {
+function viewOfferDetails(offerKey) {
+  // Retrieve offer from secure storage
+  const offer = window.offerStore.get(offerKey);
+  if (!offer) {
+    console.error('Offer not found for key:', offerKey);
+    return;
+  }
+  
   let details = [
     { label: "Offer ID", value: offer.id },
     { label: "GPU", value: offer.gpu_name || 'N/A' },
