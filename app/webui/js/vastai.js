@@ -1,6 +1,10 @@
 // ==============================
 // vastai.js — drop-in replacement
 // ==============================
+//
+// Assumes a global `api` object with { get(path), post(path, body) } returning JSON.
+// Exposes helpers on `window` for use in HTML attributes.
+//
 
 // ---------- Small helpers ----------
 function fmtMoney(n) {
@@ -34,24 +38,15 @@ function normGeo(i) {
   return "N/A";
 }
 
-// Try to guess SSH host/port no matter how backend shapes it
-function normSSH(i) {
-  let host = i.ssh_host || (i.ssh && i.ssh.host) || i.sshHost;
-  let port = i.ssh_port || (i.ssh && i.ssh.port) || i.sshPort;
-
-  // Vast sometimes uses a gateway host when not yet resolved
-  if (!truthy(host)) host = "ssh2.vast.ai";
-
-  if (!truthy(port)) {
-    port = i.ssh_port_vast || i.sshPortVast || i.sshport || i.port || i.sshPort;
-  }
-
-  const maybeStr = i.ssh_string || i.sshString || i.ssh_connection || i.sshConnection;
-  if ((!truthy(host) || !truthy(port)) && truthy(maybeStr)) {
-    const m = String(maybeStr).match(/-p\s+(\d+)\s+[^@]+@([\w\.\-]+)/);
-    if (m) { port = port || m[1]; host = host || m[2]; }
-  }
-
+// Always regard Public IP as the SSH host (authoritative)
+function resolveSSH(i) {
+  const host =
+    i.public_ip ??
+    i.public_ipaddr ??
+    i.ip_address ??
+    i.publicIp ??
+    null;                       // <- we do NOT fall back to ssh_host; public IP wins
+  const port = i.ssh_port || 22;
   return { host, port };
 }
 
@@ -85,15 +80,15 @@ function normalizeInstance(raw) {
 
   // CPU
   const cpu = i.cpu ?? i.cpu_name ?? i.cpuModel ?? null;
-  const cpuCores = i.cpu_cores ?? i.cores ?? i.vcpus ?? i.threads ?? i.cpu_cores_effective ?? null;
+  const cpuCores = i.cpu_cores ?? i.cpu_cores_effective ?? i.cores ?? i.vcpus ?? i.threads ?? null;
 
-  // Disk (kept normalized but not displayed)
+  // Disk (normalized, not always displayed)
   let diskGb = i.disk_gb ?? i.disk ?? i.storage_gb ?? null;
   if (!truthy(diskGb) && truthy(i.disk_bytes)) diskGb = (+i.disk_bytes) / (1024 ** 3);
 
-  // Network (kept normalized but not displayed)
+  // Network (normalized, not always displayed)
   const down = i.net_down_mbps ?? i.download_mbps ?? i.down_mbps ?? i.net_down ?? i.inet_down ?? null;
-  const up = i.net_up_mbps ?? i.upload_mbps ?? i.up_mbps ?? i.net_up ?? i.inet_up ?? null;
+  const up   = i.net_up_mbps   ?? i.upload_mbps   ?? i.up_mbps   ?? i.net_up   ?? i.inet_up   ?? null;
 
   // Pricing
   const cost =
@@ -102,15 +97,8 @@ function normalizeInstance(raw) {
     i.dph ??
     (i.price_per_hour ?? i.price ?? null);
 
-  // Public IP (may show as "SSH Host" when ssh_host absent)
-  const publicIp =
-    i.public_ip ??
-    i.public_ipaddr ??
-    i.ip_address ??
-    i.publicIp ??
-    null;
-
-  const { host: ssh_host, port: ssh_port } = normSSH(i);
+  // SSH (host = public IP)
+  const { host: ssh_host, port: ssh_port } = resolveSSH(i);
 
   // Template / image metadata
   const template =
@@ -134,19 +122,16 @@ function normalizeInstance(raw) {
     net_up_mbps: truthy(up) ? +up : null,
     cost_per_hour: truthy(cost) ? +cost : null,
     geolocation: normGeo(i),
-    public_ip: publicIp, // shown as "SSH Host" when ssh_host missing
-    ssh_host,            // internal; used to build SSH string
-    ssh_port,
+    ssh_host,    // <-- always from public IP fields
+    ssh_port,    // may be missing from list payload; refresh fills it
     template
   };
 }
 
 // Build the “Use This Instance” SSH string
 function buildSSHString(inst) {
-  const host = inst.ssh_host || inst.public_ip || "ssh2.vast.ai";
-  const port = inst.ssh_port;
-  if (!host || !port) return null;
-  return `ssh -p ${port} root@${host} -L 8080:localhost:8080`;
+  if (!inst.ssh_host || !inst.ssh_port) return null;
+  return `ssh -p ${inst.ssh_port} root@${inst.ssh_host} -L 8080:localhost:8080`;
 }
 
 // ---------- UI feedback ----------
@@ -166,13 +151,9 @@ function showSetupResult(message, type) {
   }
 }
 
-// ---------- Backend API wrapper expectation ----------
-// Assumes a global `api` with { get(path), post(path, body) } returning JSON.
-// If you don't have it, swap to fetch() calls.
-
 // ---------- VastAI: set/get UI_HOME, terminate, install civitdl ----------
 async function setUIHome() {
-  const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
   showSetupResult('Setting UI_HOME to /workspace/ComfyUI/...', 'info');
@@ -189,7 +170,7 @@ async function setUIHome() {
 }
 
 async function getUIHome() {
-  const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
   showSetupResult('Reading UI_HOME...', 'info');
@@ -203,7 +184,7 @@ async function getUIHome() {
 }
 
 async function terminateConnection() {
-  const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
   if (!confirm('Are you sure you want to terminate the SSH connection?')) return;
 
@@ -218,7 +199,7 @@ async function terminateConnection() {
 }
 
 async function setupCivitDL() {
-  const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
   showSetupResult('Installing and configuring CivitDL...', 'info');
@@ -226,13 +207,15 @@ async function setupCivitDL() {
     const data = await api.post('/vastai/setup-civitdl', { ssh_connection: sshConnectionString });
     if (data.success) {
       const outputDiv = document.getElementById('setup-result');
-      outputDiv.innerHTML =
-        '<strong>CivitDL Setup Completed Successfully!</strong><br><br>' +
-        '<strong>Output:</strong><pre style="white-space: pre-wrap; margin-top: 8px;">' +
-        String(data.output || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-        '</pre>';
-      outputDiv.className = 'setup-result success';
-      outputDiv.style.display = 'block';
+      if (outputDiv) {
+        outputDiv.innerHTML =
+          '<strong>CivitDL Setup Completed Successfully!</strong><br><br>' +
+          '<strong>Output:</strong><pre style="white-space: pre-wrap; margin-top: 8px;">' +
+          String(data.output || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+          '</pre>';
+        outputDiv.className = 'setup-result success';
+        outputDiv.style.display = 'block';
+      }
     } else {
       showSetupResult('Error: ' + (data.message || 'Unknown') + (data.output ? '\n\nOutput:\n' + data.output : ''), 'error');
     }
@@ -242,7 +225,7 @@ async function setupCivitDL() {
 }
 
 async function syncFromConnectionString() {
-  const sshConnectionString = document.getElementById('sshConnectionString').value.trim();
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
   showSetupResult('Starting sync from connection string...', 'info');
@@ -334,8 +317,13 @@ async function refreshInstanceCard(instanceId) {
   try {
     const inst = await fetchVastaiInstanceDetails(instanceId);
 
-    // authoritative fields (match Vast detail endpoint)
-    const sshHost = inst.ssh_host || inst.public_ipaddr || null;
+    // Authoritative values — host must come from public IP fields:
+    const sshHost =
+      inst.public_ipaddr ||
+      inst.public_ip ||
+      inst.ip_address ||
+      inst.publicIp ||
+      null;
     const sshPort = inst.ssh_port || 22;
     const state   = normStatus(inst.cur_state || inst.status || 'unknown');
 
@@ -343,7 +331,7 @@ async function refreshInstanceCard(instanceId) {
       ? `ssh -p ${sshPort} root@${sshHost} -L 8080:localhost:8080`
       : null;
 
-    // update the existing card
+    // Update the existing card
     const card = document.querySelector(`[data-instance-id="${instanceId}"]`);
     if (!card) return inst;
 
@@ -444,7 +432,7 @@ function displayVastaiInstances(instances) {
           <div class="instance-detail"><strong>Location:</strong> ${instance.geolocation || 'N/A'}</div>
           <div class="instance-detail"><strong>Cost:</strong> ${fmtMoney(instance.cost_per_hour)}</div>
           <div class="instance-detail"><strong>Template:</strong> ${instance.template || 'N/A'}</div>
-          <div class="instance-detail"><strong>SSH Host:</strong> <span data-field="ssh_host">${instance.public_ip || instance.ssh_host || 'N/A'}</span></div>
+          <div class="instance-detail"><strong>SSH Host:</strong> <span data-field="ssh_host">${instance.ssh_host || 'N/A'}</span></div>
           <div class="instance-detail"><strong>SSH Port:</strong> <span data-field="ssh_port">${instance.ssh_port || 'N/A'}</span></div>
         </div>
 
@@ -467,11 +455,10 @@ function displayVastaiInstances(instances) {
     instancesList.innerHTML = html;
   }
 
-  // Auto-refresh each card to pull authoritative ssh_host/ssh_port from detail endpoint
+  // Auto-refresh each card to pull authoritative ssh_port/state from detail endpoint
   instances.forEach(i => {
     if (i && i.id != null) {
-      // fire-and-forget; errors are surfaced via showSetupResult
-      refreshInstanceCard(i.id);
+      refreshInstanceCard(i.id); // fire-and-forget; errors surface via showSetupResult
     }
   });
 }
