@@ -11,10 +11,6 @@ function fmtGb(v) {
   if (v === null || v === undefined || isNaN(v)) return "0 GB";
   return `${(+v).toFixed(v < 10 ? 2 : 1)} GB`;
 }
-function fmtMbps(v) {
-  if (v === null || v === undefined || isNaN(v)) return "N/A";
-  return `${(+v).toFixed(0)} Mbps`;
-}
 function truthy(x) { return x !== undefined && x !== null && x !== ""; }
 
 function normStatus(s) {
@@ -40,22 +36,17 @@ function normGeo(i) {
 
 // Try to guess SSH host/port no matter how backend shapes it
 function normSSH(i) {
-  // explicit fields
   let host = i.ssh_host || (i.ssh && i.ssh.host) || i.sshHost;
   let port = i.ssh_port || (i.ssh && i.ssh.port) || i.sshPort;
 
-  // Vast defaults
   if (!truthy(host)) host = "ssh2.vast.ai";
 
-  // Sometimes only port-like fields exist
   if (!truthy(port)) {
     port = i.ssh_port_vast || i.sshPortVast || i.sshport || i.port || i.sshPort;
   }
 
-  // As a last resort, some backends return a full string
   const maybeStr = i.ssh_string || i.sshString || i.ssh_connection || i.sshConnection;
   if ((!truthy(host) || !truthy(port)) && truthy(maybeStr)) {
-    // naive parse: ssh -p 12345 root@ssh2.vast.ai -L ...
     const m = String(maybeStr).match(/-p\s+(\d+)\s+[^@]+@([\w\.\-]+)/);
     if (m) { port = port || m[1]; host = host || m[2]; }
   }
@@ -80,9 +71,7 @@ function normalizeInstance(raw) {
 
   const gpuCount = i.gpu_count ?? i.num_gpus ?? i.gpus ?? i.numGpus;
 
-  // GPU RAM normalization:
-  // Accept explicit GB fields; else convert MB→GB.
-  // If ambiguous 'gpu_ram' is large (> 256), treat as MB; otherwise GB.
+  // GPU RAM normalization (MB→GB heuristic)
   let gpuRamGb = i.gpu_ram_gb ?? i.gpu_mem_gb ?? i.vram_gb ?? null;
   if (!truthy(gpuRamGb)) {
     const ramMb = i.gpu_ram_mb ?? i.gpu_mem_mb ?? i.vram_mb;
@@ -97,22 +86,22 @@ function normalizeInstance(raw) {
   const cpu = i.cpu ?? i.cpu_name ?? i.cpuModel ?? null;
   const cpuCores = i.cpu_cores ?? i.cores ?? i.vcpus ?? i.threads ?? null;
 
-  // Disk: GB
+  // Disk (kept normalized but not displayed)
   let diskGb = i.disk_gb ?? i.disk ?? i.storage_gb ?? null;
   if (!truthy(diskGb) && truthy(i.disk_bytes)) diskGb = (+i.disk_bytes) / (1024 ** 3);
 
-  // Network
+  // Network (kept normalized but not displayed)
   const down = i.net_down_mbps ?? i.download_mbps ?? i.down_mbps ?? i.net_down ?? null;
   const up = i.net_up_mbps ?? i.upload_mbps ?? i.up_mbps ?? i.net_up ?? null;
 
-  // Pricing (dph dollars/hour preferred)
+  // Pricing
   const cost =
     i.cost_per_hour ??
     i.dph_total ??
     i.dph ??
     (i.price_per_hour ?? i.price ?? null);
 
-  // Public IP (we will show this as "SSH Host" per your request)
+  // Public IP (we will render this as "SSH Host")
   const publicIp =
     i.public_ip ??
     i.public_ipaddr ??
@@ -144,8 +133,8 @@ function normalizeInstance(raw) {
     net_up_mbps: truthy(up) ? +up : null,
     cost_per_hour: truthy(cost) ? +cost : null,
     geolocation: normGeo(i),
-    public_ip: publicIp, // will render as "SSH Host"
-    ssh_host,            // kept internally if needed elsewhere (not displayed)
+    public_ip: publicIp, // shown as "SSH Host"
+    ssh_host,            // internal; not displayed
     ssh_port,
     template
   };
@@ -153,7 +142,6 @@ function normalizeInstance(raw) {
 
 // Build the “Use This Instance” SSH string
 function buildSSHString(inst) {
-  // Prefer the actual Vast SSH endpoint + port
   const host = inst.ssh_host || "ssh2.vast.ai";
   const port = inst.ssh_port;
   if (!host || !port) return null;
@@ -278,7 +266,6 @@ async function syncFromConnectionString() {
         progressBar.style.width = '0%';
         progressText.textContent = 'Starting sync...';
         progressDetails.textContent = '';
-        // Assumes you already have pollProgress(sync_id) defined elsewhere
         pollProgress(data.sync_id);
       }
 
@@ -372,8 +359,6 @@ function displayVastaiInstances(instances) {
           <div class="instance-detail"><strong>GPU:</strong> ${instance.gpu ? instance.gpu : 'N/A'}${instance.gpu_count ? ` (${instance.gpu_count}x)` : ''}</div>
           <div class="instance-detail"><strong>GPU RAM:</strong> ${fmtGb(instance.gpu_ram_gb)}</div>
           <div class="instance-detail"><strong>CPU:</strong> ${instance.cpu || 'N/A'}${truthy(instance.cpu_cores) ? ` (${instance.cpu_cores} cores)` : ''}</div>
-          <div class="instance-detail"><strong>Disk:</strong> ${truthy(instance.disk_gb) ? `${(+instance.disk_gb).toFixed(1)} GB` : 'N/A'}</div>
-          <div class="instance-detail"><strong>Down/Up:</strong> ${fmtMbps(instance.net_down_mbps)} / ${fmtMbps(instance.net_up_mbps)}</div>
           <div class="instance-detail"><strong>Location:</strong> ${instance.geolocation || 'N/A'}</div>
           <div class="instance-detail"><strong>Cost:</strong> ${fmtMoney(instance.cost_per_hour)}</div>
           <div class="instance-detail"><strong>Template:</strong> ${instance.template || 'N/A'}</div>
