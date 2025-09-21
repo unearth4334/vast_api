@@ -480,3 +480,273 @@ window.syncFromConnectionString = syncFromConnectionString;
 window.loadVastaiInstances = loadVastaiInstances;
 window.useInstance = useInstance;
 window.refreshInstanceCard = refreshInstanceCard;
+
+// ---------- Search offers functionality ----------
+function openSearchOffersModal() {
+  const overlay = document.getElementById('searchOffersOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+  }
+}
+
+function closeSearchOffersModal() {
+  const overlay = document.getElementById('searchOffersOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+async function searchVastaiOffers() {
+  const gpuRam = document.getElementById('searchGpuRam')?.value || 10;
+  const sort = document.getElementById('searchSort')?.value || 'dph_total';
+  const resultsDiv = document.getElementById('searchResults');
+  
+  if (!resultsDiv) return;
+  
+  // Show loading state
+  resultsDiv.innerHTML = '<div class="no-results-message">🔍 Searching for available offers...</div>';
+  
+  try {
+    const data = await api.get(`/vastai/search-offers?gpu_ram=${gpuRam}&sort=${sort}`);
+    
+    if (!data || data.success === false) {
+      const msg = (data && data.message) ? data.message : 'Failed to search offers';
+      resultsDiv.innerHTML = `<div class="no-results-message" style="color: var(--text-error);">❌ Error: ${msg}</div>`;
+      return;
+    }
+    
+    const offers = Array.isArray(data.offers) ? data.offers : [];
+    displaySearchResults(offers);
+    
+  } catch (error) {
+    resultsDiv.innerHTML = `<div class="no-results-message" style="color: var(--text-error);">❌ Request failed: ${error.message}</div>`;
+  }
+}
+
+function clearSearchResults() {
+  const resultsDiv = document.getElementById('searchResults');
+  if (resultsDiv) {
+    resultsDiv.innerHTML = '<div class="no-results-message">Enter search criteria and click "Search Offers" to find available instances</div>';
+  }
+}
+
+function displaySearchResults(offers) {
+  const resultsDiv = document.getElementById('searchResults');
+  if (!resultsDiv) return;
+  
+  if (!offers || offers.length === 0) {
+    resultsDiv.innerHTML = '<div class="no-results-message">No offers found matching your criteria</div>';
+    return;
+  }
+  
+  let html = '';
+  offers.forEach((offer, index) => {
+    const gpuInfo = offer.gpu_name || 'Unknown GPU';
+    const gpuCount = offer.num_gpus || 1;
+    const gpuRam = offer.gpu_ram ? `${Math.round(offer.gpu_ram / 1024)} GB` : 'N/A';
+    const price = offer.dph_total ? `$${offer.dph_total.toFixed(3)}/hr` : 'N/A';
+    const location = offer.geolocation || [offer.country, offer.city].filter(Boolean).join(', ') || 'N/A';
+    const reliability = offer.reliability ? (offer.reliability * 100).toFixed(1) + '%' : 'N/A';
+    const score = offer.score ? offer.score.toFixed(2) : 'N/A';
+    const diskSpace = offer.disk_space ? `${Math.round(offer.disk_space)} GB` : 'N/A';
+    const cpuRam = offer.cpu_ram ? `${Math.round(offer.cpu_ram / 1024)} GB` : 'N/A';
+    
+    html += `
+      <div class="offer-item" data-offer-id="${offer.id || index}">
+        <div class="offer-header">
+          <div class="offer-title">${gpuInfo}${gpuCount > 1 ? ` (${gpuCount}x)` : ''}</div>
+          <div class="offer-price">${price}</div>
+        </div>
+        
+        <div class="offer-details">
+          <div class="offer-detail"><strong>GPU RAM:</strong> ${gpuRam}</div>
+          <div class="offer-detail"><strong>CPU RAM:</strong> ${cpuRam}</div>
+          <div class="offer-detail"><strong>Disk Space:</strong> ${diskSpace}</div>
+          <div class="offer-detail"><strong>Location:</strong> ${location}</div>
+          <div class="offer-detail"><strong>Reliability:</strong> ${reliability}</div>
+          <div class="offer-detail"><strong>Score:</strong> ${score}</div>
+        </div>
+        
+        <div class="offer-actions">
+          <button class="offer-action-btn secondary" onclick="viewOfferDetails(${JSON.stringify(offer).replace(/"/g, '&quot;')})">
+            📋 View Details
+          </button>
+          <button class="offer-action-btn" onclick="createInstanceFromOffer('${offer.id}', '${offer.gpu_name || 'GPU'}')">
+            🚀 Create Instance
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  
+  resultsDiv.innerHTML = html;
+  
+  // Show success message
+  showSetupResult(`Found ${offers.length} available offers`, 'success');
+}
+
+// Modal dialog for offer details
+function showOfferDetailsModal(details) {
+  // Inject modal CSS once
+  if (!document.getElementById('vastai-offer-modal-style')) {
+    const style = document.createElement('style');
+    style.id = 'vastai-offer-modal-style';
+    style.textContent = `
+      .vastai-modal-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.4);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .vastai-modal {
+        background: #fff;
+        border-radius: 8px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+        padding: 24px 20px 16px 20px;
+        position: relative;
+        font-family: inherit;
+        animation: fadeIn 0.2s;
+      }
+      .vastai-modal-close {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        background: none;
+        border: none;
+        font-size: 1.5em;
+        color: #888;
+        cursor: pointer;
+      }
+      .vastai-modal h2 {
+        margin-top: 0;
+        font-size: 1.2em;
+        margin-bottom: 12px;
+      }
+      .vastai-modal table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 8px;
+      }
+      .vastai-modal td {
+        padding: 4px 0;
+        vertical-align: top;
+      }
+      .vastai-modal td:first-child {
+        font-weight: bold;
+        color: #333;
+        width: 40%;
+        padding-right: 8px;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.98);}
+        to { opacity: 1; transform: scale(1);}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Remove any existing modal
+  const old = document.getElementById('vastai-offer-modal-overlay');
+  if (old) old.remove();
+
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'vastai-modal-overlay';
+  overlay.id = 'vastai-offer-modal-overlay';
+
+  // Modal content
+  const modal = document.createElement('div');
+  modal.className = 'vastai-modal';
+
+  // Close button
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'vastai-modal-close';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.onclick = () => overlay.remove();
+  modal.appendChild(closeBtn);
+
+  // Title
+  const title = document.createElement('h2');
+  title.textContent = 'Offer Details';
+  modal.appendChild(title);
+
+  // Details table
+  const table = document.createElement('table');
+  details.forEach(row => {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.textContent = row.label;
+    const tdValue = document.createElement('td');
+    tdValue.textContent = row.value;
+    tr.appendChild(tdLabel);
+    tr.appendChild(tdValue);
+    table.appendChild(tr);
+  });
+  modal.appendChild(table);
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Close modal on overlay click (but not when clicking inside modal)
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
+function viewOfferDetails(offer) {
+  let details = [
+    { label: "Offer ID", value: offer.id },
+    { label: "GPU", value: offer.gpu_name || 'N/A' },
+    { label: "GPU Count", value: offer.num_gpus || 1 },
+    { label: "GPU RAM", value: offer.gpu_ram ? Math.round(offer.gpu_ram / 1024) + ' GB' : 'N/A' },
+    { label: "CPU RAM", value: offer.cpu_ram ? Math.round(offer.cpu_ram / 1024) + ' GB' : 'N/A' },
+    { label: "Disk Space", value: offer.disk_space ? Math.round(offer.disk_space) + ' GB' : 'N/A' },
+    { label: "Price", value: offer.dph_total ? '$' + offer.dph_total.toFixed(3) + '/hr' : 'N/A' },
+    { label: "Location", value: offer.geolocation || [offer.country, offer.city].filter(Boolean).join(', ') || 'N/A' },
+    { label: "Reliability", value: offer.reliability ? (offer.reliability * 100).toFixed(1) + '%' : 'N/A' },
+    { label: "Score", value: offer.score ? offer.score.toFixed(2) : 'N/A' },
+    { label: "CPU", value: offer.cpu_name || 'N/A' },
+    { label: "Download Speed", value: offer.download_speed ? offer.download_speed + ' Mbps' : 'N/A' },
+    { label: "Upload Speed", value: offer.upload_speed ? offer.upload_speed + ' Mbps' : 'N/A' }
+  ];
+  showOfferDetailsModal(details);
+}
+
+async function createInstanceFromOffer(offerId, gpuName) {
+  if (!confirm(`Create instance from offer: ${gpuName}?\n\nThis will use your VastAI account to create a new instance.`)) {
+    return;
+  }
+  
+  showSetupResult(`Creating instance from offer ${offerId}...`, 'info');
+  
+  try {
+    const data = await api.post('/vastai/create-instance', {
+      offer_id: offerId
+    });
+    
+    if (data.success) {
+      showSetupResult(`✅ Instance created successfully! Instance ID: ${data.instance_id || 'Unknown'}`, 'success');
+      // Refresh the instances list
+      loadVastaiInstances();
+      // Close the search modal
+      closeSearchOffersModal();
+    } else {
+      showSetupResult(`❌ Failed to create instance: ${data.message || 'Unknown error'}`, 'error');
+    }
+  } catch (error) {
+    showSetupResult(`❌ Request failed: ${error.message}`, 'error');
+  }
+}
+
+// Expose search functions
+window.openSearchOffersModal = openSearchOffersModal;
+window.closeSearchOffersModal = closeSearchOffersModal;
+window.searchVastaiOffers = searchVastaiOffers;
+window.clearSearchResults = clearSearchResults;
+window.viewOfferDetails = viewOfferDetails;
+window.createInstanceFromOffer = createInstanceFromOffer;

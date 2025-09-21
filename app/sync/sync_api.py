@@ -605,6 +605,141 @@ def setup_civitdl():
         })
 
 
+@app.route('/vastai/search-offers', methods=['GET', 'OPTIONS'])
+def search_vastai_offers():
+    """Search for available VastAI offers"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Get query parameters
+        gpu_ram = request.args.get('gpu_ram', 10, type=int)
+        sort = request.args.get('sort', 'dph_total')
+        
+        # Import the API function
+        from ..utils.vastai_api import query_offers, VastAIAPIError
+        
+        # Read API key
+        api_key = read_api_key_from_file()
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found. Please check api_key.txt file.'
+            })
+        
+        # Query offers using the VastAI API
+        logger.info(f"Searching VastAI offers with gpu_ram={gpu_ram}, sort={sort}")
+        resp_json = query_offers(api_key, gpu_ram=gpu_ram, sort=sort)
+        
+        # Extract offers from response
+        offers = resp_json.get('offers', []) if resp_json else []
+        
+        return jsonify({
+            'success': True,
+            'offers': offers,
+            'count': len(offers)
+        })
+        
+    except VastAIAPIError as e:
+        logger.error(f"VastAI API error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'VastAI API error: {str(e)}'
+        })
+    except Exception as e:
+        logger.error(f"Error searching VastAI offers: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error searching offers: {str(e)}'
+        })
+
+
+@app.route('/vastai/create-instance', methods=['POST', 'OPTIONS'])
+def create_vastai_instance():
+    """Create a VastAI instance from an offer"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        offer_id = data.get('offer_id')
+        
+        if not offer_id:
+            return jsonify({
+                'success': False,
+                'message': 'Offer ID is required'
+            })
+        
+        # Import the API function
+        from ..utils.vastai_api import create_instance, VastAIAPIError
+        
+        # Read API key
+        api_key = read_api_key_from_file()
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found. Please check api_key.txt file.'
+            })
+        
+        # Read configuration for template and environment
+        import yaml
+        try:
+            with open('config.yaml', 'r') as f:
+                config = yaml.safe_load(f)
+        except FileNotFoundError:
+            return jsonify({
+                'success': False,
+                'message': 'config.yaml not found. Please ensure configuration file exists.'
+            })
+        
+        template_hash_id = config.get('template_hash_id')
+        ui_home_env = config.get('ui_home_env')
+        disk_size_gb = config.get('disk_size_gb', 32)
+        
+        if not template_hash_id or template_hash_id == "None":
+            return jsonify({
+                'success': False,
+                'message': 'Template hash ID not configured in config.yaml'
+            })
+        
+        if not ui_home_env or ui_home_env == "None":
+            return jsonify({
+                'success': False,
+                'message': 'UI_HOME environment variable not configured in config.yaml'
+            })
+        
+        # Create the instance
+        logger.info(f"Creating VastAI instance from offer {offer_id}")
+        result = create_instance(api_key, offer_id, template_hash_id, ui_home_env, disk_size_gb)
+        
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': 'Instance created successfully',
+                'instance_id': result.get('new_contract'),
+                'result': result
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f"Failed to create instance: {result.get('msg', 'Unknown error')}",
+                'result': result
+            })
+        
+    except VastAIAPIError as e:
+        logger.error(f"VastAI API error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'VastAI API error: {str(e)}'
+        })
+    except Exception as e:
+        logger.error(f"Error creating VastAI instance: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error creating instance: {str(e)}'
+        })
+
+
 if __name__ == '__main__':
     import sys
     port = int(sys.argv[1].replace('--port=', '').replace('--port', '')) if len(sys.argv) > 1 and '--port' in sys.argv[1] else 5000
