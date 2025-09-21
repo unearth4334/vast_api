@@ -52,11 +52,16 @@ def get_logs_manifest():
                     with open(filepath, 'r') as f:
                         log_data = json.load(f)
                     
+                    # Extract result data
+                    result = log_data.get('result', {})
+                    
                     log_files.append({
                         'filename': filename,
                         'timestamp': log_data.get('timestamp'),
                         'sync_type': log_data.get('sync_type'),
-                        'success': log_data.get('result', {}).get('success', False),
+                        'success': result.get('success', False),
+                        'message': result.get('message', ''),
+                        'duration_seconds': log_data.get('duration'),
                         'size': stat.st_size,
                         'modified': datetime.fromtimestamp(stat.st_mtime).isoformat()
                     })
@@ -87,7 +92,24 @@ def get_log_file_content(filename):
         with open(filepath, 'r') as f:
             log_data = json.load(f)
         
-        return {"success": True, "log": log_data}
+        # Extract result data and flatten for frontend
+        result = log_data.get('result', {})
+        
+        # Create flattened log object with all fields frontend expects
+        flattened_log = {
+            'timestamp': log_data.get('timestamp'),
+            'end_time': log_data.get('end_time'),
+            'sync_type': log_data.get('sync_type'),
+            'duration_seconds': log_data.get('duration'),
+            'success': result.get('success', False),
+            'message': result.get('message', ''),
+            'output': result.get('output', ''),
+            'error': result.get('error', ''),
+            'sync_id': result.get('sync_id', ''),
+            'filename': filename
+        }
+        
+        return {"success": True, "log": flattened_log}
         
     except json.JSONDecodeError:
         return {"success": False, "error": "Invalid JSON in log file"}
