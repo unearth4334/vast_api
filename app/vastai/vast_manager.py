@@ -13,13 +13,16 @@ from ..utils.vastai_api import (
     parse_instance_details,
     VastAIAPIError
 )
+from ..utils.config_loader import ConfigLoader
 
 VAST_BASE = "https://console.vast.ai/api/v0"
 
 class VastManager:
     def __init__(self, config_path="config.yaml", api_key_path="api_key.txt"):
-        self.config = self._load_yaml(config_path)
-        self.api_key = self._load_api_key(api_key_path)
+        # Use the centralized config loader for consistent behavior
+        self.config_loader = ConfigLoader(config_path, api_key_path)
+        self.config = self.config_loader.load_config()
+        self.api_key = self.config_loader.load_api_key()
         self.headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
@@ -27,21 +30,14 @@ class VastManager:
         }
 
     def _load_yaml(self, path):
-        with open(path, 'r') as f:
-            return yaml.safe_load(f)
+        """Legacy method for backward compatibility - now uses centralized loader"""
+        loader = ConfigLoader(config_path=path)
+        return loader.load_config()
 
     def _load_api_key(self, path):
-        with open(path, 'r') as f:
-            content = f.read().strip()
-            
-        # Handle multi-line format: "vastai: <key>"
-        for line in content.split('\n'):
-            line = line.strip()
-            if line.startswith('vastai:'):
-                return line.split(':', 1)[1].strip()
-        
-        # Fallback to entire content if no "vastai:" prefix found
-        return content
+        """Legacy method for backward compatibility - now uses centralized loader"""
+        loader = ConfigLoader(api_key_path=path)
+        return loader.load_api_key()
 
     def query_offers(self):
         gpu_ram_gb = self.config.get("gpu_ram", 10240) // 1024  # Convert MB to GB, default to 10 GB
