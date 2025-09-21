@@ -4,6 +4,14 @@ import time
 import json
 from tabulate import tabulate
 from .vast_display import display_vast_offers
+from ..utils.vastai_api import (
+    query_offers as api_query_offers,
+    create_instance as api_create_instance,
+    show_instance as api_show_instance,
+    destroy_instance as api_destroy_instance,
+    parse_instance_details,
+    VastAIAPIError
+)
 
 VAST_BASE = "https://console.vast.ai/api/v0"
 
@@ -16,14 +24,11 @@ def load_api_key():
         return f.read().strip()
 
 def query_offers(api_key, gpu_ram=10, sort="dph_total"):
-    params = {
-        "gpu_ram": gpu_ram,
-        "sort": sort,
-        "api_key": api_key
-    }
-    resp = requests.get(f"{VAST_BASE}/bundles", params=params)
-    resp.raise_for_status()
-    return resp.json()
+    try:
+        return api_query_offers(api_key, gpu_ram, sort)
+    except VastAIAPIError as e:
+        print(f"❌ Failed to query offers: {e}")
+        return {}
 
 def select_offer(offers):
     if not offers:
@@ -40,85 +45,35 @@ def select_offer(offers):
     return None
 
 def create_instance(api_key, offer_id, template_hash_id, ui_home_env, disk_size_gb=32):
-
-    # Set url = "https://console.vast.ai/api/v0/asks/1234/" where 1234 is the offer ID
-    url = f"{VAST_BASE}/asks/{offer_id}/"
-    
-    payload = json.dumps({
-    "template_hash_id": template_hash_id,
-    "disk": disk_size_gb,
-    "extra_env": f'{{"UI_HOME": "{ui_home_env}"}}',
-    "target_state": "running",
-    "cancel_unavail": True
-    })
-    headers = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'Authorization': f'Bearer {api_key}'
-    }
-
-    response = requests.request("PUT", url, headers=headers, data=payload)
-
-    print(response.text)
-
-    # If successful, the response will be like: {"success": true, "new_contract": 22035077}
-    return response.json()
+    try:
+        result = api_create_instance(api_key, offer_id, template_hash_id, ui_home_env, disk_size_gb)
+        print(json.dumps(result, indent=2))
+        return result
+    except VastAIAPIError as e:
+        print(f"❌ Failed to create instance: {e}")
+        return {"success": False, "error": str(e)}
 
 def destroy_instance(api_key, instance_id):
-
-    url = f"{VAST_BASE}/instances/{instance_id}/"
-
-    payload = {}
-    headers = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'Authorization': f'Bearer {api_key}'
-    }
-
-    response = requests.request("DELETE", url, headers=headers, data=payload)
-
-    print(response.text)
-
-    return response.json()
+    try:
+        result = api_destroy_instance(api_key, instance_id)
+        print(json.dumps(result, indent=2))
+        return result
+    except VastAIAPIError as e:
+        print(f"❌ Failed to destroy instance: {e}")
+        return {"success": False, "error": str(e)}
 
 def show_instance(api_key, instance_id):
-    url = f"{VAST_BASE}/instances/{instance_id}/"
-
-    payload = {}
-    headers = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'Authorization': f'Bearer {api_key}'
-    }
-
-    response = requests.request("GET", url, headers=headers, data=payload)
-
-    data = response.json()
-    instance = data.get("instances", {})
-
-    summary = {
-        "Instance ID": instance.get("id"),
-        "Status": instance.get("cur_state"),
-        "GPU": instance.get("gpu_name"),
-        "GPU Count": instance.get("num_gpus"),
-        "GPU RAM (GB)": round(instance.get("gpu_ram", 0) / 1024, 1),
-        "CPU": instance.get("cpu_name"),
-        "CPU Cores": instance.get("cpu_cores_effective"),
-        "Disk (GB)": instance.get("disk_space"),
-        "Download (Mbps)": instance.get("inet_down"),
-        "Upload (Mbps)": instance.get("inet_up"),
-        "Public IP": instance.get("public_ipaddr"),
-        "SSH Host": instance.get("ssh_host"),
-        "SSH Port": instance.get("ssh_port"),
-        "Template": instance.get("template_name"),
-        "Geolocation": instance.get("geolocation"),
-        "OS": instance.get("os_version"),
-    }
-
-    print("\n🖥️ Instance Summary:\n")
-    print(tabulate(summary.items(), tablefmt="fancy_grid"))
-    
-    return response.json()
+    try:
+        response_data = api_show_instance(api_key, instance_id)
+        summary = parse_instance_details(response_data)
+        
+        print("\n🖥️ Instance Summary:\n")
+        print(tabulate(summary.items(), tablefmt="fancy_grid"))
+        
+        return response_data
+    except VastAIAPIError as e:
+        print(f"❌ Failed to get instance details: {e}")
+        return {"success": False, "error": str(e)}
 
 def main():
     config = load_config()
