@@ -7,7 +7,7 @@ Provides web API endpoints for syncing media from local Docker containers and Va
 import os
 import subprocess
 import logging
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 # Import our refactored modules
@@ -81,6 +81,30 @@ def _extract_host_port(ssh_connection):
 def index():
     """Web interface for testing"""
     return get_index_template()
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    """Serve CSS files"""
+    try:
+        from ..webui import css_path
+        return send_from_directory(css_path, filename)
+    except ImportError:
+        # Handle both module and direct execution
+        import os
+        css_path = os.path.join(os.path.dirname(__file__), '..', 'webui', 'css')
+        return send_from_directory(css_path, filename)
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    """Serve JavaScript files"""
+    try:
+        from ..webui import js_path
+        return send_from_directory(js_path, filename)
+    except ImportError:
+        # Handle both module and direct execution
+        import os
+        js_path = os.path.join(os.path.dirname(__file__), '..', 'webui', 'js')
+        return send_from_directory(js_path, filename)
 
 
 # --- Sync API Routes ---

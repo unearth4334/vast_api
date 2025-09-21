@@ -1,0 +1,147 @@
+// Logs functionality - recent logs list and log modal
+
+async function refreshLogs() {
+    const logsList = document.getElementById('logsList');
+    const refreshBtn = document.querySelector('.refresh-logs-btn');
+    
+    // Show loading state
+    refreshBtn.textContent = '⟳ Loading...';
+    refreshBtn.disabled = true;
+    logsList.innerHTML = '<div class="no-logs-message">Loading logs...</div>';
+    
+    try {
+        const data = await api.get('/logs/manifest');
+        
+        if (data.success && data.logs && data.logs.length > 0) {
+            // Get latest 5 logs
+            const recentLogs = data.logs.slice(0, 5);
+            displayLogs(recentLogs);
+        } else {
+            logsList.innerHTML = '<div class="no-logs-message">No logs available</div>';
+        }
+    } catch (error) {
+        logsList.innerHTML = '<div class="no-logs-message">Failed to load logs: ' + error.message + '</div>';
+    } finally {
+        refreshBtn.textContent = '🔄 Refresh';
+        refreshBtn.disabled = false;
+    }
+}
+
+function displayLogs(logs) {
+    const logsList = document.getElementById('logsList');
+    logsList.innerHTML = '';
+    
+    logs.forEach(log => {
+        const logItem = document.createElement('div');
+        logItem.className = `log-item ${log.success ? 'success' : 'error'}`;
+        logItem.onclick = () => showLogDetails(log.filename);
+        
+        // Format timestamp
+        const date = new Date(log.timestamp);
+        const formattedDate = date.toLocaleDateString('en-US', { 
+            month: '2-digit', 
+            day: '2-digit', 
+            year: 'numeric' 
+        });
+        const formattedTime = date.toLocaleTimeString('en-US', { 
+            hour12: false,
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        });
+        
+        // Format duration
+        const duration = log.duration_seconds ? `(${log.duration_seconds}s)` : '';
+        
+        // Create log summary in the requested format
+        const statusIcon = log.success ? '✅' : '❌';
+        const syncType = log.sync_type ? log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1) : 'Unknown';
+        
+        logItem.innerHTML = `
+            <div class="log-summary">
+                ${statusIcon} ${syncType} - ${formattedDate}, ${formattedTime}<br>
+                ${log.message} ${duration}
+            </div>
+            <div class="log-meta">Click to view details</div>
+        `;
+        
+        logsList.appendChild(logItem);
+    });
+}
+
+async function showLogDetails(filename) {
+    const overlay = document.getElementById('logOverlay');
+    const modalTitle = document.getElementById('logModalTitle');
+    const modalContent = document.getElementById('logModalContent');
+    
+    // Show loading state
+    modalTitle.textContent = 'Loading log details...';
+    modalContent.innerHTML = '<div class="no-logs-message">Loading...</div>';
+    overlay.style.display = 'flex';
+    
+    try {
+        const data = await api.get(`/logs/${filename}`);
+        
+        if (data.success && data.log) {
+            const log = data.log;
+            
+            // Update modal title
+            const syncType = log.sync_type ? log.sync_type.charAt(0).toUpperCase() + log.sync_type.slice(1) : 'Unknown';
+            const date = new Date(log.timestamp);
+            const formattedDateTime = date.toLocaleString('en-US');
+            modalTitle.textContent = `${syncType} Sync - ${formattedDateTime}`;
+            
+            // Build modal content
+            let content = '';
+            
+            // Basic info section
+            content += '<div class="log-detail-section">';
+            content += '<h4>Summary</h4>';
+            content += '<div class="log-detail-content">';
+            content += `Status: ${log.success ? '✅ Success' : '❌ Failed'}\n`;
+            content += `Type: ${syncType}\n`;
+            content += `Message: ${log.message}\n`;
+            if (log.duration_seconds) {
+                content += `Duration: ${log.duration_seconds} seconds\n`;
+            }
+            if (log.sync_id) {
+                content += `Sync ID: ${log.sync_id}\n`;
+            }
+            content += '</div>';
+            content += '</div>';
+            
+            // Output section (scrollable callout as requested)
+            if (log.output) {
+                content += '<div class="log-detail-section">';
+                content += '<h4>Output</h4>';
+                content += '<div class="log-detail-content">';
+                content += log.output;
+                content += '</div>';
+                content += '</div>';
+            }
+            
+            // Error section if there's an error
+            if (log.error) {
+                content += '<div class="log-detail-section">';
+                content += '<h4>Error</h4>';
+                content += '<div class="log-detail-content">';
+                content += log.error;
+                content += '</div>';
+                content += '</div>';
+            }
+            
+            modalContent.innerHTML = content;
+        } else {
+            modalTitle.textContent = 'Error';
+            modalContent.innerHTML = '<div class="no-logs-message">Failed to load log details</div>';
+        }
+    } catch (error) {
+        modalTitle.textContent = 'Error';
+        modalContent.innerHTML = '<div class="no-logs-message">Failed to load log details: ' + error.message + '</div>';
+    }
+}
+
+function closeLogModal() {
+    const overlay = document.getElementById('logOverlay');
+    overlay.style.display = 'none';
+}
