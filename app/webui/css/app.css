@@ -647,3 +647,195 @@ body {
     transform: translateY(-1px);
     box-shadow: 0 4px 8px var(--background-modifier-box-shadow);
 }
+
+/* VastAI instances section styling */
+.instances-buttons {
+    display: flex;
+    gap: var(--size-4-2);
+    margin-bottom: var(--size-4-3);
+}
+
+/* Search offers modal */
+.search-offers-modal {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    width: 95vw;
+    max-width: 1000px;
+    max-height: 85vh;
+    box-shadow: 0 8px 32px var(--background-modifier-box-shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.search-offers-content {
+    padding: var(--size-4-4);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.search-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-4-3);
+    align-items: end;
+    padding: var(--size-4-3);
+    background: var(--background-modifier-form-field);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    margin-bottom: var(--size-4-4);
+}
+
+.search-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+    min-width: 150px;
+}
+
+.search-field label {
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.search-field input,
+.search-field select {
+    padding: var(--size-4-2);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+}
+
+.search-field input:focus,
+.search-field select:focus {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 1px;
+}
+
+.search-buttons {
+    display: flex;
+    gap: var(--size-4-2);
+}
+
+.search-button {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: var(--radius-s);
+    padding: var(--size-4-2) var(--size-4-3);
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.search-button:hover {
+    background: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+}
+
+.search-button.secondary {
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+}
+
+.search-button.secondary:hover {
+    background: var(--interactive-hover);
+}
+
+.search-results {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.no-results-message {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: var(--size-4-4);
+}
+
+.offer-item {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-3);
+    margin-bottom: var(--size-4-2);
+    transition: all 0.2s ease;
+}
+
+.offer-item:hover {
+    background: var(--background-modifier-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px var(--background-modifier-box-shadow);
+}
+
+.offer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--size-4-2);
+}
+
+.offer-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.offer-price {
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--interactive-accent);
+}
+
+.offer-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--size-4-1);
+    margin-bottom: var(--size-4-3);
+}
+
+.offer-detail {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
+.offer-detail strong {
+    color: var(--text-normal);
+}
+
+.offer-actions {
+    display: flex;
+    gap: var(--size-4-2);
+    justify-content: flex-end;
+}
+
+.offer-action-btn {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: var(--radius-s);
+    padding: var(--size-4-1) var(--size-4-3);
+    font-size: var(--font-ui-smaller);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.offer-action-btn:hover {
+    background: var(--interactive-accent-hover);
+}
+
+.offer-action-btn.secondary {
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+}
+
+.offer-action-btn.secondary:hover {
+    background: var(--interactive-hover);
+}

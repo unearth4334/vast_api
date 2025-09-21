@@ -480,3 +480,159 @@ window.syncFromConnectionString = syncFromConnectionString;
 window.loadVastaiInstances = loadVastaiInstances;
 window.useInstance = useInstance;
 window.refreshInstanceCard = refreshInstanceCard;
+
+// ---------- Search offers functionality ----------
+function openSearchOffersModal() {
+  const overlay = document.getElementById('searchOffersOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+  }
+}
+
+function closeSearchOffersModal() {
+  const overlay = document.getElementById('searchOffersOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+async function searchVastaiOffers() {
+  const gpuRam = document.getElementById('searchGpuRam')?.value || 10;
+  const sort = document.getElementById('searchSort')?.value || 'dph_total';
+  const resultsDiv = document.getElementById('searchResults');
+  
+  if (!resultsDiv) return;
+  
+  // Show loading state
+  resultsDiv.innerHTML = '<div class="no-results-message">🔍 Searching for available offers...</div>';
+  
+  try {
+    const data = await api.get(`/vastai/search-offers?gpu_ram=${gpuRam}&sort=${sort}`);
+    
+    if (!data || data.success === false) {
+      const msg = (data && data.message) ? data.message : 'Failed to search offers';
+      resultsDiv.innerHTML = `<div class="no-results-message" style="color: var(--text-error);">❌ Error: ${msg}</div>`;
+      return;
+    }
+    
+    const offers = Array.isArray(data.offers) ? data.offers : [];
+    displaySearchResults(offers);
+    
+  } catch (error) {
+    resultsDiv.innerHTML = `<div class="no-results-message" style="color: var(--text-error);">❌ Request failed: ${error.message}</div>`;
+  }
+}
+
+function clearSearchResults() {
+  const resultsDiv = document.getElementById('searchResults');
+  if (resultsDiv) {
+    resultsDiv.innerHTML = '<div class="no-results-message">Enter search criteria and click "Search Offers" to find available instances</div>';
+  }
+}
+
+function displaySearchResults(offers) {
+  const resultsDiv = document.getElementById('searchResults');
+  if (!resultsDiv) return;
+  
+  if (!offers || offers.length === 0) {
+    resultsDiv.innerHTML = '<div class="no-results-message">No offers found matching your criteria</div>';
+    return;
+  }
+  
+  let html = '';
+  offers.forEach((offer, index) => {
+    const gpuInfo = offer.gpu_name || 'Unknown GPU';
+    const gpuCount = offer.num_gpus || 1;
+    const gpuRam = offer.gpu_ram ? `${Math.round(offer.gpu_ram / 1024)} GB` : 'N/A';
+    const price = offer.dph_total ? `$${offer.dph_total.toFixed(3)}/hr` : 'N/A';
+    const location = offer.geolocation || [offer.country, offer.city].filter(Boolean).join(', ') || 'N/A';
+    const reliability = offer.reliability ? (offer.reliability * 100).toFixed(1) + '%' : 'N/A';
+    const score = offer.score ? offer.score.toFixed(2) : 'N/A';
+    const diskSpace = offer.disk_space ? `${Math.round(offer.disk_space)} GB` : 'N/A';
+    const cpuRam = offer.cpu_ram ? `${Math.round(offer.cpu_ram / 1024)} GB` : 'N/A';
+    
+    html += `
+      <div class="offer-item" data-offer-id="${offer.id || index}">
+        <div class="offer-header">
+          <div class="offer-title">${gpuInfo}${gpuCount > 1 ? ` (${gpuCount}x)` : ''}</div>
+          <div class="offer-price">${price}</div>
+        </div>
+        
+        <div class="offer-details">
+          <div class="offer-detail"><strong>GPU RAM:</strong> ${gpuRam}</div>
+          <div class="offer-detail"><strong>CPU RAM:</strong> ${cpuRam}</div>
+          <div class="offer-detail"><strong>Disk Space:</strong> ${diskSpace}</div>
+          <div class="offer-detail"><strong>Location:</strong> ${location}</div>
+          <div class="offer-detail"><strong>Reliability:</strong> ${reliability}</div>
+          <div class="offer-detail"><strong>Score:</strong> ${score}</div>
+        </div>
+        
+        <div class="offer-actions">
+          <button class="offer-action-btn secondary" onclick="viewOfferDetails(${JSON.stringify(offer).replace(/"/g, '&quot;')})">
+            📋 View Details
+          </button>
+          <button class="offer-action-btn" onclick="createInstanceFromOffer('${offer.id}', '${offer.gpu_name || 'GPU'}')">
+            🚀 Create Instance
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  
+  resultsDiv.innerHTML = html;
+  
+  // Show success message
+  showSetupResult(`Found ${offers.length} available offers`, 'success');
+}
+
+function viewOfferDetails(offer) {
+  let details = `Offer ID: ${offer.id}\n`;
+  details += `GPU: ${offer.gpu_name || 'N/A'}\n`;
+  details += `GPU Count: ${offer.num_gpus || 1}\n`;
+  details += `GPU RAM: ${offer.gpu_ram ? Math.round(offer.gpu_ram / 1024) + ' GB' : 'N/A'}\n`;
+  details += `CPU RAM: ${offer.cpu_ram ? Math.round(offer.cpu_ram / 1024) + ' GB' : 'N/A'}\n`;
+  details += `Disk Space: ${offer.disk_space ? Math.round(offer.disk_space) + ' GB' : 'N/A'}\n`;
+  details += `Price: ${offer.dph_total ? '$' + offer.dph_total.toFixed(3) + '/hr' : 'N/A'}\n`;
+  details += `Location: ${offer.geolocation || [offer.country, offer.city].filter(Boolean).join(', ') || 'N/A'}\n`;
+  details += `Reliability: ${offer.reliability ? (offer.reliability * 100).toFixed(1) + '%' : 'N/A'}\n`;
+  details += `Score: ${offer.score ? offer.score.toFixed(2) : 'N/A'}\n`;
+  details += `CPU: ${offer.cpu_name || 'N/A'}\n`;
+  details += `Download Speed: ${offer.download_speed ? offer.download_speed + ' Mbps' : 'N/A'}\n`;
+  details += `Upload Speed: ${offer.upload_speed ? offer.upload_speed + ' Mbps' : 'N/A'}\n`;
+  
+  alert(details);
+}
+
+async function createInstanceFromOffer(offerId, gpuName) {
+  if (!confirm(`Create instance from offer: ${gpuName}?\n\nThis will use your VastAI account to create a new instance.`)) {
+    return;
+  }
+  
+  showSetupResult(`Creating instance from offer ${offerId}...`, 'info');
+  
+  try {
+    const data = await api.post('/vastai/create-instance', {
+      offer_id: offerId
+    });
+    
+    if (data.success) {
+      showSetupResult(`✅ Instance created successfully! Instance ID: ${data.instance_id || 'Unknown'}`, 'success');
+      // Refresh the instances list
+      loadVastaiInstances();
+      // Close the search modal
+      closeSearchOffersModal();
+    } else {
+      showSetupResult(`❌ Failed to create instance: ${data.message || 'Unknown error'}`, 'error');
+    }
+  } catch (error) {
+    showSetupResult(`❌ Request failed: ${error.message}`, 'error');
+  }
+}
+
+// Expose search functions
+window.openSearchOffersModal = openSearchOffersModal;
+window.closeSearchOffersModal = closeSearchOffersModal;
+window.searchVastaiOffers = searchVastaiOffers;
+window.clearSearchResults = clearSearchResults;
+window.viewOfferDetails = viewOfferDetails;
+window.createInstanceFromOffer = createInstanceFromOffer;

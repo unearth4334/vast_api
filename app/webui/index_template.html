@@ -61,9 +61,14 @@
             <!-- VastAI Instances Section -->
             <div class="vastai-instances-section">
                 <h4>🖥️ Active VastAI Instances</h4>
-                <button class="setup-button secondary" onclick="loadVastaiInstances()">
-                    🔄 Load Instances
-                </button>
+                <div class="instances-buttons">
+                    <button class="setup-button secondary" onclick="loadVastaiInstances()">
+                        🔄 Load Instances
+                    </button>
+                    <button class="setup-button" onclick="openSearchOffersModal()">
+                        🔍 Search Available Offers
+                    </button>
+                </div>
                 <div id="vastai-instances-list" class="instances-list">
                     <!-- Instances will be displayed here -->
                     <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances</div>
@@ -133,6 +138,44 @@
             </div>
             <div id="logModalContent" class="log-modal-content">
                 <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Search offers overlay -->
+    <div id="searchOffersOverlay" class="log-overlay">
+        <div class="search-offers-modal">
+            <div class="log-modal-header">
+                <h3 class="log-modal-title">🔍 Search VastAI Offers</h3>
+                <button class="close-modal-btn" onclick="closeSearchOffersModal()">✕</button>
+            </div>
+            <div class="search-offers-content">
+                <div class="search-form">
+                    <div class="search-field">
+                        <label for="searchGpuRam">Minimum GPU RAM (GB):</label>
+                        <input type="number" id="searchGpuRam" value="10" min="1" max="128">
+                    </div>
+                    <div class="search-field">
+                        <label for="searchSort">Sort by:</label>
+                        <select id="searchSort">
+                            <option value="dph_total">Price per hour</option>
+                            <option value="score">Score</option>
+                            <option value="gpu_ram">GPU RAM</option>
+                            <option value="reliability">Reliability</option>
+                        </select>
+                    </div>
+                    <div class="search-buttons">
+                        <button class="search-button" onclick="searchVastaiOffers()">
+                            🔍 Search Offers
+                        </button>
+                        <button class="search-button secondary" onclick="clearSearchResults()">
+                            🧹 Clear Results
+                        </button>
+                    </div>
+                </div>
+                <div id="searchResults" class="search-results">
+                    <div class="no-results-message">Enter search criteria and click "Search Offers" to find available instances</div>
+                </div>
             </div>
         </div>
     </div>
