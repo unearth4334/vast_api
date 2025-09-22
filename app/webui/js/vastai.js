@@ -513,6 +513,13 @@ function useInstance(sshConnection) {
 // Global offer storage to prevent XSS vulnerabilities
 window.offerStore = new Map();
 
+// Global state for mobile tap reveal functionality
+window.mobileOfferState = {
+  expandedEl: null,
+  clickHandler: null,
+  keydownHandler: null
+};
+
 // Expose the functions you call from HTML or other scripts
 window.setUIHome = setUIHome;
 window.getUIHome = getUIHome;
@@ -639,10 +646,19 @@ function setupMobileOfferTapReveal() {
   const results = document.getElementById('searchResults');
   if (!results) return;
 
-  let expandedEl = null;
+  // Remove existing event listeners to prevent duplicates
+  if (window.mobileOfferState.clickHandler) {
+    results.removeEventListener('click', window.mobileOfferState.clickHandler);
+  }
+  if (window.mobileOfferState.keydownHandler) {
+    results.removeEventListener('keydown', window.mobileOfferState.keydownHandler);
+  }
 
-  // Delegate clicks/taps to the container
-  results.addEventListener('click', (e) => {
+  // Clear any previously expanded element
+  window.mobileOfferState.expandedEl = null;
+
+  // Create new event handlers
+  window.mobileOfferState.clickHandler = (e) => {
     // Only for mobile width
     if (!window.matchMedia('(max-width: 560px)').matches) return;
 
@@ -653,19 +669,18 @@ function setupMobileOfferTapReveal() {
     if (!item) return;
 
     // Toggle current; collapse previous
-    if (expandedEl && expandedEl !== item) {
-      expandedEl.classList.remove('expanded');
-      expandedEl.setAttribute('aria-expanded', 'false');
+    if (window.mobileOfferState.expandedEl && window.mobileOfferState.expandedEl !== item) {
+      window.mobileOfferState.expandedEl.classList.remove('expanded');
+      window.mobileOfferState.expandedEl.setAttribute('aria-expanded', 'false');
     }
 
     const willExpand = !item.classList.contains('expanded');
     item.classList.toggle('expanded', willExpand);
     item.setAttribute('aria-expanded', willExpand ? 'true' : 'false');
-    expandedEl = willExpand ? item : null;
-  });
+    window.mobileOfferState.expandedEl = willExpand ? item : null;
+  };
 
-  // Also support keyboard (Enter/Space) for accessibility
-  results.addEventListener('keydown', (e) => {
+  window.mobileOfferState.keydownHandler = (e) => {
     if (!window.matchMedia('(max-width: 560px)').matches) return;
 
     const item = e.target.closest('.offer-item');
@@ -675,7 +690,11 @@ function setupMobileOfferTapReveal() {
       e.preventDefault();
       item.click();
     }
-  });
+  };
+
+  // Add the new event listeners
+  results.addEventListener('click', window.mobileOfferState.clickHandler);
+  results.addEventListener('keydown', window.mobileOfferState.keydownHandler);
 }
 
 
