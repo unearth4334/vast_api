@@ -875,3 +875,89 @@ body {
 .offer-action-btn.secondary:hover {
     background: var(--interactive-hover);
 }
+
+/* --- Compact offer row layout (chips + actions on one line when wide) --- */
+.offer-row {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    flex-wrap: wrap;           /* lets it break nicely on phones */
+    margin-top: var(--size-4-1);
+}
+
+.offer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-4-2);
+    row-gap: var(--size-4-1);
+    flex: 1 1 auto;            /* take remaining space so actions can sit at end */
+    min-width: 220px;
+}
+
+/* Key/Value "pill" chips */
+.kv {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    border-radius: 9999px;
+    font-size: var(--font-ui-smaller);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.kv .k { color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+.kv .v { color: var(--text-normal); font-weight: 700; }
+
+/* Actions: keep tight; icon-only button is circular */
+.offer-actions {
+    display: flex;
+    gap: var(--size-4-2);
+    justify-content: flex-end;
+}
+.offer-actions.compact-actions {
+    flex: 0 0 auto;            /* don't grow, stay compact */
+}
+
+.offer-action-btn.icon {
+    padding: 4px 0;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+}
+
+/* Slightly reduce spacing for compact tiles */
+.offer-item.compact {
+    padding: var(--size-4-2);
+    margin-bottom: var(--size-4-1);
+}
+/* Responsive tweaks and mobile-only actions:
+    - On narrow screens, let actions wrap below chips, left-aligned
+    - On mobile, hide action buttons until a card is tapped
+*/
+@media (max-width: 560px) {
+     .offer-actions {
+          width: 100%;
+          justify-content: flex-start;
+          margin-top: 4px;
+     }
+     .offer-item {
+          cursor: pointer;
+     }
+     .offer-item .offer-actions {
+          display: none;
+     }
+     .offer-item.expanded .offer-actions {
+          display: flex;
+     }
+     /* subtle pressed feedback on tap */
+     .offer-item:active {
+          filter: brightness(0.98);
+     }
+}
