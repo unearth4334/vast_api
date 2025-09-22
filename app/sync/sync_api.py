@@ -585,7 +585,8 @@ def get_vastai_instances():
         
         return jsonify({
             'success': True,
-            'instances': instances
+            'instances': instances,
+            'count': len(instances)
         })
         
     except Exception as e:
@@ -593,6 +594,39 @@ def get_vastai_instances():
         return jsonify({
             'success': False,
             'message': f'Error getting VastAI instances: {str(e)}'
+        })
+
+
+@app.route('/vastai/instances/<int:instance_id>', methods=['GET', 'OPTIONS'])
+def get_vastai_instance_details(instance_id):
+    """Get details of a specific VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        vast_manager = VastManager()
+        # Get all instances and find the one with matching ID
+        instances = vast_manager.list_instances()
+        
+        # Find the specific instance
+        instance = next((inst for inst in instances if inst.get('id') == instance_id), None)
+        
+        if not instance:
+            return jsonify({
+                'success': False,
+                'message': f'Instance {instance_id} not found'
+            })
+        
+        return jsonify({
+            'success': True,
+            'instance': instance
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting VastAI instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting VastAI instance {instance_id}: {str(e)}'
         })
 
 
