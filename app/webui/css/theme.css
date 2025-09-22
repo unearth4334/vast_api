@@ -11,6 +11,7 @@
     --background-modifier-border: #404040;
     --background-modifier-form-field: #2d2d2d;
     --background-modifier-box-shadow: rgba(0, 0, 0, 0.3);
+    --background-modifier-hover: #404040;
     
     /* Text colors */
     --text-normal: #dcddde;
@@ -32,13 +33,15 @@
     --interactive-accent: var(--color-accent);
     --interactive-accent-hover: var(--color-accent-hover);
     
-    /* Sizes */
+    /* Typography scale - optimized progression */
+    --font-ui-smallest: 11px;
     --font-ui-smaller: 12px;
     --font-ui-small: 13px;
     --font-ui-medium: 14px;
     --font-ui-large: 16px;
     --font-ui-larger: 18px;
     
+    /* Spacing scale - consistent 4px base unit */
     --size-4-1: 4px;
     --size-4-2: 8px;
     --size-4-3: 12px;
@@ -48,12 +51,13 @@
     --size-4-8: 32px;
     --size-4-12: 48px;
     
+    /* Border radius scale */
     --radius-s: 6px;
     --radius-m: 8px;
     --radius-l: 10px;
 }
 
-/* Light theme (default) */
+/* Light theme (prefers-color-scheme override) */
 @media (prefers-color-scheme: light) {
     :root {
         --background-primary: #ffffff;
@@ -62,6 +66,7 @@
         --background-modifier-border: #e3e3e3;
         --background-modifier-form-field: #ffffff;
         --background-modifier-box-shadow: rgba(0, 0, 0, 0.05);
+        --background-modifier-hover: #f0f0f0;
         
         --text-normal: #2e3338;
         --text-muted: #7c7c7c;
