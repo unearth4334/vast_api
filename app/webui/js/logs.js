@@ -145,3 +145,135 @@ function closeLogModal() {
     const overlay = document.getElementById('logOverlay');
     overlay.style.display = 'none';
 }
+
+// VastAI Logs functionality
+
+async function refreshVastAILogs() {
+    const logsList = document.getElementById('vastai-logs-list');
+    const refreshBtn = document.querySelector('.vastai-logs-section .setup-button');
+    const linesInput = document.getElementById('vastaiLogLines');
+    
+    // Show loading state
+    refreshBtn.textContent = '⟳ Loading...';
+    refreshBtn.disabled = true;
+    logsList.innerHTML = '<div class="no-logs-message">Loading VastAI logs...</div>';
+    
+    try {
+        const maxLines = parseInt(linesInput.value) || 50;
+        const data = await api.get(`/vastai/logs?lines=${maxLines}`);
+        
+        if (data.success && data.logs && data.logs.length > 0) {
+            displayVastAILogs(data.logs);
+        } else {
+            logsList.innerHTML = '<div class="no-logs-message">No VastAI API logs available</div>';
+        }
+    } catch (error) {
+        logsList.innerHTML = '<div class="no-logs-message">Failed to load VastAI logs: ' + error.message + '</div>';
+    } finally {
+        refreshBtn.textContent = '🔄 Refresh';
+        refreshBtn.disabled = false;
+    }
+}
+
+function displayVastAILogs(logs) {
+    const logsList = document.getElementById('vastai-logs-list');
+    logsList.innerHTML = '';
+    
+    logs.forEach(log => {
+        const logItem = document.createElement('div');
+        logItem.className = `log-item ${log.error ? 'error' : 'success'}`;
+        logItem.onclick = () => showVastAILogDetails(log);
+        
+        // Format timestamp
+        const date = new Date(log.timestamp);
+        const formattedDate = date.toLocaleDateString('en-US', { 
+            month: '2-digit', 
+            day: '2-digit', 
+            year: 'numeric' 
+        });
+        const formattedTime = date.toLocaleTimeString('en-US', { 
+            hour12: false,
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+        });
+        
+        // Format duration
+        const duration = log.duration_ms ? `(${Math.round(log.duration_ms)}ms)` : '';
+        
+        // Create log summary
+        const statusIcon = log.error ? '❌' : '✅';
+        const method = log.method || 'API';
+        const endpoint = log.endpoint ? log.endpoint.replace('/api/v0', '') : '';
+        
+        logItem.innerHTML = `
+            <div class="log-summary">
+                ${statusIcon} ${method} ${endpoint} - ${formattedDate}, ${formattedTime}<br>
+                ${log.error ? log.error : 'Success'} ${duration}
+            </div>
+            <div class="log-meta">Click to view details</div>
+        `;
+        
+        logsList.appendChild(logItem);
+    });
+}
+
+function showVastAILogDetails(log) {
+    const overlay = document.getElementById('logOverlay');
+    const modalTitle = document.getElementById('logModalTitle');
+    const modalContent = document.getElementById('logModalContent');
+    
+    // Show modal
+    const date = new Date(log.timestamp);
+    const formattedDateTime = date.toLocaleString('en-US');
+    modalTitle.textContent = `VastAI API Call - ${formattedDateTime}`;
+    
+    // Build modal content
+    let content = '';
+    
+    // Basic info section
+    content += '<div class="log-detail-section">';
+    content += '<h4>Request Details</h4>';
+    content += '<div class="log-detail-content">';
+    content += `Method: ${log.method || 'Unknown'}\n`;
+    content += `Endpoint: ${log.endpoint || 'Unknown'}\n`;
+    content += `Status Code: ${log.status_code || 'N/A'}\n`;
+    if (log.duration_ms) {
+        content += `Duration: ${Math.round(log.duration_ms)}ms\n`;
+    }
+    content += '</div>';
+    content += '</div>';
+    
+    // Request data section
+    if (log.request) {
+        content += '<div class="log-detail-section">';
+        content += '<h4>Request Data</h4>';
+        content += '<div class="log-detail-content">';
+        content += JSON.stringify(log.request, null, 2);
+        content += '</div>';
+        content += '</div>';
+    }
+    
+    // Response data section
+    if (log.response) {
+        content += '<div class="log-detail-section">';
+        content += '<h4>Response Data</h4>';
+        content += '<div class="log-detail-content">';
+        content += JSON.stringify(log.response, null, 2);
+        content += '</div>';
+        content += '</div>';
+    }
+    
+    // Error section if there's an error
+    if (log.error) {
+        content += '<div class="log-detail-section">';
+        content += '<h4>Error</h4>';
+        content += '<div class="log-detail-content">';
+        content += log.error;
+        content += '</div>';
+        content += '</div>';
+    }
+    
+    modalContent.innerHTML = content;
+    overlay.style.display = 'flex';
+}

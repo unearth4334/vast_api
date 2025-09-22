@@ -434,6 +434,58 @@ body {
 }
 
 /* =========================
+   VASTAI LOGS SECTION
+   ========================= */
+
+.vastai-logs-section {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-4);
+    margin: var(--size-4-4) 0;
+    box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+}
+
+.vastai-logs-section h4 {
+    margin: 0 0 var(--size-4-3) 0;
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+.logs-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-3);
+    margin-bottom: var(--size-4-3);
+    flex-wrap: wrap;
+}
+
+.logs-controls label {
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    font-weight: 500;
+}
+
+.logs-controls input[type="number"] {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-2);
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    width: 80px;
+}
+
+.logs-controls input[type="number"]:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+}
+
+/* =========================
    MODAL DIALOGS
    ========================= */
 

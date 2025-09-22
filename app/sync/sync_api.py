@@ -299,6 +299,65 @@ def get_log_file_route(filename):
     return jsonify(get_log_file_content(filename))
 
 
+# --- VastAI Logs Routes ---
+
+@app.route('/vastai/logs', methods=['GET', 'OPTIONS'])
+def get_vastai_logs():
+    """Get VastAI API logs with optional parameters"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Import here to avoid circular imports
+        from ..utils.vastai_logging import get_vastai_logs
+        
+        max_lines = request.args.get('lines', 100, type=int)
+        date_filter = request.args.get('date', None)
+        
+        logs = get_vastai_logs(max_lines=max_lines, date_filter=date_filter)
+        
+        return jsonify({
+            'success': True,
+            'logs': logs,
+            'count': len(logs)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving VastAI logs: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error retrieving VastAI logs: {str(e)}',
+            'logs': [],
+            'count': 0
+        })
+
+
+@app.route('/vastai/logs/manifest', methods=['GET', 'OPTIONS'])
+def get_vastai_logs_manifest():
+    """Get manifest of available VastAI log files"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Import here to avoid circular imports
+        from ..utils.vastai_logging import get_vastai_log_manifest
+        
+        manifest = get_vastai_log_manifest()
+        
+        return jsonify({
+            'success': True,
+            'files': manifest
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving VastAI log manifest: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error retrieving VastAI log manifest: {str(e)}',
+            'files': []
+        })
+
+
 @app.route("/sync/latest")
 def sync_latest():
     """Get the most recent sync progress"""
