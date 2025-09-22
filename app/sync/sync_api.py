@@ -16,6 +16,7 @@ try:
     from ..vastai.vast_manager import VastManager
     from ..vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file
     from ..utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
+    from ..utils.config_loader import load_config, load_api_key
     from ..webui.templates import get_index_template
     from .ssh_test import SSHTester
 except ImportError:
@@ -27,6 +28,7 @@ except ImportError:
     from vastai.vast_manager import VastManager
     from vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file
     from utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
+    from utils.config_loader import load_config, load_api_key
     from webui.templates import get_index_template
     try:
         from ssh_test import SSHTester
@@ -682,10 +684,8 @@ def create_vastai_instance():
             })
         
         # Read configuration for template and environment
-        import yaml
         try:
-            with open('config.yaml', 'r') as f:
-                config = yaml.safe_load(f)
+            config = load_config()
         except FileNotFoundError:
             return jsonify({
                 'success': False,

@@ -12,16 +12,9 @@ from ..utils.vastai_api import (
     parse_instance_details,
     VastAIAPIError
 )
+from ..utils.config_loader import load_config, load_api_key
 
 VAST_BASE = "https://console.vast.ai/api/v0"
-
-def load_config():
-    with open("config.yaml", "r") as f:
-        return yaml.safe_load(f)
-
-def load_api_key():
-    with open("api_key.txt", "r") as f:
-        return f.read().strip()
 
 def query_offers(api_key, gpu_ram=10, sort="dph_total"):
     try:

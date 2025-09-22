@@ -8,6 +8,7 @@ import operator
 import re
 from ..utils.match_filter import match_filter
 from ..utils.vastai_api import query_offers as api_query_offers, VastAIAPIError
+from ..utils.config_loader import load_config, load_api_key
 
 
 def parse_numeric_filter(expr):
@@ -70,13 +71,9 @@ def display_vast_offers(resp_json, config):
 
 
 if __name__ == "__main__":
-    # Load API key
-    with open('api_key.txt', 'r') as file:
-        api_key = file.read().strip()
-
-    # Load config
-    with open('config.yaml', 'r') as f:
-        config = yaml.safe_load(f)
+    # Load API key and config using centralized loader
+    api_key = load_api_key()
+    config = load_config()
 
     # Query Vast.ai using the new API module
     try:
