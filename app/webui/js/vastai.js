@@ -38,6 +38,52 @@ function normGeo(i) {
   return "N/A";
 }
 
+// Get country flag emoji from geolocation
+function getCountryFlag(geolocation) {
+  if (!geolocation || geolocation === 'N/A') return '🌍';
+  
+  const countryFlags = {
+    'CA': '🇨🇦', 'US': '🇺🇸', 'TT': '🇹🇹', 'VN': '🇻🇳', 'KR': '🇰🇷', 
+    'FR': '🇫🇷', 'CZ': '🇨🇿', 'AU': '🇦🇺', 'HK': '🇭🇰', 'CN': '🇨🇳',
+    'HU': '🇭🇺', 'IN': '🇮🇳', 'BG': '🇧🇬', 'DE': '🇩🇪', 'JP': '🇯🇵',
+    'SG': '🇸🇬', 'BR': '🇧🇷', 'NL': '🇳🇱', 'GB': '🇬🇧', 'UK': '🇬🇧'
+  };
+  
+  // Extract country code or name from geolocation string
+  const parts = geolocation.split(',').map(s => s.trim());
+  
+  // Check for country codes (2 letters at end)
+  for (let part of parts) {
+    if (part.length === 2 && countryFlags[part.toUpperCase()]) {
+      return countryFlags[part.toUpperCase()];
+    }
+  }
+  
+  // Check for country names
+  for (let part of parts) {
+    if (countryFlags[part]) {
+      return countryFlags[part];
+    }
+  }
+  
+  // Default based on common patterns
+  if (geolocation.includes('Quebec') || geolocation.includes('Ontario')) return '🇨🇦';
+  if (geolocation.includes('Texas') || geolocation.includes('Washington') || geolocation.includes('Kansas') || geolocation.includes('North Carolina')) return '🇺🇸';
+  if (geolocation.includes('Trinidad')) return '🇹🇹';
+  if (geolocation.includes('Vietnam')) return '🇻🇳';
+  if (geolocation.includes('Korea')) return '🇰🇷';
+  if (geolocation.includes('France')) return '🇫🇷';
+  if (geolocation.includes('Czech')) return '🇨🇿';
+  if (geolocation.includes('Australia')) return '🇦🇺';
+  if (geolocation.includes('Hong Kong')) return '🇭🇰';
+  if (geolocation.includes('China')) return '🇨🇳';
+  if (geolocation.includes('Hungary')) return '🇭🇺';
+  if (geolocation.includes('India')) return '🇮🇳';
+  if (geolocation.includes('Bulgaria')) return '🇧🇬';
+  
+  return '🌍'; // Default globe emoji
+}
+
 // Always regard Public IP as the SSH host (authoritative)
 function resolveSSH(i) {
   const host =
@@ -553,36 +599,33 @@ function displaySearchResults(offers) {
     
     const gpuInfo = offer.gpu_name || 'Unknown GPU';
     const gpuCount = offer.num_gpus || 1;
-    const gpuRam = offer.gpu_ram ? `${Math.round(offer.gpu_ram / 1024)} GB` : 'N/A';
+    const vram = offer.gpu_ram ? `${Math.round(offer.gpu_ram / 1024)} GB` : 'N/A';
     const price = offer.dph_total ? `$${offer.dph_total.toFixed(3)}/hr` : 'N/A';
     const location = offer.geolocation || [offer.country, offer.city].filter(Boolean).join(', ') || 'N/A';
-    const reliability = offer.reliability ? (offer.reliability * 100).toFixed(1) + '%' : 'N/A';
-    const score = offer.score ? offer.score.toFixed(2) : 'N/A';
-    const diskSpace = offer.disk_space ? `${Math.round(offer.disk_space)} GB` : 'N/A';
-    const cpuRam = offer.cpu_ram ? `${Math.round(offer.cpu_ram / 1024)} GB` : 'N/A';
+    const pcieBw = offer.pcie_bw ? `${offer.pcie_bw.toFixed(1)} GB/s` : 'N/A';
+    const upDown = `${offer.inet_up ? Math.round(offer.inet_up) : 0}↑/${offer.inet_down ? Math.round(offer.inet_down) : 0}↓ Mbps`;
+    const countryFlag = getCountryFlag(location);
     
     html += `
-      <div class="offer-item" data-offer-id="${offer.id || index}">
+      <div class="offer-item compact" data-offer-id="${offer.id || index}">
         <div class="offer-header">
           <div class="offer-title">${gpuInfo}${gpuCount > 1 ? ` (${gpuCount}x)` : ''}</div>
           <div class="offer-price">${price}</div>
         </div>
         
-        <div class="offer-details">
-          <div class="offer-detail"><strong>GPU RAM:</strong> ${gpuRam}</div>
-          <div class="offer-detail"><strong>CPU RAM:</strong> ${cpuRam}</div>
-          <div class="offer-detail"><strong>Disk Space:</strong> ${diskSpace}</div>
-          <div class="offer-detail"><strong>Location:</strong> ${location}</div>
-          <div class="offer-detail"><strong>Reliability:</strong> ${reliability}</div>
-          <div class="offer-detail"><strong>Score:</strong> ${score}</div>
+        <div class="offer-details-compact">
+          <div class="offer-detail-compact"><strong>VRAM:</strong> ${vram}</div>
+          <div class="offer-detail-compact"><strong>PCIe BW:</strong> ${pcieBw}</div>
+          <div class="offer-detail-compact"><strong>Net:</strong> ${upDown}</div>
+          <div class="offer-detail-compact location-flag"><strong>Location:</strong> ${countryFlag}</div>
         </div>
         
         <div class="offer-actions">
           <button class="offer-action-btn secondary" onclick="viewOfferDetails('${offerKey}')">
-            📋 View Details
+            📋 Details
           </button>
           <button class="offer-action-btn" onclick="createInstanceFromOffer('${offer.id}', '${offer.gpu_name || 'GPU'}')">
-            🚀 Create Instance
+            🚀 Create
           </button>
         </div>
       </div>

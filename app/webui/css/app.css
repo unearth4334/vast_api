@@ -769,6 +769,11 @@ body {
     transition: all 0.2s ease;
 }
 
+.offer-item.compact {
+    padding: var(--size-4-2);
+    margin-bottom: var(--size-4-1);
+}
+
 .offer-item:hover {
     background: var(--background-modifier-hover);
     transform: translateY(-1px);
@@ -801,12 +806,37 @@ body {
     margin-bottom: var(--size-4-3);
 }
 
+.offer-details-compact {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: var(--size-4-1);
+    margin-bottom: var(--size-4-2);
+    align-items: center;
+}
+
 .offer-detail {
     font-size: var(--font-ui-small);
     color: var(--text-muted);
 }
 
+.offer-detail-compact {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.offer-detail-compact.location-flag {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    justify-self: end;
+}
+
 .offer-detail strong {
+    color: var(--text-normal);
+}
+
+.offer-detail-compact strong {
     color: var(--text-normal);
 }
 
@@ -825,6 +855,12 @@ body {
     font-size: var(--font-ui-smaller);
     cursor: pointer;
     transition: background 0.2s ease;
+    white-space: nowrap;
+}
+
+.offer-item.compact .offer-action-btn {
+    padding: var(--size-4-1) var(--size-4-2);
+    font-size: var(--font-ui-smallest);
 }
 
 .offer-action-btn:hover {
