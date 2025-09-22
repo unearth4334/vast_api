@@ -150,28 +150,45 @@
                 <button class="close-modal-btn" onclick="closeSearchOffersModal()">✕</button>
             </div>
             <div class="search-offers-content">
-                <div class="search-form">
-                    <div class="search-field">
-                        <label for="searchGpuRam">Minimum GPU RAM (GB):</label>
-                        <input type="number" id="searchGpuRam" value="10" min="1" max="128">
-                    </div>
-                    <div class="search-field">
-                        <label for="searchSort">Sort by:</label>
-                        <select id="searchSort">
-                            <option value="dph_total">Price per hour</option>
-                            <option value="score">Score</option>
-                            <option value="gpu_ram">GPU RAM</option>
-                            <option value="reliability">Reliability</option>
-                        </select>
-                    </div>
-                    <div class="search-buttons">
-                        <button class="search-button" onclick="searchVastaiOffers()">
-                            🔍 Search Offers
-                        </button>
-                        <button class="search-button secondary" onclick="clearSearchResults()">
-                            🧹 Clear
-                        </button>
-                    </div>
+                <!-- Pill Bar -->
+                <div class="pillbar" id="pillbar">
+                    <button class="pill" id="pill-search" data-filter="search" 
+                            aria-haspopup="false" aria-expanded="false">
+                        Search
+                    </button>
+                    <button class="pill" id="pill-sort" data-filter="sort" 
+                            aria-haspopup="listbox" aria-expanded="false">
+                        Sort: Price/hr
+                    </button>
+                    <button class="pill" id="pill-vram" data-filter="vram" 
+                            aria-haspopup="dialog" aria-expanded="false">
+                        VRAM: Any
+                    </button>
+                    <button class="pill" id="pill-pcie" data-filter="pcie" 
+                            aria-haspopup="dialog" aria-expanded="false">
+                        PCIe: Any
+                    </button>
+                    <button class="pill" id="pill-net" data-filter="net" 
+                            aria-haspopup="dialog" aria-expanded="false">
+                        Net: Any
+                    </button>
+                    <button class="pill" id="pill-location" data-filter="location" 
+                            aria-haspopup="listbox" aria-expanded="false">
+                        Location: Any
+                    </button>
+                    <button class="pill" id="pill-gpuModel" data-filter="gpuModel" 
+                            aria-haspopup="dialog" aria-expanded="false">
+                        GPU Model: Any
+                    </button>
+                    <button class="pill" id="pill-priceCap" data-filter="priceCap" 
+                            aria-haspopup="dialog" aria-expanded="false">
+                        Price: Any
+                    </button>
+                </div>
+                
+                <!-- Mobile Inline Editor Panel -->
+                <div class="pill-editor" id="pill-editor" role="region" style="display: none;">
+                    <!-- Editor content will be injected here -->
                 </div>
                 <div id="searchResults" class="search-results">
                     <div class="no-results-message">Enter search criteria and click "Search Offers" to find available instances</div>
