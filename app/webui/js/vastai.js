@@ -38,6 +38,45 @@ function normGeo(i) {
   return "N/A";
 }
 
+// Get country flag emoji from geolocation
+function getCountryFlag(geolocation) {
+  if (!geolocation || geolocation === 'N/A') return '';
+
+  const countryFlags = {
+    'CA': '🇨🇦', 'US': '🇺🇸', 'TT': '🇹🇹', 'VN': '🇻🇳', 'KR': '🇰🇷', 
+    'FR': '🇫🇷', 'CZ': '🇨🇿', 'AU': '🇦🇺', 'HK': '🇭🇰', 'CN': '🇨🇳',
+    'HU': '🇭🇺', 'IN': '🇮🇳', 'BG': '🇧🇬', 'DE': '🇩🇪', 'JP': '🇯🇵',
+    'SG': '🇸🇬', 'BR': '🇧🇷', 'NL': '🇳🇱', 'GB': '🇬🇧', 'UK': '🇬🇧'
+  };
+
+  // Extract parts like "City, CC" or "Country, CC"
+  const parts = geolocation.split(',').map(s => s.trim());
+
+  // Check for country codes (2 letters)
+  for (let part of parts) {
+    if (part.length === 2) {
+      const code = part.toUpperCase();
+      if (countryFlags[code]) return countryFlags[code];
+      return code; // fallback: show 2-letter abbreviation
+    }
+  }
+
+  // Check for country names
+  for (let part of parts) {
+    if (countryFlags[part]) {
+      return countryFlags[part];
+    }
+  }
+
+  // Last resort: take last word if it looks like code
+  const last = parts[parts.length - 1];
+  if (last && last.length === 2) return last.toUpperCase();
+
+  // If we can't parse anything, show just the raw geolocation
+  return geolocation;
+}
+
+
 // Always regard Public IP as the SSH host (authoritative)
 function resolveSSH(i) {
   const host =
@@ -536,64 +575,110 @@ function clearSearchResults() {
 function displaySearchResults(offers) {
   const resultsDiv = document.getElementById('searchResults');
   if (!resultsDiv) return;
-  
+
   if (!offers || offers.length === 0) {
     resultsDiv.innerHTML = '<div class="no-results-message">No offers found matching your criteria</div>';
     return;
   }
-  
+
   // Clear previous offers from store
   window.offerStore.clear();
-  
+
   let html = '';
   offers.forEach((offer, index) => {
-    // Create a unique offer key and store the offer safely
     const offerKey = `offer_${offer.id || index}_${Date.now()}`;
     window.offerStore.set(offerKey, offer);
-    
-    const gpuInfo = offer.gpu_name || 'Unknown GPU';
+
+    const gpuInfo  = offer.gpu_name || 'Unknown GPU';
     const gpuCount = offer.num_gpus || 1;
-    const gpuRam = offer.gpu_ram ? `${Math.round(offer.gpu_ram / 1024)} GB` : 'N/A';
-    const price = offer.dph_total ? `$${offer.dph_total.toFixed(3)}/hr` : 'N/A';
+    const vram     = offer.gpu_ram ? `${Math.round(offer.gpu_ram / 1024)} GB` : 'N/A';
+    const price    = offer.dph_total ? `$${offer.dph_total.toFixed(3)}/hr` : 'N/A';
     const location = offer.geolocation || [offer.country, offer.city].filter(Boolean).join(', ') || 'N/A';
-    const reliability = offer.reliability ? (offer.reliability * 100).toFixed(1) + '%' : 'N/A';
-    const score = offer.score ? offer.score.toFixed(2) : 'N/A';
-    const diskSpace = offer.disk_space ? `${Math.round(offer.disk_space)} GB` : 'N/A';
-    const cpuRam = offer.cpu_ram ? `${Math.round(offer.cpu_ram / 1024)} GB` : 'N/A';
-    
+    const pcieBw   = offer.pcie_bw ? `${offer.pcie_bw.toFixed(1)} GB/s` : 'N/A';
+    const upDown   = `${offer.inet_up ? Math.round(offer.inet_up) : 0}↑/${offer.inet_down ? Math.round(offer.inet_down) : 0}↓ Mbps`;
+    const flag     = getCountryFlag(location);
+
     html += `
-      <div class="offer-item" data-offer-id="${offer.id || index}">
+      <div class="offer-item compact" data-offer-id="${offer.id || index}" data-offer-key="${offerKey}" tabindex="0" aria-expanded="false">
         <div class="offer-header">
           <div class="offer-title">${gpuInfo}${gpuCount > 1 ? ` (${gpuCount}x)` : ''}</div>
           <div class="offer-price">${price}</div>
         </div>
-        
-        <div class="offer-details">
-          <div class="offer-detail"><strong>GPU RAM:</strong> ${gpuRam}</div>
-          <div class="offer-detail"><strong>CPU RAM:</strong> ${cpuRam}</div>
-          <div class="offer-detail"><strong>Disk Space:</strong> ${diskSpace}</div>
-          <div class="offer-detail"><strong>Location:</strong> ${location}</div>
-          <div class="offer-detail"><strong>Reliability:</strong> ${reliability}</div>
-          <div class="offer-detail"><strong>Score:</strong> ${score}</div>
-        </div>
-        
-        <div class="offer-actions">
-          <button class="offer-action-btn secondary" onclick="viewOfferDetails('${offerKey}')">
-            📋 View Details
-          </button>
-          <button class="offer-action-btn" onclick="createInstanceFromOffer('${offer.id}', '${offer.gpu_name || 'GPU'}')">
-            🚀 Create Instance
-          </button>
+
+        <div class="offer-row">
+          <div class="offer-meta">
+            <span class="kv"><span class="k">VRAM</span><span class="v">${vram}</span></span>
+            <span class="kv"><span class="k">PCIe</span><span class="v">${pcieBw}</span></span>
+            <span class="kv"><span class="k">Net</span><span class="v">${upDown}</span></span>
+            <span class="kv"><span class="k">Loc</span><span class="v">${flag}</span></span>
+          </div>
+
+          <div class="offer-actions compact-actions" aria-label="Actions">
+            <button class="offer-action-btn icon" title="Details" aria-label="Details"
+                    onclick="viewOfferDetails('${offerKey}')">ⓘ</button>
+            <button class="offer-action-btn" onclick="createInstanceFromOffer('${offer.id}','${offer.gpu_name || 'GPU'}')">
+              🚀 Create
+            </button>
+          </div>
         </div>
       </div>
     `;
   });
-  
+
   resultsDiv.innerHTML = html;
-  
-  // Show success message
+
+  // NEW: enable mobile tap-to-reveal behavior
+  setupMobileOfferTapReveal();
+
   showSetupResult(`Found ${offers.length} available offers`, 'success');
 }
+
+// Mobile-only: tap an offer to reveal its action buttons.
+// Only one offer can be expanded at a time. Desktop unaffected.
+function setupMobileOfferTapReveal() {
+  const results = document.getElementById('searchResults');
+  if (!results) return;
+
+  let expandedEl = null;
+
+  // Delegate clicks/taps to the container
+  results.addEventListener('click', (e) => {
+    // Only for mobile width
+    if (!window.matchMedia('(max-width: 560px)').matches) return;
+
+    // If the user tapped an action button, don't toggle the card
+    if (e.target.closest('.offer-action-btn')) return;
+
+    const item = e.target.closest('.offer-item');
+    if (!item) return;
+
+    // Toggle current; collapse previous
+    if (expandedEl && expandedEl !== item) {
+      expandedEl.classList.remove('expanded');
+      expandedEl.setAttribute('aria-expanded', 'false');
+    }
+
+    const willExpand = !item.classList.contains('expanded');
+    item.classList.toggle('expanded', willExpand);
+    item.setAttribute('aria-expanded', willExpand ? 'true' : 'false');
+    expandedEl = willExpand ? item : null;
+  });
+
+  // Also support keyboard (Enter/Space) for accessibility
+  results.addEventListener('keydown', (e) => {
+    if (!window.matchMedia('(max-width: 560px)').matches) return;
+
+    const item = e.target.closest('.offer-item');
+    if (!item) return;
+
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      item.click();
+    }
+  });
+}
+
+
 
 // Modal dialog for offer details
 function showOfferDetailsModal(details) {
