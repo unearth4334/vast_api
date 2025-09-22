@@ -150,31 +150,204 @@
                 <button class="close-modal-btn" onclick="closeSearchOffersModal()">✕</button>
             </div>
             <div class="search-offers-content">
-                <div class="search-form">
-                    <div class="search-field">
-                        <label for="searchGpuRam">Minimum GPU RAM (GB):</label>
-                        <input type="number" id="searchGpuRam" value="10" min="1" max="128">
-                    </div>
-                    <div class="search-field">
-                        <label for="searchSort">Sort by:</label>
-                        <select id="searchSort">
-                            <option value="dph_total">Price per hour</option>
-                            <option value="score">Score</option>
-                            <option value="gpu_ram">GPU RAM</option>
-                            <option value="reliability">Reliability</option>
-                        </select>
-                    </div>
-                    <div class="search-buttons">
-                        <button class="search-button" onclick="searchVastaiOffers()">
-                            🔍 Search Offers
+                <!-- Pill Bar for Search Criteria -->
+                <div class="pillbar-container">
+                    <div class="pillbar" id="pillbar">
+                        <button class="pill pill-search" id="searchPill" onclick="searchVastaiOffers()">
+                            🔍 Search
                         </button>
-                        <button class="search-button secondary" onclick="clearSearchResults()">
-                            🧹 Clear
+                        <button class="pill" id="sortPill" onclick="togglePillPopover('sort')" aria-haspopup="listbox">
+                            Sort: Price/hr
+                        </button>
+                        <button class="pill" id="vramPill" onclick="togglePillPopover('vram')" aria-haspopup="dialog">
+                            VRAM: Any
+                        </button>
+                        <button class="pill" id="pciePill" onclick="togglePillPopover('pcie')" aria-haspopup="dialog">
+                            PCIe: Any
+                        </button>
+                        <button class="pill" id="netPill" onclick="togglePillPopover('net')" aria-haspopup="dialog">
+                            Net: Any
+                        </button>
+                        <button class="pill" id="locationPill" onclick="togglePillPopover('location')" aria-haspopup="dialog">
+                            Location: Any
+                        </button>
+                        <button class="pill" id="gpuModelPill" onclick="togglePillPopover('gpuModel')" aria-haspopup="dialog">
+                            GPU: Any
+                        </button>
+                        <button class="pill" id="pricePill" onclick="togglePillPopover('price')" aria-haspopup="dialog">
+                            Price: Any
                         </button>
                     </div>
                 </div>
+                
+                <!-- Pill Popovers Container -->
+                <div id="pill-popovers">
+                    <!-- Sort Popover -->
+                    <div id="sortPopover" class="pill-popover" role="listbox" style="display: none;">
+                        <div class="popover-content">
+                            <div class="popover-title">Sort by</div>
+                            <div class="radio-list">
+                                <label class="radio-option">
+                                    <input type="radio" name="sortOption" value="dph_total" checked>
+                                    <span>Price/hr</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="sortOption" value="score">
+                                    <span>Score</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="sortOption" value="gpu_ram">
+                                    <span>GPU RAM</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="sortOption" value="reliability">
+                                    <span>Reliability</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- VRAM Popover -->
+                    <div id="vramPopover" class="pill-popover" role="dialog" style="display: none;">
+                        <div class="popover-content">
+                            <div class="popover-title">Minimum GPU RAM (GB)</div>
+                            <div class="numeric-controls">
+                                <input type="range" id="vramSlider" min="1" max="80" value="10" step="1" class="slider">
+                                <input type="number" id="vramInput" min="1" max="80" value="10" class="numeric-input">
+                            </div>
+                            <div class="quick-chips">
+                                <button class="chip" onclick="setVramValue(8)">8</button>
+                                <button class="chip" onclick="setVramValue(16)">16</button>
+                                <button class="chip" onclick="setVramValue(24)">24</button>
+                                <button class="chip" onclick="setVramValue(32)">32</button>
+                                <button class="chip" onclick="setVramValue(48)">48</button>
+                                <button class="chip" onclick="setVramValue(80)">80</button>
+                            </div>
+                            <div class="popover-actions">
+                                <button class="popover-btn secondary" onclick="clearVramFilter()">Clear</button>
+                                <button class="popover-btn primary" onclick="applyVramFilter()">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PCIe Popover -->
+                    <div id="pciePopover" class="pill-popover" role="dialog" style="display: none;">
+                        <div class="popover-content">
+                            <div class="popover-title">Minimum PCIe Bandwidth (GB/s)</div>
+                            <div class="numeric-controls">
+                                <input type="range" id="pcieSlider" min="1" max="64" value="16" step="1" class="slider">
+                                <input type="number" id="pcieInput" min="1" max="64" value="16" class="numeric-input">
+                            </div>
+                            <div class="quick-chips">
+                                <button class="chip" onclick="setPcieValue(8)">8</button>
+                                <button class="chip" onclick="setPcieValue(16)">16</button>
+                                <button class="chip" onclick="setPcieValue(32)">32</button>
+                                <button class="chip" onclick="setPcieValue(64)">64</button>
+                            </div>
+                            <div class="popover-actions">
+                                <button class="popover-btn secondary" onclick="clearPcieFilter()">Clear</button>
+                                <button class="popover-btn primary" onclick="applyPcieFilter()">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Net Popover -->
+                    <div id="netPopover" class="pill-popover" role="dialog" style="display: none;">
+                        <div class="popover-content">
+                            <div class="popover-title">Network Speed (Mbps)</div>
+                            <div class="net-controls">
+                                <div class="net-group">
+                                    <label>Upload ≥</label>
+                                    <input type="range" id="netUpSlider" min="0" max="1000" value="100" step="10" class="slider">
+                                    <input type="number" id="netUpInput" min="0" max="1000" value="100" class="numeric-input">
+                                </div>
+                                <div class="net-group">
+                                    <label>Download ≥</label>
+                                    <input type="range" id="netDownSlider" min="0" max="1000" value="100" step="10" class="slider">
+                                    <input type="number" id="netDownInput" min="0" max="1000" value="100" class="numeric-input">
+                                </div>
+                            </div>
+                            <div class="popover-actions">
+                                <button class="popover-btn secondary" onclick="clearNetFilter()">Clear</button>
+                                <button class="popover-btn primary" onclick="applyNetFilter()">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Location Popover -->
+                    <div id="locationPopover" class="pill-popover" role="dialog" style="display: none;">
+                        <div class="popover-content">
+                            <div class="popover-title">Location</div>
+                            <div class="search-controls">
+                                <input type="text" id="locationSearch" placeholder="Search countries..." class="search-input">
+                            </div>
+                            <div class="checkbox-list" id="locationList">
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="US"> United States
+                                </label>
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="CA"> Canada
+                                </label>
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="GB"> United Kingdom
+                                </label>
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="DE"> Germany
+                                </label>
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="FR"> France
+                                </label>
+                            </div>
+                            <div class="popover-actions">
+                                <button class="popover-btn tertiary" onclick="selectAllLocations()">All</button>
+                                <button class="popover-btn tertiary" onclick="selectNoLocations()">None</button>
+                                <button class="popover-btn secondary" onclick="clearLocationFilter()">Clear</button>
+                                <button class="popover-btn primary" onclick="applyLocationFilter()">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- GPU Model Popover -->
+                    <div id="gpuModelPopover" class="pill-popover" role="dialog" style="display: none;">
+                        <div class="popover-content">
+                            <div class="popover-title">GPU Model</div>
+                            <div class="search-controls">
+                                <input type="text" id="gpuModelInput" placeholder="Type GPU model..." class="search-input">
+                            </div>
+                            <div class="suggestion-list" id="gpuModelSuggestions" style="display: none;">
+                                <!-- Suggestions will be populated dynamically -->
+                            </div>
+                            <div class="popover-actions">
+                                <button class="popover-btn secondary" onclick="clearGpuModelFilter()">Clear</button>
+                                <button class="popover-btn primary" onclick="applyGpuModelFilter()">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Price Popover -->
+                    <div id="pricePopover" class="pill-popover" role="dialog" style="display: none;">
+                        <div class="popover-content">
+                            <div class="popover-title">Maximum Price per Hour ($)</div>
+                            <div class="numeric-controls">
+                                <input type="range" id="priceSlider" min="0.01" max="5.00" value="1.00" step="0.01" class="slider">
+                                <input type="number" id="priceInput" min="0.01" max="5.00" value="1.00" step="0.01" class="numeric-input">
+                            </div>
+                            <div class="quick-chips">
+                                <button class="chip" onclick="setPriceValue(0.25)">$0.25</button>
+                                <button class="chip" onclick="setPriceValue(0.50)">$0.50</button>
+                                <button class="chip" onclick="setPriceValue(1.00)">$1.00</button>
+                                <button class="chip" onclick="setPriceValue(2.00)">$2.00</button>
+                            </div>
+                            <div class="popover-actions">
+                                <button class="popover-btn secondary" onclick="clearPriceFilter()">Clear</button>
+                                <button class="popover-btn primary" onclick="applyPriceFilter()">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div id="searchResults" class="search-results">
-                    <div class="no-results-message">Enter search criteria and click "Search Offers" to find available instances</div>
+                    <div class="no-results-message">Enter search criteria and click "Search" to find available instances</div>
                 </div>
             </div>
         </div>
@@ -183,6 +356,7 @@
     <!-- JavaScript files -->
     <script src="js/state.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/pillbar.js"></script>
     <script src="js/sync.js"></script>
     <script src="js/logs.js"></script>
     <script src="js/vastai.js"></script>
