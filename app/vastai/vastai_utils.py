@@ -253,6 +253,6 @@ def format_instance_info(instance):
         'gpu': instance.get('gpu_name'),
         'host': instance.get('ssh_host'),
         'port': instance.get('ssh_port'),
-        'status': instance.get('actual_status'),
+        'status': instance.get('cur_state'),
         'location': instance.get('geolocation')
     }
