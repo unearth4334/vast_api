@@ -44,39 +44,90 @@ class TestVastAIAPI(unittest.TestCase):
         self.assertEqual(headers['Content-Type'], 'application/json')
         self.assertEqual(headers['Authorization'], f'Bearer {self.test_api_key}')
     
-    @patch('app.utils.vastai_api.requests.get')
-    def test_query_offers_success(self, mock_get):
+    @patch('app.utils.vastai_api.requests.put')
+    def test_query_offers_success(self, mock_put):
         """Test successful offers query"""
         # Mock successful response
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {"offers": [{"id": 1, "gpu_name": "RTX 4090"}]}
-        mock_get.return_value = mock_response
+        mock_put.return_value = mock_response
         
         result = query_offers(self.test_api_key, gpu_ram=8, sort="dph_total")
         
         # Verify request was made correctly
-        mock_get.assert_called_once_with(
-            f"{VAST_API_BASE_URL}/bundles",
-            params={
-                "gpu_ram": 8,
-                "sort": "dph_total",
-                "api_key": self.test_api_key
+        expected_body = {
+            "select_cols": ["*"],
+            "q": {
+                "verified": {"eq": True},
+                "rentable": {"eq": True},
+                "external": {"eq": False},
+                "rented": {"eq": False},
+                "order": [["dph_total", "asc"]],
+                "type": "on-demand",
+                "limit": 100,
+                "gpu_ram": {"gte": 8192}  # 8 GB * 1024 MB/GB
             }
+        }
+        
+        mock_put.assert_called_once_with(
+            f"{VAST_API_BASE_URL}/search/asks/",
+            headers={'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': f'Bearer {self.test_api_key}'},
+            json=expected_body
         )
         
         # Verify response
         self.assertEqual(result, {"offers": [{"id": 1, "gpu_name": "RTX 4090"}]})
     
-    @patch('app.utils.vastai_api.requests.get')
-    def test_query_offers_failure(self, mock_get):
+    @patch('app.utils.vastai_api.requests.put')
+    def test_query_offers_failure(self, mock_put):
         """Test offers query failure"""
         # Mock failed response
         import requests
-        mock_get.side_effect = requests.RequestException("Network error")
+        mock_put.side_effect = requests.RequestException("Network error")
         
         with self.assertRaises(VastAIAPIError):
             query_offers(self.test_api_key)
+    
+    @patch('app.utils.vastai_api.requests.put')
+    def test_query_offers_custom_parameters(self, mock_put):
+        """Test offers query with custom parameters"""
+        # Mock successful response
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"offers": []}
+        mock_put.return_value = mock_response
+        
+        # Test with custom parameters
+        query_offers(
+            self.test_api_key, 
+            gpu_ram=16, 
+            sort="score", 
+            limit=50,
+            verified=False,
+            external=True
+        )
+        
+        # Verify request was made with custom parameters
+        expected_body = {
+            "select_cols": ["*"],
+            "q": {
+                "verified": {"eq": False},
+                "rentable": {"eq": True},
+                "external": {"eq": True},
+                "rented": {"eq": False},
+                "order": [["score", "asc"]],
+                "type": "on-demand",
+                "limit": 50,
+                "gpu_ram": {"gte": 16384}  # 16 GB * 1024 MB/GB
+            }
+        }
+        
+        mock_put.assert_called_once_with(
+            f"{VAST_API_BASE_URL}/search/asks/",
+            headers={'Accept': 'application/json', 'Content-Type': 'application/json', 'Authorization': f'Bearer {self.test_api_key}'},
+            json=expected_body
+        )
     
     @patch('app.utils.vastai_api.requests.put')
     def test_create_instance_success(self, mock_put):

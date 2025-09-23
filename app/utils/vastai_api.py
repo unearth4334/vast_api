@@ -38,63 +38,93 @@ def create_headers(api_key):
     }
 
 
-def query_offers(api_key, gpu_ram=10, sort="dph_total"):
+def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100, 
+                 verified=True, rentable=True, external=False, rented=False, 
+                 type_filter="on-demand"):
     """
-    Query available VastAI offers.
+    Query available VastAI offers using the correct search/asks API endpoint.
     
     Args:
         api_key (str): VastAI API key
         gpu_ram (int): Minimum GPU RAM in GB
-        sort (str): Sort criteria for offers
+        sort (str): Sort criteria for offers (e.g., "dph_total", "score")
+        limit (int): Maximum number of offers to return
+        verified (bool): Filter for verified offers
+        rentable (bool): Filter for rentable offers
+        external (bool): Filter for external offers
+        rented (bool): Filter for rented offers
+        type_filter (str): Type of offers ("on-demand", etc.)
         
     Returns:
-        dict: JSON response from VastAI API
+        dict: JSON response from VastAI API containing offers
         
     Raises:
         VastAIAPIError: If API request fails
     """
     start_time = time.time()
-    endpoint = "/bundles"
-    method = "GET"
-    
-    params = {
-        "gpu_ram": gpu_ram,
-        "sort": sort,
-        "api_key": api_key
+    endpoint = "/search/asks/"
+    method = "PUT"
+
+    headers = create_headers(api_key)
+    url = f"{VAST_API_BASE_URL}{endpoint}"
+
+    # Build the query object according to API documentation
+    query_body = {
+        "select_cols": ["*"],
+        "q": {
+            "verified": {"eq": verified},
+            "rentable": {"eq": rentable},
+            "external": {"eq": external},
+            "rented": {"eq": rented},
+            "order": [[sort, "asc"]],
+            "type": type_filter,
+            "limit": limit
+        }
     }
-    
+
+    # Add gpu_ram filter if specified (API expects MiB)
+    if gpu_ram and gpu_ram > 0:
+        query_body["q"]["gpu_ram"] = {"gte": int(gpu_ram * 1024)}  # GB -> MiB
+
     try:
-        response = requests.get(f"{VAST_API_BASE_URL}{endpoint}", params=params)
-        duration_ms = (time.time() - start_time) * 1000
-        
+        response = requests.put(url, headers=headers, json=query_body)
         response.raise_for_status()
         response_data = response.json()
-        
+        duration_ms = (time.time() - start_time) * 1000
+
+        # Determine offer count for logging (API may use "offers" or "asks")
+        offers_list = []
+        if isinstance(response_data, dict):
+            if "offers" in response_data and isinstance(response_data["offers"], list):
+                offers_list = response_data["offers"]
+            elif "asks" in response_data and isinstance(response_data["asks"], list):
+                offers_list = response_data["asks"]
+
         # Log successful API interaction
         log_api_interaction(
             method=method,
             endpoint=endpoint,
-            request_data=params,
-            response_data={"offers_count": len(response_data) if isinstance(response_data, list) else "unknown"},
+            request_data=query_body,
+            response_data={"offers_count": len(offers_list) if offers_list else "unknown"},
             status_code=response.status_code,
             duration_ms=duration_ms
         )
-        
+
         return response_data
-        
+
     except requests.RequestException as e:
         duration_ms = (time.time() - start_time) * 1000
-        
+
         # Log failed API interaction
         log_api_interaction(
             method=method,
             endpoint=endpoint,
-            request_data=params,
+            request_data=query_body,
             status_code=getattr(response, 'status_code', None) if 'response' in locals() else None,
             error=str(e),
             duration_ms=duration_ms
         )
-        
+
         logger.error(f"Failed to query VastAI offers: {e}")
         raise VastAIAPIError(f"Failed to query offers: {e}") from e
 
@@ -132,10 +162,9 @@ def create_instance(api_key, offer_id, template_hash_id, ui_home_env, disk_size_
     
     try:
         response = requests.put(f"{VAST_API_BASE_URL}{endpoint}", headers=headers, data=json.dumps(payload))
-        duration_ms = (time.time() - start_time) * 1000
-        
         # Handle VastAI API error responses
         if response.status_code != 200:
+            duration_ms = (time.time() - start_time) * 1000
             error_data = response.json() if response.text else {}
             error_msg = f"Failed to create instance: {error_data.get('error', 'Unknown error')}"
             
@@ -154,6 +183,7 @@ def create_instance(api_key, offer_id, template_hash_id, ui_home_env, disk_size_
             raise VastAIAPIError(error_msg)
         
         response_data = response.json()
+        duration_ms = (time.time() - start_time) * 1000
         
         # Log successful API interaction
         log_api_interaction(
@@ -206,10 +236,9 @@ def show_instance(api_key, instance_id):
     
     try:
         response = requests.get(f"{VAST_API_BASE_URL}{endpoint}", headers=headers)
-        duration_ms = (time.time() - start_time) * 1000
-        
         response.raise_for_status()
         response_data = response.json()
+        duration_ms = (time.time() - start_time) * 1000
         
         # Log successful API interaction
         log_api_interaction(
@@ -262,10 +291,9 @@ def destroy_instance(api_key, instance_id):
     
     try:
         response = requests.delete(f"{VAST_API_BASE_URL}{endpoint}", headers=headers)
-        duration_ms = (time.time() - start_time) * 1000
-        
         response.raise_for_status()
         response_data = response.json()
+        duration_ms = (time.time() - start_time) * 1000
         
         # Log successful API interaction
         log_api_interaction(
@@ -317,11 +345,10 @@ def list_instances(api_key):
     
     try:
         response = requests.get(f"{VAST_API_BASE_URL}{endpoint}", headers=headers)
-        duration_ms = (time.time() - start_time) * 1000
-        
         response.raise_for_status()
         response_data = response.json()
         instances = response_data.get("instances", [])
+        duration_ms = (time.time() - start_time) * 1000
         
         # Log successful API interaction
         log_api_interaction(
