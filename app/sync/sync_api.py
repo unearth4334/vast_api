@@ -7,6 +7,7 @@ Provides web API endpoints for syncing media from local Docker containers and Va
 import os
 import subprocess
 import logging
+import time
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -40,6 +41,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Cache for VastAI status to prevent excessive API calls from health checks
+_vastai_status_cache = {
+    'data': None,
+    'timestamp': 0,
+    'ttl': 300  # 5 minutes in seconds
+}
 
 # --- CORS setup (allow local HTTP origins) ---
 ALLOWED_ORIGINS = [
@@ -75,6 +83,37 @@ def add_pna_header(resp):
 def _extract_host_port(ssh_connection):
     """Helper function to extract host and port from SSH connection string"""
     return parse_host_port(ssh_connection)
+
+
+def _get_cached_vastai_status():
+    """Get VastAI status with caching to prevent excessive API calls from health checks"""
+    current_time = time.time()
+    
+    # Check if we have valid cached data
+    if (_vastai_status_cache['data'] is not None and 
+        current_time - _vastai_status_cache['timestamp'] < _vastai_status_cache['ttl']):
+        return _vastai_status_cache['data']
+    
+    # Cache is expired or empty, fetch fresh data
+    try:
+        vast_manager = VastManager()
+        running_instance = vast_manager.get_running_instance()
+        vastai_status = {
+            'available': running_instance is not None,
+            'instance': running_instance
+        }
+    except Exception as e:
+        logger.error(f"VastAI status check error: {str(e)}")
+        vastai_status = {
+            'available': False,
+            'error': 'VastAI configuration error'
+        }
+    
+    # Update cache
+    _vastai_status_cache['data'] = vastai_status
+    _vastai_status_cache['timestamp'] = current_time
+    
+    return vastai_status
 
 
 # --- Web UI Routes ---
@@ -299,6 +338,65 @@ def get_log_file_route(filename):
     return jsonify(get_log_file_content(filename))
 
 
+# --- VastAI Logs Routes ---
+
+@app.route('/vastai/logs', methods=['GET', 'OPTIONS'])
+def get_vastai_logs():
+    """Get VastAI API logs with optional parameters"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Import here to avoid circular imports
+        from ..utils.vastai_logging import get_vastai_logs
+        
+        max_lines = request.args.get('lines', 100, type=int)
+        date_filter = request.args.get('date', None)
+        
+        logs = get_vastai_logs(max_lines=max_lines, date_filter=date_filter)
+        
+        return jsonify({
+            'success': True,
+            'logs': logs,
+            'count': len(logs)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving VastAI logs: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error retrieving VastAI logs: {str(e)}',
+            'logs': [],
+            'count': 0
+        })
+
+
+@app.route('/vastai/logs/manifest', methods=['GET', 'OPTIONS'])
+def get_vastai_logs_manifest():
+    """Get manifest of available VastAI log files"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Import here to avoid circular imports
+        from ..utils.vastai_logging import get_vastai_log_manifest
+        
+        manifest = get_vastai_log_manifest()
+        
+        return jsonify({
+            'success': True,
+            'files': manifest
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving VastAI log manifest: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error retrieving VastAI log manifest: {str(e)}',
+            'files': []
+        })
+
+
 @app.route("/sync/latest")
 def sync_latest():
     """Get the most recent sync progress"""
@@ -316,19 +414,7 @@ def sync_active():
 @app.route('/status')
 def status():
     """Get status of available sync targets"""
-    try:
-        vast_manager = VastManager()
-        running_instance = vast_manager.get_running_instance()
-        vastai_status = {
-            'available': running_instance is not None,
-            'instance': running_instance
-        }
-    except Exception as e:
-        logger.error(f"VastAI status check error: {str(e)}")
-        vastai_status = {
-            'available': False,
-            'error': 'VastAI configuration error'
-        }
+    vastai_status = _get_cached_vastai_status()
     
     return jsonify({
         'forge': {
@@ -526,7 +612,8 @@ def get_vastai_instances():
         
         return jsonify({
             'success': True,
-            'instances': instances
+            'instances': instances,
+            'count': len(instances)
         })
         
     except Exception as e:
@@ -534,6 +621,39 @@ def get_vastai_instances():
         return jsonify({
             'success': False,
             'message': f'Error getting VastAI instances: {str(e)}'
+        })
+
+
+@app.route('/vastai/instances/<int:instance_id>', methods=['GET', 'OPTIONS'])
+def get_vastai_instance_details(instance_id):
+    """Get details of a specific VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        vast_manager = VastManager()
+        # Get all instances and find the one with matching ID
+        instances = vast_manager.list_instances()
+        
+        # Find the specific instance
+        instance = next((inst for inst in instances if inst.get('id') == instance_id), None)
+        
+        if not instance:
+            return jsonify({
+                'success': False,
+                'message': f'Instance {instance_id} not found'
+            })
+        
+        return jsonify({
+            'success': True,
+            'instance': instance
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting VastAI instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting VastAI instance {instance_id}: {str(e)}'
         })
 
 

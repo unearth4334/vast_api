@@ -494,12 +494,8 @@ function displayVastaiInstances(instances) {
     instancesList.innerHTML = html;
   }
 
-  // Auto-refresh each card to pull authoritative ssh_port/state from detail endpoint
-  instances.forEach(i => {
-    if (i && i.id != null) {
-      refreshInstanceCard(i.id); // fire-and-forget; errors surface via showSetupResult
-    }
-  });
+  // Note: Auto-refresh removed to prevent excessive API calls.
+  // Users can manually refresh individual instances using the "Refresh details" button.
 }
 
 function useInstance(sshConnection) {
