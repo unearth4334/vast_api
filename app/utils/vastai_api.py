@@ -36,29 +36,52 @@ def create_headers(api_key):
     }
 
 
-def query_offers(api_key, gpu_ram=10, sort="dph_total"):
+def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100, 
+                 verified=True, rentable=True, external=False, rented=False, 
+                 type_filter="on-demand"):
     """
-    Query available VastAI offers.
+    Query available VastAI offers using the correct search/asks API endpoint.
     
     Args:
         api_key (str): VastAI API key
         gpu_ram (int): Minimum GPU RAM in GB
-        sort (str): Sort criteria for offers
+        sort (str): Sort criteria for offers (e.g., "dph_total", "score")
+        limit (int): Maximum number of offers to return
+        verified (bool): Filter for verified offers
+        rentable (bool): Filter for rentable offers
+        external (bool): Filter for external offers
+        rented (bool): Filter for rented offers
+        type_filter (str): Type of offers ("on-demand", etc.)
         
     Returns:
-        dict: JSON response from VastAI API
+        dict: JSON response from VastAI API containing offers
         
     Raises:
         VastAIAPIError: If API request fails
     """
     try:
-        params = {
-            "gpu_ram": gpu_ram,
-            "sort": sort,
-            "api_key": api_key
+        headers = create_headers(api_key)
+        url = f"{VAST_API_BASE_URL}/search/asks/"
+        
+        # Build the query object according to API documentation
+        query_body = {
+            "select_cols": ["*"],
+            "q": {
+                "verified": {"eq": verified},
+                "rentable": {"eq": rentable},
+                "external": {"eq": external},
+                "rented": {"eq": rented},
+                "order": [[sort, "asc"]],
+                "type": type_filter,
+                "limit": limit
+            }
         }
         
-        response = requests.get(f"{VAST_API_BASE_URL}/bundles", params=params)
+        # Add gpu_ram filter if specified
+        if gpu_ram > 0:
+            query_body["q"]["gpu_ram"] = {"gte": gpu_ram * 1024}  # Convert GB to MB
+        
+        response = requests.put(url, headers=headers, json=query_body)
         response.raise_for_status()
         
         return response.json()
