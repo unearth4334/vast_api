@@ -61,6 +61,7 @@ CORS(
         r"/sync/*": {"origins": ALLOWED_ORIGINS},
         r"/vastai/*": {"origins": ALLOWED_ORIGINS},
         r"/status": {"origins": ALLOWED_ORIGINS},
+        r"/health": {"origins": ALLOWED_ORIGINS},
         r"/test/*": {"origins": ALLOWED_ORIGINS},
         r"/logs/*": {"origins": ALLOWED_ORIGINS},
         r"/": {"origins": ALLOWED_ORIGINS},
@@ -410,6 +411,15 @@ def sync_active():
 
 
 # --- Status Routes ---
+
+@app.route('/health')
+def health():
+    """Simple health check endpoint for container health checks"""
+    return jsonify({
+        'status': 'healthy',
+        'message': 'Service is running'
+    })
+
 
 @app.route('/status')
 def status():
