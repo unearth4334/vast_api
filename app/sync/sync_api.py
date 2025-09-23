@@ -414,7 +414,19 @@ def sync_active():
 @app.route('/status')
 def status():
     """Get status of available sync targets"""
-    vastai_status = _get_cached_vastai_status()
+    # Check if this is a health check request (based on User-Agent)
+    user_agent = request.headers.get('User-Agent', '')
+    is_health_check = 'curl' in user_agent.lower()
+    
+    if is_health_check:
+        # Return static status for health checks to avoid VastAI API calls
+        vastai_status = {
+            'available': False,
+            'message': 'VastAI status not checked during health check'
+        }
+    else:
+        # For web UI requests, get actual VastAI status
+        vastai_status = _get_cached_vastai_status()
     
     return jsonify({
         'forge': {
