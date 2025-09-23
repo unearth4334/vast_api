@@ -918,6 +918,12 @@ async function searchVastaiOffers() {
   const state = window.vastaiSearchState;
   if (state.vramMinGb) params.set('gpu_ram', state.vramMinGb);
   if (state.sortBy) params.set('sort', state.sortBy);
+  if (state.pcieMinGbps) params.set('pcie_bandwidth', state.pcieMinGbps);
+  if (state.netUpMinMbps) params.set('net_up', state.netUpMinMbps);
+  if (state.netDownMinMbps) params.set('net_down', state.netDownMinMbps);
+  if (state.priceMaxPerHour) params.set('price_max', state.priceMaxPerHour);
+  if (state.gpuModelQuery) params.set('gpu_model', state.gpuModelQuery);
+  if (state.locations && state.locations.length > 0) params.set('locations', state.locations.join(','));
   
   const resultsDiv = document.getElementById('searchResults');
   if (!resultsDiv) return;

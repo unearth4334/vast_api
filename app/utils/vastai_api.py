@@ -40,7 +40,8 @@ def create_headers(api_key):
 
 def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100, 
                  verified=True, rentable=True, external=False, rented=False, 
-                 type_filter="on-demand"):
+                 type_filter="on-demand", pcie_bandwidth=None, net_up=None, 
+                 net_down=None, price_max=None, gpu_model=None, locations=None):
     """
     Query available VastAI offers using the correct search/asks API endpoint.
     
@@ -54,6 +55,12 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
         external (bool): Filter for external offers
         rented (bool): Filter for rented offers
         type_filter (str): Type of offers ("on-demand", etc.)
+        pcie_bandwidth (float): Minimum PCIe bandwidth in GB/s
+        net_up (int): Minimum upload speed in Mbps
+        net_down (int): Minimum download speed in Mbps
+        price_max (float): Maximum price per hour in USD
+        gpu_model (str): GPU model filter string
+        locations (list): List of location/country codes to filter by
         
     Returns:
         dict: JSON response from VastAI API containing offers
@@ -85,6 +92,33 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
     # Add gpu_ram filter if specified (API expects MiB)
     if gpu_ram and gpu_ram > 0:
         query_body["q"]["gpu_ram"] = {"gte": int(gpu_ram * 1024)}  # GB -> MiB
+    
+    # Add PCIe bandwidth filter if specified (API expects GB/s)
+    if pcie_bandwidth and pcie_bandwidth > 0:
+        query_body["q"]["pcie_bw"] = {"gte": float(pcie_bandwidth)}
+    
+    # Add network upload speed filter if specified (API expects Mbps)
+    if net_up and net_up > 0:
+        query_body["q"]["inet_up"] = {"gte": int(net_up)}
+    
+    # Add network download speed filter if specified (API expects Mbps)
+    if net_down and net_down > 0:
+        query_body["q"]["inet_down"] = {"gte": int(net_down)}
+    
+    # Add maximum price filter if specified (API expects USD per hour)
+    if price_max and price_max > 0:
+        query_body["q"]["dph_total"] = {"lte": float(price_max)}
+    
+    # Add GPU model filter if specified (API expects partial string match)
+    if gpu_model and gpu_model.strip():
+        query_body["q"]["gpu_name"] = {"ilike": f"%{gpu_model.strip()}%"}
+    
+    # Add location filters if specified (API expects country codes)
+    if locations and len(locations) > 0:
+        # Filter out empty strings and convert to uppercase
+        valid_locations = [loc.upper().strip() for loc in locations if loc.strip()]
+        if valid_locations:
+            query_body["q"]["geolocation"] = {"in": valid_locations}
 
     try:
         response = requests.put(url, headers=headers, json=query_body)

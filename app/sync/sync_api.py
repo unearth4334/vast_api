@@ -737,6 +737,15 @@ def search_vastai_offers():
         # Get query parameters
         gpu_ram = request.args.get('gpu_ram', 10, type=int)
         sort = request.args.get('sort', 'dph_total')
+        pcie_bandwidth = request.args.get('pcie_bandwidth', type=float)
+        net_up = request.args.get('net_up', type=int)
+        net_down = request.args.get('net_down', type=int)
+        price_max = request.args.get('price_max', type=float)
+        gpu_model = request.args.get('gpu_model', type=str)
+        locations = request.args.get('locations', type=str)
+        
+        # Parse locations into a list if provided
+        location_list = locations.split(',') if locations else None
         
         # Import the API function
         from ..utils.vastai_api import query_offers, VastAIAPIError
@@ -750,8 +759,18 @@ def search_vastai_offers():
             })
         
         # Query offers using the VastAI API
-        logger.info(f"Searching VastAI offers with gpu_ram={gpu_ram}, sort={sort}")
-        resp_json = query_offers(api_key, gpu_ram=gpu_ram, sort=sort)
+        logger.info(f"Searching VastAI offers with gpu_ram={gpu_ram}, sort={sort}, pcie_bandwidth={pcie_bandwidth}, net_up={net_up}, net_down={net_down}, price_max={price_max}, gpu_model={gpu_model}, locations={location_list}")
+        resp_json = query_offers(
+            api_key, 
+            gpu_ram=gpu_ram, 
+            sort=sort, 
+            pcie_bandwidth=pcie_bandwidth,
+            net_up=net_up,
+            net_down=net_down,
+            price_max=price_max,
+            gpu_model=gpu_model,
+            locations=location_list
+        )
         
         # Extract offers from response
         offers = resp_json.get('offers', []) if resp_json else []
