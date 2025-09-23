@@ -66,6 +66,21 @@ class TestSyncAPI(unittest.TestCase):
         self.assertIn('not checked during health check', data['vastai']['message'])
 
     @patch('app.sync.sync_api.VastManager')
+    def test_vastai_endpoints_still_make_api_calls(self, mock_vast_manager):
+        """Test that VastAI endpoints (non-status) still make API calls for web UI"""
+        mock_vast_manager.side_effect = Exception("API key missing")
+        
+        # Test /vastai/instances endpoint
+        response = self.app.get('/vastai/instances', headers={'User-Agent': 'Mozilla/5.0'})
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('Error getting VastAI instances', data['message'])
+        
+        # Verify VastManager was called (API call attempted)
+        mock_vast_manager.assert_called()
+
+    @patch('app.sync.sync_api.VastManager')
     def test_status_endpoint_vastai_error(self, mock_vast_manager):
         """Test status endpoint with VastAI connection error"""
         mock_vast_manager.side_effect = Exception("API error")
