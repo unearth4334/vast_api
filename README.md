@@ -88,6 +88,26 @@ ssh-copy-id -i ~/.ssh/id_ed25519.pub root@10.0.78.108 -p 2222
 ssh-copy-id -i ~/.ssh/id_ed25519.pub root@10.0.78.108 -p 2223
 ```
 
+### SSH Troubleshooting
+
+If you encounter SSH connection issues (like "Failed to add SSH key"), use the built-in diagnostic tools:
+
+**Web Interface**: Click the "🩺 SSH Diagnostics" button in the web interface for detailed diagnostics.
+
+**Command Line**: Run the diagnostic script inside the container:
+```bash
+# Full diagnostics and automatic fixes
+./fix_ssh_issues.sh
+
+# Check SSH configuration only
+./fix_ssh_issues.sh --check-only
+
+# Fix permissions only
+./fix_ssh_issues.sh --fix-permissions
+```
+
+The system now includes robust SSH connection handling with automatic retries and detailed error reporting.
+
 ### Local Paths
 
 The sync script uses these default paths (configurable in `sync_outputs.sh`):

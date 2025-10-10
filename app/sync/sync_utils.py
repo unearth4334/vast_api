@@ -11,6 +11,12 @@ import glob
 import re
 from datetime import datetime
 
+# Import our SSH manager
+try:
+    from .ssh_manager import SSHManager, validate_ssh_prerequisites
+except ImportError:
+    from ssh_manager import SSHManager, validate_ssh_prerequisites
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -125,6 +131,21 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
     
     logger.info(f"Starting {sync_type} sync to {host}:{port} with ID {sync_id} (cleanup: {cleanup})")
     
+    # Validate SSH prerequisites first
+    try:
+        prereqs = validate_ssh_prerequisites()
+        if not prereqs['valid']:
+            error_msg = f"SSH prerequisites not met: {'; '.join(prereqs['issues'])}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'message': error_msg,
+                'output': '',
+                'sync_id': sync_id
+            }
+    except Exception as e:
+        logger.error(f"Failed to validate SSH prerequisites: {e}")
+    
     # Create progress file
     progress_file = f"/tmp/sync_progress_{sync_id}.json"
     progress_data = {
@@ -141,6 +162,24 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
         json.dump(progress_data, f)
     
     try:
+        # Set up SSH connection with proper error handling
+        ssh_setup_success = False
+        ssh_setup_message = ""
+        
+        try:
+            with SSHManager() as ssh_mgr:
+                # Test SSH connection before attempting sync
+                ssh_result = ssh_mgr.setup_ssh_for_sync(host, port)
+                if ssh_result['success']:
+                    ssh_setup_success = True
+                    logger.info(f"SSH connection validated for {host}:{port}")
+                else:
+                    ssh_setup_message = ssh_result['message']
+                    logger.warning(f"SSH setup failed but proceeding with sync: {ssh_setup_message}")
+        except Exception as e:
+            ssh_setup_message = f"SSH validation error: {e}"
+            logger.warning(f"SSH validation failed but proceeding with sync: {ssh_setup_message}")
+        
         # Build the command - use proper argument format expected by sync_outputs.sh
         cleanup_arg = "--cleanup" if cleanup else ""
         
@@ -155,8 +194,11 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
         if cleanup_arg:
             cmd.append(cleanup_arg)
         
+        # Run the sync with proper environment
+        env = os.environ.copy()
+        
         # Run the sync
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
         
         end_time = datetime.now()
         

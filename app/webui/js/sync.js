@@ -216,3 +216,65 @@ async function testSSH() {
         resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
     }
 }
+
+async function runSSHDiagnostics() {
+    const resultDiv = document.getElementById('result');
+    resultDiv.className = 'result-panel loading';
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<h3>Running SSH diagnostics...</h3><p>Checking SSH configuration and connectivity.</p>';
+    
+    try {
+        const data = await api.post('/test/ssh-diagnostics', {
+            host: '10.0.78.108',
+            port: '2222',
+            user: 'root'
+        });
+        
+        if (data.success) {
+            let output = `<h3>✅ SSH diagnostics completed</h3>`;
+            const diag = data.diagnostics;
+            
+            output += `<p><strong>Target:</strong> ${diag.user}@${diag.host}:${diag.port}</p>`;
+            output += `<p><strong>Timestamp:</strong> ${new Date(diag.timestamp).toLocaleString()}</p>`;
+            
+            // Prerequisites
+            output += `<h4>Prerequisites</h4>`;
+            if (diag.prerequisites.valid) {
+                output += `<p>✅ All prerequisites met</p>`;
+            } else {
+                output += `<p>❌ Prerequisites issues found:</p><ul>`;
+                for (const issue of diag.prerequisites.issues) {
+                    output += `<li>${issue}</li>`;
+                }
+                output += `</ul>`;
+            }
+            
+            // SSH Setup
+            output += `<h4>SSH Connection Setup</h4>`;
+            if (diag.ssh_setup.success) {
+                output += `<p>✅ SSH setup successful</p>`;
+            } else {
+                output += `<p>❌ SSH setup failed: ${diag.ssh_setup.message}</p>`;
+            }
+            
+            // Detailed steps
+            if (diag.ssh_setup.steps) {
+                output += `<h4>Setup Steps</h4><ul>`;
+                for (const [step, result] of Object.entries(diag.ssh_setup.steps)) {
+                    const status = result.success ? '✅' : '❌';
+                    output += `<li>${status} ${step}: ${result.message}</li>`;
+                }
+                output += `</ul>`;
+            }
+            
+            resultDiv.className = 'result-panel success';
+            resultDiv.innerHTML = output;
+        } else {
+            resultDiv.className = 'result-panel error';
+            resultDiv.innerHTML = `<h3>❌ SSH diagnostics failed</h3><p>${data.message}</p>`;
+        }
+    } catch (error) {
+        resultDiv.className = 'result-panel error';
+        resultDiv.innerHTML = `<h3>❌ Request failed</h3><p>${error.message}</p>`;
+    }
+}

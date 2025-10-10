@@ -911,39 +911,42 @@ function setupPopoverHandlers(popover, filterType) {
 }
 
 async function searchVastaiOffers() {
-  // Build query parameters from current state
   const params = new URLSearchParams();
-  
-  // Add non-null values to params
-  const state = window.vastaiSearchState;
-  if (state.vramMinGb) params.set('gpu_ram', state.vramMinGb);
-  if (state.sortBy) params.set('sort', state.sortBy);
-  
+  const s = window.vastaiSearchState || {};
+
+  if (s.vramMinGb) params.set('gpu_ram', s.vramMinGb);
+  if (s.sortBy)    params.set('sort', s.sortBy);
+
+  // NEW: forward the rest of the filters if set
+  if (s.pcieMinGbps != null)          params.set('pcie_min', s.pcieMinGbps);
+  if (s.gpuModelQuery && s.gpuModelQuery.trim()) params.set('gpu_model', s.gpuModelQuery.trim());
+  if (s.netUpMinMbps != null)         params.set('net_up_min', s.netUpMinMbps);
+  if (s.netDownMinMbps != null)       params.set('net_down_min', s.netDownMinMbps);
+  if (Array.isArray(s.locations) && s.locations.length > 0) {
+    // Expect array of ISO country codes (e.g. ["CA","US"])
+    params.set('locations', s.locations.join(','));
+  }
+  if (s.priceMaxPerHour != null)      params.set('price_max', s.priceMaxPerHour);
+
   const resultsDiv = document.getElementById('searchResults');
   if (!resultsDiv) return;
-  
-  // Show loading state
   resultsDiv.innerHTML = '<div class="no-results-message">🔍 Searching for available offers...</div>';
-  
+
   try {
     const data = await api.get(`/vastai/search-offers?${params.toString()}`);
-    
     if (!data || data.success === false) {
       const msg = (data && data.message) ? data.message : 'Failed to search offers';
       resultsDiv.innerHTML = `<div class="no-results-message" style="color: var(--text-error);">❌ Error: ${msg}</div>`;
       return;
     }
-    
     const offers = Array.isArray(data.offers) ? data.offers : [];
     displaySearchResults(offers);
-    
-    // Close any open editors after search
     closePillEditor();
-    
   } catch (error) {
     resultsDiv.innerHTML = `<div class="no-results-message" style="color: var(--text-error);">❌ Request failed: ${error.message}</div>`;
   }
 }
+
 
 // Build editor UI for specific filter type
 function buildEditor(filterType) {

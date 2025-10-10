@@ -1,3 +1,7 @@
+x-paths:
+  &paths
+  HOMES_BASE: ${CONTAINER_DATA_BASE:-/share/Public/container-homes}
+
 services:
   media-sync-api:
     build: .

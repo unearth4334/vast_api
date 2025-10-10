@@ -223,9 +223,32 @@ echo "🔗 Remote: $SSH_DEST  (port $REMOTE_PORT)"
 
 update_progress "ssh_setup" 5 "Setting up SSH connection"
 
-# Start ssh-agent and add key
-eval "$(ssh-agent -s)"
-ssh-add "$SSH_KEY" >/dev/null 2>&1 || { echo "❌ Failed to add SSH key. Exiting."; exit 1; }
+# Source SSH utilities
+SSH_UTILS_PATH="$(dirname "$0")/app/sync/ssh_utils.sh"
+if [[ -f "$SSH_UTILS_PATH" ]]; then
+    source "$SSH_UTILS_PATH"
+fi
+
+# Validate SSH key and connection first
+if ! validate_ssh_key "$SSH_KEY" "$REMOTE_HOST" "$REMOTE_PORT" "$REMOTE_USER"; then
+    echo "❌ SSH key validation failed. Exiting."
+    update_progress "error" 0 "SSH key validation failed"
+    exit 1
+fi
+
+# Set up SSH agent with robust error handling
+if ! setup_ssh_agent_robust "$SSH_KEY"; then
+    echo "❌ Failed to set up SSH agent. Exiting."
+    update_progress "error" 0 "SSH agent setup failed"
+    exit 1
+fi
+
+# Final connection test
+if ! test_ssh_with_agent "$REMOTE_HOST" "$REMOTE_PORT" "$REMOTE_USER"; then
+    echo "❌ SSH connection test failed. Exiting."
+    update_progress "error" 0 "SSH connection test failed"
+    exit 1
+fi
 
 update_progress "remote_discovery" 10 "Discovering remote UI_HOME"
 

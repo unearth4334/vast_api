@@ -38,29 +38,23 @@ def create_headers(api_key):
     }
 
 
-def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100, 
-                 verified=True, rentable=True, external=False, rented=False, 
-                 type_filter="on-demand"):
-    """
-    Query available VastAI offers using the correct search/asks API endpoint.
-    
-    Args:
-        api_key (str): VastAI API key
-        gpu_ram (int): Minimum GPU RAM in GB
-        sort (str): Sort criteria for offers (e.g., "dph_total", "score")
-        limit (int): Maximum number of offers to return
-        verified (bool): Filter for verified offers
-        rentable (bool): Filter for rentable offers
-        external (bool): Filter for external offers
-        rented (bool): Filter for rented offers
-        type_filter (str): Type of offers ("on-demand", etc.)
-        
-    Returns:
-        dict: JSON response from VastAI API containing offers
-        
-    Raises:
-        VastAIAPIError: If API request fails
-    """
+def query_offers(api_key,
+                 gpu_ram=10,
+                 sort="dph_total",
+                 limit=100,
+                 verified=True,
+                 rentable=True,
+                 external=False,
+                 rented=False,
+                 type_filter="on-demand",
+                 *,
+                 # NEW filters
+                 pcie_min=None,          # GB/s
+                 gpu_model=None,         # string
+                 net_up_min=None,        # Mbps
+                 net_down_min=None,      # Mbps
+                 locations=None,         # list of country codes, e.g. ["CA","US"]
+                 price_max=None):        # $/hr
     start_time = time.time()
     endpoint = "/search/asks/"
     method = "PUT"
@@ -68,23 +62,92 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
     headers = create_headers(api_key)
     url = f"{VAST_API_BASE_URL}{endpoint}"
 
-    # Build the query object according to API documentation
-    query_body = {
-        "select_cols": ["*"],
-        "q": {
-            "verified": {"eq": verified},
-            "rentable": {"eq": rentable},
-            "external": {"eq": external},
-            "rented": {"eq": rented},
-            "order": [[sort, "asc"]],
-            "type": type_filter,
-            "limit": limit
-        }
+    q = {
+        "verified": {"eq": verified},
+        "rentable": {"eq": rentable},
+        "external": {"eq": external},
+        "rented":   {"eq": rented},
+        "order":    [[sort, "asc"]],
+        "type":     type_filter,
+        "limit":    limit
     }
 
-    # Add gpu_ram filter if specified (API expects MiB)
+
+    # GPU RAM in MiB
     if gpu_ram and gpu_ram > 0:
-        query_body["q"]["gpu_ram"] = {"gte": int(gpu_ram * 1024)}  # GB -> MiB
+        q["gpu_ram"] = {"gte": int(gpu_ram * 1024)}  # GB -> MiB
+
+    # PCIe bandwidth in GB/s
+    if pcie_min is not None:
+        q["pcie_bw"] = {"gte": float(pcie_min)}
+
+    # ---------- FIX: gpu_name (no regexp; use exact/in candidates) ----------
+    def _gpu_name_candidates(term: str):
+        t = term.strip()
+        if not t:
+            return []
+        # Normalize spaces/underscores
+        base = t.replace('-', ' ').replace('_', ' ').upper()
+        parts = [p for p in base.split() if p]
+
+        # If user just typed a series like "6000", build common variants
+        cands = set()
+
+        # Raw inputs (exact forms users commonly see on Vast)
+        cands.add(t)
+        cands.add(base)
+        cands.add(base.replace(' ', '_'))
+
+        # Common 6000-family expansions
+        # e.g., "6000" -> A6000 / RTX 6000 / RTX_6000 / RTX 6000 Ada / RTX_6000_Ada
+        if len(parts) == 1 and parts[0].isdigit():
+            num = parts[0]
+            cands.update({
+                f"A{num}", f"RTX {num}", f"RTX_{num}",
+                f"RTX {num} Ada", f"RTX_{num}_Ada"
+            })
+
+        # If user typed something like "RTX 6000" or "RTX_6000", also add Ada forms
+        if any(p.isdigit() for p in parts) and any("RTX" in p for p in parts):
+            num = next((p for p in parts if p.isdigit()), None)
+            if num:
+                cands.update({f"RTX {num} Ada", f"RTX_{num}_Ada"})
+
+        return [c for c in cands if c]
+
+    if gpu_model:
+        name_list = _gpu_name_candidates(gpu_model)
+        if len(name_list) == 1:
+            q["gpu_name"] = {"eq": name_list[0]}
+        elif len(name_list) > 1:
+            q["gpu_name"] = {"in": name_list}
+        # If empty, omit gpu_name filter entirely
+
+    # Network speeds: API uses MB/s; UI likely in Mbps -> convert
+    def _mbps_to_mbs(x):
+        try:
+            return float(x) / 8.0
+        except Exception:
+            return None
+
+    if net_up_min is not None:
+        up_mbs = _mbps_to_mbs(net_up_min)
+        if up_mbs is not None:
+            q["inet_up"] = {"gte": up_mbs}
+    if net_down_min is not None:
+        down_mbs = _mbps_to_mbs(net_down_min)
+        if down_mbs is not None:
+            q["inet_down"] = {"gte": down_mbs}
+
+    # Locations
+    if locations:
+        q["country_code"] = {"in": [cc.upper() for cc in locations if cc]}
+
+    # Price cap ($/hr)
+    if price_max is not None:
+        q["dph_total"] = {"lte": float(price_max)}
+
+    query_body = {"select_cols": ["*"], "q": q}
 
     try:
         response = requests.put(url, headers=headers, json=query_body)
@@ -92,7 +155,7 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
         response_data = response.json()
         duration_ms = (time.time() - start_time) * 1000
 
-        # Determine offer count for logging (API may use "offers" or "asks")
+        # Extract offers/asks for logging
         offers_list = []
         if isinstance(response_data, dict):
             if "offers" in response_data and isinstance(response_data["offers"], list):
@@ -100,7 +163,6 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
             elif "asks" in response_data and isinstance(response_data["asks"], list):
                 offers_list = response_data["asks"]
 
-        # Log successful API interaction
         log_api_interaction(
             method=method,
             endpoint=endpoint,
@@ -114,8 +176,6 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
 
     except requests.RequestException as e:
         duration_ms = (time.time() - start_time) * 1000
-
-        # Log failed API interaction
         log_api_interaction(
             method=method,
             endpoint=endpoint,
@@ -124,7 +184,6 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
             error=str(e),
             duration_ms=duration_ms
         )
-
         logger.error(f"Failed to query VastAI offers: {e}")
         raise VastAIAPIError(f"Failed to query offers: {e}") from e
 

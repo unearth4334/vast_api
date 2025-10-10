@@ -8,6 +8,7 @@ import os
 import subprocess
 import logging
 import time
+from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -46,7 +47,7 @@ app = Flask(__name__)
 _vastai_status_cache = {
     'data': None,
     'timestamp': 0,
-    'ttl': 300  # 5 minutes in seconds
+    'ttl': 3000  # 5 minutes in seconds
 }
 
 # --- CORS setup (allow local HTTP origins) ---
@@ -289,16 +290,16 @@ def test_ssh():
     """Test SSH connectivity to configured hosts"""
     if request.method == 'OPTIONS':
         return ("", 204)
-        
-    if not SSHTester:
+    
+    if SSHTester is None:
         return jsonify({
             'success': False,
             'message': 'SSH testing functionality not available'
         })
     
     try:
-        tester = SSHTester()
-        results = tester.test_all_hosts()
+        ssh_tester = SSHTester()
+        results = ssh_tester.test_all_hosts()
         
         return jsonify({
             'success': True,
@@ -310,10 +311,66 @@ def test_ssh():
         logger.error(f"SSH test error: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'SSH test error: {str(e)}'
+            'message': f'SSH test failed: {str(e)}'
         })
 
-
+@app.route('/test/ssh-diagnostics', methods=['POST', 'OPTIONS'])
+def ssh_diagnostics():
+    """Run comprehensive SSH diagnostics"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Import SSH manager here to avoid circular imports
+        try:
+            from .ssh_manager import SSHManager, validate_ssh_prerequisites
+        except ImportError:
+            try:
+                import sys
+                sys.path.append(os.path.dirname(__file__))
+                from ssh_manager import SSHManager, validate_ssh_prerequisites
+            except ImportError:
+                return jsonify({
+                    'success': False,
+                    'message': 'SSH diagnostics not available - SSH manager not found'
+                })
+        
+        # Get request data
+        data = request.get_json() if request.is_json else {}
+        host = data.get('host', FORGE_HOST)
+        port = data.get('port', FORGE_PORT)
+        user = data.get('user', 'root')
+        
+        diagnostics = {
+            'host': host,
+            'port': port,
+            'user': user,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Step 1: Check prerequisites
+        prereqs = validate_ssh_prerequisites()
+        diagnostics['prerequisites'] = prereqs
+        
+        # Step 2: Test SSH setup
+        with SSHManager() as ssh_mgr:
+            ssh_result = ssh_mgr.setup_ssh_for_sync(host, port, user)
+            diagnostics['ssh_setup'] = ssh_result
+        
+        overall_success = prereqs['valid'] and ssh_result['success']
+        
+        return jsonify({
+            'success': overall_success,
+            'message': 'SSH diagnostics completed',
+            'diagnostics': diagnostics
+        })
+        
+    except Exception as e:
+        logger.error(f"SSH diagnostics error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH diagnostics failed: {str(e)}'
+        })
 # --- Progress and Logging Routes ---
 
 @app.route('/sync/progress/<sync_id>')
@@ -729,51 +786,61 @@ def setup_civitdl():
 
 @app.route('/vastai/search-offers', methods=['GET', 'OPTIONS'])
 def search_vastai_offers():
-    """Search for available VastAI offers"""
     if request.method == 'OPTIONS':
         return ("", 204)
-    
+
     try:
-        # Get query parameters
+        # Existing params
         gpu_ram = request.args.get('gpu_ram', 10, type=int)
-        sort = request.args.get('sort', 'dph_total')
-        
-        # Import the API function
+        sort    = request.args.get('sort', 'dph_total')
+
+        # NEW: extra filters
+        pcie_min     = request.args.get('pcie_min', type=float)      # GB/s
+        gpu_model    = request.args.get('gpu_model', type=str)       # free-text
+        net_up_min   = request.args.get('net_up_min', type=int)      # Mbps
+        net_down_min = request.args.get('net_down_min', type=int)    # Mbps
+        locations    = request.args.get('locations', type=str)       # "CA,US,KR"
+        price_max    = request.args.get('price_max', type=float)     # $/hr
+
+        # Normalize locations to list of country codes
+        location_list = []
+        if locations:
+            location_list = [x.strip().upper() for x in locations.split(',') if x.strip()]
+
         from ..utils.vastai_api import query_offers, VastAIAPIError
-        
-        # Read API key
+
         api_key = read_api_key_from_file()
         if not api_key:
-            return jsonify({
-                'success': False,
-                'message': 'VastAI API key not found. Please check api_key.txt file.'
-            })
-        
-        # Query offers using the VastAI API
-        logger.info(f"Searching VastAI offers with gpu_ram={gpu_ram}, sort={sort}")
-        resp_json = query_offers(api_key, gpu_ram=gpu_ram, sort=sort)
-        
-        # Extract offers from response
+            return jsonify({'success': False, 'message': 'VastAI API key not found. Please check api_key.txt file.'})
+
+        logger.info(
+            "Searching VastAI offers with filters: gpu_ram=%s, sort=%s, pcie_min=%s, gpu_model=%s, "
+            "net_up_min=%s, net_down_min=%s, locations=%s, price_max=%s",
+            gpu_ram, sort, pcie_min, gpu_model, net_up_min, net_down_min, location_list, price_max
+        )
+
+        resp_json = query_offers(
+            api_key,
+            gpu_ram=gpu_ram,
+            sort=sort,
+            pcie_min=pcie_min,
+            gpu_model=gpu_model,
+            net_up_min=net_up_min,
+            net_down_min=net_down_min,
+            locations=location_list,
+            price_max=price_max
+        )
+
         offers = resp_json.get('offers', []) if resp_json else []
-        
-        return jsonify({
-            'success': True,
-            'offers': offers,
-            'count': len(offers)
-        })
-        
+        return jsonify({'success': True, 'offers': offers, 'count': len(offers)})
+
     except VastAIAPIError as e:
         logger.error(f"VastAI API error: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f'VastAI API error: {str(e)}'
-        })
+        return jsonify({'success': False, 'message': f'VastAI API error: {str(e)}'})
     except Exception as e:
         logger.error(f"Error searching VastAI offers: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f'Error searching offers: {str(e)}'
-        })
+        return jsonify({'success': False, 'message': f'Error searching offers: {str(e)}'})
+
 
 
 @app.route('/vastai/create-instance', methods=['POST', 'OPTIONS'])
