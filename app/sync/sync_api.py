@@ -792,45 +792,46 @@ def search_vastai_offers():
     try:
         # Existing params
         gpu_ram = request.args.get('gpu_ram', 10, type=int)
-        sort    = request.args.get('sort', 'dph_total')
-
-        # NEW: extra filters
-        pcie_min     = request.args.get('pcie_min', type=float)      # GB/s
-        gpu_model    = request.args.get('gpu_model', type=str)       # free-text
-        net_up_min   = request.args.get('net_up_min', type=int)      # Mbps
-        net_down_min = request.args.get('net_down_min', type=int)    # Mbps
-        locations    = request.args.get('locations', type=str)       # "CA,US,KR"
-        price_max    = request.args.get('price_max', type=float)     # $/hr
-
-        # Normalize locations to list of country codes
+        sort = request.args.get('sort', 'dph_total')
+        
+        # Search filter parameters (combining both naming conventions)
+        pcie_bandwidth = request.args.get('pcie_bandwidth', type=float) or request.args.get('pcie_min', type=float)
+        net_up = request.args.get('net_up', type=int) or request.args.get('net_up_min', type=int)
+        net_down = request.args.get('net_down', type=int) or request.args.get('net_down_min', type=int)
+        price_max = request.args.get('price_max', type=float)
+        gpu_model = request.args.get('gpu_model', type=str)
+        locations = request.args.get('locations', type=str)
+        
+        # Parse locations into a list if provided
         location_list = []
         if locations:
             location_list = [x.strip().upper() for x in locations.split(',') if x.strip()]
-
+        
+        # Import the API function
         from ..utils.vastai_api import query_offers, VastAIAPIError
 
         api_key = read_api_key_from_file()
         if not api_key:
-            return jsonify({'success': False, 'message': 'VastAI API key not found. Please check api_key.txt file.'})
-
-        logger.info(
-            "Searching VastAI offers with filters: gpu_ram=%s, sort=%s, pcie_min=%s, gpu_model=%s, "
-            "net_up_min=%s, net_down_min=%s, locations=%s, price_max=%s",
-            gpu_ram, sort, pcie_min, gpu_model, net_up_min, net_down_min, location_list, price_max
-        )
-
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found. Please check api_key.txt file.'
+            })
+        
+        # Query offers using the VastAI API
+        logger.info(f"Searching VastAI offers with gpu_ram={gpu_ram}, sort={sort}, pcie_bandwidth={pcie_bandwidth}, net_up={net_up}, net_down={net_down}, price_max={price_max}, gpu_model={gpu_model}, locations={location_list}")
         resp_json = query_offers(
-            api_key,
-            gpu_ram=gpu_ram,
-            sort=sort,
-            pcie_min=pcie_min,
+            api_key, 
+            gpu_ram=gpu_ram, 
+            sort=sort, 
+            pcie_bandwidth=pcie_bandwidth,
+            net_up=net_up,
+            net_down=net_down,
+            price_max=price_max,
             gpu_model=gpu_model,
-            net_up_min=net_up_min,
-            net_down_min=net_down_min,
-            locations=location_list,
-            price_max=price_max
+            locations=location_list
         )
-
+        
+        # Extract offers from response
         offers = resp_json.get('offers', []) if resp_json else []
         return jsonify({'success': True, 'offers': offers, 'count': len(offers)})
 

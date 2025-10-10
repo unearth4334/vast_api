@@ -912,22 +912,31 @@ function setupPopoverHandlers(popover, filterType) {
 
 async function searchVastaiOffers() {
   const params = new URLSearchParams();
-  const s = window.vastaiSearchState || {};
-
-  if (s.vramMinGb) params.set('gpu_ram', s.vramMinGb);
-  if (s.sortBy)    params.set('sort', s.sortBy);
-
-  // NEW: forward the rest of the filters if set
-  if (s.pcieMinGbps != null)          params.set('pcie_min', s.pcieMinGbps);
-  if (s.gpuModelQuery && s.gpuModelQuery.trim()) params.set('gpu_model', s.gpuModelQuery.trim());
-  if (s.netUpMinMbps != null)         params.set('net_up_min', s.netUpMinMbps);
-  if (s.netDownMinMbps != null)       params.set('net_down_min', s.netDownMinMbps);
-  if (Array.isArray(s.locations) && s.locations.length > 0) {
-    // Expect array of ISO country codes (e.g. ["CA","US"])
-    params.set('locations', s.locations.join(','));
+  
+  // Add non-null values to params (with defensive null check)
+  const state = window.vastaiSearchState || {};
+  if (state.vramMinGb) params.set('gpu_ram', state.vramMinGb);
+  if (state.sortBy) params.set('sort', state.sortBy);
+  
+  // Use both parameter naming conventions for compatibility
+  if (state.pcieMinGbps != null) {
+    params.set('pcie_bandwidth', state.pcieMinGbps);
+    params.set('pcie_min', state.pcieMinGbps); // Fallback for compatibility
   }
-  if (s.priceMaxPerHour != null)      params.set('price_max', s.priceMaxPerHour);
-
+  if (state.netUpMinMbps != null) {
+    params.set('net_up', state.netUpMinMbps);
+    params.set('net_up_min', state.netUpMinMbps); // Fallback for compatibility
+  }
+  if (state.netDownMinMbps != null) {
+    params.set('net_down', state.netDownMinMbps);
+    params.set('net_down_min', state.netDownMinMbps); // Fallback for compatibility
+  }
+  if (state.priceMaxPerHour != null) params.set('price_max', state.priceMaxPerHour);
+  if (state.gpuModelQuery && state.gpuModelQuery.trim()) params.set('gpu_model', state.gpuModelQuery.trim());
+  if (Array.isArray(state.locations) && state.locations.length > 0) {
+    params.set('locations', state.locations.join(','));
+  }
+  
   const resultsDiv = document.getElementById('searchResults');
   if (!resultsDiv) return;
   resultsDiv.innerHTML = '<div class="no-results-message">🔍 Searching for available offers...</div>';

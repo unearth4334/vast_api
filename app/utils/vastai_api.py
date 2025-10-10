@@ -38,23 +38,37 @@ def create_headers(api_key):
     }
 
 
-def query_offers(api_key,
-                 gpu_ram=10,
-                 sort="dph_total",
-                 limit=100,
-                 verified=True,
-                 rentable=True,
-                 external=False,
-                 rented=False,
-                 type_filter="on-demand",
-                 *,
-                 # NEW filters
-                 pcie_min=None,          # GB/s
-                 gpu_model=None,         # string
-                 net_up_min=None,        # Mbps
-                 net_down_min=None,      # Mbps
-                 locations=None,         # list of country codes, e.g. ["CA","US"]
-                 price_max=None):        # $/hr
+
+def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100, 
+                 verified=True, rentable=True, external=False, rented=False, 
+                 type_filter="on-demand", pcie_bandwidth=None, net_up=None, 
+                 net_down=None, price_max=None, gpu_model=None, locations=None):
+    """
+    Query available VastAI offers using the correct search/asks API endpoint.
+    
+    Args:
+        api_key (str): VastAI API key
+        gpu_ram (int): Minimum GPU RAM in GB
+        sort (str): Sort criteria for offers (e.g., "dph_total", "score")
+        limit (int): Maximum number of offers to return
+        verified (bool): Filter for verified offers
+        rentable (bool): Filter for rentable offers
+        external (bool): Filter for external offers
+        rented (bool): Filter for rented offers
+        type_filter (str): Type of offers ("on-demand", etc.)
+        pcie_bandwidth (float): Minimum PCIe bandwidth in GB/s
+        net_up (int): Minimum upload speed in Mbps
+        net_down (int): Minimum download speed in Mbps
+        price_max (float): Maximum price per hour in USD
+        gpu_model (str): GPU model filter string
+        locations (list): List of location/country codes to filter by
+        
+    Returns:
+        dict: JSON response from VastAI API containing offers
+        
+    Raises:
+        VastAIAPIError: If API request fails
+    """
     start_time = time.time()
     endpoint = "/search/asks/"
     method = "PUT"
@@ -72,16 +86,15 @@ def query_offers(api_key,
         "limit":    limit
     }
 
-
     # GPU RAM in MiB
     if gpu_ram and gpu_ram > 0:
         q["gpu_ram"] = {"gte": int(gpu_ram * 1024)}  # GB -> MiB
-
-    # PCIe bandwidth in GB/s
-    if pcie_min is not None:
-        q["pcie_bw"] = {"gte": float(pcie_min)}
-
-    # ---------- FIX: gpu_name (no regexp; use exact/in candidates) ----------
+    
+    # Add PCIe bandwidth filter if specified (API expects GB/s)
+    if pcie_bandwidth and pcie_bandwidth > 0:
+        q["pcie_bw"] = {"gte": float(pcie_bandwidth)}
+    
+    # GPU model filtering with intelligent candidate matching
     def _gpu_name_candidates(term: str):
         t = term.strip()
         if not t:
@@ -115,14 +128,14 @@ def query_offers(api_key,
 
         return [c for c in cands if c]
 
-    if gpu_model:
+    if gpu_model and gpu_model.strip():
         name_list = _gpu_name_candidates(gpu_model)
         if len(name_list) == 1:
             q["gpu_name"] = {"eq": name_list[0]}
         elif len(name_list) > 1:
             q["gpu_name"] = {"in": name_list}
         # If empty, omit gpu_name filter entirely
-
+    
     # Network speeds: API uses MB/s; UI likely in Mbps -> convert
     def _mbps_to_mbs(x):
         try:
@@ -130,22 +143,26 @@ def query_offers(api_key,
         except Exception:
             return None
 
-    if net_up_min is not None:
-        up_mbs = _mbps_to_mbs(net_up_min)
+    if net_up and net_up > 0:
+        up_mbs = _mbps_to_mbs(net_up)
         if up_mbs is not None:
             q["inet_up"] = {"gte": up_mbs}
-    if net_down_min is not None:
-        down_mbs = _mbps_to_mbs(net_down_min)
+    
+    if net_down and net_down > 0:
+        down_mbs = _mbps_to_mbs(net_down)
         if down_mbs is not None:
             q["inet_down"] = {"gte": down_mbs}
-
-    # Locations
-    if locations:
-        q["country_code"] = {"in": [cc.upper() for cc in locations if cc]}
-
-    # Price cap ($/hr)
-    if price_max is not None:
+    
+    # Add maximum price filter if specified (API expects USD per hour)
+    if price_max and price_max > 0:
         q["dph_total"] = {"lte": float(price_max)}
+    
+    # Add location filters if specified (API expects country codes)
+    if locations and len(locations) > 0:
+        # Filter out empty strings and convert to uppercase
+        valid_locations = [loc.upper().strip() for loc in locations if loc.strip()]
+        if valid_locations:
+            q["geolocation"] = {"in": valid_locations}
 
     query_body = {"select_cols": ["*"], "q": q}
 
