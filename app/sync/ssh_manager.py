@@ -81,15 +81,20 @@ class SSHManager:
             # Parse the output to extract environment variables
             for line in proc.stdout.strip().split('\n'):
                 if line.startswith('SSH_AUTH_SOCK='):
-                    auth_sock = line.split('=', 1)[1].rstrip(';')
+                    auth_sock = line.split('=', 1)[1].rstrip(';').split()[0]  # Remove export command
                     self.ssh_auth_sock = auth_sock
                     os.environ['SSH_AUTH_SOCK'] = auth_sock
                     result['auth_sock'] = auth_sock
                 elif line.startswith('SSH_AGENT_PID='):
-                    pid = line.split('=', 1)[1].rstrip(';')
-                    self.ssh_agent_pid = int(pid)
-                    os.environ['SSH_AGENT_PID'] = pid
-                    result['pid'] = int(pid)
+                    pid_str = line.split('=', 1)[1].rstrip(';').split()[0]  # Remove export command
+                    try:
+                        self.ssh_agent_pid = int(pid_str)
+                        os.environ['SSH_AGENT_PID'] = pid_str
+                        result['pid'] = int(pid_str)
+                    except ValueError:
+                        # Handle cases where ssh-agent output format is different
+                        logger.warning(f"Could not parse SSH_AGENT_PID from: {line}")
+                        continue
             
             if self.ssh_agent_pid and self.ssh_auth_sock:
                 result['success'] = True

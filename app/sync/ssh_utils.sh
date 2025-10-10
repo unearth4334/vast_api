@@ -1,7 +1,7 @@
 #!/bin/bash
-"""
-SSH connection validation and retry utility for sync operations
-"""
+#
+# SSH connection validation and retry utility for sync operations
+#
 
 validate_ssh_key() {
     local ssh_key="$1"
