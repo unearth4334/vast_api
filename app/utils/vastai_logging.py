@@ -947,14 +947,26 @@ def get_vastai_log_manifest() -> List[Dict[str, Any]]:
                 continue
                 
             for filename in os.listdir(category_dir):
+                filepath = os.path.join(category_dir, filename)
+                
+                # Handle both old format (category_log_YYYYMMDD.json) and new format (YYYY-MM-DD.json)
+                date_str = None
                 if filename.startswith(f'{category}_log_') and filename.endswith('.json'):
-                    filepath = os.path.join(category_dir, filename)
+                    # Old format: category_log_20251020.json
+                    date_str = filename[len(f'{category}_log_'):-5]  # Remove prefix and .json
+                elif filename.endswith('.json') and len(filename) == 15:  # YYYY-MM-DD.json = 15 chars
+                    # New enhanced format: 2025-10-20.json
+                    try:
+                        # Validate it's a valid date format
+                        datetime.strptime(filename[:-5], '%Y-%m-%d')
+                        date_str = filename[:-5].replace('-', '')  # Convert to YYYYMMDD for consistency
+                    except ValueError:
+                        continue  # Skip files that don't match date format
+                
+                if date_str and filename.endswith('.json'):
                     try:
                         stat = os.stat(filepath)
                         entries = _load_log_file(filepath, category)
-                        
-                        # Extract date from filename
-                        date_str = filename[len(f'{category}_log_'):-5]  # Remove prefix and .json
                         
                         # Calculate analytics
                         analytics = _calculate_log_analytics(entries)
