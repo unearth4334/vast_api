@@ -892,18 +892,37 @@ def get_vastai_logs(max_lines: int = 100, date_filter: str = None) -> List[Dict[
                 continue
                 
             if date_filter:
-                # Load specific date file
-                log_filepath = os.path.join(category_dir, f"{category}_log_{date_filter}.json")
-                if os.path.exists(log_filepath):
-                    entries = _load_log_file(log_filepath, category)
+                # Load specific date file - check both formats
+                # Old format: category_log_YYYYMMDD.json
+                log_filepath_old = os.path.join(category_dir, f"{category}_log_{date_filter}.json")
+                if os.path.exists(log_filepath_old):
+                    entries = _load_log_file(log_filepath_old, category)
                     all_entries.extend(entries)
+                
+                # New enhanced format: YYYY-MM-DD.json (convert date_filter format)
+                if len(date_filter) == 8:  # YYYYMMDD format
+                    formatted_date = f"{date_filter[:4]}-{date_filter[4:6]}-{date_filter[6:8]}"
+                    log_filepath_new = os.path.join(category_dir, f"{formatted_date}.json")
+                    if os.path.exists(log_filepath_new):
+                        entries = _load_log_file(log_filepath_new, category)
+                        all_entries.extend(entries)
             else:
                 # Load all log files, sorted by date (newest first)
                 log_files = []
                 for filename in os.listdir(category_dir):
+                    filepath = os.path.join(category_dir, filename)
+                    
+                    # Handle both old format (category_log_YYYYMMDD.json) and new format (YYYY-MM-DD.json)
                     if filename.startswith(f'{category}_log_') and filename.endswith('.json'):
-                        filepath = os.path.join(category_dir, filename)
+                        # Old format
                         log_files.append((os.path.getmtime(filepath), filepath))
+                    elif filename.endswith('.json') and len(filename) == 15:  # YYYY-MM-DD.json = 15 chars
+                        # New enhanced format - validate it's a valid date
+                        try:
+                            datetime.strptime(filename[:-5], '%Y-%m-%d')
+                            log_files.append((os.path.getmtime(filepath), filepath))
+                        except ValueError:
+                            continue  # Skip files that don't match date format
                 
                 # Sort by modification time (newest first)
                 log_files.sort(reverse=True)
