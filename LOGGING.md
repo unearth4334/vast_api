@@ -131,3 +131,92 @@ docker run --rm -v vast_api_vast_api_logs:/logs alpine sh -c 'watch -n1 "ls -la 
 - New logs are stored in `/app/logs/sync/` and `/app/logs/vastai/` respectively
 - Progress files moved from `/tmp/sync_progress_*.json` to `/app/logs/sync/progress/`
 - All log directories are created automatically on application startup
+
+## Troubleshooting SSH Connection Issues
+
+### Common "Failed to set UI_HOME" Errors
+
+When you see "Failed to set UI_HOME" errors in the VastAI Setup tab, this usually indicates SSH connection problems. Here's how to diagnose and fix them:
+
+#### 1. Use the SSH Test Button
+Before trying to set UI_HOME, click the "🔧 Test SSH Connection" button to verify basic connectivity:
+- This will test if SSH keys are working
+- Shows detailed error messages for authentication/connection issues
+- Verifies the SSH connection string parsing
+
+#### 2. Common Error Types and Solutions
+
+**Authentication Failed (Permission denied)**
+```
+Error: SSH authentication failed - check SSH keys
+```
+**Solution:** Ensure SSH keys are properly mounted in the Docker container
+- Check that `SSH_DIR_PATH` environment variable points to your SSH keys
+- Verify the private key has correct permissions (600)
+- Ensure the key matches what's configured on the VastAI instance
+
+**Connection Refused**
+```
+Error: SSH connection refused - check host and port
+```
+**Solution:** Verify the SSH connection string format
+- Ensure the format is: `ssh -p PORT root@HOST -L 8080:localhost:8080`
+- Verify the port number is correct
+- Check that the VastAI instance is running
+
+**Network/Timeout Issues**
+```
+Error: SSH connection timed out - check host and firewall
+Error: Network unreachable - check host address
+```
+**Solution:** Check network connectivity
+- Verify the host IP address is reachable
+- Check firewall settings
+- Ensure the VastAI instance is accessible from your network
+
+#### 3. SSH Connection String Format
+
+The system expects SSH connection strings in this format:
+```bash
+ssh -p 28276 root@39.114.238.31 -L 8080:localhost:8080
+```
+
+Components:
+- `-p PORT`: SSH port number
+- `root@HOST`: Username and host IP/hostname
+- `-L 8080:localhost:8080`: Local port forwarding (optional for UI_HOME operations)
+
+#### 4. Manual SSH Testing
+
+You can manually test SSH connectivity from your local machine:
+```bash
+# Test basic SSH connectivity
+ssh -p 28276 root@39.114.238.31 -o ConnectTimeout=10 echo "Connection successful"
+
+# Test with the same options the application uses
+ssh -p 28276 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@39.114.238.31 whoami
+```
+
+#### 5. Checking SSH Keys in Docker
+
+If running in Docker, verify SSH keys are properly mounted:
+```bash
+# Check if SSH keys are accessible in container
+docker exec -it media-sync-api ls -la /root/.ssh/
+
+# Test SSH from within container
+docker exec -it media-sync-api ssh -p 28276 root@39.114.238.31 -o ConnectTimeout=10 echo "test"
+```
+
+#### 6. Application Logs
+
+Check application logs for detailed SSH error information:
+```bash
+# View recent application logs
+./deploy.sh app-logs
+
+# Check specific error logs
+./deploy.sh app-logs app_log_20251019.json
+```
+
+The logs will contain detailed SSH command output, return codes, and error messages that can help identify the specific issue.

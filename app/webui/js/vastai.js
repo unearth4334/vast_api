@@ -190,7 +190,34 @@ function showSetupResult(message, type) {
   }
 }
 
-// ---------- VastAI: set/get UI_HOME, terminate, install civitdl ----------
+// ---------- VastAI: SSH test, set/get UI_HOME, terminate, install civitdl ----------
+async function testVastAISSH() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  showSetupResult('Testing SSH connection...', 'info');
+  try {
+    const data = await api.post('/test/ssh/vastai', {
+      ssh_connection: sshConnectionString
+    });
+    
+    if (data.success) {
+      showSetupResult(`✅ SSH connection successful to ${data.host}:${data.port}<br>Output: ${data.output}`, 'success');
+    } else {
+      let errorMsg = `❌ SSH connection failed: ${data.message}`;
+      if (data.error) {
+        errorMsg += `<br><strong>Details:</strong> ${data.error}`;
+      }
+      if (data.return_code) {
+        errorMsg += `<br><strong>Return code:</strong> ${data.return_code}`;
+      }
+      showSetupResult(errorMsg, 'error');
+    }
+  } catch (error) {
+    showSetupResult('Request failed: ' + error.message, 'error');
+  }
+}
+
 async function setUIHome() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
@@ -201,8 +228,19 @@ async function setUIHome() {
       ssh_connection: sshConnectionString,
       ui_home: '/workspace/ComfyUI/'
     });
-    data.success ? showSetupResult(data.message, 'success')
-                 : showSetupResult('Error: ' + (data.message || 'Unknown'), 'error');
+    
+    if (data.success) {
+      showSetupResult(data.message, 'success');
+    } else {
+      let errorMsg = `Error: ${data.message || 'Unknown error'}`;
+      if (data.error) {
+        errorMsg += `<br><strong>Details:</strong> ${data.error}`;
+      }
+      if (data.return_code) {
+        errorMsg += `<br><strong>Return code:</strong> ${data.return_code}`;
+      }
+      showSetupResult(errorMsg, 'error');
+    }
   } catch (error) {
     showSetupResult('Request failed: ' + error.message, 'error');
   }
@@ -215,8 +253,19 @@ async function getUIHome() {
   showSetupResult('Reading UI_HOME...', 'info');
   try {
     const data = await api.post('/vastai/get-ui-home', { ssh_connection: sshConnectionString });
-    data.success ? showSetupResult('UI_HOME: ' + (data.ui_home || 'Unknown'), 'success')
-                 : showSetupResult('Error: ' + (data.message || 'Unknown'), 'error');
+    
+    if (data.success) {
+      showSetupResult('UI_HOME: ' + (data.ui_home || 'Not set'), 'success');
+    } else {
+      let errorMsg = `Error: ${data.message || 'Unknown error'}`;
+      if (data.error) {
+        errorMsg += `<br><strong>Details:</strong> ${data.error}`;
+      }
+      if (data.return_code) {
+        errorMsg += `<br><strong>Return code:</strong> ${data.return_code}`;
+      }
+      showSetupResult(errorMsg, 'error');
+    }
   } catch (error) {
     showSetupResult('Request failed: ' + error.message, 'error');
   }
@@ -517,6 +566,7 @@ window.mobileOfferState = {
 };
 
 // Expose the functions you call from HTML or other scripts
+window.testVastAISSH = testVastAISSH;
 window.setUIHome = setUIHome;
 window.getUIHome = getUIHome;
 window.terminateConnection = terminateConnection;

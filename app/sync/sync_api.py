@@ -284,6 +284,94 @@ def sync_vastai_connection():
 
 # --- SSH Test Routes ---
 
+@app.route('/test/ssh/vastai', methods=['POST', 'OPTIONS'])
+def test_vastai_ssh():
+    """Test SSH connectivity to a specific VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+        
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            })
+        
+        logger.info(f"Testing SSH connection to {ssh_host}:{ssh_port}")
+        
+        # Test basic SSH connectivity
+        cmd = [
+            'ssh', 
+            '-p', ssh_port,
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',
+            '-o', 'ConnectTimeout=10',
+            '-o', 'BatchMode=yes',  # Fail if password authentication is required
+            f'root@{ssh_host}',
+            'echo "SSH connection successful" && whoami && pwd'
+        ]
+        
+        logger.debug(f"Executing SSH test command: {' '.join(cmd[:8])} [command hidden]")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        
+        logger.debug(f"SSH test return code: {result.returncode}")
+        logger.debug(f"SSH test stdout: {result.stdout}")
+        logger.debug(f"SSH test stderr: {result.stderr}")
+        
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': f'SSH connection to {ssh_host}:{ssh_port} successful',
+                'output': result.stdout,
+                'host': ssh_host,
+                'port': ssh_port
+            })
+        else:
+            # Provide more detailed error information
+            error_msg = "SSH connection failed"
+            if "Permission denied" in result.stderr:
+                error_msg = "SSH authentication failed - check SSH keys"
+            elif "Connection refused" in result.stderr:
+                error_msg = "SSH connection refused - check host and port"
+            elif "No route to host" in result.stderr:
+                error_msg = "Network unreachable - check host address"
+            elif "Connection timed out" in result.stderr:
+                error_msg = "SSH connection timed out - check host and firewall"
+            
+            return jsonify({
+                'success': False,
+                'message': error_msg,
+                'error': result.stderr,
+                'return_code': result.returncode,
+                'host': ssh_host,
+                'port': ssh_port
+            })
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'message': 'SSH connection test timed out'
+        })
+    except Exception as e:
+        logger.error(f"SSH test error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH test error: {str(e)}'
+        })
+
+
 @app.route('/test/ssh', methods=['POST', 'OPTIONS'])
 def test_ssh():
     """Test SSH connectivity to configured hosts"""
@@ -473,14 +561,24 @@ def set_ui_home():
         
         logger.info(f"Setting UI_HOME to {ui_home_path} on {ssh_host}:{ssh_port}")
         
-        # Execute the command to set UI_HOME
+        # Execute the command to set UI_HOME with proper SSH options
         cmd = [
-            'ssh', '-p', ssh_port,
+            'ssh', 
+            '-p', ssh_port,
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',
+            '-o', 'ConnectTimeout=10',
             f'root@{ssh_host}',
             f'echo "export UI_HOME={ui_home_path}" >> ~/.bashrc && echo "UI_HOME set successfully"'
         ]
         
+        logger.debug(f"Executing SSH command: {' '.join(cmd[:7])} [command hidden]")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        logger.debug(f"SSH command return code: {result.returncode}")
+        logger.debug(f"SSH stdout: {result.stdout}")
+        logger.debug(f"SSH stderr: {result.stderr}")
         
         if result.returncode == 0:
             return jsonify({
@@ -489,10 +587,13 @@ def set_ui_home():
                 'output': result.stdout
             })
         else:
+            logger.error(f"SSH command failed with return code {result.returncode}")
+            logger.error(f"SSH stderr: {result.stderr}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to set UI_HOME',
-                'error': result.stderr
+                'error': result.stderr,
+                'return_code': result.returncode
             })
             
     except subprocess.TimeoutExpired:
@@ -502,12 +603,29 @@ def set_ui_home():
         })
     except Exception as e:
         logger.error(f"Error setting UI_HOME: {str(e)}")
+        
+        # Log the error to application logs
+        try:
+            from ..utils.app_logging import log_error
+            log_error("ssh.ui_home_set", f"Failed to set UI_HOME: {str(e)}", {
+                "ssh_host": ssh_host,
+                "ssh_port": ssh_port, 
+                "ui_home_path": ui_home_path,
+                "error": str(e)
+            })
+        except ImportError:
+            from utils.app_logging import log_error
+            log_error("ssh.ui_home_set", f"Failed to set UI_HOME: {str(e)}", {
+                "ssh_host": ssh_host,
+                "ssh_port": ssh_port,
+                "ui_home_path": ui_home_path,
+                "error": str(e)
+            })
+        
         return jsonify({
             'success': False,
             'message': f'Error setting UI_HOME: {str(e)}'
         })
-
-
 @app.route('/vastai/get-ui-home', methods=['POST', 'OPTIONS'])
 def get_ui_home():
     """Get UI_HOME environment variable from VastAI instance"""
@@ -534,14 +652,24 @@ def get_ui_home():
         
         logger.info(f"Reading UI_HOME from {ssh_host}:{ssh_port}")
         
-        # Execute the command to get UI_HOME
+        # Execute the command to get UI_HOME with proper SSH options
         cmd = [
-            'ssh', '-p', ssh_port,
+            'ssh', 
+            '-p', ssh_port,
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'LogLevel=ERROR',
+            '-o', 'ConnectTimeout=10',
             f'root@{ssh_host}',
-            'echo $UI_HOME'
+            'source ~/.bashrc && echo $UI_HOME'
         ]
         
+        logger.debug(f"Executing SSH command: {' '.join(cmd[:7])} [command hidden]")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        logger.debug(f"SSH command return code: {result.returncode}")
+        logger.debug(f"SSH stdout: {result.stdout}")
+        logger.debug(f"SSH stderr: {result.stderr}")
         
         if result.returncode == 0:
             ui_home = result.stdout.strip()
@@ -551,10 +679,13 @@ def get_ui_home():
                 'output': result.stdout
             })
         else:
+            logger.error(f"SSH command failed with return code {result.returncode}")
+            logger.error(f"SSH stderr: {result.stderr}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to get UI_HOME',
-                'error': result.stderr
+                'error': result.stderr,
+                'return_code': result.returncode
             })
             
     except subprocess.TimeoutExpired:
