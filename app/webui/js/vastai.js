@@ -1960,6 +1960,226 @@ async function createInstanceFromOffer(offerId, gpuName) {
   }
 }
 
+// ---------- Template Management ----------
+
+let currentTemplate = null;
+let availableTemplates = [];
+
+// Load templates on page load
+async function loadTemplates() {
+  try {
+    const data = await api.get('/templates');
+    
+    if (data.success) {
+      availableTemplates = data.templates;
+      populateTemplateSelector();
+    } else {
+      console.error('Failed to load templates:', data.message);
+      showTemplateError('Failed to load templates');
+    }
+  } catch (error) {
+    console.error('Error loading templates:', error);
+    showTemplateError('Error loading templates');
+  }
+}
+
+function populateTemplateSelector() {
+  const selector = document.getElementById('templateSelector');
+  if (!selector) return;
+  
+  // Clear existing options
+  selector.innerHTML = '<option value="">Select a template...</option>';
+  
+  // Add template options
+  availableTemplates.forEach(template => {
+    const option = document.createElement('option');
+    option.value = template.id;
+    option.textContent = `${template.name} (${template.version})`;
+    option.title = template.description;
+    selector.appendChild(option);
+  });
+  
+  // If only one template available, select it automatically
+  if (availableTemplates.length === 1) {
+    selector.value = availableTemplates[0].id;
+    onTemplateChange();
+  }
+}
+
+function showTemplateError(message) {
+  const selector = document.getElementById('templateSelector');
+  if (selector) {
+    selector.innerHTML = `<option value="">❌ ${message}</option>`;
+  }
+}
+
+async function onTemplateChange() {
+  const selector = document.getElementById('templateSelector');
+  const templateId = selector?.value;
+  
+  if (!templateId) {
+    hideTemplateInfo();
+    resetSetupButtons();
+    return;
+  }
+  
+  try {
+    const data = await api.get(`/templates/${templateId}`);
+    
+    if (data.success) {
+      currentTemplate = data.template;
+      showTemplateInfo(currentTemplate);
+      updateSetupButtons(currentTemplate);
+    } else {
+      showSetupResult(`Failed to load template: ${data.message}`, 'error');
+      hideTemplateInfo();
+      resetSetupButtons();
+    }
+  } catch (error) {
+    showSetupResult(`Error loading template: ${error.message}`, 'error');
+    hideTemplateInfo();
+    resetSetupButtons();
+  }
+}
+
+function showTemplateInfo(template) {
+  const infoDiv = document.getElementById('template-info');
+  const nameSpan = document.getElementById('template-name');
+  const descSpan = document.getElementById('template-description');
+  
+  if (infoDiv && nameSpan && descSpan) {
+    nameSpan.textContent = `${template.name} v${template.version || '1.0.0'}`;
+    descSpan.textContent = template.description || 'No description available';
+    infoDiv.style.display = 'block';
+  }
+}
+
+function hideTemplateInfo() {
+  const infoDiv = document.getElementById('template-info');
+  if (infoDiv) {
+    infoDiv.style.display = 'none';
+  }
+}
+
+function updateSetupButtons(template) {
+  const container = document.getElementById('setup-buttons-container');
+  if (!container) return;
+  
+  const uiConfig = template.ui_config || {};
+  const buttons = uiConfig.setup_buttons || [];
+  
+  // Clear existing buttons except test SSH and sync instance
+  container.innerHTML = '';
+  
+  // Always include basic buttons first
+  container.innerHTML += `
+    <button class="setup-button" onclick="testVastAISSH()">
+      🔧 Test SSH Connection
+    </button>
+    <button class="setup-button" onclick="syncFromConnectionString()">
+      🔄 Sync Instance
+    </button>
+  `;
+  
+  // Add template-specific buttons
+  buttons.forEach(button => {
+    if (button.action !== 'test_ssh' && button.action !== 'sync_instance') {
+      const btnClass = getButtonClass(button.style);
+      const onclick = getButtonOnClick(button.action, template);
+      
+      container.innerHTML += `
+        <button class="${btnClass}" onclick="${onclick}">
+          ${button.label}
+        </button>
+      `;
+    }
+  });
+}
+
+function resetSetupButtons() {
+  const container = document.getElementById('setup-buttons-container');
+  if (container) {
+    container.innerHTML = `
+      <button class="setup-button" onclick="testVastAISSH()">
+        🔧 Test SSH Connection
+      </button>
+      <button class="setup-button" onclick="syncFromConnectionString()">
+        🔄 Sync Instance
+      </button>
+    `;
+  }
+}
+
+function getButtonClass(style) {
+  switch (style) {
+    case 'primary': return 'setup-button';
+    case 'secondary': return 'setup-button secondary';
+    case 'danger': return 'setup-button danger';
+    default: return 'setup-button';
+  }
+}
+
+function getButtonOnClick(action, template) {
+  switch (action) {
+    case 'setup_civitdl': return 'executeTemplateStep("Install CivitDL")';
+    case 'set_ui_home': return 'executeTemplateStep("Set UI Home")';
+    case 'setup_python_venv': return 'executeTemplateStep("Setup Python Virtual Environment")';
+    case 'clone_auto_installer': return 'executeTemplateStep("Clone ComfyUI Auto Installer")';
+    case 'get_ui_home': return 'getUIHome()';
+    case 'terminate_connection': return 'terminateConnection()';
+    default: return `console.log("Unknown action: ${action}")`;
+  }
+}
+
+async function executeTemplateStep(stepName) {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  const templateId = document.getElementById('templateSelector')?.value;
+  
+  if (!sshConnectionString) {
+    showSetupResult('Please enter an SSH connection string first.', 'error');
+    return;
+  }
+  
+  if (!templateId || !currentTemplate) {
+    showSetupResult('Please select a template first.', 'error');
+    return;
+  }
+  
+  showSetupResult(`Executing: ${stepName}...`, 'info');
+  
+  try {
+    const data = await api.post(`/templates/${templateId}/execute-step`, {
+      ssh_connection: sshConnectionString,
+      step_name: stepName
+    });
+    
+    if (data.success) {
+      showSetupResult(`✅ ${stepName} completed successfully!`, 'success');
+      if (data.output) {
+        console.log(`${stepName} output:`, data.output);
+      }
+    } else {
+      let errorMsg = `❌ ${stepName} failed: ${data.message}`;
+      if (data.error) {
+        errorMsg += `\n\nDetails: ${data.error}`;
+      }
+      showSetupResult(errorMsg, 'error');
+    }
+  } catch (error) {
+    showSetupResult(`❌ ${stepName} request failed: ${error.message}`, 'error');
+  }
+}
+
+// Initialize templates when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  loadTemplates();
+});
+
+// Expose template functions
+window.onTemplateChange = onTemplateChange;
+window.executeTemplateStep = executeTemplateStep;
+window.loadTemplates = loadTemplates;
+
 // Expose search functions
 window.openSearchOffersModal = openSearchOffersModal;
 window.closeSearchOffersModal = closeSearchOffersModal;

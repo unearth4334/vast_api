@@ -19,6 +19,7 @@ try:
     from ..utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from ..utils.config_loader import load_config, load_api_key
     from ..webui.templates import get_index_template
+    from ..webui.template_manager import template_manager
     from .ssh_test import SSHTester
 except ImportError:
     # Handle imports for both module and direct execution
@@ -1021,6 +1022,332 @@ def create_vastai_instance():
             'success': False,
             'message': f'Error creating instance: {str(e)}'
         })
+
+
+# --- Template Management Routes ---
+
+@app.route('/templates', methods=['GET', 'OPTIONS'])
+def get_templates():
+    """Get list of available setup templates"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        templates = template_manager.get_available_templates()
+        return jsonify({
+            'success': True,
+            'templates': templates
+        })
+    except Exception as e:
+        logger.error(f"Error getting templates: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting templates: {str(e)}'
+        })
+
+
+@app.route('/templates/<template_name>', methods=['GET', 'OPTIONS'])
+def get_template(template_name):
+    """Get specific template configuration"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        template_data = template_manager.load_template(template_name)
+        if not template_data:
+            return jsonify({
+                'success': False,
+                'message': f'Template "{template_name}" not found'
+            })
+        
+        return jsonify({
+            'success': True,
+            'template': template_data
+        })
+    except Exception as e:
+        logger.error(f"Error getting template {template_name}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting template: {str(e)}'
+        })
+
+
+@app.route('/templates/<template_name>/execute-step', methods=['POST', 'OPTIONS'])
+def execute_template_step(template_name):
+    """Execute a specific step from a template"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json()
+        ssh_connection = data.get('ssh_connection')
+        step_name = data.get('step_name')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        if not step_name:
+            return jsonify({
+                'success': False,
+                'message': 'Step name is required'
+            })
+        
+        # Get template and find the step
+        template_data = template_manager.load_template(template_name)
+        if not template_data:
+            return jsonify({
+                'success': False,
+                'message': f'Template "{template_name}" not found'
+            })
+        
+        setup_steps = template_data.get('setup_steps', [])
+        step = next((s for s in setup_steps if s.get('name') == step_name), None)
+        
+        if not step:
+            return jsonify({
+                'success': False,
+                'message': f'Step "{step_name}" not found in template'
+            })
+        
+        # Execute the step based on its type
+        result = execute_step(ssh_connection, step, template_data)
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error executing template step: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error executing step: {str(e)}'
+        })
+
+
+def execute_step(ssh_connection, step, template_data):
+    """Execute a single template step"""
+    step_type = step.get('type')
+    step_name = step.get('name')
+    
+    try:
+        if step_type == 'civitdl_install':
+            # Use existing setup CivitDL functionality
+            return execute_civitdl_setup(ssh_connection)
+            
+        elif step_type == 'set_ui_home':
+            ui_home = step.get('path') or template_data.get('environment', {}).get('ui_home')
+            if ui_home:
+                return execute_set_ui_home(ssh_connection, ui_home)
+            else:
+                return {
+                    'success': False,
+                    'message': 'No UI home path specified in step or template environment'
+                }
+        
+        elif step_type == 'git_clone':
+            repository = step.get('repository')
+            destination = step.get('destination')
+            if repository and destination:
+                return execute_git_clone(ssh_connection, repository, destination)
+            else:
+                return {
+                    'success': False,
+                    'message': 'Repository and destination are required for git_clone step'
+                }
+        
+        elif step_type == 'python_venv':
+            venv_path = step.get('path') or template_data.get('environment', {}).get('python_venv')
+            if venv_path:
+                return execute_python_venv_setup(ssh_connection, venv_path)
+            else:
+                return {
+                    'success': False,
+                    'message': 'No Python venv path specified in step or template environment'
+                }
+        
+        else:
+            return {
+                'success': False,
+                'message': f'Unknown step type: {step_type}'
+            }
+            
+    except Exception as e:
+        logger.error(f"Error executing step {step_name}: {str(e)}")
+        return {
+            'success': False,
+            'message': f'Error executing {step_name}: {str(e)}'
+        }
+
+
+def execute_civitdl_setup(ssh_connection):
+    """Execute CivitDL setup using existing functionality"""
+    # This uses the existing setup-civitdl endpoint logic
+    try:
+        host, port = parse_ssh_connection(ssh_connection)
+        if not host or not port:
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        # Use existing CivitDL setup logic
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{host} "
+        set -e
+        cd /workspace
+        if [ ! -d civitdl ]; then
+            git clone https://github.com/civitai/civitdl.git
+        fi
+        cd civitdl
+        pip install -e .
+        pip install requests tqdm
+        echo 'CivitDL installation completed'
+        "'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            return {
+                'success': True,
+                'message': 'CivitDL setup completed successfully',
+                'output': result.stdout
+            }
+        else:
+            return {
+                'success': False,
+                'message': f'CivitDL setup failed with return code {result.returncode}',
+                'error': result.stderr
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'Error during CivitDL setup: {str(e)}'
+        }
+
+
+def execute_set_ui_home(ssh_connection, ui_home_path):
+    """Execute UI_HOME setup"""
+    try:
+        host, port = parse_ssh_connection(ssh_connection)
+        if not host or not port:
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{host} "
+        echo 'export UI_HOME={ui_home_path}' >> ~/.bashrc
+        export UI_HOME={ui_home_path}
+        echo 'UI_HOME set to {ui_home_path}'
+        "'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+        
+        if result.returncode == 0:
+            return {
+                'success': True,
+                'message': f'UI_HOME set to {ui_home_path}',
+                'output': result.stdout
+            }
+        else:
+            return {
+                'success': False,
+                'message': f'Failed to set UI_HOME with return code {result.returncode}',
+                'error': result.stderr
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'Error setting UI_HOME: {str(e)}'
+        }
+
+
+def execute_git_clone(ssh_connection, repository, destination):
+    """Execute git clone"""
+    try:
+        host, port = parse_ssh_connection(ssh_connection)
+        if not host or not port:
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{host} "
+        set -e
+        if [ ! -d '{destination}' ]; then
+            git clone {repository} {destination}
+            echo 'Repository cloned successfully to {destination}'
+        else
+            echo 'Repository already exists at {destination}'
+        fi
+        "'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            return {
+                'success': True,
+                'message': f'Repository cloned to {destination}',
+                'output': result.stdout
+            }
+        else:
+            return {
+                'success': False,
+                'message': f'Git clone failed with return code {result.returncode}',
+                'error': result.stderr
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'Error cloning repository: {str(e)}'
+        }
+
+
+def execute_python_venv_setup(ssh_connection, venv_path):
+    """Execute Python virtual environment setup"""
+    try:
+        host, port = parse_ssh_connection(ssh_connection)
+        if not host or not port:
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{host} "
+        set -e
+        if [ ! -d '{venv_path}' ]; then
+            python3 -m venv {venv_path}
+            echo 'Python virtual environment created at {venv_path}'
+        else
+            echo 'Virtual environment already exists at {venv_path}'
+        fi
+        source {venv_path}/bin/activate
+        pip install --upgrade pip
+        echo 'Virtual environment setup completed'
+        "'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=180)
+        
+        if result.returncode == 0:
+            return {
+                'success': True,
+                'message': f'Python virtual environment setup at {venv_path}',
+                'output': result.stdout
+            }
+        else:
+            return {
+                'success': False,
+                'message': f'Python venv setup failed with return code {result.returncode}',
+                'error': result.stderr
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'Error setting up Python virtual environment: {str(e)}'
+        }
 
 
 if __name__ == '__main__':
