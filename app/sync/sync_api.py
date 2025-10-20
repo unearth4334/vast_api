@@ -710,6 +710,16 @@ def get_ui_home():
         ssh_connection = data.get('ssh_connection')
         
         if not ssh_connection:
+            enhanced_logger.log_error(
+                "UI_HOME read failed - no SSH connection string provided",
+                "validation_error",
+                context=LogContext(
+                    operation_id=f"get_ui_home_{int(time.time())}",
+                    user_agent="vast_api/1.0 (get_ui_home)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': 'SSH connection string is required'
@@ -718,11 +728,31 @@ def get_ui_home():
         try:
             ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
+            enhanced_logger.log_error(
+                f"UI_HOME read failed - invalid SSH connection format: {str(e)}",
+                "validation_error",
+                context=LogContext(
+                    operation_id=f"get_ui_home_{int(time.time())}",
+                    user_agent="vast_api/1.0 (get_ui_home)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': str(e)
             })
         
+        enhanced_logger.log_operation(
+            f"Reading UI_HOME from {ssh_host}:{ssh_port}",
+            "get_ui_home_start",
+            context=LogContext(
+                operation_id=f"get_ui_home_{int(time.time())}",
+                user_agent="vast_api/1.0 (get_ui_home)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         logger.info(f"Reading UI_HOME from {ssh_host}:{ssh_port}")
         
         # Execute the command to get UI_HOME with proper SSH options
@@ -746,12 +776,32 @@ def get_ui_home():
         
         if result.returncode == 0:
             ui_home = result.stdout.strip()
+            enhanced_logger.log_operation(
+                f"✅ Successfully read UI_HOME from {ssh_host}:{ssh_port} - {ui_home if ui_home else 'Not set'}",
+                "get_ui_home_success",
+                context=LogContext(
+                    operation_id=f"get_ui_home_{int(time.time())}",
+                    user_agent="vast_api/1.0 (get_ui_home)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': True,
                 'ui_home': ui_home if ui_home else 'Not set',
                 'output': result.stdout
             })
         else:
+            enhanced_logger.log_error(
+                f"❌ Failed to read UI_HOME from {ssh_host}:{ssh_port} - SSH command failed",
+                "connection_error",
+                context=LogContext(
+                    operation_id=f"get_ui_home_{int(time.time())}",
+                    user_agent="vast_api/1.0 (get_ui_home)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             logger.error(f"SSH command failed with return code {result.returncode}")
             logger.error(f"SSH stderr: {result.stderr}")
             return jsonify({
@@ -762,11 +812,31 @@ def get_ui_home():
             })
             
     except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "UI_HOME read operation timed out",
+            "timeout_error",
+            context=LogContext(
+                operation_id=f"get_ui_home_{int(time.time())}",
+                user_agent="vast_api/1.0 (get_ui_home)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         return jsonify({
             'success': False,
             'message': 'SSH command timed out'
         })
     except Exception as e:
+        enhanced_logger.log_error(
+            f"UI_HOME read unexpected error: {str(e)}",
+            "unexpected_error",
+            context=LogContext(
+                operation_id=f"get_ui_home_{int(time.time())}",
+                user_agent="vast_api/1.0 (get_ui_home)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         logger.error(f"Error getting UI_HOME: {str(e)}")
         return jsonify({
             'success': False,

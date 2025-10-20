@@ -445,6 +445,16 @@ body {
     margin-top: var(--size-4-1);
 }
 
+.log-status-success {
+    color: var(--text-success);
+    font-weight: 500;
+}
+
+.log-status-failed {
+    color: var(--text-error);
+    font-weight: 500;
+}
+
 .no-logs-message {
     text-align: center;
     color: var(--text-muted);

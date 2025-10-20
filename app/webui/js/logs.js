@@ -148,6 +148,42 @@ function closeLogModal() {
 
 // VastAI Logs functionality
 
+function getActionLabel(log) {
+    // Get user-friendly action labels based on log data
+    if (log.operation) {
+        switch (log.operation) {
+            case 'test_ssh_start':
+                return '🔍 Testing SSH Connection';
+            case 'test_ssh_success':
+                return '✅ SSH Connection Test';
+            case 'get_ui_home_start':
+                return '📖 Reading UI_HOME';
+            case 'get_ui_home_success':
+                return '✅ UI_HOME Retrieved';
+            case 'terminate_vastai':
+                return '🛑 Terminating Instance';
+            case 'create_instance':
+                return '🚀 Creating Instance';
+            case 'list_instances':
+                return '📋 Listing Instances';
+            case 'show_instance':
+                return '👁️ Viewing Instance';
+            case 'template_execution_start':
+                return '⚙️ Running Template';
+            case 'template_execution_complete':
+                return '✅ Template Complete';
+            default:
+                return `🔧 ${log.operation.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+        }
+    } else if (log.method && log.endpoint) {
+        // Fallback for older API logs
+        return `${log.method} ${log.endpoint.replace('/api/v0', '')}`;
+    } else if (log.category) {
+        return `📊 ${log.category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+    }
+    return '📝 VastAI Operation';
+}
+
 async function refreshVastAILogs() {
     const logsList = document.getElementById('vastai-logs-list');
     const refreshBtn = document.querySelector('.vastai-logs-section .setup-button');
@@ -201,15 +237,31 @@ function displayVastAILogs(logs) {
         // Format duration
         const duration = log.duration_ms ? `(${Math.round(log.duration_ms)}ms)` : '';
         
-        // Create log summary
-        const statusIcon = log.error ? '❌' : '✅';
-        const method = log.method || 'API';
-        const endpoint = log.endpoint ? log.endpoint.replace('/api/v0', '') : '';
+        // Create log summary with informative action label
+        const actionLabel = getActionLabel(log);
+        const statusIcon = log.level === 'ERROR' || log.error ? '❌' : '✅';
+        const statusText = log.level === 'ERROR' || log.error ? 'Failed' : 'Success';
+        
+        // Extract meaningful message from log
+        let displayMessage = '';
+        if (log.message) {
+            // Clean up common prefixes for better readability
+            displayMessage = log.message
+                .replace(/^✅\s*/, '')
+                .replace(/^❌\s*/, '')
+                .replace(/^Operation - \w+:\s*/, '')
+                .replace(/^API - /, '')
+                .replace(/^Performance - \w+:\s*/, '');
+        } else if (log.error) {
+            displayMessage = log.error;
+        } else {
+            displayMessage = statusText;
+        }
         
         logItem.innerHTML = `
             <div class="log-summary">
-                ${statusIcon} ${method} ${endpoint} - ${formattedDate}, ${formattedTime}<br>
-                ${log.error ? log.error : 'Success'} ${duration}
+                ${actionLabel} - ${formattedDate}, ${formattedTime}<br>
+                <span class="log-status-${statusText.toLowerCase()}">${statusIcon} ${displayMessage}</span> ${duration}
             </div>
             <div class="log-meta">Click to view details</div>
         `;
