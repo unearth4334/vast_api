@@ -2102,10 +2102,13 @@ function updateSetupButtons(template) {
   `;
   
   // Add template-specific buttons
-  buttons.forEach(button => {
+  console.log(`🔧 Adding ${buttons.length} template buttons`);
+  buttons.forEach((button, index) => {
     if (button.action !== 'test_ssh' && button.action !== 'sync_instance') {
       const btnClass = getButtonClass(button.style);
       const onclick = getButtonOnClick(button.action, template);
+      
+      console.log(`  ${index+1}. Creating button: "${button.label}" (${button.action}) -> onclick="${onclick}"`);
       
       container.innerHTML += `
         <button class="${btnClass}" onclick="${onclick}">
@@ -2114,6 +2117,8 @@ function updateSetupButtons(template) {
       `;
     }
   });
+  
+  console.log(`✅ Template buttons HTML updated. Final container content:`, container.innerHTML);
 }
 
 function resetSetupButtons() {
@@ -2215,11 +2220,13 @@ window.debugTemplateState = function() {
   const sshElement = document.getElementById('sshConnectionString');
   const templateElement = document.getElementById('templateSelector');
   const resultElement = document.getElementById('setup-result');
+  const buttonsContainer = document.getElementById('setup-buttons-container');
   
   console.log('📍 Elements:');
   console.log('  - SSH Input:', !!sshElement, sshElement?.value);
   console.log('  - Template Select:', !!templateElement, templateElement?.value);
   console.log('  - Result Div:', !!resultElement);
+  console.log('  - Buttons Container:', !!buttonsContainer);
   
   console.log('📋 State:');
   console.log('  - currentTemplate:', currentTemplate);
@@ -2229,6 +2236,14 @@ window.debugTemplateState = function() {
     const buttons = currentTemplate.ui_config.setup_buttons || [];
     buttons.forEach((btn, i) => {
       console.log(`  ${i+1}. ${btn.label} (${btn.action})`);
+    });
+  }
+  
+  if (buttonsContainer) {
+    console.log('🎯 Actual DOM Buttons:');
+    const domButtons = buttonsContainer.querySelectorAll('button');
+    domButtons.forEach((btn, i) => {
+      console.log(`  ${i+1}. "${btn.textContent.trim()}" onclick="${btn.onclick || btn.getAttribute('onclick')}"`);
     });
   }
   
@@ -2246,8 +2261,30 @@ window.debugTemplateState = function() {
     sshConnection: sshElement?.value,
     templateId: templateElement?.value,
     currentTemplate: currentTemplate,
+    buttonCount: buttonsContainer?.querySelectorAll('button').length || 0,
     ready: !!(sshElement?.value && templateElement?.value && currentTemplate)
   };
+};
+
+// Test function to simulate button click
+window.testSetUIHomeButton = function() {
+  console.log('🧪 Testing Set UI Home button click...');
+  const buttonsContainer = document.getElementById('setup-buttons-container');
+  if (buttonsContainer) {
+    const setUIHomeButton = Array.from(buttonsContainer.querySelectorAll('button'))
+      .find(btn => btn.textContent.includes('Set UI_HOME'));
+    
+    if (setUIHomeButton) {
+      console.log('✅ Found Set UI_HOME button, simulating click...');
+      setUIHomeButton.click();
+    } else {
+      console.log('❌ Set UI_HOME button not found in DOM');
+      console.log('Available buttons:', Array.from(buttonsContainer.querySelectorAll('button'))
+        .map(btn => btn.textContent.trim()));
+    }
+  } else {
+    console.log('❌ Buttons container not found');
+  }
 };
 
 // Expose template functions
