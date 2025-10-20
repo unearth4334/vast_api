@@ -241,6 +241,44 @@ def validate_ssh_host_format(host):
     return bool(re.match(hostname_pattern, host))
 
 
+def get_ssh_port(instance):
+    """
+    Extract SSH port from VastAI instance data.
+    
+    Prefers the host-side port from the ports mapping (instance["ports"]["22/tcp"][0]["HostPort"])
+    as this represents the externally mapped port. Falls back to instance["ssh_port"] if the
+    ports mapping is not available or malformed.
+    
+    Args:
+        instance (dict): Instance data from VastAI API
+        
+    Returns:
+        int or str: SSH port number, or None if not found
+    """
+    if not instance:
+        return None
+    
+    # Try to get port from ports mapping (preferred method)
+    try:
+        ports = instance.get('ports', {})
+        if isinstance(ports, dict) and '22/tcp' in ports:
+            tcp_ports = ports['22/tcp']
+            if isinstance(tcp_ports, list) and len(tcp_ports) > 0:
+                host_port = tcp_ports[0].get('HostPort')
+                if host_port:
+                    return host_port
+    except (TypeError, KeyError, IndexError, AttributeError):
+        # Ignore errors and fall back to ssh_port
+        pass
+    
+    # Fallback to ssh_port field
+    ssh_port = instance.get('ssh_port')
+    if ssh_port:
+        return ssh_port
+    
+    return None
+
+
 def format_instance_info(instance):
     """
     Format VastAI instance information for display.
@@ -252,7 +290,7 @@ def format_instance_info(instance):
         'id': instance.get('id'),
         'gpu': instance.get('gpu_name'),
         'host': instance.get('ssh_host'),
-        'port': instance.get('ssh_port'),
+        'port': get_ssh_port(instance),
         'status': instance.get('actual_status'),
         'location': instance.get('geolocation')
     }
