@@ -298,6 +298,14 @@ def test_vastai_ssh():
         ssh_connection = data.get('ssh_connection')
         
         if not ssh_connection:
+            enhanced_logger.log_error(
+                "SSH test failed - no connection string provided",
+                context=LogContext(
+                    operation="test_vastai_ssh",
+                    component="ssh_test",
+                    details={"request_data": data}
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': 'SSH connection string is required'
@@ -306,11 +314,27 @@ def test_vastai_ssh():
         try:
             ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
+            enhanced_logger.log_error(
+                f"SSH test failed - invalid connection format: {str(e)}",
+                context=LogContext(
+                    operation="test_vastai_ssh",
+                    component="ssh_test",
+                    details={"ssh_connection": ssh_connection, "error": str(e)}
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': str(e)
             })
         
+        enhanced_logger.log_operation(
+            f"Testing SSH connection to {ssh_host}:{ssh_port}",
+            context=LogContext(
+                operation="test_vastai_ssh",
+                component="ssh_test",
+                details={"ssh_host": ssh_host, "ssh_port": ssh_port, "ssh_connection": ssh_connection}
+            )
+        )
         logger.info(f"Testing SSH connection to {ssh_host}:{ssh_port}")
         
         # Test basic SSH connectivity
@@ -334,6 +358,20 @@ def test_vastai_ssh():
         logger.debug(f"SSH test stderr: {result.stderr}")
         
         if result.returncode == 0:
+            enhanced_logger.log_operation(
+                f"✅ SSH connection successful to {ssh_host}:{ssh_port}",
+                context=LogContext(
+                    operation="test_vastai_ssh",
+                    component="ssh_test",
+                    details={
+                        "ssh_host": ssh_host,
+                        "ssh_port": ssh_port,
+                        "return_code": result.returncode,
+                        "output": result.stdout.strip(),
+                        "success": True
+                    }
+                )
+            )
             return jsonify({
                 'success': True,
                 'message': f'SSH connection to {ssh_host}:{ssh_port} successful',
@@ -353,6 +391,21 @@ def test_vastai_ssh():
             elif "Connection timed out" in result.stderr:
                 error_msg = "SSH connection timed out - check host and firewall"
             
+            enhanced_logger.log_error(
+                f"❌ SSH connection failed to {ssh_host}:{ssh_port} - {error_msg}",
+                context=LogContext(
+                    operation="test_vastai_ssh",
+                    component="ssh_test",
+                    details={
+                        "ssh_host": ssh_host,
+                        "ssh_port": ssh_port,
+                        "return_code": result.returncode,
+                        "stderr": result.stderr.strip(),
+                        "error_message": error_msg,
+                        "success": False
+                    }
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': error_msg,
@@ -363,11 +416,27 @@ def test_vastai_ssh():
             })
             
     except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "SSH connection test timed out",
+            context=LogContext(
+                operation="test_vastai_ssh",
+                component="ssh_test",
+                details={"error": "timeout", "timeout_duration": "15s"}
+            )
+        )
         return jsonify({
             'success': False,
             'message': 'SSH connection test timed out'
         })
     except Exception as e:
+        enhanced_logger.log_error(
+            f"SSH test unexpected error: {str(e)}",
+            context=LogContext(
+                operation="test_vastai_ssh",
+                component="ssh_test",
+                details={"error": str(e), "error_type": type(e).__name__}
+            )
+        )
         logger.error(f"SSH test error: {str(e)}")
         return jsonify({
             'success': False,

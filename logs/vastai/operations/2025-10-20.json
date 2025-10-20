@@ -53,5 +53,282 @@
       "integration_test": true,
       "api_module": "vastai_api"
     }
+  },
+  {
+    "timestamp": "2025-10-20T19:24:53.479303",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Testing ComfyUI template step execution",
+    "operation": "template_step_test",
+    "context": {
+      "operation_id": "template_comfyui_Install CivitDL_1760988293_8b35c574",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988293",
+      "ip_address": "localhost",
+      "instance_id": null,
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.5,
+      "memory_usage": 18.4,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:24:53.478937"
+    },
+    "extra_data": {
+      "template_name": "comfyui",
+      "step_name": "Install CivitDL",
+      "test_mode": true
+    }
+  },
+  {
+    "timestamp": "2025-10-20T19:25:34.044880",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Starting template step execution: comfyui - Install CivitDL",
+    "operation": "template_step_start",
+    "context": {
+      "operation_id": "template_comfyui_Install CivitDL_1760988334_c81d22c8",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988334",
+      "ip_address": "10.0.78.66",
+      "instance_id": "27050456",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:25:34.044031"
+    },
+    "extra_data": {
+      "template_name": "comfyui",
+      "step_name": "Install CivitDL",
+      "step_type": "civitdl_install",
+      "ssh_connection": "root@10.0.78.66:40150"
+    }
+  },
+  {
+    "timestamp": "2025-10-20T19:25:34.046204",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Executing step \"Install CivitDL\" of type \"civitdl_install\"",
+    "operation": "step_execution_start",
+    "context": {
+      "operation_id": "template_comfyui_Install CivitDL_1760988334_c81d22c8",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988334",
+      "ip_address": "10.0.78.66",
+      "instance_id": "27050456",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:25:34.044031"
+    },
+    "extra_data": {
+      "step_name": "Install CivitDL",
+      "step_type": "civitdl_install",
+      "step_config": {
+        "type": "civitdl_install",
+        "name": "Install CivitDL"
+      }
+    }
+  },
+  {
+    "timestamp": "2025-10-20T19:25:34.230010",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Starting template step execution: comfyui - Set UI Home",
+    "operation": "template_step_start",
+    "context": {
+      "operation_id": "template_comfyui_Set UI Home_1760988334_0cb54e41",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988334",
+      "ip_address": "10.0.78.66",
+      "instance_id": "27050456",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:25:34.044031"
+    },
+    "extra_data": {
+      "template_name": "comfyui",
+      "step_name": "Set UI Home",
+      "step_type": "set_ui_home",
+      "ssh_connection": "root@10.0.78.66:40150"
+    }
+  },
+  {
+    "timestamp": "2025-10-20T19:25:34.231603",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Executing step \"Set UI Home\" of type \"set_ui_home\"",
+    "operation": "step_execution_start",
+    "context": {
+      "operation_id": "template_comfyui_Set UI Home_1760988334_0cb54e41",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988334",
+      "ip_address": "10.0.78.66",
+      "instance_id": "27050456",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:25:34.044031"
+    },
+    "extra_data": {
+      "step_name": "Set UI Home",
+      "step_type": "set_ui_home",
+      "step_config": {
+        "type": "set_ui_home",
+        "name": "Set UI Home"
+      }
+    }
+  },
+  {
+    "timestamp": "2025-10-20T19:25:34.334825",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Starting template step execution: comfyui - Clone ComfyUI Auto Installer",
+    "operation": "template_step_start",
+    "context": {
+      "operation_id": "template_comfyui_Clone ComfyUI Auto Installer_1760988334_6e8a5e95",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988334",
+      "ip_address": "10.0.78.66",
+      "instance_id": "27050456",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:25:34.044031"
+    },
+    "extra_data": {
+      "template_name": "comfyui",
+      "step_name": "Clone ComfyUI Auto Installer",
+      "step_type": "git_clone",
+      "ssh_connection": "root@10.0.78.66:40150"
+    }
+  },
+  {
+    "timestamp": "2025-10-20T19:25:34.336672",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Executing step \"Clone ComfyUI Auto Installer\" of type \"git_clone\"",
+    "operation": "step_execution_start",
+    "context": {
+      "operation_id": "template_comfyui_Clone ComfyUI Auto Installer_1760988334_6e8a5e95",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988334",
+      "ip_address": "10.0.78.66",
+      "instance_id": "27050456",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:25:34.044031"
+    },
+    "extra_data": {
+      "step_name": "Clone ComfyUI Auto Installer",
+      "step_type": "git_clone",
+      "step_config": {
+        "type": "git_clone",
+        "name": "Clone ComfyUI Auto Installer"
+      }
+    }
+  },
+  {
+    "timestamp": "2025-10-20T19:25:34.439413",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Starting template step execution: comfyui - Setup Python Virtual Environment",
+    "operation": "template_step_start",
+    "context": {
+      "operation_id": "template_comfyui_Setup Python Virtual Environment_1760988334_e05b8b1f",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988334",
+      "ip_address": "10.0.78.66",
+      "instance_id": "27050456",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:25:34.044031"
+    },
+    "extra_data": {
+      "template_name": "comfyui",
+      "step_name": "Setup Python Virtual Environment",
+      "step_type": "python_venv",
+      "ssh_connection": "root@10.0.78.66:40150"
+    }
+  },
+  {
+    "timestamp": "2025-10-20T19:25:34.439861",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Executing step \"Setup Python Virtual Environment\" of type \"python_venv\"",
+    "operation": "step_execution_start",
+    "context": {
+      "operation_id": "template_comfyui_Setup Python Virtual Environment_1760988334_e05b8b1f",
+      "user_agent": "template_executor/1.0 (comfyui)",
+      "session_id": "template_session_1760988334",
+      "ip_address": "10.0.78.66",
+      "instance_id": "27050456",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T12:25:34.044031"
+    },
+    "extra_data": {
+      "step_name": "Setup Python Virtual Environment",
+      "step_type": "python_venv",
+      "step_config": {
+        "type": "python_venv",
+        "name": "Setup Python Virtual Environment"
+      }
+    }
   }
 ]

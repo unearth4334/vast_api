@@ -101,3 +101,5 @@ $RECYCLE.BIN/
 
 # Temporary sync progress files
 /tmp/sync_progress_*.json
+
+logs/*
