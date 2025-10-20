@@ -301,9 +301,10 @@ def test_vastai_ssh():
             enhanced_logger.log_error(
                 "SSH test failed - no connection string provided",
                 context=LogContext(
-                    operation="test_vastai_ssh",
-                    component="ssh_test",
-                    details={"request_data": data}
+                    operation_id=f"test_ssh_{int(time.time())}",
+                    user_agent="vast_api/1.0 (test_ssh)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
                 )
             )
             return jsonify({
@@ -317,9 +318,10 @@ def test_vastai_ssh():
             enhanced_logger.log_error(
                 f"SSH test failed - invalid connection format: {str(e)}",
                 context=LogContext(
-                    operation="test_vastai_ssh",
-                    component="ssh_test",
-                    details={"ssh_connection": ssh_connection, "error": str(e)}
+                    operation_id=f"test_ssh_{int(time.time())}",
+                    user_agent="vast_api/1.0 (test_ssh)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
                 )
             )
             return jsonify({
@@ -330,9 +332,10 @@ def test_vastai_ssh():
         enhanced_logger.log_operation(
             f"Testing SSH connection to {ssh_host}:{ssh_port}",
             context=LogContext(
-                operation="test_vastai_ssh",
-                component="ssh_test",
-                details={"ssh_host": ssh_host, "ssh_port": ssh_port, "ssh_connection": ssh_connection}
+                operation_id=f"test_ssh_{int(time.time())}",
+                user_agent="vast_api/1.0 (test_ssh)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
             )
         )
         logger.info(f"Testing SSH connection to {ssh_host}:{ssh_port}")
@@ -361,15 +364,10 @@ def test_vastai_ssh():
             enhanced_logger.log_operation(
                 f"✅ SSH connection successful to {ssh_host}:{ssh_port}",
                 context=LogContext(
-                    operation="test_vastai_ssh",
-                    component="ssh_test",
-                    details={
-                        "ssh_host": ssh_host,
-                        "ssh_port": ssh_port,
-                        "return_code": result.returncode,
-                        "output": result.stdout.strip(),
-                        "success": True
-                    }
+                    operation_id=f"test_ssh_{int(time.time())}",
+                    user_agent="vast_api/1.0 (test_ssh)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
                 )
             )
             return jsonify({
@@ -394,16 +392,10 @@ def test_vastai_ssh():
             enhanced_logger.log_error(
                 f"❌ SSH connection failed to {ssh_host}:{ssh_port} - {error_msg}",
                 context=LogContext(
-                    operation="test_vastai_ssh",
-                    component="ssh_test",
-                    details={
-                        "ssh_host": ssh_host,
-                        "ssh_port": ssh_port,
-                        "return_code": result.returncode,
-                        "stderr": result.stderr.strip(),
-                        "error_message": error_msg,
-                        "success": False
-                    }
+                    operation_id=f"test_ssh_{int(time.time())}",
+                    user_agent="vast_api/1.0 (test_ssh)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
                 )
             )
             return jsonify({
@@ -419,9 +411,10 @@ def test_vastai_ssh():
         enhanced_logger.log_error(
             "SSH connection test timed out",
             context=LogContext(
-                operation="test_vastai_ssh",
-                component="ssh_test",
-                details={"error": "timeout", "timeout_duration": "15s"}
+                operation_id=f"test_ssh_{int(time.time())}",
+                user_agent="vast_api/1.0 (test_ssh)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
             )
         )
         return jsonify({
@@ -432,9 +425,10 @@ def test_vastai_ssh():
         enhanced_logger.log_error(
             f"SSH test unexpected error: {str(e)}",
             context=LogContext(
-                operation="test_vastai_ssh",
-                component="ssh_test",
-                details={"error": str(e), "error_type": type(e).__name__}
+                operation_id=f"test_ssh_{int(time.time())}",
+                user_agent="vast_api/1.0 (test_ssh)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
             )
         )
         logger.error(f"SSH test error: {str(e)}")
