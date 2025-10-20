@@ -1535,7 +1535,13 @@ def execute_civitdl_setup(ssh_connection):
     """Execute CivitDL setup using existing functionality"""
     # This uses the existing setup-civitdl endpoint logic
     try:
-        host, port = parse_ssh_connection(ssh_connection)
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        host, port = ssh_info['host'], ssh_info['port']
         if not host or not port:
             return {
                 'success': False,
@@ -1580,7 +1586,13 @@ def execute_civitdl_setup(ssh_connection):
 def execute_set_ui_home(ssh_connection, ui_home_path):
     """Execute UI_HOME setup"""
     try:
-        host, port = parse_ssh_connection(ssh_connection)
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        host, port = ssh_info['host'], ssh_info['port']
         if not host or not port:
             return {
                 'success': False,
@@ -1618,7 +1630,13 @@ def execute_set_ui_home(ssh_connection, ui_home_path):
 def execute_git_clone(ssh_connection, repository, destination):
     """Execute git clone"""
     try:
-        host, port = parse_ssh_connection(ssh_connection)
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        host, port = ssh_info['host'], ssh_info['port']
         if not host or not port:
             return {
                 'success': False,
@@ -1660,7 +1678,13 @@ def execute_git_clone(ssh_connection, repository, destination):
 def execute_python_venv_setup(ssh_connection, venv_path):
     """Execute Python virtual environment setup"""
     try:
-        host, port = parse_ssh_connection(ssh_connection)
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        host, port = ssh_info['host'], ssh_info['port']
         if not host or not port:
             return {
                 'success': False,
