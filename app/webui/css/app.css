@@ -680,6 +680,11 @@ body {
     background: var(--background-error);
 }
 
+.setup-result.info {
+    border-color: var(--text-muted);
+    background: var(--background-secondary-alt);
+}
+
 /* =========================
    VASTAI INSTANCES
    ========================= */

@@ -175,11 +175,17 @@ function buildSSHString(inst) {
 
 // ---------- UI feedback ----------
 function showSetupResult(message, type) {
+  console.log('showSetupResult called:', message, type);
   const resultDiv = document.getElementById('setup-result');
-  if (!resultDiv) return;
+  console.log('Result div:', resultDiv);
+  if (!resultDiv) {
+    console.error('setup-result div not found!');
+    return;
+  }
   resultDiv.textContent = message;
   resultDiv.className = 'setup-result ' + type;
   resultDiv.style.display = 'block';
+  console.log('Result div updated, display:', resultDiv.style.display, 'className:', resultDiv.className);
 
   if (type === 'info') {
     setTimeout(() => {
@@ -192,7 +198,10 @@ function showSetupResult(message, type) {
 
 // ---------- VastAI: set/get UI_HOME, terminate, install civitdl ----------
 async function setUIHome() {
-  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  const inputElement = document.getElementById('sshConnectionString');
+  console.log('setUIHome called, input element:', inputElement);
+  const sshConnectionString = inputElement?.value.trim();
+  console.log('SSH connection string:', sshConnectionString);
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
   showSetupResult('Setting UI_HOME to /workspace/ComfyUI/...', 'info');
@@ -209,7 +218,10 @@ async function setUIHome() {
 }
 
 async function getUIHome() {
-  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  const inputElement = document.getElementById('sshConnectionString');
+  console.log('getUIHome called, input element:', inputElement);
+  const sshConnectionString = inputElement?.value.trim();
+  console.log('SSH connection string:', sshConnectionString);
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
   showSetupResult('Reading UI_HOME...', 'info');
@@ -223,7 +235,10 @@ async function getUIHome() {
 }
 
 async function terminateConnection() {
-  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  const inputElement = document.getElementById('sshConnectionString');
+  console.log('terminateConnection called, input element:', inputElement);
+  const sshConnectionString = inputElement?.value.trim();
+  console.log('SSH connection string:', sshConnectionString);
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
   if (!confirm('Are you sure you want to terminate the SSH connection?')) return;
 
@@ -238,7 +253,10 @@ async function terminateConnection() {
 }
 
 async function setupCivitDL() {
-  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  const inputElement = document.getElementById('sshConnectionString');
+  console.log('setupCivitDL called, input element:', inputElement);
+  const sshConnectionString = inputElement?.value.trim();
+  console.log('SSH connection string:', sshConnectionString);
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
   showSetupResult('Installing and configuring CivitDL...', 'info');
@@ -264,7 +282,10 @@ async function setupCivitDL() {
 }
 
 async function syncFromConnectionString() {
-  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  const inputElement = document.getElementById('sshConnectionString');
+  console.log('syncFromConnectionString called, input element:', inputElement);
+  const sshConnectionString = inputElement?.value.trim();
+  console.log('SSH connection string:', sshConnectionString);
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
   showSetupResult('Starting sync from connection string...', 'info');
