@@ -1,0 +1,57 @@
+[
+  {
+    "timestamp": "2025-10-20T18:38:38.190258",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Test operation completed",
+    "operation": "test_operation",
+    "context": {
+      "operation_id": "test_123",
+      "user_agent": "test/1.0",
+      "session_id": "session_test",
+      "ip_address": "127.0.0.1",
+      "instance_id": null,
+      "template_name": null
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.5,
+      "memory_usage": 18.8,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T11:38:38.189028"
+    },
+    "extra_data": {
+      "success": true
+    }
+  },
+  {
+    "timestamp": "2025-10-20T18:38:59.128221",
+    "level": "INFO",
+    "category": "operation",
+    "message": "Testing VastAI API enhanced logging integration",
+    "operation": "api_test",
+    "context": {
+      "operation_id": "test_api_call_1760985539_31c21774",
+      "user_agent": "vast_api/1.0 (test_api_call)",
+      "session_id": "session_1760985539",
+      "ip_address": "localhost",
+      "instance_id": "12345",
+      "template_name": "comfyui"
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 3.0,
+      "memory_usage": 18.8,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T11:38:59.124426"
+    },
+    "extra_data": {
+      "integration_test": true,
+      "api_module": "vastai_api"
+    }
+  }
+]
