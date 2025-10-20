@@ -200,11 +200,17 @@ function buildSSHString(inst) {
 
 // ---------- UI feedback ----------
 function showSetupResult(message, type) {
+  console.log(`📢 showSetupResult called: "${message}" (${type})`);
   const resultDiv = document.getElementById('setup-result');
-  if (!resultDiv) return;
+  console.log(`📍 setup-result element exists:`, !!resultDiv);
+  if (!resultDiv) {
+    console.log(`❌ setup-result element not found!`);
+    return;
+  }
   resultDiv.textContent = message;
   resultDiv.className = 'setup-result ' + type;
   resultDiv.style.display = 'block';
+  console.log(`✅ Result displayed: "${message}"`);  
 
   if (type === 'info') {
     setTimeout(() => {
@@ -2014,28 +2020,42 @@ function showTemplateError(message) {
 }
 
 async function onTemplateChange() {
+  console.log(`🎛️ onTemplateChange called`);
   const selector = document.getElementById('templateSelector');
   const templateId = selector?.value;
   
+  console.log(`📋 Template ID selected: "${templateId}"`);
+  console.log(`📍 Template selector exists:`, !!selector);
+  
   if (!templateId) {
+    console.log(`❌ No template ID, resetting buttons`);
+    currentTemplate = null;
     hideTemplateInfo();
     resetSetupButtons();
     return;
   }
   
   try {
+    console.log(`🔄 Loading template: ${templateId}`);
     const data = await api.get(`/templates/${templateId}`);
+    console.log(`📦 Template API response:`, data);
     
     if (data.success) {
       currentTemplate = data.template;
+      console.log(`✅ Template loaded successfully:`, currentTemplate);
       showTemplateInfo(currentTemplate);
       updateSetupButtons(currentTemplate);
+      console.log(`🔧 Template buttons updated`);
     } else {
+      console.log(`❌ Template loading failed:`, data.message);
+      currentTemplate = null;
       showSetupResult(`Failed to load template: ${data.message}`, 'error');
       hideTemplateInfo();
       resetSetupButtons();
     }
   } catch (error) {
+    console.log(`🚨 Template loading error:`, error);
+    currentTemplate = null;
     showSetupResult(`Error loading template: ${error.message}`, 'error');
     hideTemplateInfo();
     resetSetupButtons();
@@ -2132,19 +2152,31 @@ function getButtonOnClick(action, template) {
 }
 
 async function executeTemplateStep(stepName) {
+  // Enhanced debugging for template execution
+  console.log(`🔧 executeTemplateStep called with: "${stepName}"`);
+  
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   const templateId = document.getElementById('templateSelector')?.value;
   
+  console.log(`🔗 SSH Connection String: "${sshConnectionString}"`);
+  console.log(`🎛️ Template ID: "${templateId}"`);
+  console.log(`📋 Current Template:`, currentTemplate);
+  console.log(`📍 SSH Element exists:`, !!document.getElementById('sshConnectionString'));
+  console.log(`📍 Template Selector exists:`, !!document.getElementById('templateSelector'));
+  
   if (!sshConnectionString) {
+    console.log(`❌ No SSH connection string provided`);
     showSetupResult('Please enter an SSH connection string first.', 'error');
     return;
   }
   
   if (!templateId || !currentTemplate) {
+    console.log(`❌ Template validation failed - templateId: "${templateId}", currentTemplate:`, currentTemplate);
     showSetupResult('Please select a template first.', 'error');
     return;
   }
   
+  console.log(`✅ All validations passed, executing template step...`);
   showSetupResult(`Executing: ${stepName}...`, 'info');
   
   try {
@@ -2174,6 +2206,49 @@ async function executeTemplateStep(stepName) {
 document.addEventListener('DOMContentLoaded', () => {
   loadTemplates();
 });
+
+// Debug function to manually test template functionality
+window.debugTemplateState = function() {
+  console.log('🔧 TEMPLATE DEBUG STATE');
+  console.log('========================');
+  
+  const sshElement = document.getElementById('sshConnectionString');
+  const templateElement = document.getElementById('templateSelector');
+  const resultElement = document.getElementById('setup-result');
+  
+  console.log('📍 Elements:');
+  console.log('  - SSH Input:', !!sshElement, sshElement?.value);
+  console.log('  - Template Select:', !!templateElement, templateElement?.value);
+  console.log('  - Result Div:', !!resultElement);
+  
+  console.log('📋 State:');
+  console.log('  - currentTemplate:', currentTemplate);
+  
+  if (currentTemplate && currentTemplate.ui_config) {
+    console.log('🔧 Template Buttons:');
+    const buttons = currentTemplate.ui_config.setup_buttons || [];
+    buttons.forEach((btn, i) => {
+      console.log(`  ${i+1}. ${btn.label} (${btn.action})`);
+    });
+  }
+  
+  console.log('🧪 Test executeTemplateStep:');
+  if (sshElement?.value && templateElement?.value && currentTemplate) {
+    console.log('  ✅ Ready to test - all requirements met');
+  } else {
+    console.log('  ❌ Not ready:');
+    if (!sshElement?.value) console.log('    - Missing SSH connection');
+    if (!templateElement?.value) console.log('    - Missing template selection');  
+    if (!currentTemplate) console.log('    - currentTemplate not loaded');
+  }
+  
+  return {
+    sshConnection: sshElement?.value,
+    templateId: templateElement?.value,
+    currentTemplate: currentTemplate,
+    ready: !!(sshElement?.value && templateElement?.value && currentTemplate)
+  };
+};
 
 // Expose template functions
 window.onTemplateChange = onTemplateChange;
