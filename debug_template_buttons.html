@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Template Button Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .setup-button { 
+            padding: 8px 16px; 
+            margin: 5px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        .setup-button:hover { background: #0056b3; }
+        #debug-log { 
+            background: #f8f9fa; 
+            border: 1px solid #ddd; 
+            padding: 10px; 
+            max-height: 300px; 
+            overflow-y: auto; 
+            font-family: monospace; 
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Template Button Debug Test</h1>
+    
+    <div class="test-section">
+        <h3>1. API Connection Test</h3>
+        <button class="setup-button" onclick="testAPI()">Test API Connection</button>
+        <div id="api-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Template Loading Test</h3>
+        <button class="setup-button" onclick="testTemplates()">Load Templates</button>
+        <div id="template-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. SSH Connection String Test</h3>
+        <input type="text" id="sshConnectionString" 
+               placeholder="ssh -p 40150 root@39.114.238.31 -L 8080:localhost:8080" 
+               style="width: 500px; padding: 5px;">
+        <button class="setup-button" onclick="testSSHConnection()">Test SSH Field</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>4. Template Execution Test</h3>
+        <button class="setup-button" onclick="testTemplateExecution()">📁 Test Set UI_HOME</button>
+        <div id="execution-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Debug Log</h3>
+        <div id="debug-log"></div>
+    </div>
+
+    <script>
+        function log(message) {
+            const debugLog = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.innerHTML += `[${timestamp}] ${message}<br>`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        async function testAPI() {
+            log("Testing API connection...");
+            try {
+                const response = await fetch('/vastai/instances');
+                const data = await response.json();
+                document.getElementById('api-result').innerHTML = 
+                    `✅ API working, found ${data.instances ? data.instances.length : 0} instances`;
+                log("✅ API connection successful");
+            } catch (error) {
+                document.getElementById('api-result').innerHTML = `❌ API failed: ${error.message}`;
+                log(`❌ API error: ${error.message}`);
+            }
+        }
+
+        async function testTemplates() {
+            log("Testing template loading...");
+            try {
+                const response = await fetch('/templates');
+                const data = await response.json();
+                document.getElementById('template-result').innerHTML = 
+                    `✅ Templates loaded: ${JSON.stringify(data.templates, null, 2)}`;
+                log("✅ Templates loaded successfully");
+                
+                if (data.templates && data.templates.length > 0) {
+                    const template = data.templates[0];
+                    log(`Template found: ${template.name} (id: ${template.id})`);
+                    
+                    // Load template details
+                    const detailResponse = await fetch(`/templates/${template.id}`);
+                    const detailData = await detailResponse.json();
+                    log(`Template details: ${JSON.stringify(detailData.template.ui_config?.setup_buttons || [], null, 2)}`);
+                }
+            } catch (error) {
+                document.getElementById('template-result').innerHTML = `❌ Template loading failed: ${error.message}`;
+                log(`❌ Template loading error: ${error.message}`);
+            }
+        }
+
+        function testSSHConnection() {
+            const sshField = document.getElementById('sshConnectionString');
+            const value = sshField.value.trim();
+            log(`SSH Connection field value: "${value}"`);
+            log(`SSH field exists: ${!!sshField}`);
+            log(`SSH field has value: ${!!value}`);
+        }
+
+        async function testTemplateExecution() {
+            log("Testing template execution...");
+            
+            const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+            
+            if (!sshConnectionString) {
+                document.getElementById('execution-result').innerHTML = '❌ Please enter SSH connection string first';
+                log("❌ No SSH connection string provided");
+                return;
+            }
+            
+            log(`Using SSH connection: ${sshConnectionString}`);
+            
+            try {
+                document.getElementById('execution-result').innerHTML = 'Executing Set UI_HOME...';
+                
+                const response = await fetch('/templates/comfyui/execute-step', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ssh_connection: sshConnectionString,
+                        step_name: 'Set UI Home',
+                        instance_id: 'test'
+                    })
+                });
+                
+                const data = await response.json();
+                log(`Template execution response: ${JSON.stringify(data, null, 2)}`);
+                
+                if (data.success) {
+                    document.getElementById('execution-result').innerHTML = 
+                        `✅ Set UI_HOME completed successfully!<br>Output: ${data.output || 'No output'}`;
+                    log("✅ Template execution successful");
+                } else {
+                    document.getElementById('execution-result').innerHTML = 
+                        `❌ Set UI_HOME failed: ${data.message}<br>Error: ${data.error || 'No error details'}`;
+                    log(`❌ Template execution failed: ${data.message}`);
+                }
+            } catch (error) {
+                document.getElementById('execution-result').innerHTML = `❌ Request failed: ${error.message}`;
+                log(`❌ Template execution error: ${error.message}`);
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            log("Debug page loaded");
+            // Auto-fill SSH connection string for testing
+            document.getElementById('sshConnectionString').value = 'ssh -p 40150 root@39.114.238.31 -L 8080:localhost:8080';
+        });
+    </script>
+</body>
+</html>

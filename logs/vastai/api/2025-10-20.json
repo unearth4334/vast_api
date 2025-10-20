@@ -1,0 +1,30 @@
+[
+  {
+    "timestamp": "2025-10-20T18:38:38.189623",
+    "level": "INFO",
+    "category": "api",
+    "message": "Testing enhanced VastAI logging system",
+    "status_code": 200,
+    "context": {
+      "operation_id": "test_123",
+      "user_agent": "test/1.0",
+      "session_id": "session_test",
+      "ip_address": "127.0.0.1",
+      "instance_id": null,
+      "template_name": null
+    },
+    "system_info": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.5,
+      "memory_usage": 18.8,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T11:38:38.189028"
+    },
+    "extra_data": {
+      "test": true,
+      "module": "vastai_api"
+    }
+  }
+]

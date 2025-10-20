@@ -8,6 +8,7 @@ import os
 import subprocess
 import logging
 import time
+import uuid
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -15,10 +16,12 @@ from flask_cors import CORS
 try:
     from .sync_utils import run_sync, FORGE_HOST, FORGE_PORT, COMFY_HOST, COMFY_PORT
     from ..vastai.vast_manager import VastManager
-    from ..vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file
+    from ..vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file, get_ssh_port
     from ..utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from ..utils.config_loader import load_config, load_api_key
+    from ..utils.vastai_logging import enhanced_logger, LogContext
     from ..webui.templates import get_index_template
+    from ..webui.template_manager import template_manager
     from .ssh_test import SSHTester
 except ImportError:
     # Handle imports for both module and direct execution
@@ -27,7 +30,7 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from sync_utils import run_sync, FORGE_HOST, FORGE_PORT, COMFY_HOST, COMFY_PORT
     from vastai.vast_manager import VastManager
-    from vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file
+    from vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file, get_ssh_port
     from utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from utils.config_loader import load_config, load_api_key
     from webui.templates import get_index_template
@@ -200,7 +203,7 @@ def sync_vastai():
         
         # Extract SSH connection details
         ssh_host = running_instance.get('ssh_host')
-        ssh_port = str(running_instance.get('ssh_port', 22))
+        ssh_port = str(get_ssh_port(running_instance) or 22)
         
         if not ssh_host:
             return jsonify({
@@ -295,6 +298,16 @@ def test_vastai_ssh():
         ssh_connection = data.get('ssh_connection')
         
         if not ssh_connection:
+            enhanced_logger.log_error(
+                "SSH test failed - no connection string provided",
+                "validation_error",
+                context=LogContext(
+                    operation_id=f"test_ssh_{int(time.time())}",
+                    user_agent="vast_api/1.0 (test_ssh)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': 'SSH connection string is required'
@@ -303,11 +316,31 @@ def test_vastai_ssh():
         try:
             ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
+            enhanced_logger.log_error(
+                f"SSH test failed - invalid connection format: {str(e)}",
+                "validation_error",
+                context=LogContext(
+                    operation_id=f"test_ssh_{int(time.time())}",
+                    user_agent="vast_api/1.0 (test_ssh)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': str(e)
             })
         
+        enhanced_logger.log_operation(
+            f"Testing SSH connection to {ssh_host}:{ssh_port}",
+            "test_ssh_start",
+            context=LogContext(
+                operation_id=f"test_ssh_{int(time.time())}",
+                user_agent="vast_api/1.0 (test_ssh)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         logger.info(f"Testing SSH connection to {ssh_host}:{ssh_port}")
         
         # Test basic SSH connectivity
@@ -331,6 +364,16 @@ def test_vastai_ssh():
         logger.debug(f"SSH test stderr: {result.stderr}")
         
         if result.returncode == 0:
+            enhanced_logger.log_operation(
+                f"✅ SSH connection successful to {ssh_host}:{ssh_port}",
+                "test_ssh_success",
+                context=LogContext(
+                    operation_id=f"test_ssh_{int(time.time())}",
+                    user_agent="vast_api/1.0 (test_ssh)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': True,
                 'message': f'SSH connection to {ssh_host}:{ssh_port} successful',
@@ -350,6 +393,16 @@ def test_vastai_ssh():
             elif "Connection timed out" in result.stderr:
                 error_msg = "SSH connection timed out - check host and firewall"
             
+            enhanced_logger.log_error(
+                f"❌ SSH connection failed to {ssh_host}:{ssh_port} - {error_msg}",
+                "connection_error",
+                context=LogContext(
+                    operation_id=f"test_ssh_{int(time.time())}",
+                    user_agent="vast_api/1.0 (test_ssh)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': error_msg,
@@ -360,11 +413,31 @@ def test_vastai_ssh():
             })
             
     except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "SSH connection test timed out",
+            "timeout_error",
+            context=LogContext(
+                operation_id=f"test_ssh_{int(time.time())}",
+                user_agent="vast_api/1.0 (test_ssh)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         return jsonify({
             'success': False,
             'message': 'SSH connection test timed out'
         })
     except Exception as e:
+        enhanced_logger.log_error(
+            f"SSH test unexpected error: {str(e)}",
+            "unexpected_error",
+            context=LogContext(
+                operation_id=f"test_ssh_{int(time.time())}",
+                user_agent="vast_api/1.0 (test_ssh)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         logger.error(f"SSH test error: {str(e)}")
         return jsonify({
             'success': False,
@@ -637,6 +710,16 @@ def get_ui_home():
         ssh_connection = data.get('ssh_connection')
         
         if not ssh_connection:
+            enhanced_logger.log_error(
+                "UI_HOME read failed - no SSH connection string provided",
+                "validation_error",
+                context=LogContext(
+                    operation_id=f"get_ui_home_{int(time.time())}",
+                    user_agent="vast_api/1.0 (get_ui_home)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': 'SSH connection string is required'
@@ -645,11 +728,31 @@ def get_ui_home():
         try:
             ssh_host, ssh_port = _extract_host_port(ssh_connection)
         except ValueError as e:
+            enhanced_logger.log_error(
+                f"UI_HOME read failed - invalid SSH connection format: {str(e)}",
+                "validation_error",
+                context=LogContext(
+                    operation_id=f"get_ui_home_{int(time.time())}",
+                    user_agent="vast_api/1.0 (get_ui_home)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': False,
                 'message': str(e)
             })
         
+        enhanced_logger.log_operation(
+            f"Reading UI_HOME from {ssh_host}:{ssh_port}",
+            "get_ui_home_start",
+            context=LogContext(
+                operation_id=f"get_ui_home_{int(time.time())}",
+                user_agent="vast_api/1.0 (get_ui_home)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         logger.info(f"Reading UI_HOME from {ssh_host}:{ssh_port}")
         
         # Execute the command to get UI_HOME with proper SSH options
@@ -673,12 +776,32 @@ def get_ui_home():
         
         if result.returncode == 0:
             ui_home = result.stdout.strip()
+            enhanced_logger.log_operation(
+                f"✅ Successfully read UI_HOME from {ssh_host}:{ssh_port} - {ui_home if ui_home else 'Not set'}",
+                "get_ui_home_success",
+                context=LogContext(
+                    operation_id=f"get_ui_home_{int(time.time())}",
+                    user_agent="vast_api/1.0 (get_ui_home)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             return jsonify({
                 'success': True,
                 'ui_home': ui_home if ui_home else 'Not set',
                 'output': result.stdout
             })
         else:
+            enhanced_logger.log_error(
+                f"❌ Failed to read UI_HOME from {ssh_host}:{ssh_port} - SSH command failed",
+                "connection_error",
+                context=LogContext(
+                    operation_id=f"get_ui_home_{int(time.time())}",
+                    user_agent="vast_api/1.0 (get_ui_home)",
+                    session_id=f"session_{int(time.time())}",
+                    ip_address=request.remote_addr or "localhost"
+                )
+            )
             logger.error(f"SSH command failed with return code {result.returncode}")
             logger.error(f"SSH stderr: {result.stderr}")
             return jsonify({
@@ -689,11 +812,31 @@ def get_ui_home():
             })
             
     except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "UI_HOME read operation timed out",
+            "timeout_error",
+            context=LogContext(
+                operation_id=f"get_ui_home_{int(time.time())}",
+                user_agent="vast_api/1.0 (get_ui_home)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         return jsonify({
             'success': False,
             'message': 'SSH command timed out'
         })
     except Exception as e:
+        enhanced_logger.log_error(
+            f"UI_HOME read unexpected error: {str(e)}",
+            "unexpected_error",
+            context=LogContext(
+                operation_id=f"get_ui_home_{int(time.time())}",
+                user_agent="vast_api/1.0 (get_ui_home)",
+                session_id=f"session_{int(time.time())}",
+                ip_address=request.remote_addr or "localhost"
+            )
+        )
         logger.error(f"Error getting UI_HOME: {str(e)}")
         return jsonify({
             'success': False,
@@ -1021,6 +1164,898 @@ def create_vastai_instance():
             'success': False,
             'message': f'Error creating instance: {str(e)}'
         })
+
+
+# --- Template Management Routes ---
+
+@app.route('/templates', methods=['GET', 'OPTIONS'])
+def get_templates():
+    """Get list of available setup templates"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        templates = template_manager.get_available_templates()
+        return jsonify({
+            'success': True,
+            'templates': templates
+        })
+    except Exception as e:
+        logger.error(f"Error getting templates: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting templates: {str(e)}'
+        })
+
+
+@app.route('/templates/<template_name>', methods=['GET', 'OPTIONS'])
+def get_template(template_name):
+    """Get specific template configuration"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        template_data = template_manager.load_template(template_name)
+        if not template_data:
+            return jsonify({
+                'success': False,
+                'message': f'Template "{template_name}" not found'
+            })
+        
+        return jsonify({
+            'success': True,
+            'template': template_data
+        })
+    except Exception as e:
+        logger.error(f"Error getting template {template_name}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting template: {str(e)}'
+        })
+
+
+def create_template_context(template_name: str, step_name: str = None) -> LogContext:
+    """Create enhanced logging context for template operations"""
+    operation_id = f"template_{template_name}_{step_name or 'general'}_{int(time.time())}_{str(uuid.uuid4())[:8]}"
+    return LogContext(
+        operation_id=operation_id,
+        user_agent=f"template_executor/1.0 ({template_name})",
+        session_id=f"template_session_{int(time.time())}",
+        ip_address=request.remote_addr or "localhost",
+        instance_id=None,
+        template_name=template_name
+    )
+
+
+@app.route('/templates/<template_name>/execute-step', methods=['POST', 'OPTIONS'])
+def execute_template_step(template_name):
+    """Execute a specific step from a template with enhanced logging"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json()
+        ssh_connection = data.get('ssh_connection')
+        step_name = data.get('step_name')
+        
+        # Create enhanced logging context
+        context = create_template_context(template_name, step_name)
+        
+        enhanced_logger.log_operation(
+            message=f"Starting template step execution: {template_name} - {step_name}",
+            operation="template_step_start",
+            context=context,
+            extra_data={
+                "template_name": template_name,
+                "step_name": step_name,
+                "has_ssh_connection": bool(ssh_connection),
+                "request_data": data
+            }
+        )
+        
+        if not ssh_connection:
+            enhanced_logger.log_error(
+                message="SSH connection string is required for template execution",
+                error_type="missing_ssh_connection",
+                context=context,
+                extra_data={"template_name": template_name, "step_name": step_name}
+            )
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        if not step_name:
+            enhanced_logger.log_error(
+                message="Step name is required for template execution",
+                error_type="missing_step_name",
+                context=context,
+                extra_data={"template_name": template_name}
+            )
+            return jsonify({
+                'success': False,
+                'message': 'Step name is required'
+            })
+        
+        # Get template and find the step
+        template_data = template_manager.load_template(template_name)
+        if not template_data:
+            enhanced_logger.log_error(
+                message=f'Template "{template_name}" not found',
+                error_type="template_not_found",
+                context=context,
+                extra_data={"template_name": template_name}
+            )
+            return jsonify({
+                'success': False,
+                'message': f'Template "{template_name}" not found'
+            })
+        
+        setup_steps = template_data.get('setup_steps', [])
+        step = next((s for s in setup_steps if s.get('name') == step_name), None)
+        
+        if not step:
+            enhanced_logger.log_error(
+                message=f'Step "{step_name}" not found in template "{template_name}"',
+                error_type="step_not_found",
+                context=context,
+                extra_data={
+                    "template_name": template_name,
+                    "step_name": step_name,
+                    "available_steps": [s.get('name') for s in setup_steps]
+                }
+            )
+            return jsonify({
+                'success': False,
+                'message': f'Step "{step_name}" not found in template'
+            })
+        
+        enhanced_logger.log_operation(
+            message=f"Executing template step: {step_name} (type: {step.get('type')})",
+            operation="template_step_execute",
+            context=context,
+            extra_data={
+                "template_name": template_name,
+                "step_name": step_name,
+                "step_type": step.get('type'),
+                "step_config": step,
+                "ssh_connection_host": ssh_connection.split('@')[-1].split(':')[0] if '@' in ssh_connection else "unknown"
+            }
+        )
+        
+        # Execute the step based on its type
+        start_time = time.time()
+        result = execute_step(ssh_connection, step, template_data, context)
+        execution_time = time.time() - start_time
+        
+        enhanced_logger.log_performance(
+            message=f"Template step execution completed: {step_name}",
+            operation="template_step_complete",
+            duration=execution_time,
+            context=context,
+            extra_data={
+                "template_name": template_name,
+                "step_name": step_name,
+                "step_type": step.get('type'),
+                "success": result.get('success', False),
+                "result": result
+            }
+        )
+        
+        if result.get('success'):
+            enhanced_logger.log_operation(
+                message=f"Template step '{step_name}' completed successfully",
+                operation="template_step_success",
+                context=context,
+                extra_data={
+                    "template_name": template_name,
+                    "step_name": step_name,
+                    "execution_time": execution_time,
+                    "result": result
+                }
+            )
+        else:
+            enhanced_logger.log_error(
+                message=f"Template step '{step_name}' failed: {result.get('message', 'Unknown error')}",
+                error_type="template_step_failure",
+                context=context,
+                extra_data={
+                    "template_name": template_name,
+                    "step_name": step_name,
+                    "execution_time": execution_time,
+                    "result": result
+                }
+            )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        context = create_template_context(template_name, step_name if 'step_name' in locals() else None)
+        enhanced_logger.log_error(
+            message=f"Unexpected error executing template step: {str(e)}",
+            error_type="template_execution_exception",
+            context=context,
+            extra_data={
+                "template_name": template_name,
+                "exception": str(e),
+                "exception_type": type(e).__name__
+            }
+        )
+        logger.error(f"Error executing template step: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error executing step: {str(e)}'
+        })
+
+
+def execute_step(ssh_connection, step, template_data, context: LogContext):
+    """Execute a single template step with enhanced logging"""
+    step_type = step.get('type')
+    step_name = step.get('name')
+    
+    enhanced_logger.log_operation(
+        message=f"Executing step '{step_name}' of type '{step_type}'",
+        operation="step_execution_start",
+        context=context,
+        extra_data={
+            "step_name": step_name,
+            "step_type": step_type,
+            "step_config": step
+        }
+    )
+    
+    try:
+        if step_type == 'civitdl_install':
+            enhanced_logger.log_operation(
+                message="Installing CivitDL via template step",
+                operation="civitdl_install_step",
+                context=context,
+                extra_data={"ssh_connection_info": ssh_connection.split('@')[-1] if '@' in ssh_connection else ssh_connection}
+            )
+            # Use existing setup CivitDL functionality
+            result = execute_civitdl_setup(ssh_connection)
+            
+        elif step_type == 'set_ui_home':
+            ui_home = step.get('path') or template_data.get('environment', {}).get('ui_home')
+            if ui_home:
+                enhanced_logger.log_operation(
+                    message=f"Setting UI_HOME to: {ui_home}",
+                    operation="set_ui_home_step",
+                    context=context,
+                    extra_data={"ui_home_path": ui_home}
+                )
+                result = execute_set_ui_home(ssh_connection, ui_home)
+            else:
+                enhanced_logger.log_error(
+                    message="No UI home path specified in step or template environment",
+                    error_type="missing_ui_home_path",
+                    context=context,
+                    extra_data={"step_config": step, "template_environment": template_data.get('environment', {})}
+                )
+                result = {
+                    'success': False,
+                    'message': 'No UI home path specified in step or template environment'
+                }
+        
+        elif step_type == 'git_clone':
+            repository = step.get('repository')
+            destination = step.get('destination')
+            if repository and destination:
+                enhanced_logger.log_operation(
+                    message=f"Cloning repository {repository} to {destination}",
+                    operation="git_clone_step",
+                    context=context,
+                    extra_data={"repository": repository, "destination": destination}
+                )
+                result = execute_git_clone(ssh_connection, repository, destination)
+            else:
+                enhanced_logger.log_error(
+                    message="Repository and destination are required for git_clone step",
+                    error_type="missing_git_clone_params",
+                    context=context,
+                    extra_data={"repository": repository, "destination": destination, "step_config": step}
+                )
+                result = {
+                    'success': False,
+                    'message': 'Repository and destination are required for git_clone step'
+                }
+        
+        elif step_type == 'python_venv':
+            venv_path = step.get('path') or template_data.get('environment', {}).get('python_venv')
+            if venv_path:
+                enhanced_logger.log_operation(
+                    message=f"Setting up Python virtual environment at: {venv_path}",
+                    operation="python_venv_step",
+                    context=context,
+                    extra_data={"venv_path": venv_path}
+                )
+                result = execute_python_venv_setup(ssh_connection, venv_path)
+            else:
+                enhanced_logger.log_error(
+                    message="No Python venv path specified in step or template environment",
+                    error_type="missing_venv_path",
+                    context=context,
+                    extra_data={"step_config": step, "template_environment": template_data.get('environment', {})}
+                )
+                result = {
+                    'success': False,
+                    'message': 'No Python venv path specified in step or template environment'
+                }
+        
+        else:
+            enhanced_logger.log_error(
+                message=f"Unknown step type: {step_type}",
+                error_type="unknown_step_type",
+                context=context,
+                extra_data={"step_type": step_type, "step_name": step_name, "step_config": step}
+            )
+            result = {
+                'success': False,
+                'message': f'Unknown step type: {step_type}'
+            }
+        
+        # Log the step execution result
+        if result.get('success'):
+            enhanced_logger.log_operation(
+                message=f"Step '{step_name}' completed successfully",
+                operation="step_execution_success",
+                context=context,
+                extra_data={"step_name": step_name, "step_type": step_type, "result": result}
+            )
+        else:
+            enhanced_logger.log_error(
+                message=f"Step '{step_name}' failed: {result.get('message', 'Unknown error')}",
+                error_type="step_execution_failure",
+                context=context,
+                extra_data={"step_name": step_name, "step_type": step_type, "result": result}
+            )
+        
+        return result
+            
+    except Exception as e:
+        enhanced_logger.log_error(
+            message=f"Exception during step execution: {str(e)}",
+            error_type="step_execution_exception",
+            context=context,
+            extra_data={
+                "step_name": step_name,
+                "step_type": step_type,
+                "exception": str(e),
+                "exception_type": type(e).__name__
+            }
+        )
+        logger.error(f"Error executing step {step_name}: {str(e)}")
+        return {
+            'success': False,
+            'message': f'Error executing {step_name}: {str(e)}'
+        }
+
+
+def execute_civitdl_setup(ssh_connection):
+    """Execute CivitDL setup with enhanced logging"""
+    operation_id = f"civitdl_setup_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    session_id = f"session_{int(time.time())}"
+    
+    # Create log context for this operation
+    context = LogContext(
+        operation_id=operation_id,
+        user_agent="vast_api/1.0 (template_civitdl_setup)",
+        session_id=session_id,
+        ip_address="localhost",
+        template_name="comfyui"
+    )
+    
+    try:
+        # Log start of operation
+        enhanced_logger.log_operation(
+            "🎨 Starting CivitDL installation and setup",
+            "template_civitdl_setup_start",
+            context=context,
+            extra_data={"ssh_connection": ssh_connection}
+        )
+        
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for CivitDL setup",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        # Log SSH connection attempt
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} for CivitDL setup",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
+        
+        # Use existing CivitDL setup logic
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
+        set -e
+        cd /workspace
+        if [ ! -d civitdl ]; then
+            echo 'Cloning CivitDL repository...'
+            git clone https://github.com/civitai/civitdl.git
+        else
+            echo 'CivitDL directory already exists'
+        fi
+        cd civitdl
+        echo 'Installing CivitDL package...'
+        pip install -e .
+        pip install requests tqdm
+        echo 'CivitDL installation completed successfully'
+        "'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            # Log successful operation
+            enhanced_logger.log_operation(
+                "✅ CivitDL setup completed successfully",
+                "template_civitdl_setup_success",
+                context=context,
+                extra_data={
+                    "ssh_output": result.stdout.strip(),
+                    "return_code": result.returncode
+                }
+            )
+            return {
+                'success': True,
+                'message': 'CivitDL setup completed successfully',
+                'output': result.stdout
+            }
+        else:
+            # Log failure
+            enhanced_logger.log_error(
+                f"CivitDL setup failed: {result.stderr.strip()}",
+                "template_civitdl_setup_failed",
+                context=context,
+                extra_data={
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
+            return {
+                'success': False,
+                'message': f'CivitDL setup failed with return code {result.returncode}',
+                'error': result.stderr
+            }
+            
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "CivitDL setup timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 300}
+        )
+        return {
+            'success': False,
+            'message': 'SSH command timed out during CivitDL setup'
+        }
+    except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during CivitDL setup: {str(e)}",
+            "template_civitdl_setup_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
+        return {
+            'success': False,
+            'message': f'Error during CivitDL setup: {str(e)}'
+        }
+
+
+def execute_set_ui_home(ssh_connection, ui_home_path):
+    """Execute UI_HOME setup with enhanced logging"""
+    operation_id = f"set_ui_home_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    session_id = f"session_{int(time.time())}"
+    
+    # Create log context for this operation
+    context = LogContext(
+        operation_id=operation_id,
+        user_agent="vast_api/1.0 (template_set_ui_home)",
+        session_id=session_id,
+        ip_address="localhost",
+        template_name="comfyui"
+    )
+    
+    try:
+        # Log start of operation
+        enhanced_logger.log_operation(
+            f"🏠 Setting UI_HOME to {ui_home_path}",
+            "template_set_ui_home_start",
+            context=context,
+            extra_data={"ui_home_path": ui_home_path, "ssh_connection": ssh_connection}
+        )
+        
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for UI_HOME setup",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        # Log SSH connection attempt
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} to set UI_HOME",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
+        
+        # Build SSH command with proper escaping
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
+        echo 'export UI_HOME={ui_home_path}' >> ~/.bashrc && 
+        export UI_HOME={ui_home_path} && 
+        echo 'UI_HOME successfully set to {ui_home_path}'"'''
+        
+        # Execute SSH command
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+        
+        if result.returncode == 0:
+            # Log successful operation
+            enhanced_logger.log_operation(
+                f"✅ UI_HOME successfully set to {ui_home_path}",
+                "template_set_ui_home_success",
+                context=context,
+                extra_data={
+                    "ui_home_path": ui_home_path,
+                    "ssh_output": result.stdout.strip(),
+                    "return_code": result.returncode
+                }
+            )
+            return {
+                'success': True,
+                'message': f'UI_HOME set to {ui_home_path}',
+                'output': result.stdout
+            }
+        else:
+            # Log failure
+            enhanced_logger.log_error(
+                f"Failed to set UI_HOME: {result.stderr.strip()}",
+                "template_set_ui_home_failed",
+                context=context,
+                extra_data={
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
+            return {
+                'success': False,
+                'message': f'Failed to set UI_HOME with return code {result.returncode}',
+                'error': result.stderr
+            }
+            
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "UI_HOME setup timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 60}
+        )
+        return {
+            'success': False,
+            'message': 'SSH command timed out while setting UI_HOME'
+        }
+    except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during UI_HOME setup: {str(e)}",
+            "template_set_ui_home_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
+        return {
+            'success': False,
+            'message': f'Error setting UI_HOME: {str(e)}'
+        }
+
+
+def execute_git_clone(ssh_connection, repository, destination):
+    """Execute git clone with enhanced logging"""
+    operation_id = f"git_clone_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    session_id = f"session_{int(time.time())}"
+    
+    # Create log context for this operation
+    context = LogContext(
+        operation_id=operation_id,
+        user_agent="vast_api/1.0 (template_git_clone)",
+        session_id=session_id,
+        ip_address="localhost",
+        template_name="comfyui"
+    )
+    
+    try:
+        # Log start of operation
+        enhanced_logger.log_operation(
+            f"📥 Cloning repository {repository} to {destination}",
+            "template_git_clone_start",
+            context=context,
+            extra_data={"repository": repository, "destination": destination, "ssh_connection": ssh_connection}
+        )
+        
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for git clone",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        # Log SSH connection attempt
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} for git clone",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
+        
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
+        set -e
+        if [ ! -d '{destination}' ]; then
+            echo 'Cloning repository {repository}...'
+            git clone {repository} {destination}
+            echo 'Repository cloned successfully to {destination}'
+        else
+            echo 'Repository already exists at {destination}'
+            cd {destination}
+            git pull origin main || git pull origin master || echo 'Repository updated or pull not needed'
+        fi
+        "'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            # Log successful operation
+            enhanced_logger.log_operation(
+                f"✅ Git clone completed: {repository} -> {destination}",
+                "template_git_clone_success",
+                context=context,
+                extra_data={
+                    "repository": repository,
+                    "destination": destination,
+                    "ssh_output": result.stdout.strip(),
+                    "return_code": result.returncode
+                }
+            )
+            return {
+                'success': True,
+                'message': f'Repository cloned to {destination}',
+                'output': result.stdout
+            }
+        else:
+            # Log failure
+            enhanced_logger.log_error(
+                f"Git clone failed: {result.stderr.strip()}",
+                "template_git_clone_failed",
+                context=context,
+                extra_data={
+                    "repository": repository,
+                    "destination": destination,
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
+            return {
+                'success': False,
+                'message': f'Git clone failed with return code {result.returncode}',
+                'error': result.stderr
+            }
+            
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "Git clone timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 300, "repository": repository, "destination": destination}
+        )
+        return {
+            'success': False,
+            'message': 'SSH command timed out during git clone'
+        }
+    except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during git clone: {str(e)}",
+            "template_git_clone_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
+        return {
+            'success': False,
+            'message': f'Error during git clone: {str(e)}'
+        }
+
+
+def execute_python_venv_setup(ssh_connection, venv_path):
+    """Execute Python virtual environment setup with enhanced logging"""
+    operation_id = f"python_venv_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    session_id = f"session_{int(time.time())}"
+    
+    # Create log context for this operation
+    context = LogContext(
+        operation_id=operation_id,
+        user_agent="vast_api/1.0 (template_python_venv)",
+        session_id=session_id,
+        ip_address="localhost",
+        template_name="comfyui"
+    )
+    
+    try:
+        # Log start of operation
+        enhanced_logger.log_operation(
+            f"🐍 Setting up Python virtual environment at {venv_path}",
+            "template_python_venv_start",
+            context=context,
+            extra_data={"venv_path": venv_path, "ssh_connection": ssh_connection}
+        )
+        
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for Python venv setup",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        # Log SSH connection attempt
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} for Python venv setup",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
+        
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
+        set -e
+        if [ ! -d '{venv_path}' ]; then
+            echo 'Creating Python virtual environment...'
+            python3 -m venv {venv_path}
+            echo 'Python virtual environment created at {venv_path}'
+        else
+            echo 'Virtual environment already exists at {venv_path}'
+        fi
+        echo 'Activating virtual environment and upgrading pip...'
+        source {venv_path}/bin/activate
+        pip install --upgrade pip
+        echo 'Virtual environment setup completed successfully'
+        "'''
+        
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=180)
+        
+        if result.returncode == 0:
+            # Log successful operation
+            enhanced_logger.log_operation(
+                f"✅ Python virtual environment setup completed at {venv_path}",
+                "template_python_venv_success",
+                context=context,
+                extra_data={
+                    "venv_path": venv_path,
+                    "ssh_output": result.stdout.strip(),
+                    "return_code": result.returncode
+                }
+            )
+            return {
+                'success': True,
+                'message': f'Python virtual environment setup at {venv_path}',
+                'output': result.stdout
+            }
+        else:
+            # Log failure
+            enhanced_logger.log_error(
+                f"Python venv setup failed: {result.stderr.strip()}",
+                "template_python_venv_failed",
+                context=context,
+                extra_data={
+                    "venv_path": venv_path,
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
+            return {
+                'success': False,
+                'message': f'Python venv setup failed with return code {result.returncode}',
+                'error': result.stderr
+            }
+            
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "Python venv setup timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 180, "venv_path": venv_path}
+        )
+        return {
+            'success': False,
+            'message': 'SSH command timed out during Python venv setup'
+        }
+    except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during Python venv setup: {str(e)}",
+            "template_python_venv_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
+        return {
+            'success': False,
+            'message': f'Error setting up Python virtual environment: {str(e)}'
+        }
 
 
 if __name__ == '__main__':

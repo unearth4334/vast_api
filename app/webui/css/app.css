@@ -445,6 +445,16 @@ body {
     margin-top: var(--size-4-1);
 }
 
+.log-status-success {
+    color: var(--text-success);
+    font-weight: 500;
+}
+
+.log-status-failed {
+    color: var(--text-error);
+    font-weight: 500;
+}
+
 .no-logs-message {
     text-align: center;
     color: var(--text-muted);
@@ -650,6 +660,20 @@ body {
    VASTAI SETUP FORMS
    ========================= */
 
+.setup-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--size-4-4);
+    margin-bottom: var(--size-4-4);
+    align-items: end;
+}
+
+@media (max-width: 768px) {
+    .setup-fields-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .setup-field {
     margin-bottom: var(--size-4-4);
 }
@@ -661,14 +685,51 @@ body {
     color: var(--text-normal);
 }
 
-.setup-field input[type="text"] {
+.setup-field input[type="text"],
+.setup-field select {
     width: 100%;
     padding: var(--size-4-3);
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-s);
     background: var(--background-modifier-form-field);
     color: var(--text-normal);
+    font-size: var(--font-ui-small);
+}
+
+.setup-field input[type="text"] {
     font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.setup-field select {
+    font-family: inherit;
+    cursor: pointer;
+    min-width: 200px;
+}
+
+.setup-field select:focus,
+.setup-field input[type="text"]:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.1);
+}
+
+.template-info {
+    margin: var(--size-4-4) 0;
+    padding: var(--size-4-4);
+    background: var(--background-secondary);
+    border-radius: var(--radius-s);
+    border-left: 3px solid var(--interactive-accent);
+}
+
+.template-info h4 {
+    margin: 0 0 var(--size-4-2) 0;
+    color: var(--text-normal);
+    font-size: var(--font-ui-medium);
+}
+
+.template-info p {
+    margin: 0;
+    color: var(--text-muted);
     font-size: var(--font-ui-small);
 }
 

@@ -1,0 +1,76 @@
+# ComfyUI Template Configuration
+name: "ComfyUI"
+description: "Complete ComfyUI setup with CivitDL and auto-installer"
+version: "1.0.0"
+
+# Environment settings
+environment:
+  ui_home: "/workspace/ComfyUI/"
+  python_venv: "/workspace/ComfyUI/venv"
+  
+# Setup steps that will be executed in order
+setup_steps:
+  - name: "Install CivitDL"
+    type: "civitdl_install"
+    description: "Install and configure CivitDL for model management"
+    
+  - name: "Set UI Home"
+    type: "set_ui_home"
+    path: "/workspace/ComfyUI/"
+    description: "Configure UI_HOME environment variable"
+    
+  - name: "Clone ComfyUI Auto Installer"
+    type: "git_clone"
+    repository: "https://github.com/unearth4334/ComfyUI-Auto_installer"
+    destination: "/workspace/ComfyUI-Auto_installer"
+    description: "Clone the ComfyUI auto-installer repository"
+    
+  - name: "Setup Python Virtual Environment"
+    type: "python_venv"
+    path: "/workspace/ComfyUI/venv"
+    description: "Create Python virtual environment for ComfyUI"
+
+# UI Configuration
+ui_config:
+  setup_buttons:
+    - label: "🔧 Test SSH Connection"
+      action: "test_ssh"
+      style: "primary"
+      
+    - label: "🔄 Sync Instance"
+      action: "sync_instance" 
+      style: "primary"
+      
+    - label: "🎨 Setup CivitDL"
+      action: "setup_civitdl"
+      style: "primary"
+      
+    - label: "📁 Set UI_HOME"
+      action: "set_ui_home"
+      style: "primary"
+      
+    - label: "🐍 Setup Python venv"
+      action: "setup_python_venv"
+      style: "primary"
+      
+    - label: "📥 Clone Auto Installer"
+      action: "clone_auto_installer"
+      style: "primary"
+      
+    - label: "📖 Read UI_HOME"
+      action: "get_ui_home"
+      style: "secondary"
+      
+    - label: "🔌 Terminate Connection"
+      action: "terminate_connection"
+      style: "danger"
+
+# Additional metadata
+metadata:
+  author: "vast_api"
+  created_date: "2025-10-20"
+  tags: ["comfyui", "stable-diffusion", "ai-art"]
+  requirements:
+    - "SSH access to VastAI instance"
+    - "Python 3.8+ on target instance"
+    - "Git installed on target instance"
