@@ -1,0 +1,217 @@
+[
+  {
+    "timestamp": "2025-10-20T11:50:39.553723",
+    "operation_id": "test_full_logging_123",
+    "api": {
+      "method": "PUT",
+      "endpoint": "/search/asks/",
+      "url": "https://console.vast.ai/api/v0/search/asks/",
+      "headers": {
+        "Authorization": "Bearer [REDACTED:19 chars]",
+        "Content-Type": "application/json",
+        "User-Agent": "vast_api/1.0"
+      },
+      "status_code": 200,
+      "duration_ms": 1250.5,
+      "retry_count": 0,
+      "success": true
+    },
+    "request": {
+      "data": {
+        "select_cols": [
+          "*"
+        ],
+        "q": {
+          "verified": {
+            "eq": true
+          },
+          "rentable": {
+            "eq": true
+          },
+          "gpu_ram": {
+            "gte": 10240
+          },
+          "order": [
+            [
+              "dph_total",
+              "asc"
+            ]
+          ],
+          "limit": 100
+        }
+      },
+      "size_bytes": 155,
+      "contains_files": false,
+      "data_type": "dict",
+      "parameter_count": 2,
+      "structure": {
+        "type": "dict",
+        "size": 155,
+        "keys": [
+          "select_cols",
+          "q"
+        ],
+        "key_count": 2,
+        "nested_levels": 4,
+        "has_arrays": true,
+        "has_objects": true
+      }
+    },
+    "response": {
+      "data": {
+        "asks": [
+          {
+            "id": 12345,
+            "gpu_name": "RTX 4090",
+            "dph_total": 0.5,
+            "gpu_ram": 24576,
+            "verified": true
+          },
+          {
+            "id": 12346,
+            "gpu_name": "RTX 3090",
+            "dph_total": 0.4,
+            "gpu_ram": 24576,
+            "verified": true
+          }
+        ]
+      },
+      "size_bytes": 196,
+      "record_count": 2,
+      "data_types": {
+        "list": 1,
+        "int": 4,
+        "str": 2,
+        "float": 2,
+        "bool": 2
+      },
+      "data_type": "dict",
+      "structure": {
+        "type": "dict",
+        "size": 196,
+        "keys": [
+          "asks"
+        ],
+        "key_count": 1,
+        "nested_levels": 3,
+        "has_arrays": true,
+        "has_objects": false
+      }
+    },
+    "context": {
+      "session_id": "session_test",
+      "user_agent": "test/1.0",
+      "ip_address": "127.0.0.1",
+      "instance_id": null,
+      "template_name": null
+    },
+    "system": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 1.5,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T11:50:39.654706"
+    },
+    "performance": {
+      "memory_before_mb": 17.41796875,
+      "duration_category": "slow",
+      "success": true
+    }
+  },
+  {
+    "timestamp": "2025-10-20T11:53:51.010439",
+    "operation_id": "test_integration_1760986431_38a03027",
+    "api": {
+      "method": "PUT",
+      "endpoint": "/asks/12345/",
+      "url": "https://console.vast.ai/api/v0/asks/12345/",
+      "headers": {
+        "Authorization": "Bearer [REDACTED:18 chars]",
+        "Content-Type": "application/json"
+      },
+      "status_code": 200,
+      "duration_ms": 2150.3,
+      "retry_count": 0,
+      "success": true
+    },
+    "request": {
+      "data": {
+        "template_hash_id": "abc123def456",
+        "disk": 32,
+        "extra_env": "{\"UI_HOME\": \"/app/ui\"}",
+        "target_state": "running",
+        "cancel_unavail": true
+      },
+      "size_bytes": 142,
+      "contains_files": false,
+      "data_type": "dict",
+      "parameter_count": 5,
+      "structure": {
+        "type": "dict",
+        "size": 138,
+        "keys": [
+          "template_hash_id",
+          "disk",
+          "extra_env",
+          "target_state",
+          "cancel_unavail"
+        ],
+        "key_count": 5,
+        "nested_levels": 1,
+        "has_arrays": false,
+        "has_objects": false
+      }
+    },
+    "response": {
+      "data": {
+        "success": true,
+        "new_contract": 27050456,
+        "message": "Instance created successfully"
+      },
+      "size_bytes": 87,
+      "record_count": 0,
+      "data_types": {
+        "bool": 1,
+        "int": 1,
+        "str": 1
+      },
+      "data_type": "dict",
+      "structure": {
+        "type": "dict",
+        "size": 87,
+        "keys": [
+          "success",
+          "new_contract",
+          "message"
+        ],
+        "key_count": 3,
+        "nested_levels": 1,
+        "has_arrays": false,
+        "has_objects": false
+      }
+    },
+    "context": {
+      "session_id": "session_1760986431",
+      "user_agent": "vast_api/1.0 (test_integration)",
+      "ip_address": "localhost",
+      "instance_id": "27050456",
+      "template_name": null
+    },
+    "system": {
+      "hostname": "DESKTOP1",
+      "platform": "Linux 6.14.0-33-generic",
+      "python_version": "3.13.3",
+      "cpu_usage": 2.0,
+      "memory_usage": 18.5,
+      "disk_usage": 48.5,
+      "timestamp": "2025-10-20T11:53:51.111161"
+    },
+    "performance": {
+      "memory_before_mb": 32.44921875,
+      "duration_category": "slow",
+      "success": true
+    }
+  }
+]

@@ -200,6 +200,19 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
             }
         )
 
+        # Enhanced API interaction logging with complete request/response data
+        enhanced_logger.log_api_interaction(
+            method=method,
+            endpoint=endpoint,
+            context=context,
+            request_data=query_body,
+            response_data=response_data,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            headers=headers,
+            url=url
+        )
+
         # Log successful API interaction (backward compatibility)
         log_api_interaction(
             method=method,
@@ -226,6 +239,20 @@ def query_offers(api_key, gpu_ram=10, sort="dph_total", limit=100,
                 "response_time_ms": duration_ms,
                 "status_code": getattr(response, 'status_code', None) if 'response' in locals() else None
             }
+        )
+
+        # Enhanced API interaction logging for errors with complete request data
+        enhanced_logger.log_api_interaction(
+            method=method,
+            endpoint=endpoint,
+            context=context,
+            request_data=query_body,
+            response_data=getattr(response, 'text', None) if 'response' in locals() else None,
+            status_code=getattr(response, 'status_code', None) if 'response' in locals() else None,
+            error=str(e),
+            duration_ms=duration_ms,
+            headers=headers,
+            url=url
         )
 
         # Log failed API interaction (backward compatibility)
@@ -310,6 +337,20 @@ def create_instance(api_key, offer_id, template_hash_id, ui_home_env, disk_size_
                 }
             )
             
+            # Enhanced API interaction logging for errors with complete request/response data
+            enhanced_logger.log_api_interaction(
+                method=method,
+                endpoint=endpoint,
+                context=context,
+                request_data=payload,
+                response_data=error_data,
+                status_code=response.status_code,
+                error=error_msg,
+                duration_ms=duration_ms,
+                headers=headers,
+                url=f"{VAST_API_BASE_URL}{endpoint}"
+            )
+            
             # Log failed API interaction (backward compatibility)
             log_api_interaction(
                 method=method,
@@ -350,6 +391,19 @@ def create_instance(api_key, offer_id, template_hash_id, ui_home_env, disk_size_
                 "instance_id": new_instance_id,
                 "status_code": response.status_code
             }
+        )
+        
+        # Enhanced API interaction logging with complete request/response data
+        enhanced_logger.log_api_interaction(
+            method=method,
+            endpoint=endpoint,
+            context=context,
+            request_data=payload,
+            response_data=response_data,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            headers=headers,
+            url=f"{VAST_API_BASE_URL}{endpoint}"
         )
         
         # Log successful API interaction (backward compatibility)
@@ -659,6 +713,19 @@ def list_instances(api_key):
                 "instance_count": len(instances),
                 "status_code": response.status_code
             }
+        )
+        
+        # Enhanced API interaction logging with complete response data
+        enhanced_logger.log_api_interaction(
+            method=method,
+            endpoint=endpoint,
+            context=context,
+            request_data=None,
+            response_data=response_data,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            headers=headers,
+            url=f"{VAST_API_BASE_URL}{endpoint}"
         )
         
         # Log successful API interaction (backward compatibility)

@@ -151,35 +151,63 @@ class EnhancedVastAILogger:
                            error: str = None, 
                            duration_ms: float = None,
                            retry_count: int = 0,
-                           rate_limit_info: Dict[str, Any] = None) -> None:
+                           rate_limit_info: Dict[str, Any] = None,
+                           headers: Dict[str, str] = None,
+                           url: str = None) -> None:
         """
-        Enhanced API interaction logging with comprehensive details.
+        Enhanced API interaction logging with complete request/response capture.
         
         Args:
             method (str): HTTP method (GET, POST, PUT, DELETE)
             endpoint (str): VastAI API endpoint
             context (LogContext): Enhanced context information
-            request_data (dict, optional): Request payload/parameters
-            response_data (dict, optional): Response data from API
+            request_data (dict, optional): Complete request payload/parameters
+            response_data (dict, optional): Complete response data from API
             status_code (int, optional): HTTP status code
             error (str, optional): Error message if request failed
             duration_ms (float, optional): Request duration in milliseconds
             retry_count (int): Number of retries attempted
             rate_limit_info (dict, optional): Rate limiting information
+            headers (dict, optional): Request headers (will be sanitized)
+            url (str, optional): Full request URL
         """
         timestamp = datetime.now()
         system_info = SystemInfo.capture()
         
-        # Create comprehensive log entry
+        # Sanitize sensitive data while preserving structure for analysis
+        safe_request_data = self._deep_sanitize_data(request_data) if request_data else None
+        safe_response_data = self._deep_sanitize_data(response_data) if response_data else None
+        safe_headers = self._sanitize_headers(headers) if headers else None
+        
+        # Create comprehensive log entry with full request/response details
         log_entry = {
             "timestamp": timestamp.isoformat(),
             "operation_id": context.operation_id,
             "api": {
                 "method": method,
                 "endpoint": endpoint,
+                "url": url or f"https://console.vast.ai/api/v0{endpoint}",
+                "headers": safe_headers,
                 "status_code": status_code,
                 "duration_ms": duration_ms,
-                "retry_count": retry_count
+                "retry_count": retry_count,
+                "success": status_code is not None and 200 <= status_code < 300
+            },
+            "request": {
+                "data": safe_request_data,
+                "size_bytes": len(json.dumps(request_data, default=str)) if request_data else 0,
+                "contains_files": self._contains_files(request_data),
+                "data_type": type(request_data).__name__ if request_data else None,
+                "parameter_count": len(request_data) if isinstance(request_data, dict) else 0,
+                "structure": self._analyze_data_structure(request_data) if request_data else None
+            },
+            "response": {
+                "data": safe_response_data,
+                "size_bytes": len(json.dumps(response_data, default=str)) if response_data else 0,
+                "record_count": self._count_records(response_data),
+                "data_types": self._analyze_data_types(response_data),
+                "data_type": type(response_data).__name__ if response_data else None,
+                "structure": self._analyze_data_structure(response_data) if response_data else None
             },
             "context": {
                 "session_id": context.session_id,
@@ -195,24 +223,6 @@ class EnhancedVastAILogger:
                 "success": error is None
             }
         }
-        
-        # Add request data if provided (sanitized)
-        if request_data:
-            log_entry["request"] = {
-                "data": self._sanitize_data(request_data),
-                "size_bytes": len(json.dumps(request_data, default=str)),
-                "contains_files": self._contains_files(request_data)
-            }
-        
-        # Add response data if provided (sanitized and analyzed)
-        if response_data:
-            sanitized_response = self._sanitize_data(response_data)
-            log_entry["response"] = {
-                "data": sanitized_response,
-                "size_bytes": len(json.dumps(response_data, default=str)),
-                "record_count": self._count_records(response_data),
-                "data_types": self._analyze_data_types(response_data)
-            }
         
         # Add error details if provided
         if error:
@@ -237,6 +247,37 @@ class EnhancedVastAILogger:
         # Log errors to separate error file
         if error:
             self._log_error(log_entry, timestamp)
+        
+        # Enhanced standard logging with request/response summary
+        log_level = "ERROR" if error else "INFO"
+        log_message = f"{method} {endpoint}"
+        if status_code:
+            log_message += f" [{status_code}]"
+        if duration_ms:
+            log_message += f" ({duration_ms:.1f}ms)"
+        if safe_request_data:
+            log_message += f" Req:{len(str(safe_request_data))}b"
+        if safe_response_data:
+            log_message += f" Resp:{len(str(safe_response_data))}b"
+        if error:
+            log_message += f" Error: {error}"
+            
+        self.logger.log(
+            logging.ERROR if error else logging.INFO,
+            log_message,
+            extra={
+                "context": asdict(context), 
+                "api_data": log_entry["api"],
+                "request_summary": {
+                    "size": log_entry["request"]["size_bytes"],
+                    "type": log_entry["request"]["data_type"]
+                },
+                "response_summary": {
+                    "size": log_entry["response"]["size_bytes"],
+                    "records": log_entry["response"]["record_count"]
+                }
+            }
+        )
     
     def log_instance_operation(self, operation: str, instance_id: str, 
                               details: Dict[str, Any], context: LogContext,
@@ -380,6 +421,147 @@ class EnhancedVastAILogger:
                       (isinstance(value, str) and len(value) > 1000)
                       for key, value in data.items())
         return False
+
+    def _deep_sanitize_data(self, data: Any, max_depth: int = 10) -> Any:
+        """
+        Deep sanitization of data while preserving structure for analysis.
+        
+        Args:
+            data: Data to sanitize
+            max_depth: Maximum recursion depth to prevent infinite loops
+            
+        Returns:
+            Sanitized data with preserved structure
+        """
+        if max_depth <= 0:
+            return "[MAX_DEPTH_REACHED]"
+            
+        if isinstance(data, dict):
+            sanitized = {}
+            for key, value in data.items():
+                # Sanitize sensitive keys
+                if any(sensitive in str(key).lower() for sensitive in ['password', 'token', 'key', 'secret', 'auth']):
+                    sanitized[key] = "[REDACTED]"
+                else:
+                    sanitized[key] = self._deep_sanitize_data(value, max_depth - 1)
+            return sanitized
+        elif isinstance(data, list):
+            # For large lists, sample first/last items and show count
+            if len(data) > 20:
+                return {
+                    "type": "large_list",
+                    "length": len(data),
+                    "sample_first": [self._deep_sanitize_data(item, max_depth - 1) for item in data[:3]],
+                    "sample_last": [self._deep_sanitize_data(item, max_depth - 1) for item in data[-2:]],
+                    "truncated": True
+                }
+            else:
+                return [self._deep_sanitize_data(item, max_depth - 1) for item in data]
+        elif isinstance(data, str):
+            # Truncate very long strings but preserve some content for analysis
+            if len(data) > 1000:
+                return {
+                    "type": "long_string",
+                    "length": len(data),
+                    "preview": data[:200] + "...",
+                    "truncated": True
+                }
+            return data
+        else:
+            return data
+
+    def _sanitize_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
+        """
+        Sanitize HTTP headers while preserving important information.
+        
+        Args:
+            headers: Request headers dictionary
+            
+        Returns:
+            Sanitized headers with sensitive data redacted
+        """
+        if not headers:
+            return {}
+            
+        sanitized = {}
+        for key, value in headers.items():
+            key_lower = key.lower()
+            if key_lower in ['authorization', 'x-api-key', 'cookie', 'x-auth-token']:
+                # Keep the auth type but redact the actual token
+                if key_lower == 'authorization' and value.startswith('Bearer '):
+                    sanitized[key] = f"Bearer [REDACTED:{len(value)-7} chars]"
+                else:
+                    sanitized[key] = f"[REDACTED:{len(value)} chars]"
+            else:
+                sanitized[key] = value
+        return sanitized
+
+    def _analyze_data_structure(self, data: Any) -> Dict[str, Any]:
+        """
+        Analyze data structure for logging insights.
+        
+        Args:
+            data: Data to analyze
+            
+        Returns:
+            Structure analysis dictionary
+        """
+        if data is None:
+            return {"type": "null", "structure": "none"}
+            
+        structure_info = {
+            "type": type(data).__name__,
+            "size": len(str(data))
+        }
+        
+        if isinstance(data, dict):
+            structure_info.update({
+                "keys": list(data.keys())[:10],  # First 10 keys
+                "key_count": len(data),
+                "nested_levels": self._get_nesting_depth(data),
+                "has_arrays": any(isinstance(v, list) for v in data.values()),
+                "has_objects": any(isinstance(v, dict) for v in data.values())
+            })
+        elif isinstance(data, list):
+            structure_info.update({
+                "length": len(data),
+                "item_types": list(set(type(item).__name__ for item in data[:20])),
+                "is_homogeneous": len(set(type(item).__name__ for item in data)) == 1,
+                "nested_levels": self._get_nesting_depth(data)
+            })
+        elif isinstance(data, str):
+            structure_info.update({
+                "length": len(data),
+                "is_json": self._is_json_string(data),
+                "contains_newlines": '\n' in data,
+                "contains_special_chars": any(c in data for c in ['<', '>', '{', '}', '[', ']'])
+            })
+            
+        return structure_info
+
+    def _get_nesting_depth(self, data: Any, current_depth: int = 0, max_depth: int = 10) -> int:
+        """Calculate maximum nesting depth of data structure"""
+        if current_depth >= max_depth:
+            return max_depth
+            
+        if isinstance(data, dict):
+            if not data:
+                return current_depth
+            return max(self._get_nesting_depth(v, current_depth + 1, max_depth) for v in data.values())
+        elif isinstance(data, list):
+            if not data:
+                return current_depth
+            return max(self._get_nesting_depth(item, current_depth + 1, max_depth) for item in data)
+        else:
+            return current_depth
+
+    def _is_json_string(self, text: str) -> bool:
+        """Check if string contains valid JSON"""
+        try:
+            json.loads(text)
+            return True
+        except (json.JSONDecodeError, TypeError):
+            return False
     
     def _count_records(self, data: Any) -> int:
         """Count records in response data"""
