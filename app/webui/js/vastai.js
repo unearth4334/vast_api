@@ -85,7 +85,32 @@ function resolveSSH(i) {
     i.ip_address ??
     i.publicIp ??
     null;                       // <- we do NOT fall back to ssh_host; public IP wins
-  const port = i.ssh_port || 22;
+  
+  // Extract SSH port using the same logic as backend get_ssh_port()
+  // Prefers host-side port from ports mapping, falls back to ssh_port
+  let port = null;
+  
+  try {
+    // Try to get port from ports mapping (preferred method)
+    const ports = i.ports;
+    if (ports && typeof ports === 'object' && ports['22/tcp']) {
+      const tcpPorts = ports['22/tcp'];
+      if (Array.isArray(tcpPorts) && tcpPorts.length > 0) {
+        const hostPort = tcpPorts[0].HostPort;
+        if (hostPort) {
+          port = hostPort;
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore errors and fall back to ssh_port
+  }
+  
+  // Fallback to ssh_port field if ports mapping didn't work
+  if (!port) {
+    port = i.ssh_port || 22;
+  }
+  
   return { host, port };
 }
 
@@ -412,8 +437,10 @@ async function refreshInstanceCard(instanceId) {
       inst.ip_address ||
       inst.publicIp ||
       null;
-    const sshPort = inst.ssh_port || 22;
-    const state   = normStatus(inst.cur_state || inst.status || 'unknown');
+    
+    // Use the same SSH port resolution logic as resolveSSH()
+    const { port: sshPort } = resolveSSH(inst);
+    const state = normStatus(inst.cur_state || inst.status || 'unknown');
 
     const sshConnection = (sshHost && sshPort)
       ? `ssh -p ${sshPort} root@${sshHost} -L 8080:localhost:8080`
