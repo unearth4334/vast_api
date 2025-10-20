@@ -2088,50 +2088,78 @@ function updateSetupButtons(template) {
   const uiConfig = template.ui_config || {};
   const buttons = uiConfig.setup_buttons || [];
   
-  // Clear existing buttons except test SSH and sync instance
+  // Clear existing buttons
   container.innerHTML = '';
   
   // Always include basic buttons first
-  container.innerHTML += `
-    <button class="setup-button" onclick="testVastAISSH()">
-      🔧 Test SSH Connection
-    </button>
-    <button class="setup-button" onclick="syncFromConnectionString()">
-      🔄 Sync Instance
-    </button>
-  `;
+  const testSSHBtn = document.createElement('button');
+  testSSHBtn.className = 'setup-button';
+  testSSHBtn.textContent = '🔧 Test SSH Connection';
+  testSSHBtn.onclick = testVastAISSH;
+  container.appendChild(testSSHBtn);
+  
+  const syncBtn = document.createElement('button');
+  syncBtn.className = 'setup-button';
+  syncBtn.textContent = '🔄 Sync Instance';
+  syncBtn.onclick = syncFromConnectionString;
+  container.appendChild(syncBtn);
   
   // Add template-specific buttons
   console.log(`🔧 Adding ${buttons.length} template buttons`);
   buttons.forEach((button, index) => {
     if (button.action !== 'test_ssh' && button.action !== 'sync_instance') {
-      const btnClass = getButtonClass(button.style);
-      const onclick = getButtonOnClick(button.action, template);
+      const btnElement = document.createElement('button');
+      btnElement.className = getButtonClass(button.style);
+      btnElement.textContent = button.label;
       
-      console.log(`  ${index+1}. Creating button: "${button.label}" (${button.action}) -> onclick="${onclick}"`);
+      // Set onclick handler based on action
+      switch (button.action) {
+        case 'setup_civitdl':
+          btnElement.onclick = () => executeTemplateStep('Install CivitDL');
+          break;
+        case 'set_ui_home':
+          btnElement.onclick = () => executeTemplateStep('Set UI Home');
+          break;
+        case 'setup_python_venv':
+          btnElement.onclick = () => executeTemplateStep('Setup Python Virtual Environment');
+          break;
+        case 'clone_auto_installer':
+          btnElement.onclick = () => executeTemplateStep('Clone ComfyUI Auto Installer');
+          break;
+        case 'get_ui_home':
+          btnElement.onclick = getUIHome;
+          break;
+        case 'terminate_connection':
+          btnElement.onclick = terminateConnection;
+          break;
+        default:
+          btnElement.onclick = () => console.log(`Unknown action: ${button.action}`);
+      }
       
-      container.innerHTML += `
-        <button class="${btnClass}" onclick="${onclick}">
-          ${button.label}
-        </button>
-      `;
+      console.log(`  ${index+1}. Creating button: "${button.label}" (${button.action})`);
+      container.appendChild(btnElement);
     }
   });
   
-  console.log(`✅ Template buttons HTML updated. Final container content:`, container.innerHTML);
+  console.log(`✅ Template buttons created. Total buttons:`, container.children.length);
 }
 
 function resetSetupButtons() {
   const container = document.getElementById('setup-buttons-container');
   if (container) {
-    container.innerHTML = `
-      <button class="setup-button" onclick="testVastAISSH()">
-        🔧 Test SSH Connection
-      </button>
-      <button class="setup-button" onclick="syncFromConnectionString()">
-        🔄 Sync Instance
-      </button>
-    `;
+    container.innerHTML = '';
+    
+    const testSSHBtn = document.createElement('button');
+    testSSHBtn.className = 'setup-button';
+    testSSHBtn.textContent = '🔧 Test SSH Connection';
+    testSSHBtn.onclick = testVastAISSH;
+    container.appendChild(testSSHBtn);
+    
+    const syncBtn = document.createElement('button');
+    syncBtn.className = 'setup-button';
+    syncBtn.textContent = '🔄 Sync Instance';
+    syncBtn.onclick = syncFromConnectionString;
+    container.appendChild(syncBtn);
   }
 }
 
@@ -2144,17 +2172,7 @@ function getButtonClass(style) {
   }
 }
 
-function getButtonOnClick(action, template) {
-  switch (action) {
-    case 'setup_civitdl': return 'executeTemplateStep("Install CivitDL")';
-    case 'set_ui_home': return 'executeTemplateStep("Set UI Home")';
-    case 'setup_python_venv': return 'executeTemplateStep("Setup Python Virtual Environment")';
-    case 'clone_auto_installer': return 'executeTemplateStep("Clone ComfyUI Auto Installer")';
-    case 'get_ui_home': return 'getUIHome()';
-    case 'terminate_connection': return 'terminateConnection()';
-    default: return `console.log("Unknown action: ${action}")`;
-  }
-}
+
 
 async function executeTemplateStep(stepName) {
   // Enhanced debugging for template execution
@@ -2213,7 +2231,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Debug function to manually test template functionality
-window.debugTemplateState = function() {
+function debugTemplateState() {
   console.log('🔧 TEMPLATE DEBUG STATE');
   console.log('========================');
   
@@ -2264,18 +2282,19 @@ window.debugTemplateState = function() {
     buttonCount: buttonsContainer?.querySelectorAll('button').length || 0,
     ready: !!(sshElement?.value && templateElement?.value && currentTemplate)
   };
-};
+}
 
 // Test function to simulate button click
-window.testSetUIHomeButton = function() {
+function testSetUIHomeButton() {
   console.log('🧪 Testing Set UI Home button click...');
   const buttonsContainer = document.getElementById('setup-buttons-container');
   if (buttonsContainer) {
     const setUIHomeButton = Array.from(buttonsContainer.querySelectorAll('button'))
-      .find(btn => btn.textContent.includes('Set UI_HOME'));
+      .find(btn => btn.textContent.includes('Set UI_HOME') || btn.textContent.includes('📁 Set UI_HOME'));
     
     if (setUIHomeButton) {
       console.log('✅ Found Set UI_HOME button, simulating click...');
+      console.log('Button onclick attribute:', setUIHomeButton.getAttribute('onclick'));
       setUIHomeButton.click();
     } else {
       console.log('❌ Set UI_HOME button not found in DOM');
@@ -2285,12 +2304,14 @@ window.testSetUIHomeButton = function() {
   } else {
     console.log('❌ Buttons container not found');
   }
-};
+}
 
 // Expose template functions
 window.onTemplateChange = onTemplateChange;
 window.executeTemplateStep = executeTemplateStep;
 window.loadTemplates = loadTemplates;
+window.debugTemplateState = debugTemplateState;
+window.testSetUIHomeButton = testSetUIHomeButton;
 
 // Expose search functions
 window.openSearchOffersModal = openSearchOffersModal;
