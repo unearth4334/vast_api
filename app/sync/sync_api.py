@@ -1532,51 +1532,133 @@ def execute_step(ssh_connection, step, template_data, context: LogContext):
 
 
 def execute_civitdl_setup(ssh_connection):
-    """Execute CivitDL setup using existing functionality"""
-    # This uses the existing setup-civitdl endpoint logic
+    """Execute CivitDL setup with enhanced logging"""
+    operation_id = f"civitdl_setup_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    session_id = f"session_{int(time.time())}"
+    
+    # Create log context for this operation
+    context = LogContext(
+        operation_id=operation_id,
+        user_agent="vast_api/1.0 (template_civitdl_setup)",
+        session_id=session_id,
+        ip_address="localhost",
+        template_name="comfyui"
+    )
+    
     try:
+        # Log start of operation
+        enhanced_logger.log_operation(
+            "🎨 Starting CivitDL installation and setup",
+            "template_civitdl_setup_start",
+            context=context,
+            extra_data={"ssh_connection": ssh_connection}
+        )
+        
         ssh_info = parse_ssh_connection(ssh_connection)
         if not ssh_info:
-            return {
-                'success': False,
-                'message': 'Invalid SSH connection string format'
-            }
-        host, port = ssh_info['host'], ssh_info['port']
-        if not host or not port:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for CivitDL setup",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
             return {
                 'success': False,
                 'message': 'Invalid SSH connection string format'
             }
         
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        # Log SSH connection attempt
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} for CivitDL setup",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
+        
         # Use existing CivitDL setup logic
-        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{host} "
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
         set -e
         cd /workspace
         if [ ! -d civitdl ]; then
+            echo 'Cloning CivitDL repository...'
             git clone https://github.com/civitai/civitdl.git
+        else
+            echo 'CivitDL directory already exists'
         fi
         cd civitdl
+        echo 'Installing CivitDL package...'
         pip install -e .
         pip install requests tqdm
-        echo 'CivitDL installation completed'
+        echo 'CivitDL installation completed successfully'
         "'''
         
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
         
         if result.returncode == 0:
+            # Log successful operation
+            enhanced_logger.log_operation(
+                "✅ CivitDL setup completed successfully",
+                "template_civitdl_setup_success",
+                context=context,
+                extra_data={
+                    "ssh_output": result.stdout.strip(),
+                    "return_code": result.returncode
+                }
+            )
             return {
                 'success': True,
                 'message': 'CivitDL setup completed successfully',
                 'output': result.stdout
             }
         else:
+            # Log failure
+            enhanced_logger.log_error(
+                f"CivitDL setup failed: {result.stderr.strip()}",
+                "template_civitdl_setup_failed",
+                context=context,
+                extra_data={
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
             return {
                 'success': False,
                 'message': f'CivitDL setup failed with return code {result.returncode}',
                 'error': result.stderr
             }
             
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "CivitDL setup timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 300}
+        )
+        return {
+            'success': False,
+            'message': 'SSH command timed out during CivitDL setup'
+        }
     except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during CivitDL setup: {str(e)}",
+            "template_civitdl_setup_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
         return {
             'success': False,
             'message': f'Error during CivitDL setup: {str(e)}'
@@ -1584,43 +1666,124 @@ def execute_civitdl_setup(ssh_connection):
 
 
 def execute_set_ui_home(ssh_connection, ui_home_path):
-    """Execute UI_HOME setup"""
+    """Execute UI_HOME setup with enhanced logging"""
+    operation_id = f"set_ui_home_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    session_id = f"session_{int(time.time())}"
+    
+    # Create log context for this operation
+    context = LogContext(
+        operation_id=operation_id,
+        user_agent="vast_api/1.0 (template_set_ui_home)",
+        session_id=session_id,
+        ip_address="localhost",
+        template_name="comfyui"
+    )
+    
     try:
+        # Log start of operation
+        enhanced_logger.log_operation(
+            f"🏠 Setting UI_HOME to {ui_home_path}",
+            "template_set_ui_home_start",
+            context=context,
+            extra_data={"ui_home_path": ui_home_path, "ssh_connection": ssh_connection}
+        )
+        
         ssh_info = parse_ssh_connection(ssh_connection)
         if not ssh_info:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for UI_HOME setup",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
             return {
                 'success': False,
                 'message': 'Invalid SSH connection string format'
             }
-        host, port = ssh_info['host'], ssh_info['port']
+        
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
         if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
             return {
                 'success': False,
                 'message': 'Invalid SSH connection string format'
             }
         
-        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{host} "
-        echo 'export UI_HOME={ui_home_path}' >> ~/.bashrc
-        export UI_HOME={ui_home_path}
-        echo 'UI_HOME set to {ui_home_path}'
-        "'''
+        # Log SSH connection attempt
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} to set UI_HOME",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
         
+        # Build SSH command with proper escaping
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
+        echo 'export UI_HOME={ui_home_path}' >> ~/.bashrc && 
+        export UI_HOME={ui_home_path} && 
+        echo 'UI_HOME successfully set to {ui_home_path}'"'''
+        
+        # Execute SSH command
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
         
         if result.returncode == 0:
+            # Log successful operation
+            enhanced_logger.log_operation(
+                f"✅ UI_HOME successfully set to {ui_home_path}",
+                "template_set_ui_home_success",
+                context=context,
+                extra_data={
+                    "ui_home_path": ui_home_path,
+                    "ssh_output": result.stdout.strip(),
+                    "return_code": result.returncode
+                }
+            )
             return {
                 'success': True,
                 'message': f'UI_HOME set to {ui_home_path}',
                 'output': result.stdout
             }
         else:
+            # Log failure
+            enhanced_logger.log_error(
+                f"Failed to set UI_HOME: {result.stderr.strip()}",
+                "template_set_ui_home_failed",
+                context=context,
+                extra_data={
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
             return {
                 'success': False,
                 'message': f'Failed to set UI_HOME with return code {result.returncode}',
                 'error': result.stderr
             }
             
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "UI_HOME setup timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 60}
+        )
+        return {
+            'success': False,
+            'message': 'SSH command timed out while setting UI_HOME'
+        }
     except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during UI_HOME setup: {str(e)}",
+            "template_set_ui_home_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
         return {
             'success': False,
             'message': f'Error setting UI_HOME: {str(e)}'
@@ -1628,98 +1791,267 @@ def execute_set_ui_home(ssh_connection, ui_home_path):
 
 
 def execute_git_clone(ssh_connection, repository, destination):
-    """Execute git clone"""
+    """Execute git clone with enhanced logging"""
+    operation_id = f"git_clone_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    session_id = f"session_{int(time.time())}"
+    
+    # Create log context for this operation
+    context = LogContext(
+        operation_id=operation_id,
+        user_agent="vast_api/1.0 (template_git_clone)",
+        session_id=session_id,
+        ip_address="localhost",
+        template_name="comfyui"
+    )
+    
     try:
+        # Log start of operation
+        enhanced_logger.log_operation(
+            f"📥 Cloning repository {repository} to {destination}",
+            "template_git_clone_start",
+            context=context,
+            extra_data={"repository": repository, "destination": destination, "ssh_connection": ssh_connection}
+        )
+        
         ssh_info = parse_ssh_connection(ssh_connection)
         if not ssh_info:
-            return {
-                'success': False,
-                'message': 'Invalid SSH connection string format'
-            }
-        host, port = ssh_info['host'], ssh_info['port']
-        if not host or not port:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for git clone",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
             return {
                 'success': False,
                 'message': 'Invalid SSH connection string format'
             }
         
-        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{host} "
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        # Log SSH connection attempt
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} for git clone",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
+        
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
         set -e
         if [ ! -d '{destination}' ]; then
+            echo 'Cloning repository {repository}...'
             git clone {repository} {destination}
             echo 'Repository cloned successfully to {destination}'
         else
             echo 'Repository already exists at {destination}'
+            cd {destination}
+            git pull origin main || git pull origin master || echo 'Repository updated or pull not needed'
         fi
         "'''
         
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
         
         if result.returncode == 0:
+            # Log successful operation
+            enhanced_logger.log_operation(
+                f"✅ Git clone completed: {repository} -> {destination}",
+                "template_git_clone_success",
+                context=context,
+                extra_data={
+                    "repository": repository,
+                    "destination": destination,
+                    "ssh_output": result.stdout.strip(),
+                    "return_code": result.returncode
+                }
+            )
             return {
                 'success': True,
                 'message': f'Repository cloned to {destination}',
                 'output': result.stdout
             }
         else:
+            # Log failure
+            enhanced_logger.log_error(
+                f"Git clone failed: {result.stderr.strip()}",
+                "template_git_clone_failed",
+                context=context,
+                extra_data={
+                    "repository": repository,
+                    "destination": destination,
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
             return {
                 'success': False,
                 'message': f'Git clone failed with return code {result.returncode}',
                 'error': result.stderr
             }
             
-    except Exception as e:
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "Git clone timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 300, "repository": repository, "destination": destination}
+        )
         return {
             'success': False,
-            'message': f'Error cloning repository: {str(e)}'
+            'message': 'SSH command timed out during git clone'
+        }
+    except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during git clone: {str(e)}",
+            "template_git_clone_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
+        return {
+            'success': False,
+            'message': f'Error during git clone: {str(e)}'
         }
 
 
 def execute_python_venv_setup(ssh_connection, venv_path):
-    """Execute Python virtual environment setup"""
+    """Execute Python virtual environment setup with enhanced logging"""
+    operation_id = f"python_venv_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+    session_id = f"session_{int(time.time())}"
+    
+    # Create log context for this operation
+    context = LogContext(
+        operation_id=operation_id,
+        user_agent="vast_api/1.0 (template_python_venv)",
+        session_id=session_id,
+        ip_address="localhost",
+        template_name="comfyui"
+    )
+    
     try:
+        # Log start of operation
+        enhanced_logger.log_operation(
+            f"🐍 Setting up Python virtual environment at {venv_path}",
+            "template_python_venv_start",
+            context=context,
+            extra_data={"venv_path": venv_path, "ssh_connection": ssh_connection}
+        )
+        
         ssh_info = parse_ssh_connection(ssh_connection)
         if not ssh_info:
-            return {
-                'success': False,
-                'message': 'Invalid SSH connection string format'
-            }
-        host, port = ssh_info['host'], ssh_info['port']
-        if not host or not port:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for Python venv setup",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
             return {
                 'success': False,
                 'message': 'Invalid SSH connection string format'
             }
         
-        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{host} "
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        # Log SSH connection attempt
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} for Python venv setup",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
+        
+        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
         set -e
         if [ ! -d '{venv_path}' ]; then
+            echo 'Creating Python virtual environment...'
             python3 -m venv {venv_path}
             echo 'Python virtual environment created at {venv_path}'
         else
             echo 'Virtual environment already exists at {venv_path}'
         fi
+        echo 'Activating virtual environment and upgrading pip...'
         source {venv_path}/bin/activate
         pip install --upgrade pip
-        echo 'Virtual environment setup completed'
+        echo 'Virtual environment setup completed successfully'
         "'''
         
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=180)
         
         if result.returncode == 0:
+            # Log successful operation
+            enhanced_logger.log_operation(
+                f"✅ Python virtual environment setup completed at {venv_path}",
+                "template_python_venv_success",
+                context=context,
+                extra_data={
+                    "venv_path": venv_path,
+                    "ssh_output": result.stdout.strip(),
+                    "return_code": result.returncode
+                }
+            )
             return {
                 'success': True,
                 'message': f'Python virtual environment setup at {venv_path}',
                 'output': result.stdout
             }
         else:
+            # Log failure
+            enhanced_logger.log_error(
+                f"Python venv setup failed: {result.stderr.strip()}",
+                "template_python_venv_failed",
+                context=context,
+                extra_data={
+                    "venv_path": venv_path,
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
             return {
                 'success': False,
                 'message': f'Python venv setup failed with return code {result.returncode}',
                 'error': result.stderr
             }
             
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "Python venv setup timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 180, "venv_path": venv_path}
+        )
+        return {
+            'success': False,
+            'message': 'SSH command timed out during Python venv setup'
+        }
     except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during Python venv setup: {str(e)}",
+            "template_python_venv_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
         return {
             'success': False,
             'message': f'Error setting up Python virtual environment: {str(e)}'
