@@ -300,6 +300,7 @@ def test_vastai_ssh():
         if not ssh_connection:
             enhanced_logger.log_error(
                 "SSH test failed - no connection string provided",
+                "validation_error",
                 context=LogContext(
                     operation_id=f"test_ssh_{int(time.time())}",
                     user_agent="vast_api/1.0 (test_ssh)",
@@ -317,6 +318,7 @@ def test_vastai_ssh():
         except ValueError as e:
             enhanced_logger.log_error(
                 f"SSH test failed - invalid connection format: {str(e)}",
+                "validation_error",
                 context=LogContext(
                     operation_id=f"test_ssh_{int(time.time())}",
                     user_agent="vast_api/1.0 (test_ssh)",
@@ -391,6 +393,7 @@ def test_vastai_ssh():
             
             enhanced_logger.log_error(
                 f"❌ SSH connection failed to {ssh_host}:{ssh_port} - {error_msg}",
+                "connection_error",
                 context=LogContext(
                     operation_id=f"test_ssh_{int(time.time())}",
                     user_agent="vast_api/1.0 (test_ssh)",
@@ -410,6 +413,7 @@ def test_vastai_ssh():
     except subprocess.TimeoutExpired:
         enhanced_logger.log_error(
             "SSH connection test timed out",
+            "timeout_error",
             context=LogContext(
                 operation_id=f"test_ssh_{int(time.time())}",
                 user_agent="vast_api/1.0 (test_ssh)",
@@ -424,6 +428,7 @@ def test_vastai_ssh():
     except Exception as e:
         enhanced_logger.log_error(
             f"SSH test unexpected error: {str(e)}",
+            "unexpected_error",
             context=LogContext(
                 operation_id=f"test_ssh_{int(time.time())}",
                 user_agent="vast_api/1.0 (test_ssh)",
