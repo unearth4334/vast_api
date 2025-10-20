@@ -1214,7 +1214,6 @@ def get_template(template_name):
         })
 
 
-@app.route('/templates/<template_name>/execute-step', methods=['POST', 'OPTIONS'])
 def create_template_context(template_name: str, step_name: str = None) -> LogContext:
     """Create enhanced logging context for template operations"""
     operation_id = f"template_{template_name}_{step_name or 'general'}_{int(time.time())}_{str(uuid.uuid4())[:8]}"
