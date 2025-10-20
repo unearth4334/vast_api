@@ -333,6 +333,7 @@ def test_vastai_ssh():
         
         enhanced_logger.log_operation(
             f"Testing SSH connection to {ssh_host}:{ssh_port}",
+            "test_ssh_start",
             context=LogContext(
                 operation_id=f"test_ssh_{int(time.time())}",
                 user_agent="vast_api/1.0 (test_ssh)",
@@ -365,6 +366,7 @@ def test_vastai_ssh():
         if result.returncode == 0:
             enhanced_logger.log_operation(
                 f"✅ SSH connection successful to {ssh_host}:{ssh_port}",
+                "test_ssh_success",
                 context=LogContext(
                     operation_id=f"test_ssh_{int(time.time())}",
                     user_agent="vast_api/1.0 (test_ssh)",
