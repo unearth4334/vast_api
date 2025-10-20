@@ -167,6 +167,7 @@ body {
 .search-button,
 .offer-action-btn,
 .use-instance-btn,
+.details-btn,
 .refresh-logs-btn,
 .close-modal-btn {
     border: none;
@@ -185,7 +186,8 @@ body {
 .setup-button,
 .search-button,
 .offer-action-btn,
-.use-instance-btn {
+.use-instance-btn,
+.details-btn {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
     border-radius: var(--radius-s);
@@ -238,6 +240,18 @@ body {
     min-width: 180px;
 }
 
+/* Details button - secondary action */
+.details-btn {
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+    padding: var(--size-4-1) var(--size-4-3);
+    font-weight: 500;
+    font-size: var(--font-ui-smaller);
+    border-radius: var(--radius-s);
+    margin-left: var(--size-4-2);
+    min-width: 80px;
+}
+
 /* Small utility buttons */
 .refresh-logs-btn,
 .close-modal-btn {
@@ -264,6 +278,11 @@ body {
 .offer-action-btn:hover,
 .use-instance-btn:hover {
     background: var(--interactive-accent-hover);
+}
+
+.details-btn:hover {
+    background: var(--interactive-hover);
+    color: var(--text-normal);
 }
 
 .sync-button:hover,
@@ -775,6 +794,8 @@ body {
     margin-top: var(--size-4-3);
     display: flex;
     gap: var(--size-4-2);
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 /* =========================

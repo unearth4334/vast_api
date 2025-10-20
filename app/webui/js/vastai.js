@@ -534,6 +534,9 @@ function displayVastaiInstances(instances) {
                    🔄 Load SSH
                  </button>`
           }
+          <button class="details-btn" onclick="showInstanceDetails(${instance.id})">
+            {...} Details
+          </button>
         </div>
       </div>
     `;
@@ -565,6 +568,129 @@ window.mobileOfferState = {
   keydownHandler: null
 };
 
+// Show instance details in an overlay
+async function showInstanceDetails(instanceId) {
+  try {
+    // Get the raw instance data from the API
+    const data = await api.get(`/vastai/instances/${instanceId}`);
+    
+    if (!data || data.success === false) {
+      const msg = (data && data.message) ? data.message : 'Unknown error';
+      showSetupResult(`Failed to get instance details: ${msg}`, 'error');
+      return;
+    }
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'instance-details-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    `;
+    
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      background: var(--bg-primary, #ffffff);
+      color: var(--text-primary, #000000);
+      border-radius: 8px;
+      max-width: 90vw;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 20px;
+      position: relative;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    `;
+    
+    // Create close button
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cssText = `
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--text-secondary, #666);
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    
+    // Create content
+    const content = document.createElement('div');
+    content.innerHTML = `
+      <h2 style="margin-top: 0; margin-bottom: 20px; color: var(--text-primary, #000);">
+        Instance #${instanceId} - Raw Details
+      </h2>
+      <pre style="
+        background: var(--bg-secondary, #f5f5f5);
+        color: var(--text-primary, #000);
+        padding: 15px;
+        border-radius: 4px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-family: 'Courier New', Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.4;
+        max-height: 70vh;
+        overflow-y: auto;
+        border: 1px solid var(--border-color, #ddd);
+      ">${JSON.stringify(data.instance, null, 2)}</pre>
+    `;
+    
+    // Assemble modal
+    modal.appendChild(closeBtn);
+    modal.appendChild(content);
+    overlay.appendChild(modal);
+    
+    // Close handlers
+    const closeOverlay = () => {
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    };
+    
+    closeBtn.addEventListener('click', closeOverlay);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        closeOverlay();
+      }
+    });
+    
+    // Escape key handler
+    const escapeHandler = (e) => {
+      if (e.key === 'Escape') {
+        closeOverlay();
+        document.removeEventListener('keydown', escapeHandler);
+      }
+    };
+    document.addEventListener('keydown', escapeHandler);
+    
+    // Add to page
+    document.body.appendChild(overlay);
+    
+  } catch (error) {
+    showSetupResult(`Failed to get instance details: ${error.message}`, 'error');
+  }
+}
+
 // Expose the functions you call from HTML or other scripts
 window.testVastAISSH = testVastAISSH;
 window.setUIHome = setUIHome;
@@ -575,6 +701,7 @@ window.syncFromConnectionString = syncFromConnectionString;
 window.loadVastaiInstances = loadVastaiInstances;
 window.useInstance = useInstance;
 window.refreshInstanceCard = refreshInstanceCard;
+window.showInstanceDetails = showInstanceDetails;
 
 // ---------- Search offers functionality ----------
 
