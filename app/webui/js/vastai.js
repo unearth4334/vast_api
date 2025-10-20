@@ -2,9 +2,12 @@
 // vastai.js — drop-in replacement
 // ==============================
 //
+// Version: 2025-10-20-v2 (Button Generation Fix)
 // Assumes a global `api` object with { get(path), post(path, body) } returning JSON.
 // Exposes helpers on `window` for use in HTML attributes.
 //
+
+console.log('📄 vastai.js loaded - Version: 2025-10-20-v2 (Button Generation Fix)');
 
 // ---------- Small helpers ----------
 function fmtMoney(n) {
@@ -2289,20 +2292,73 @@ function testSetUIHomeButton() {
   console.log('🧪 Testing Set UI Home button click...');
   const buttonsContainer = document.getElementById('setup-buttons-container');
   if (buttonsContainer) {
-    const setUIHomeButton = Array.from(buttonsContainer.querySelectorAll('button'))
-      .find(btn => btn.textContent.includes('Set UI_HOME') || btn.textContent.includes('📁 Set UI_HOME'));
+    console.log('🔍 Inspecting all buttons in container:');
+    const allButtons = Array.from(buttonsContainer.querySelectorAll('button'));
+    allButtons.forEach((btn, i) => {
+      console.log(`  ${i+1}. "${btn.textContent.trim()}" 
+        - onclick property: ${typeof btn.onclick}
+        - onclick attribute: "${btn.getAttribute('onclick')}"
+        - class: "${btn.className}"`);
+    });
+    
+    const setUIHomeButton = allButtons.find(btn => 
+      btn.textContent.includes('Set UI_HOME') || 
+      btn.textContent.includes('📁 Set UI_HOME') ||
+      btn.textContent.includes('Set UI Home')
+    );
     
     if (setUIHomeButton) {
       console.log('✅ Found Set UI_HOME button, simulating click...');
-      console.log('Button onclick attribute:', setUIHomeButton.getAttribute('onclick'));
-      setUIHomeButton.click();
+      console.log('Button details:', {
+        textContent: setUIHomeButton.textContent.trim(),
+        onclick: typeof setUIHomeButton.onclick,
+        onclickAttr: setUIHomeButton.getAttribute('onclick'),
+        className: setUIHomeButton.className
+      });
+      
+      // Try to call the onclick handler directly
+      if (typeof setUIHomeButton.onclick === 'function') {
+        console.log('🎯 Calling onclick handler directly...');
+        setUIHomeButton.onclick();
+      } else {
+        console.log('❌ No onclick handler found, trying click() event...');
+        setUIHomeButton.click();
+      }
     } else {
       console.log('❌ Set UI_HOME button not found in DOM');
-      console.log('Available buttons:', Array.from(buttonsContainer.querySelectorAll('button'))
-        .map(btn => btn.textContent.trim()));
+      console.log('Available buttons:', allButtons.map(btn => btn.textContent.trim()));
     }
   } else {
     console.log('❌ Buttons container not found');
+  }
+}
+
+// Debug function to check button generation
+function debugButtonGeneration() {
+  console.log('🔧 BUTTON GENERATION DEBUG');
+  console.log('==========================');
+  
+  const container = document.getElementById('setup-buttons-container');
+  const templateSelect = document.getElementById('templateSelector');
+  
+  console.log('Container exists:', !!container);
+  console.log('Template selector exists:', !!templateSelect);
+  console.log('Template selector value:', templateSelect?.value);
+  console.log('Current template:', currentTemplate);
+  
+  if (container) {
+    console.log('Container children count:', container.children.length);
+    
+    if (currentTemplate && currentTemplate.ui_config) {
+      console.log('Expected template buttons:');
+      const buttons = currentTemplate.ui_config.setup_buttons || [];
+      buttons.forEach((btn, i) => {
+        console.log(`  ${i+1}. ${btn.label} (${btn.action})`);
+      });
+      
+      console.log('Calling updateSetupButtons manually...');
+      updateSetupButtons(currentTemplate);
+    }
   }
 }
 
@@ -2312,6 +2368,7 @@ window.executeTemplateStep = executeTemplateStep;
 window.loadTemplates = loadTemplates;
 window.debugTemplateState = debugTemplateState;
 window.testSetUIHomeButton = testSetUIHomeButton;
+window.debugButtonGeneration = debugButtonGeneration;
 
 // Expose search functions
 window.openSearchOffersModal = openSearchOffersModal;
