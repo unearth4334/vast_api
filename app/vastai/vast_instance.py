@@ -1,4 +1,5 @@
 from tabulate import tabulate
+from .vastai_utils import get_ssh_port
 
 class VastInstance:
     def __init__(self, instance_id, offer_id, client):
@@ -21,7 +22,7 @@ class VastInstance:
             "Download (Mbps)": data.get("inet_down"),
             "Public IP": data.get("public_ipaddr"),
             "SSH Host": data.get("ssh_host"),
-            "SSH Port": data.get("ssh_port"),
+            "SSH Port": get_ssh_port(data),
             "Template": data.get("template_name"),
             "Geolocation": data.get("geolocation"),
             "OS": data.get("os_version"),

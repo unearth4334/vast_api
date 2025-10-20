@@ -15,7 +15,7 @@ from flask_cors import CORS
 try:
     from .sync_utils import run_sync, FORGE_HOST, FORGE_PORT, COMFY_HOST, COMFY_PORT
     from ..vastai.vast_manager import VastManager
-    from ..vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file
+    from ..vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file, get_ssh_port
     from ..utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from ..utils.config_loader import load_config, load_api_key
     from ..webui.templates import get_index_template
@@ -27,7 +27,7 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from sync_utils import run_sync, FORGE_HOST, FORGE_PORT, COMFY_HOST, COMFY_PORT
     from vastai.vast_manager import VastManager
-    from vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file
+    from vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file, get_ssh_port
     from utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from utils.config_loader import load_config, load_api_key
     from webui.templates import get_index_template
@@ -200,7 +200,7 @@ def sync_vastai():
         
         # Extract SSH connection details
         ssh_host = running_instance.get('ssh_host')
-        ssh_port = str(running_instance.get('ssh_port', 22))
+        ssh_port = str(get_ssh_port(running_instance) or 22)
         
         if not ssh_host:
             return jsonify({

@@ -10,6 +10,7 @@ import json
 import logging
 import time
 from .vastai_logging import log_api_interaction
+from ..vastai.vastai_utils import get_ssh_port
 
 logger = logging.getLogger(__name__)
 
@@ -464,7 +465,7 @@ def parse_instance_details(instance_data):
         "Upload (Mbps)": instance.get("inet_up"),
         "Public IP": instance.get("public_ipaddr"),
         "SSH Host": instance.get("ssh_host"),
-        "SSH Port": instance.get("ssh_port"),
+        "SSH Port": get_ssh_port(instance),
         "Template": instance.get("template_name"),
         "Geolocation": instance.get("geolocation"),
         "OS": instance.get("os_version"),
