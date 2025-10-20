@@ -8,6 +8,7 @@ import os
 import subprocess
 import logging
 import time
+import uuid
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -18,6 +19,7 @@ try:
     from ..vastai.vastai_utils import parse_ssh_connection, parse_host_port, read_api_key_from_file, get_ssh_port
     from ..utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from ..utils.config_loader import load_config, load_api_key
+    from ..utils.vastai_logging import enhanced_logger, LogContext
     from ..webui.templates import get_index_template
     from ..webui.template_manager import template_manager
     from .ssh_test import SSHTester
@@ -1073,8 +1075,22 @@ def get_template(template_name):
 
 
 @app.route('/templates/<template_name>/execute-step', methods=['POST', 'OPTIONS'])
+def create_template_context(template_name: str, step_name: str = None) -> LogContext:
+    """Create enhanced logging context for template operations"""
+    operation_id = f"template_{template_name}_{step_name or 'general'}_{int(time.time())}_{str(uuid.uuid4())[:8]}"
+    return LogContext(
+        operation_id=operation_id,
+        user_agent=f"template_executor/1.0 ({template_name})",
+        session_id=f"template_session_{int(time.time())}",
+        ip_address=request.remote_addr or "localhost",
+        instance_id=None,
+        template_name=template_name
+    )
+
+
+@app.route('/templates/<template_name>/execute-step', methods=['POST', 'OPTIONS'])
 def execute_template_step(template_name):
-    """Execute a specific step from a template"""
+    """Execute a specific step from a template with enhanced logging"""
     if request.method == 'OPTIONS':
         return ("", 204)
     
@@ -1083,13 +1099,40 @@ def execute_template_step(template_name):
         ssh_connection = data.get('ssh_connection')
         step_name = data.get('step_name')
         
+        # Create enhanced logging context
+        context = create_template_context(template_name, step_name)
+        
+        enhanced_logger.log_operation(
+            message=f"Starting template step execution: {template_name} - {step_name}",
+            operation="template_step_start",
+            context=context,
+            extra_data={
+                "template_name": template_name,
+                "step_name": step_name,
+                "has_ssh_connection": bool(ssh_connection),
+                "request_data": data
+            }
+        )
+        
         if not ssh_connection:
+            enhanced_logger.log_error(
+                message="SSH connection string is required for template execution",
+                error_type="missing_ssh_connection",
+                context=context,
+                extra_data={"template_name": template_name, "step_name": step_name}
+            )
             return jsonify({
                 'success': False,
                 'message': 'SSH connection string is required'
             })
         
         if not step_name:
+            enhanced_logger.log_error(
+                message="Step name is required for template execution",
+                error_type="missing_step_name",
+                context=context,
+                extra_data={"template_name": template_name}
+            )
             return jsonify({
                 'success': False,
                 'message': 'Step name is required'
@@ -1098,6 +1141,12 @@ def execute_template_step(template_name):
         # Get template and find the step
         template_data = template_manager.load_template(template_name)
         if not template_data:
+            enhanced_logger.log_error(
+                message=f'Template "{template_name}" not found',
+                error_type="template_not_found",
+                context=context,
+                extra_data={"template_name": template_name}
+            )
             return jsonify({
                 'success': False,
                 'message': f'Template "{template_name}" not found'
@@ -1107,16 +1156,92 @@ def execute_template_step(template_name):
         step = next((s for s in setup_steps if s.get('name') == step_name), None)
         
         if not step:
+            enhanced_logger.log_error(
+                message=f'Step "{step_name}" not found in template "{template_name}"',
+                error_type="step_not_found",
+                context=context,
+                extra_data={
+                    "template_name": template_name,
+                    "step_name": step_name,
+                    "available_steps": [s.get('name') for s in setup_steps]
+                }
+            )
             return jsonify({
                 'success': False,
                 'message': f'Step "{step_name}" not found in template'
             })
         
+        enhanced_logger.log_operation(
+            message=f"Executing template step: {step_name} (type: {step.get('type')})",
+            operation="template_step_execute",
+            context=context,
+            extra_data={
+                "template_name": template_name,
+                "step_name": step_name,
+                "step_type": step.get('type'),
+                "step_config": step,
+                "ssh_connection_host": ssh_connection.split('@')[-1].split(':')[0] if '@' in ssh_connection else "unknown"
+            }
+        )
+        
         # Execute the step based on its type
-        result = execute_step(ssh_connection, step, template_data)
+        start_time = time.time()
+        result = execute_step(ssh_connection, step, template_data, context)
+        execution_time = time.time() - start_time
+        
+        enhanced_logger.log_performance(
+            message=f"Template step execution completed: {step_name}",
+            operation="template_step_complete",
+            duration=execution_time,
+            context=context,
+            extra_data={
+                "template_name": template_name,
+                "step_name": step_name,
+                "step_type": step.get('type'),
+                "success": result.get('success', False),
+                "result": result
+            }
+        )
+        
+        if result.get('success'):
+            enhanced_logger.log_operation(
+                message=f"Template step '{step_name}' completed successfully",
+                operation="template_step_success",
+                context=context,
+                extra_data={
+                    "template_name": template_name,
+                    "step_name": step_name,
+                    "execution_time": execution_time,
+                    "result": result
+                }
+            )
+        else:
+            enhanced_logger.log_error(
+                message=f"Template step '{step_name}' failed: {result.get('message', 'Unknown error')}",
+                error_type="template_step_failure",
+                context=context,
+                extra_data={
+                    "template_name": template_name,
+                    "step_name": step_name,
+                    "execution_time": execution_time,
+                    "result": result
+                }
+            )
+        
         return jsonify(result)
         
     except Exception as e:
+        context = create_template_context(template_name, step_name if 'step_name' in locals() else None)
+        enhanced_logger.log_error(
+            message=f"Unexpected error executing template step: {str(e)}",
+            error_type="template_execution_exception",
+            context=context,
+            extra_data={
+                "template_name": template_name,
+                "exception": str(e),
+                "exception_type": type(e).__name__
+            }
+        )
         logger.error(f"Error executing template step: {str(e)}")
         return jsonify({
             'success': False,
@@ -1124,22 +1249,51 @@ def execute_template_step(template_name):
         })
 
 
-def execute_step(ssh_connection, step, template_data):
-    """Execute a single template step"""
+def execute_step(ssh_connection, step, template_data, context: LogContext):
+    """Execute a single template step with enhanced logging"""
     step_type = step.get('type')
     step_name = step.get('name')
     
+    enhanced_logger.log_operation(
+        message=f"Executing step '{step_name}' of type '{step_type}'",
+        operation="step_execution_start",
+        context=context,
+        extra_data={
+            "step_name": step_name,
+            "step_type": step_type,
+            "step_config": step
+        }
+    )
+    
     try:
         if step_type == 'civitdl_install':
+            enhanced_logger.log_operation(
+                message="Installing CivitDL via template step",
+                operation="civitdl_install_step",
+                context=context,
+                extra_data={"ssh_connection_info": ssh_connection.split('@')[-1] if '@' in ssh_connection else ssh_connection}
+            )
             # Use existing setup CivitDL functionality
-            return execute_civitdl_setup(ssh_connection)
+            result = execute_civitdl_setup(ssh_connection)
             
         elif step_type == 'set_ui_home':
             ui_home = step.get('path') or template_data.get('environment', {}).get('ui_home')
             if ui_home:
-                return execute_set_ui_home(ssh_connection, ui_home)
+                enhanced_logger.log_operation(
+                    message=f"Setting UI_HOME to: {ui_home}",
+                    operation="set_ui_home_step",
+                    context=context,
+                    extra_data={"ui_home_path": ui_home}
+                )
+                result = execute_set_ui_home(ssh_connection, ui_home)
             else:
-                return {
+                enhanced_logger.log_error(
+                    message="No UI home path specified in step or template environment",
+                    error_type="missing_ui_home_path",
+                    context=context,
+                    extra_data={"step_config": step, "template_environment": template_data.get('environment', {})}
+                )
+                result = {
                     'success': False,
                     'message': 'No UI home path specified in step or template environment'
                 }
@@ -1148,9 +1302,21 @@ def execute_step(ssh_connection, step, template_data):
             repository = step.get('repository')
             destination = step.get('destination')
             if repository and destination:
-                return execute_git_clone(ssh_connection, repository, destination)
+                enhanced_logger.log_operation(
+                    message=f"Cloning repository {repository} to {destination}",
+                    operation="git_clone_step",
+                    context=context,
+                    extra_data={"repository": repository, "destination": destination}
+                )
+                result = execute_git_clone(ssh_connection, repository, destination)
             else:
-                return {
+                enhanced_logger.log_error(
+                    message="Repository and destination are required for git_clone step",
+                    error_type="missing_git_clone_params",
+                    context=context,
+                    extra_data={"repository": repository, "destination": destination, "step_config": step}
+                )
+                result = {
                     'success': False,
                     'message': 'Repository and destination are required for git_clone step'
                 }
@@ -1158,20 +1324,67 @@ def execute_step(ssh_connection, step, template_data):
         elif step_type == 'python_venv':
             venv_path = step.get('path') or template_data.get('environment', {}).get('python_venv')
             if venv_path:
-                return execute_python_venv_setup(ssh_connection, venv_path)
+                enhanced_logger.log_operation(
+                    message=f"Setting up Python virtual environment at: {venv_path}",
+                    operation="python_venv_step",
+                    context=context,
+                    extra_data={"venv_path": venv_path}
+                )
+                result = execute_python_venv_setup(ssh_connection, venv_path)
             else:
-                return {
+                enhanced_logger.log_error(
+                    message="No Python venv path specified in step or template environment",
+                    error_type="missing_venv_path",
+                    context=context,
+                    extra_data={"step_config": step, "template_environment": template_data.get('environment', {})}
+                )
+                result = {
                     'success': False,
                     'message': 'No Python venv path specified in step or template environment'
                 }
         
         else:
-            return {
+            enhanced_logger.log_error(
+                message=f"Unknown step type: {step_type}",
+                error_type="unknown_step_type",
+                context=context,
+                extra_data={"step_type": step_type, "step_name": step_name, "step_config": step}
+            )
+            result = {
                 'success': False,
                 'message': f'Unknown step type: {step_type}'
             }
+        
+        # Log the step execution result
+        if result.get('success'):
+            enhanced_logger.log_operation(
+                message=f"Step '{step_name}' completed successfully",
+                operation="step_execution_success",
+                context=context,
+                extra_data={"step_name": step_name, "step_type": step_type, "result": result}
+            )
+        else:
+            enhanced_logger.log_error(
+                message=f"Step '{step_name}' failed: {result.get('message', 'Unknown error')}",
+                error_type="step_execution_failure",
+                context=context,
+                extra_data={"step_name": step_name, "step_type": step_type, "result": result}
+            )
+        
+        return result
             
     except Exception as e:
+        enhanced_logger.log_error(
+            message=f"Exception during step execution: {str(e)}",
+            error_type="step_execution_exception",
+            context=context,
+            extra_data={
+                "step_name": step_name,
+                "step_type": step_type,
+                "exception": str(e),
+                "exception_type": type(e).__name__
+            }
+        )
         logger.error(f"Error executing step {step_name}: {str(e)}")
         return {
             'success': False,
