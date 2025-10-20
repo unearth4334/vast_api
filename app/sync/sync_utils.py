@@ -15,9 +15,9 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # Configuration constants
-MEDIA_BASE = os.environ.get('MEDIA_BASE', '/media')
+LOG_BASE = os.environ.get('LOG_BASE', '/app/logs')
 SYNC_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'sync_outputs.sh')
-SYNC_LOG_DIR = os.path.join(MEDIA_BASE, '.sync_log')
+SYNC_LOG_DIR = os.path.join(LOG_BASE, 'sync')
 FORGE_HOST = "10.0.78.108"
 FORGE_PORT = "2222"
 COMFY_HOST = "10.0.78.108"
@@ -28,6 +28,9 @@ def ensure_sync_log_dir():
     """Ensure the sync log directory exists"""
     try:
         os.makedirs(SYNC_LOG_DIR, exist_ok=True)
+        # Also create subdirectories for better organization
+        os.makedirs(os.path.join(SYNC_LOG_DIR, 'operations'), exist_ok=True)
+        os.makedirs(os.path.join(SYNC_LOG_DIR, 'progress'), exist_ok=True)
         return True
     except PermissionError:
         logger.error(f"Failed to create sync log directory {SYNC_LOG_DIR}: Permission denied")
@@ -92,7 +95,7 @@ def save_sync_log(sync_type, result, start_time, end_time):
         
         timestamp = start_time.strftime('%Y%m%d_%H%M')
         log_filename = f"sync_log_{timestamp}.json"
-        log_path = os.path.join(SYNC_LOG_DIR, log_filename)
+        log_path = os.path.join(SYNC_LOG_DIR, 'operations', log_filename)
         
         log_entry = {
             'timestamp': start_time.isoformat(),
@@ -125,8 +128,8 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
     
     logger.info(f"Starting {sync_type} sync to {host}:{port} with ID {sync_id} (cleanup: {cleanup})")
     
-    # Create progress file
-    progress_file = f"/tmp/sync_progress_{sync_id}.json"
+    # Create progress file in log directory
+    progress_file = os.path.join(SYNC_LOG_DIR, 'progress', f"sync_progress_{sync_id}.json")
     progress_data = {
         "sync_id": sync_id,
         "status": "running",

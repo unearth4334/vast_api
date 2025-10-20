@@ -17,11 +17,17 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     
+    # Initialize log directories
+    from app.utils.log_init import ensure_all_log_directories
+    from app.utils.app_logging import log_startup
+    ensure_all_log_directories()
+    log_startup()
+    
     # Check if sync script exists
     if not os.path.exists(SYNC_SCRIPT_PATH):
         logger.error(f"Sync script not found at {SYNC_SCRIPT_PATH}")
         sys.exit(1)
     
-    logger.info("Starting Media Sync API Server")
+    logger.info("Starting VastAI Sync API Server")
     port = int(sys.argv[1].replace('--port=', '').replace('--port', '')) if len(sys.argv) > 1 and '--port' in sys.argv[1] else 5000
     app.run(host='0.0.0.0', port=port, debug=False)

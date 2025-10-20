@@ -37,6 +37,13 @@ RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
 # Create directory for local sync destination (will be mounted as volume)
 RUN mkdir -p /media
 
+# Create log directory structure (will be mounted as volume)
+RUN mkdir -p /app/logs/vastai/api \
+    && mkdir -p /app/logs/vastai/instances \
+    && mkdir -p /app/logs/sync/operations \
+    && mkdir -p /app/logs/sync/progress \
+    && mkdir -p /app/logs/app
+
 # Expose port
 EXPOSE 5000
 

@@ -15,14 +15,17 @@ from typing import Dict, Any, Optional, List
 logger = logging.getLogger(__name__)
 
 # Configuration constants
-MEDIA_BASE = os.environ.get('MEDIA_BASE', '/media')
-VASTAI_LOG_DIR = os.path.join(MEDIA_BASE, '.vastai_log')
+LOG_BASE = os.environ.get('LOG_BASE', '/app/logs')
+VASTAI_LOG_DIR = os.path.join(LOG_BASE, 'vastai')
 
 
 def ensure_vastai_log_dir():
     """Ensure the VastAI log directory exists"""
     try:
         os.makedirs(VASTAI_LOG_DIR, exist_ok=True)
+        # Also create subdirectories for better organization
+        os.makedirs(os.path.join(VASTAI_LOG_DIR, 'api'), exist_ok=True)
+        os.makedirs(os.path.join(VASTAI_LOG_DIR, 'instances'), exist_ok=True)
         return True
     except PermissionError:
         logger.error(f"Failed to create VastAI log directory {VASTAI_LOG_DIR}: Permission denied")
@@ -55,7 +58,7 @@ def get_log_filepath(date: datetime = None) -> str:
         str: Full path to the log file
     """
     filename = get_log_filename(date)
-    return os.path.join(VASTAI_LOG_DIR, filename)
+    return os.path.join(VASTAI_LOG_DIR, 'api', filename)
 
 
 def log_api_interaction(method: str, endpoint: str, request_data: Dict[Any, Any] = None, 
@@ -170,17 +173,21 @@ def get_vastai_logs(max_lines: int = 100, date_filter: str = None) -> List[Dict[
     try:
         if date_filter:
             # Load specific date file
-            log_filepath = os.path.join(VASTAI_LOG_DIR, f"api_log_{date_filter}.json")
+            log_filepath = os.path.join(VASTAI_LOG_DIR, 'api', f"api_log_{date_filter}.json")
             if os.path.exists(log_filepath):
                 with open(log_filepath, 'r') as f:
                     entries = json.load(f)
                     all_entries.extend(entries)
         else:
             # Load all log files, sorted by date (newest first)
+            api_log_dir = os.path.join(VASTAI_LOG_DIR, 'api')
+            if not os.path.exists(api_log_dir):
+                return []
+                
             log_files = []
-            for filename in os.listdir(VASTAI_LOG_DIR):
+            for filename in os.listdir(api_log_dir):
                 if filename.startswith('api_log_') and filename.endswith('.json'):
-                    filepath = os.path.join(VASTAI_LOG_DIR, filename)
+                    filepath = os.path.join(api_log_dir, filename)
                     log_files.append((os.path.getmtime(filepath), filepath))
             
             # Sort by modification time (newest first)
@@ -216,9 +223,13 @@ def get_vastai_log_manifest() -> List[Dict[str, Any]]:
     manifest = []
     
     try:
-        for filename in os.listdir(VASTAI_LOG_DIR):
+        api_log_dir = os.path.join(VASTAI_LOG_DIR, 'api')
+        if not os.path.exists(api_log_dir):
+            return []
+            
+        for filename in os.listdir(api_log_dir):
             if filename.startswith('api_log_') and filename.endswith('.json'):
-                filepath = os.path.join(VASTAI_LOG_DIR, filename)
+                filepath = os.path.join(api_log_dir, filename)
                 try:
                     stat = os.stat(filepath)
                     with open(filepath, 'r') as f:

@@ -11,8 +11,8 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # Configuration constants
-MEDIA_BASE = os.environ.get('MEDIA_BASE', '/media')
-SYNC_LOG_DIR = os.path.join(MEDIA_BASE, '.sync_log')
+LOG_BASE = os.environ.get('LOG_BASE', '/app/logs')
+SYNC_LOG_DIR = os.path.join(LOG_BASE, 'sync')
 
 
 def _load_json(path):
@@ -28,7 +28,11 @@ def _find_latest_progress():
     """Find the most recent progress file"""
     import glob as _glob
     
-    progress_files = _glob.glob("/tmp/sync_progress_*.json")
+    progress_dir = os.path.join(SYNC_LOG_DIR, 'progress')
+    if not os.path.exists(progress_dir):
+        return None
+        
+    progress_files = _glob.glob(os.path.join(progress_dir, "sync_progress_*.json"))
     if not progress_files:
         return None
     
@@ -40,13 +44,14 @@ def _find_latest_progress():
 def get_logs_manifest():
     """Get list of available log files with metadata"""
     try:
-        if not os.path.exists(SYNC_LOG_DIR):
+        operations_dir = os.path.join(SYNC_LOG_DIR, 'operations')
+        if not os.path.exists(operations_dir):
             return {"success": True, "logs": []}
         
         log_files = []
-        for filename in sorted(os.listdir(SYNC_LOG_DIR), reverse=True):
+        for filename in sorted(os.listdir(operations_dir), reverse=True):
             if filename.endswith('.json'):
-                filepath = os.path.join(SYNC_LOG_DIR, filename)
+                filepath = os.path.join(operations_dir, filename)
                 try:
                     stat = os.stat(filepath)
                     with open(filepath, 'r') as f:
@@ -84,7 +89,7 @@ def get_log_file_content(filename):
         if not filename.endswith('.json') or '/' in filename or '\\' in filename:
             return {"success": False, "error": "Invalid filename"}
         
-        filepath = os.path.join(SYNC_LOG_DIR, filename)
+        filepath = os.path.join(SYNC_LOG_DIR, 'operations', filename)
         
         if not os.path.exists(filepath):
             return {"success": False, "error": "Log file not found"}
@@ -123,14 +128,16 @@ def get_active_syncs():
     import glob as _glob
     
     out = []
-    for fp in sorted(_glob.glob("/tmp/sync_progress_*.json"), key=os.path.getmtime, reverse=True):
-        data = _load_json(fp) or {}
-        out.append({
-            "sync_id": os.path.basename(fp)[len("sync_progress_"):-5],
-            "status": data.get("status"),
-            "progress_percent": data.get("progress_percent"),
-            "last_update": data.get("last_update"),
-        })
+    progress_dir = os.path.join(SYNC_LOG_DIR, 'progress')
+    if os.path.exists(progress_dir):
+        for fp in sorted(_glob.glob(os.path.join(progress_dir, "sync_progress_*.json")), key=os.path.getmtime, reverse=True):
+            data = _load_json(fp) or {}
+            out.append({
+                "sync_id": os.path.basename(fp)[len("sync_progress_"):-5],
+                "status": data.get("status"),
+                "progress_percent": data.get("progress_percent"),
+                "last_update": data.get("last_update"),
+            })
     return {"success": True, "items": out}
 
 
@@ -145,7 +152,8 @@ def get_latest_sync():
 
 def get_sync_progress(sync_id):
     """Get progress for a specific sync operation"""
-    progress_file = f"/tmp/sync_progress_{sync_id}.json"
+    progress_dir = os.path.join(SYNC_LOG_DIR, 'progress')
+    progress_file = os.path.join(progress_dir, f"sync_progress_{sync_id}.json")
     data = _load_json(progress_file)
     
     if data:

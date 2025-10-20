@@ -322,6 +322,19 @@ def get_sync_progress_route(sync_id):
     return jsonify(get_sync_progress(sync_id))
 
 
+@app.route('/logs/info', methods=['GET', 'OPTIONS'])
+def get_log_info_route():
+    """Get log directory information and status"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    try:
+        from ..utils.log_init import get_log_directory_info
+        return jsonify(get_log_directory_info())
+    except ImportError:
+        from utils.log_init import get_log_directory_info
+        return jsonify(get_log_directory_info())
+
+
 @app.route('/logs/manifest', methods=['GET', 'OPTIONS'])
 def get_logs_manifest_route():
     """Get list of available log files"""
@@ -880,6 +893,18 @@ def create_vastai_instance():
 
 
 if __name__ == '__main__':
+    # Initialize log directories
+    try:
+        from ..utils.log_init import ensure_all_log_directories
+        from ..utils.app_logging import log_startup
+        ensure_all_log_directories()
+        log_startup()
+    except ImportError:
+        from utils.log_init import ensure_all_log_directories
+        from utils.app_logging import log_startup
+        ensure_all_log_directories()
+        log_startup()
+    
     import sys
     port = int(sys.argv[1].replace('--port=', '').replace('--port', '')) if len(sys.argv) > 1 and '--port' in sys.argv[1] else 5000
     app.run(host='0.0.0.0', port=port, debug=False)

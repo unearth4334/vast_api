@@ -8,10 +8,12 @@ services:
       - "${SSH_DIR_PATH}:/root/.ssh"
       - "${HOST_MEDIA_PATH}:/media"
       - "${API_KEY_PATH}:/app/api_key.txt:ro"
+      - vast_api_logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
       - PUID=${PUID}
       - PGID=${PGID}
+      - LOG_BASE=/app/logs
     restart: unless-stopped
 
     healthcheck:
@@ -27,3 +29,7 @@ services:
 networks:
   media-sync-network:
     driver: bridge
+
+volumes:
+  vast_api_logs:
+    driver: local
