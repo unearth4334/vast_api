@@ -168,6 +168,8 @@ body {
 .offer-action-btn,
 .use-instance-btn,
 .details-btn,
+.stop-instance-btn,
+.destroy-instance-btn,
 .refresh-logs-btn,
 .close-modal-btn {
     border: none;
@@ -187,6 +189,8 @@ body {
 .search-button,
 .offer-action-btn,
 .use-instance-btn,
+.stop-instance-btn,
+.destroy-instance-btn,
 .details-btn {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
@@ -240,6 +244,30 @@ body {
     min-width: 180px;
 }
 
+/* Stop instance button - warning action */
+.stop-instance-btn {
+    background: #f59e0b;
+    color: white;
+    padding: var(--size-4-1) var(--size-4-3);
+    font-weight: 500;
+    font-size: var(--font-ui-smaller);
+    border-radius: var(--radius-s);
+    margin-left: var(--size-4-2);
+    min-width: 80px;
+}
+
+/* Destroy instance button - danger action */
+.destroy-instance-btn {
+    background: #dc2626;
+    color: white;
+    padding: var(--size-4-1) var(--size-4-3);
+    font-weight: 500;
+    font-size: var(--font-ui-smaller);
+    border-radius: var(--radius-s);
+    margin-left: var(--size-4-2);
+    min-width: 80px;
+}
+
 /* Details button - secondary action */
 .details-btn {
     background: var(--interactive-normal);
@@ -283,6 +311,18 @@ body {
 .details-btn:hover {
     background: var(--interactive-hover);
     color: var(--text-normal);
+}
+
+.stop-instance-btn:hover {
+    filter: brightness(0.9);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px var(--background-modifier-box-shadow);
+}
+
+.destroy-instance-btn:hover {
+    filter: brightness(0.9);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px var(--background-modifier-box-shadow);
 }
 
 .sync-button:hover,

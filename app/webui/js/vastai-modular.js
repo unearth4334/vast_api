@@ -35,6 +35,8 @@ window.syncFromConnectionString = VastAIInstances.syncFromConnectionString;
 window.loadVastaiInstances = VastAIInstances.loadVastaiInstances;
 window.useInstance = VastAIInstances.useInstance;
 window.refreshInstanceCard = VastAIInstances.refreshInstanceCard;
+window.stopInstance = VastAIInstances.stopInstance;
+window.destroyInstance = VastAIInstances.destroyInstance;
 
 // === UI COMPONENTS ===
 window.showSetupResult = VastAIUI.showSetupResult;

@@ -369,6 +369,16 @@ export async function refreshInstanceCard(instanceId) {
         <button class="details-btn" onclick="VastAIUI.showInstanceDetails(${instanceId})">
           {...} Details
         </button>
+        ${
+          state === 'running'
+            ? `<button class="stop-instance-btn" onclick="VastAIInstances.stopInstance(${instanceId})" title="Stop instance (will destroy it)">
+                 ⏹️ Stop
+               </button>`
+            : ''
+        }
+        <button class="destroy-instance-btn" onclick="VastAIInstances.destroyInstance(${instanceId})" title="Permanently destroy instance">
+          🗑️ Destroy
+        </button>
       `;
     }
 
@@ -459,6 +469,16 @@ export function displayVastaiInstances(instances) {
           <button class="details-btn" onclick="VastAIUI.showInstanceDetails(${instance.id})">
             {...} Details
           </button>
+          ${
+            normalizedStatus === 'running'
+              ? `<button class="stop-instance-btn" onclick="VastAIInstances.stopInstance(${instance.id})" title="Stop instance (will destroy it)">
+                   ⏹️ Stop
+                 </button>`
+              : ''
+          }
+          <button class="destroy-instance-btn" onclick="VastAIInstances.destroyInstance(${instance.id})" title="Permanently destroy instance">
+            🗑️ Destroy
+          </button>
         </div>
       </div>
     `;
@@ -481,6 +501,61 @@ export function useInstance(sshConnection) {
   if (sshInput) {
     sshInput.value = sshConnection;
     showSetupResult('✅ SSH connection parameters copied to SSH Connection String field', 'success');
+  }
+}
+
+/**
+ * Stop a VastAI instance (alias for destroy, as VastAI doesn't have a separate stop function)
+ * @param {number} instanceId - ID of the instance to stop
+ */
+export async function stopInstance(instanceId) {
+  const confirmation = confirm(`Are you sure you want to STOP instance #${instanceId}?\n\nNote: In VastAI, stopping an instance permanently destroys it. This action cannot be undone.`);
+  if (!confirmation) return;
+  
+  return destroyInstance(instanceId);
+}
+
+/**
+ * Destroy a VastAI instance
+ * @param {number} instanceId - ID of the instance to destroy
+ */
+export async function destroyInstance(instanceId) {
+  const confirmation = confirm(`Are you sure you want to DESTROY instance #${instanceId}?\n\nThis action cannot be undone and will permanently delete the instance.`);
+  if (!confirmation) return;
+  
+  try {
+    showSetupResult(`Destroying instance #${instanceId}...`, 'info');
+    
+    const response = await fetch(`/vastai/instances/${instanceId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showSetupResult(`✅ Instance #${instanceId} destroyed successfully`, 'success');
+      
+      // Remove the instance from the UI
+      const instanceElement = document.querySelector(`[data-instance-id="${instanceId}"]`);
+      if (instanceElement) {
+        instanceElement.remove();
+      }
+      
+      // Refresh the instances list to get updated data
+      setTimeout(() => {
+        loadVastaiInstances();
+      }, 2000);
+      
+    } else {
+      showSetupResult(`❌ Failed to destroy instance #${instanceId}: ${data.message}`, 'error');
+    }
+    
+  } catch (error) {
+    console.error('Error destroying instance:', error);
+    showSetupResult(`❌ Error destroying instance #${instanceId}: ${error.message}`, 'error');
   }
 }
 

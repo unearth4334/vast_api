@@ -1182,6 +1182,48 @@ def create_vastai_instance():
         })
 
 
+@app.route('/vastai/instances/<int:instance_id>', methods=['DELETE', 'OPTIONS'])
+def destroy_vastai_instance(instance_id):
+    """Destroy a VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Import the API function
+        from ..utils.vastai_api import destroy_instance, VastAIAPIError
+        
+        # Read API key
+        api_key = read_api_key_from_file()
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found. Please check api_key.txt file.'
+            })
+        
+        # Destroy the instance
+        logger.info(f"Destroying VastAI instance {instance_id}")
+        result = destroy_instance(api_key, instance_id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Instance {instance_id} destroyed successfully',
+            'result': result
+        })
+        
+    except VastAIAPIError as e:
+        logger.error(f"VastAI API error destroying instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'VastAI API error: {str(e)}'
+        })
+    except Exception as e:
+        logger.error(f"Error destroying VastAI instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error destroying instance: {str(e)}'
+        })
+
+
 # --- Template Management Routes ---
 
 @app.route('/templates', methods=['GET', 'OPTIONS'])
