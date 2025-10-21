@@ -103,7 +103,7 @@ def start_sync():
         logger.error(f"Failed to start sync: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while starting the sync operation'
         }), 500
 
 
@@ -165,7 +165,7 @@ def get_status(job_id):
         logger.error(f"Failed to get job status: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while retrieving job status'
         }), 500
 
 
@@ -224,7 +224,7 @@ def get_progress(job_id):
         logger.error(f"Failed to get progress: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while retrieving progress information'
         }), 500
 
 
@@ -263,7 +263,7 @@ def list_active():
         logger.error(f"Failed to list active jobs: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while listing active jobs'
         }), 500
 
 
@@ -301,7 +301,7 @@ def cancel_job(job_id):
         logger.error(f"Failed to cancel job: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'An error occurred while cancelling the job'
         }), 500
 
 
