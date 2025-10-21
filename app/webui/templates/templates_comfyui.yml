@@ -19,7 +19,7 @@ setup_steps:
         description: "Install CivitDL using the ComfyUI Python virtual environment"
         
       - name: "Configure CivitDL API key"
-        command: "/venv/main/bin/python -m civitdl.civitconfig --api-key {civitdl_api_key}"
+        command: "/venv/main/bin/civitconfig --api-key {civitdl_api_key}"
         description: "Set the CivitDL API key for accessing restricted models"
         requires_api_key: true
         

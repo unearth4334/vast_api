@@ -980,13 +980,13 @@ def setup_civitdl():
         # Setup commands for CivitDL using the ComfyUI virtual environment
         setup_commands = [
             '/venv/main/bin/python -m pip install civitdl',
-            '/venv/main/bin/python -c "import civitdl; print(f\'CivitDL version: {civitdl.__version__}\')"'
+            '/venv/main/bin/python -c "import civitdl; print(\\"CivitDL installed successfully\\")"'
         ]
         
         # Add API key configuration if available
         if civitdl_api_key:
             setup_commands.extend([
-                f'/venv/main/bin/python -c "import subprocess; subprocess.run([\'/venv/main/bin/python\', \'-m\', \'civitdl.civitconfig\', \'--api-key\', \'{civitdl_api_key}\'], check=True)"',
+                f'/venv/main/bin/civitconfig --api-key "{civitdl_api_key}"',
                 'echo "CivitDL API key configured successfully"'
             ])
         else:
@@ -1621,14 +1621,14 @@ def execute_civitdl_setup(ssh_connection):
             'echo "Installing CivitDL package using pip..."',
             '/venv/main/bin/python -m pip install civitdl',
             'echo "Verifying CivitDL installation..."',
-            '/venv/main/bin/python -c "import civitdl; print(f\\"CivitDL version: {civitdl.__version__}\\")"'
+            '/venv/main/bin/python -c "import civitdl; print(\\"CivitDL installed successfully\\")"'
         ]
         
         # Add API key configuration if available
         if civitdl_api_key:
             install_commands.extend([
                 'echo "Configuring CivitDL API key..."',
-                f'/venv/main/bin/python -c "import subprocess; subprocess.run([\'/venv/main/bin/python\', \'-m\', \'civitdl.civitconfig\', \'--api-key\', \'{civitdl_api_key}\'], check=True)"',
+                f'/venv/main/bin/civitconfig --api-key "{civitdl_api_key}"',
                 'echo "API key configured successfully"'
             ])
         else:
@@ -1636,12 +1636,18 @@ def execute_civitdl_setup(ssh_connection):
         
         install_commands.append('echo "CivitDL installation completed successfully"')
         
-        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
-        set -e
-        {" && ".join(install_commands)}
-        "'''
+        # Create a simple command string without complex escaping
+        command_str = " && ".join(install_commands)
         
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+        cmd = [
+            'ssh', '-p', str(port), 
+            '-o', 'StrictHostKeyChecking=no', 
+            '-o', 'ConnectTimeout=10',
+            f'{user}@{host}',
+            f'set -e && {command_str}'
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         
         if result.returncode == 0:
             # Log successful operation
