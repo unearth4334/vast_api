@@ -979,14 +979,14 @@ def setup_civitdl():
         
         # Setup commands for CivitDL using the ComfyUI virtual environment
         setup_commands = [
-            '/venv/main/bin/python -m pip install civitdl',
+            '/venv/main/bin/python -m pip install --root-user-action=ignore civitdl',
             '/venv/main/bin/python -c "import civitdl; print(\\"CivitDL installed successfully\\")"'
         ]
         
         # Add API key configuration if available
         if civitdl_api_key:
             setup_commands.extend([
-                f'/venv/main/bin/civitconfig --api-key "{civitdl_api_key}"',
+                f'echo "{civitdl_api_key}" | /venv/main/bin/civitconfig default --api-key',
                 'echo "CivitDL API key configured successfully"'
             ])
         else:
@@ -1619,7 +1619,7 @@ def execute_civitdl_setup(ssh_connection):
         # Build the installation command
         install_commands = [
             'echo "Installing CivitDL package using pip..."',
-            '/venv/main/bin/python -m pip install civitdl',
+            '/venv/main/bin/python -m pip install --root-user-action=ignore civitdl',
             'echo "Verifying CivitDL installation..."',
             '/venv/main/bin/python -c "import civitdl; print(\\"CivitDL installed successfully\\")"'
         ]
@@ -1628,7 +1628,7 @@ def execute_civitdl_setup(ssh_connection):
         if civitdl_api_key:
             install_commands.extend([
                 'echo "Configuring CivitDL API key..."',
-                f'/venv/main/bin/civitconfig --api-key "{civitdl_api_key}"',
+                f'echo "{civitdl_api_key}" | /venv/main/bin/civitconfig default --api-key',
                 'echo "API key configured successfully"'
             ])
         else:

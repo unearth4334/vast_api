@@ -15,11 +15,11 @@ setup_steps:
     description: "Install and configure CivitDL for model management"
     commands:
       - name: "Install CivitDL package"
-        command: "/venv/main/bin/python -m pip install civitdl"
+        command: "/venv/main/bin/python -m pip install --root-user-action=ignore civitdl"
         description: "Install CivitDL using the ComfyUI Python virtual environment"
         
       - name: "Configure CivitDL API key"
-        command: "/venv/main/bin/civitconfig --api-key {civitdl_api_key}"
+        command: "echo {civitdl_api_key} | /venv/main/bin/civitconfig default --api-key"
         description: "Set the CivitDL API key for accessing restricted models"
         requires_api_key: true
         
@@ -32,12 +32,12 @@ setup_steps:
     description: "Test CivitDL installation and API connectivity"
     commands:
       - name: "Test CivitDL help command"
-        command: "/venv/main/bin/python -m civitdl --help"
+        command: "/venv/main/bin/civitdl --help"
         description: "Verify CivitDL command line interface is working"
         
       - name: "Test CivitDL configuration"
-        command: "/venv/main/bin/python -m civitdl.civitconfig --show"
-        description: "Display current CivitDL configuration including API key status"
+        command: "/venv/main/bin/civitconfig settings"
+        description: "Display current CivitDL configuration"
         
       - name: "Test API connectivity (optional)"
         command: "/venv/main/bin/python -c \"import requests; r = requests.get('https://civitai.com/api/v1/models', timeout=10); print(f'API Status: {r.status_code}')\""
