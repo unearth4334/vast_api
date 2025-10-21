@@ -970,13 +970,29 @@ def setup_civitdl():
         
         logger.info(f"Setting up CivitDL on {ssh_host}:{ssh_port}")
         
-        # Setup commands for CivitDL
+        # Try to read CivitDL API key
+        try:
+            civitdl_api_key = read_api_key_from_file(vendor="civitdl")
+        except Exception as e:
+            logger.warning(f"Could not read CivitDL API key: {str(e)}")
+            civitdl_api_key = None
+        
+        # Setup commands for CivitDL using the ComfyUI virtual environment
         setup_commands = [
-            'pip install civitdl',
-            'mkdir -p /workspace/civitdl',
-            'cd /workspace/civitdl',
-            'echo "CivitDL setup complete"'
+            '/venv/main/bin/python -m pip install civitdl',
+            '/venv/main/bin/python -c "import civitdl; print(f\'CivitDL version: {civitdl.__version__}\')"'
         ]
+        
+        # Add API key configuration if available
+        if civitdl_api_key:
+            setup_commands.extend([
+                f'/venv/main/bin/python -c "import subprocess; subprocess.run([\'/venv/main/bin/python\', \'-m\', \'civitdl.civitconfig\', \'--api-key\', \'{civitdl_api_key}\'], check=True)"',
+                'echo "CivitDL API key configured successfully"'
+            ])
+        else:
+            setup_commands.append('echo "Warning: No CivitDL API key found in api_key.txt"')
+            
+        setup_commands.append('echo "CivitDL setup complete"')
         
         command_string = ' && '.join(setup_commands)
         
@@ -1588,21 +1604,41 @@ def execute_civitdl_setup(ssh_connection):
             extra_data={"host": host, "port": port, "user": user}
         )
         
-        # Use existing CivitDL setup logic
+        # Use pip install for CivitDL setup as per template specification
+        # First, try to read CivitDL API key
+        try:
+            civitdl_api_key = read_api_key_from_file(vendor="civitdl")
+        except Exception as e:
+            enhanced_logger.log_error(
+                f"Could not read CivitDL API key: {str(e)}",
+                "civitdl_api_key_read_error",
+                context=context
+            )
+            civitdl_api_key = None
+        
+        # Build the installation command
+        install_commands = [
+            'echo "Installing CivitDL package using pip..."',
+            '/venv/main/bin/python -m pip install civitdl',
+            'echo "Verifying CivitDL installation..."',
+            '/venv/main/bin/python -c "import civitdl; print(f\\"CivitDL version: {civitdl.__version__}\\")"'
+        ]
+        
+        # Add API key configuration if available
+        if civitdl_api_key:
+            install_commands.extend([
+                'echo "Configuring CivitDL API key..."',
+                f'/venv/main/bin/python -c "import subprocess; subprocess.run([\'/venv/main/bin/python\', \'-m\', \'civitdl.civitconfig\', \'--api-key\', \'{civitdl_api_key}\'], check=True)"',
+                'echo "API key configured successfully"'
+            ])
+        else:
+            install_commands.append('echo "Warning: No CivitDL API key found in api_key.txt"')
+        
+        install_commands.append('echo "CivitDL installation completed successfully"')
+        
         cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
         set -e
-        cd /workspace
-        if [ ! -d civitdl ]; then
-            echo 'Cloning CivitDL repository...'
-            git clone https://github.com/civitai/civitdl.git
-        else
-            echo 'CivitDL directory already exists'
-        fi
-        cd civitdl
-        echo 'Installing CivitDL package...'
-        pip install -e .
-        pip install requests tqdm
-        echo 'CivitDL installation completed successfully'
+        {" && ".join(install_commands)}
         "'''
         
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)

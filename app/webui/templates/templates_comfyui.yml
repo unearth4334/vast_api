@@ -6,14 +6,44 @@ version: "1.0.0"
 # Environment settings
 environment:
   ui_home: "/workspace/ComfyUI/"
-  python_venv: "/workspace/ComfyUI/venv"
+  python_venv: "/venv/main/bin/python"
   
 # Setup steps that will be executed in order
 setup_steps:
   - name: "Install CivitDL"
     type: "civitdl_install"
     description: "Install and configure CivitDL for model management"
+    commands:
+      - name: "Install CivitDL package"
+        command: "/venv/main/bin/python -m pip install civitdl"
+        description: "Install CivitDL using the ComfyUI Python virtual environment"
+        
+      - name: "Configure CivitDL API key"
+        command: "/venv/main/bin/python -m civitdl.civitconfig --api-key {civitdl_api_key}"
+        description: "Set the CivitDL API key for accessing restricted models"
+        requires_api_key: true
+        
+      - name: "Verify CivitDL installation"
+        command: "/venv/main/bin/python -c \"import civitdl; print(f'CivitDL version: {civitdl.__version__}')\""
+        description: "Verify that CivitDL is properly installed and accessible"
     
+  - name: "Test CivitDL"
+    type: "civitdl_test"
+    description: "Test CivitDL installation and API connectivity"
+    commands:
+      - name: "Test CivitDL help command"
+        command: "/venv/main/bin/python -m civitdl --help"
+        description: "Verify CivitDL command line interface is working"
+        
+      - name: "Test CivitDL configuration"
+        command: "/venv/main/bin/python -m civitdl.civitconfig --show"
+        description: "Display current CivitDL configuration including API key status"
+        
+      - name: "Test API connectivity (optional)"
+        command: "/venv/main/bin/python -c \"import requests; r = requests.get('https://civitai.com/api/v1/models', timeout=10); print(f'API Status: {r.status_code}')\""
+        description: "Test basic connectivity to CivitAI API"
+        optional: true
+        
   - name: "Set UI Home"
     type: "set_ui_home"
     path: "/workspace/ComfyUI/"
@@ -44,6 +74,13 @@ ui_config:
     - label: "🎨 Setup CivitDL"
       action: "setup_civitdl"
       style: "primary"
+      tooltip: "Install CivitDL package and configure API key for model downloads"
+      requires_api_key: true
+      
+    - label: "🧪 Test CivitDL"
+      action: "test_civitdl"
+      style: "secondary"
+      tooltip: "Test CivitDL installation and API key configuration"
       
     - label: "📁 Set UI_HOME"
       action: "set_ui_home"
@@ -69,8 +106,24 @@ ui_config:
 metadata:
   author: "vast_api"
   created_date: "2025-10-20"
-  tags: ["comfyui", "stable-diffusion", "ai-art"]
+  tags: ["comfyui", "stable-diffusion", "ai-art", "civitdl"]
   requirements:
     - "SSH access to VastAI instance"
     - "Python 3.8+ on target instance"
     - "Git installed on target instance"
+    - "CivitDL API key for model downloads"
+  api_keys:
+    civitdl:
+      description: "CivitAI API key for downloading models"
+      required: true
+      source: "api_key.txt"
+      format: "civitdl: {api_key}"
+  civitdl_info:
+    version: "2.1.2"
+    repository: "https://github.com/OwenTruong/civitdl"
+    pypi: "https://pypi.org/project/civitdl/"
+    documentation:
+      - "Basic usage: civitdl <model_id_or_url> <download_directory>"
+      - "Configuration: civitconfig --help"
+      - "API key setup: civitconfig --api-key <your_api_key>"
+      - "Supports batch downloads and metadata extraction"
