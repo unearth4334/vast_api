@@ -16,10 +16,8 @@ class SyncConfig:
     source_type: str  # 'forge', 'comfyui', 'vastai', etc.
     source_host: str
     source_port: int
+    dest_path: str  # Destination configuration
     source_path: Optional[str] = None
-    
-    # Destination configuration
-    dest_path: str
     
     # Sync options
     folders: List[str] = field(default_factory=list)
