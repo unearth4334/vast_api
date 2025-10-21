@@ -26,6 +26,17 @@ class SyncOrchestrator:
         self.progress_manager = ProgressManager()
         self.event_manager = MediaEventManager()
         self._active_jobs: Dict[str, SyncJob] = {}
+        
+        # Try to setup WebSocket progress reporting
+        try:
+            from .websocket_progress import get_socketio, WebSocketProgressReporter
+            socketio = get_socketio()
+            if socketio:
+                reporter = WebSocketProgressReporter(socketio)
+                self.progress_manager.register_callback(reporter.report_progress)
+                logger.info("WebSocket progress reporter registered")
+        except Exception as e:
+            logger.warning(f"Failed to setup WebSocket progress reporter: {e}")
     
     async def start_sync(self, config: SyncConfig) -> SyncJob:
         """
