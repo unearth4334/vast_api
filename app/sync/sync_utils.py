@@ -179,13 +179,38 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
         
         if result.returncode != 0:
             logger.error(f"{sync_type} sync failed with return code {result.returncode}")
+            
+            # Check for SSH host key error
+            error_output = result.stderr or result.stdout
+            host_key_error = None
+            try:
+                from .ssh_host_key_manager import SSHHostKeyManager
+                manager = SSHHostKeyManager()
+                detected_error = manager.detect_host_key_error(error_output)
+                if detected_error:
+                    host_key_error = {
+                        'host': detected_error.host,
+                        'port': detected_error.port,
+                        'known_hosts_file': detected_error.known_hosts_file,
+                        'line_number': detected_error.line_number,
+                        'new_fingerprint': detected_error.new_fingerprint,
+                        'detected_at': detected_error.detected_at
+                    }
+                    logger.warning(f"Detected SSH host key error for {detected_error.host}:{detected_error.port}")
+            except Exception as e:
+                logger.debug(f"Error checking for host key error: {e}")
+            
             sync_result = {
                 'success': False,
                 'message': f'{sync_type} sync failed',
-                'output': result.stderr or result.stdout,
+                'output': error_output,
                 'sync_id': sync_id,
                 'stats': stats
             }
+            
+            # Add host key error info if detected
+            if host_key_error:
+                sync_result['host_key_error'] = host_key_error
         else:
             logger.info(f"{sync_type} sync completed successfully")
             sync_result = {

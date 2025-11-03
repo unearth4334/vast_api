@@ -1438,3 +1438,86 @@ body {
         filter: brightness(0.98);
     }
 }
+
+/* SSH Host Key Error Modal Styles */
+.host-key-error-content {
+    padding: 20px;
+}
+
+.warning-box {
+    background-color: rgba(255, 107, 107, 0.1);
+    border-left: 4px solid #ff6b6b;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.warning-box p {
+    margin: 10px 0;
+}
+
+.warning-box ul {
+    margin: 10px 0;
+    padding-left: 25px;
+}
+
+.warning-box li {
+    margin: 5px 0;
+}
+
+.host-key-details {
+    background-color: var(--background-secondary);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.host-key-details h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--text-normal);
+}
+
+.detail-item {
+    margin: 10px 0;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.detail-item:last-child {
+    border-bottom: none;
+}
+
+.detail-item strong {
+    display: inline-block;
+    width: 150px;
+    color: var(--text-muted);
+}
+
+.host-key-actions {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.host-key-actions p {
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.host-key-actions button {
+    margin: 5px;
+}
+
+.host-key-info {
+    background-color: var(--background-modifier-hover);
+    padding: 12px;
+    border-radius: 4px;
+    margin-top: 20px;
+}
+
+.host-key-info p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9em;
+    line-height: 1.5;
+}

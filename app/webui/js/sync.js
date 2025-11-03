@@ -75,6 +75,11 @@ async function sync(type) {
             resultDiv.className = 'result-panel error';
             const brief = (data.error || data.output || '').split('\\n').slice(0,6).join('\\n');
             resultDiv.innerHTML = `<h3>❌ ${data.message}</h3><pre>${brief}\\n\\n(Click for full report)</pre>`;
+            
+            // Check for host key error
+            if (data.host_key_error) {
+                showHostKeyErrorModal(data.host_key_error);
+            }
         }
     } catch (error) {
         resultDiv.className = 'result-panel error';
