@@ -2154,6 +2154,159 @@ def execute_python_venv_setup(ssh_connection, venv_path):
         }
 
 
+# --- SSH Host Key Management Routes ---
+
+@app.route('/ssh/host-keys/check', methods=['POST', 'OPTIONS'])
+def check_host_key_error():
+    """Check if SSH output contains a host key error"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .ssh_host_key_manager import SSHHostKeyManager
+        
+        data = request.get_json() if request.is_json else {}
+        ssh_output = data.get('ssh_output', '')
+        
+        if not ssh_output:
+            return jsonify({
+                'success': False,
+                'message': 'SSH output is required'
+            }), 400
+        
+        manager = SSHHostKeyManager()
+        error = manager.detect_host_key_error(ssh_output)
+        
+        if error:
+            return jsonify({
+                'success': True,
+                'has_error': True,
+                'error': {
+                    'host': error.host,
+                    'port': error.port,
+                    'known_hosts_file': error.known_hosts_file,
+                    'line_number': error.line_number,
+                    'new_fingerprint': error.new_fingerprint,
+                    'detected_at': error.detected_at
+                }
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'has_error': False
+            })
+    
+    except Exception as e:
+        logger.error(f"Error checking host key error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error checking host key: {str(e)}'
+        }), 500
+
+
+@app.route('/ssh/host-keys/resolve', methods=['POST', 'OPTIONS'])
+def resolve_host_key_error():
+    """Resolve a host key error by removing old key and accepting new one"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .ssh_host_key_manager import SSHHostKeyManager, HostKeyError
+        
+        data = request.get_json() if request.is_json else {}
+        host = data.get('host')
+        port = data.get('port')
+        known_hosts_file = data.get('known_hosts_file')
+        user = data.get('user', 'root')
+        
+        if not host or not port:
+            return jsonify({
+                'success': False,
+                'message': 'Host and port are required'
+            }), 400
+        
+        # Create a minimal HostKeyError object for resolution
+        from datetime import datetime
+        error = HostKeyError(
+            host=host,
+            port=int(port),
+            known_hosts_file=known_hosts_file or os.path.expanduser("~/.ssh/known_hosts"),
+            line_number=0,
+            new_fingerprint="",
+            error_message="",
+            detected_at=datetime.now().isoformat()
+        )
+        
+        manager = SSHHostKeyManager()
+        success, message = manager.resolve_host_key_error(error, user)
+        
+        if success:
+            logger.info(f"Successfully resolved host key error for {host}:{port}")
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            logger.error(f"Failed to resolve host key error for {host}:{port}: {message}")
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 500
+    
+    except Exception as e:
+        logger.error(f"Error resolving host key error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error resolving host key: {str(e)}'
+        }), 500
+
+
+@app.route('/ssh/host-keys/remove', methods=['POST', 'OPTIONS'])
+def remove_host_key():
+    """Remove a specific host key from known_hosts"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .ssh_host_key_manager import SSHHostKeyManager
+        
+        data = request.get_json() if request.is_json else {}
+        host = data.get('host')
+        port = data.get('port')
+        known_hosts_file = data.get('known_hosts_file')
+        
+        if not host or not port:
+            return jsonify({
+                'success': False,
+                'message': 'Host and port are required'
+            }), 400
+        
+        manager = SSHHostKeyManager()
+        success, message = manager.remove_old_host_key(
+            host, 
+            int(port), 
+            known_hosts_file
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 500
+    
+    except Exception as e:
+        logger.error(f"Error removing host key: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error removing host key: {str(e)}'
+        }), 500
+
+
 # Initialize WebSocket support for real-time progress
 try:
     from .websocket_progress import init_socketio

@@ -217,12 +217,68 @@
         </div>
     </div>
     
+    <!-- SSH Host Key Error Modal -->
+    <div id="hostKeyErrorOverlay" class="log-overlay" style="display: none;">
+        <div class="log-modal">
+            <div class="log-modal-header">
+                <h3 class="log-modal-title">⚠️ SSH Host Key Changed</h3>
+                <button class="close-modal-btn" onclick="closeHostKeyErrorModal()">✕</button>
+            </div>
+            <div class="log-modal-content">
+                <div class="host-key-error-content">
+                    <div class="warning-box">
+                        <p><strong>WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!</strong></p>
+                        <p>The SSH host key for this server has changed. This could indicate:</p>
+                        <ul>
+                            <li>The server has been reinstalled or reconfigured</li>
+                            <li>You're connecting to a different server at the same address</li>
+                            <li><strong style="color: #ff6b6b;">Potentially a man-in-the-middle attack</strong></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="host-key-details">
+                        <h4>Host Key Details:</h4>
+                        <div class="detail-item">
+                            <strong>Host:</strong> <span id="hk-host">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Port:</strong> <span id="hk-port">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>New Fingerprint:</strong> <span id="hk-fingerprint" style="font-family: monospace;">-</span>
+                        </div>
+                        <div class="detail-item">
+                            <strong>Known Hosts File:</strong> <span id="hk-file" style="font-family: monospace; font-size: 0.9em;">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="host-key-actions">
+                        <p><strong>What would you like to do?</strong></p>
+                        <button class="sync-button" onclick="resolveHostKeyError()" id="resolveHostKeyBtn">
+                            <span>✓</span>
+                            Accept New Host Key
+                        </button>
+                        <button class="sync-button secondary" onclick="closeHostKeyErrorModal()">
+                            <span>✕</span>
+                            Cancel
+                        </button>
+                    </div>
+                    
+                    <div class="host-key-info">
+                        <p><small><strong>Note:</strong> Accepting the new host key will remove the old key and add the new one to your known_hosts file. Only do this if you trust the server and understand why the key has changed.</small></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- JavaScript files -->
     <!-- Core modules -->
     <script src="js/state.js?v=20251020-v3"></script>
     <script src="js/api.js?v=20251020-v3"></script>
     <script src="js/sync.js?v=20251020-v3"></script>
     <script src="js/logs.js?v=20251020-v3"></script>
+    <script src="js/ssh-host-key.js?v=20251103-v1"></script>
     
     <!-- VastAI Modular System -->
     <script type="module" src="js/vastai-modular.js?v=20251020-v3"></script>
