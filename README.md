@@ -2,6 +2,9 @@
 
 An easy-to-use tool for syncing media from local Docker containers and VastAI cloud VMs. Provides a web API interface designed for deployment on QNAP NAS.
 
+> **🎉 NEW: Redesigned Sync System Available!**  
+> See [SYNC_REDESIGN_README.md](SYNC_REDESIGN_README.md) for the new v2 API with real-time progress, WebSocket support, and enhanced performance.
+
 ## Features
 
 - 🔥 **Sync Forge**: Sync from Stable Diffusion WebUI Forge (10.0.78.108:2222)
@@ -9,6 +12,9 @@ An easy-to-use tool for syncing media from local Docker containers and VastAI cl
 - ☁️ **Sync VastAI**: Auto-discover running VastAI instance and sync
 - 🐳 **Docker Ready**: Containerized for easy deployment on QNAP NAS
 - 🌐 **Web API**: REST endpoints for web interface
+- ⚡ **Fast Sync**: Manifest-based change detection (v2)
+- 📊 **Live Progress**: Real-time WebSocket updates (v2)
+- 🧹 **Auto Cleanup**: Configurable old media purge (v2)
 
 ## Quick Start
 

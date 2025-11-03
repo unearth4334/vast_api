@@ -2142,6 +2142,24 @@ def execute_python_venv_setup(ssh_connection, venv_path):
         }
 
 
+# Initialize WebSocket support for real-time progress
+try:
+    from .websocket_progress import init_socketio
+    socketio = init_socketio(app)
+    logger.info("WebSocket support initialized")
+except Exception as e:
+    logger.warning(f"Failed to initialize WebSocket support: {e}")
+    socketio = None
+
+# Register v2 API
+try:
+    from .sync_api_v2 import register_v2_api
+    register_v2_api(app)
+    logger.info("Registered Sync API v2")
+except Exception as e:
+    logger.warning(f"Failed to register Sync API v2: {e}")
+
+
 if __name__ == '__main__':
     # Initialize log directories
     try:
