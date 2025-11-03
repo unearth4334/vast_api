@@ -54,12 +54,39 @@ class TestSyncAPI(unittest.TestCase):
         self.assertEqual(data['forge']['port'], '2222')
         self.assertEqual(data['comfy']['port'], '2223')
 
+    def test_status_endpoint_health_check(self):
+        """Test status endpoint with health check request (should not call VastAI API)"""
+        response = self.app.get('/status', headers={'User-Agent': 'curl/7.68.0'})
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertTrue(data['forge']['available'])
+        self.assertTrue(data['comfy']['available'])
+        self.assertFalse(data['vastai']['available'])  # Should be False for health checks
+        self.assertIn('not checked during health check', data['vastai']['message'])
+
+    @patch('app.sync.sync_api.VastManager')
+    def test_vastai_endpoints_still_make_api_calls(self, mock_vast_manager):
+        """Test that VastAI endpoints (non-status) still make API calls for web UI"""
+        mock_vast_manager.side_effect = Exception("API key missing")
+        
+        # Test /vastai/instances endpoint
+        response = self.app.get('/vastai/instances', headers={'User-Agent': 'Mozilla/5.0'})
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('Error getting VastAI instances', data['message'])
+        
+        # Verify VastManager was called (API call attempted)
+        mock_vast_manager.assert_called()
+
     @patch('app.sync.sync_api.VastManager')
     def test_status_endpoint_vastai_error(self, mock_vast_manager):
         """Test status endpoint with VastAI connection error"""
         mock_vast_manager.side_effect = Exception("API error")
 
-        response = self.app.get('/status')
+        # Test with a regular user agent (not curl)
+        response = self.app.get('/status', headers={'User-Agent': 'Mozilla/5.0'})
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
