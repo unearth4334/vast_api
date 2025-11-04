@@ -8,7 +8,7 @@ import os
 from typing import Optional
 
 from .orchestrator import SyncOrchestrator
-from .models import SyncConfig
+from .models import SyncConfig, SyncJob
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,34 @@ def get_orchestrator() -> SyncOrchestrator:
     if _orchestrator is None:
         _orchestrator = SyncOrchestrator()
     return _orchestrator
+
+
+async def _poll_job_status(orchestrator: SyncOrchestrator, job_id: str, max_wait: int = 600) -> Optional[SyncJob]:
+    """
+    Poll job status asynchronously to avoid blocking.
+    
+    Uses asyncio.to_thread() to run synchronous get_job_status in a thread,
+    preventing blocking of the event loop during progress polling.
+    
+    Args:
+        orchestrator: The orchestrator instance
+        job_id: Job ID to poll
+        max_wait: Maximum time to wait in seconds
+    
+    Returns:
+        The final job status or None if timeout
+    """
+    elapsed = 0
+    while elapsed < max_wait:
+        # Run synchronous get_job_status in a thread to avoid blocking
+        job_status = await asyncio.to_thread(orchestrator.get_job_status, job_id)
+        if job_status and job_status.status in ['complete', 'failed']:
+            return job_status
+        await asyncio.sleep(2)
+        elapsed += 2
+    
+    # Timeout - get final status
+    return await asyncio.to_thread(orchestrator.get_job_status, job_id)
 
 
 def run_sync_v2(host: str, port: str, sync_type: str, cleanup: bool = True, 
@@ -95,20 +123,14 @@ def run_sync_v2(host: str, port: str, sync_type: str, cleanup: bool = True,
         asyncio.set_event_loop(loop)
         job = loop.run_until_complete(orchestrator.start_sync(config))
         
-        # Wait for completion (with timeout)
-        max_wait = 600  # 10 minutes
-        elapsed = 0
-        while elapsed < max_wait:
-            job_status = orchestrator.get_job_status(job.id)
-            if job_status and job_status.status in ['complete', 'failed']:
-                break
-            asyncio.sleep(2)
-            elapsed += 2
+        # Poll for completion using asyncio.to_thread() to avoid blocking
+        final_job = loop.run_until_complete(_poll_job_status(orchestrator, job.id, max_wait=600))
         
         loop.close()
         
-        # Get final status
-        final_job = orchestrator.get_job_status(job.id)
+        # Get final status if polling returned None
+        if not final_job:
+            final_job = orchestrator.get_job_status(job.id)
         
         if not final_job:
             return {
