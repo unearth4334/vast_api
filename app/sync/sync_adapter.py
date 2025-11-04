@@ -8,7 +8,7 @@ import os
 from typing import Optional
 
 from .orchestrator import SyncOrchestrator
-from .models import SyncConfig
+from .models import SyncConfig, SyncJob
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def get_orchestrator() -> SyncOrchestrator:
     return _orchestrator
 
 
-async def _poll_job_status(orchestrator: SyncOrchestrator, job_id: str, max_wait: int = 600) -> Optional[dict]:
+async def _poll_job_status(orchestrator: SyncOrchestrator, job_id: str, max_wait: int = 600) -> Optional[SyncJob]:
     """
     Poll job status asynchronously to avoid blocking.
     
