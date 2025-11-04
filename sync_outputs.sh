@@ -45,9 +45,21 @@ fi
 
 # Set up progress tracking
 if [[ -n "$SYNC_ID" ]]; then
-  PROGRESS_FILE="/tmp/sync_progress_${SYNC_ID}.json"
+  # Use the same log directory as Python backend
+  LOG_BASE="${LOG_BASE:-/app/logs}"
+  PROGRESS_DIR="$LOG_BASE/sync/progress"
+  
+  # Ensure progress directory exists with proper permissions
+  if ! mkdir -p "$PROGRESS_DIR" 2>/dev/null; then
+    echo "⚠️  Warning: Failed to create progress directory: $PROGRESS_DIR" >&2
+    # Fallback to /tmp if /app/logs is not writable
+    PROGRESS_DIR="/tmp"
+  fi
+  
+  PROGRESS_FILE="$PROGRESS_DIR/sync_progress_${SYNC_ID}.json"
+  
   # Initialize progress file
-  cat > "$PROGRESS_FILE" << EOF
+  cat > "$PROGRESS_FILE" 2>/dev/null << EOF
 {
   "sync_id": "$SYNC_ID",
   "status": "starting",
@@ -61,6 +73,13 @@ if [[ -n "$SYNC_ID" ]]; then
   "last_update": "$(date -Iseconds)"
 }
 EOF
+  
+  if [[ -f "$PROGRESS_FILE" ]]; then
+    echo "📊 Progress tracking enabled: $PROGRESS_FILE"
+  else
+    echo "⚠️  Warning: Failed to initialize progress file" >&2
+    PROGRESS_FILE=""
+  fi
 fi
 
 # Progress update function
@@ -70,6 +89,11 @@ update_progress() {
     local percent="$2"
     local message="${3:-}"
     local current_folder="${4:-}"
+    
+    # Escape single quotes in strings for Python
+    stage="${stage//\'/\\\'}"
+    message="${message//\'/\\\'}"
+    current_folder="${current_folder//\'/\\\'}"
     
     # Create a temporary file to update progress atomically
     local temp_file="${PROGRESS_FILE}.tmp"
@@ -90,18 +114,18 @@ except Exception:
         'start_time': datetime.now().isoformat()
     }
 
-data['current_stage'] = '$stage'
+data['current_stage'] = '''$stage'''
 data['progress_percent'] = $percent
 data['last_update'] = datetime.now().isoformat()
 data['status'] = 'running'
 
-if '$current_folder':
-    data['current_folder'] = '$current_folder'
+if '''$current_folder''':
+    data['current_folder'] = '''$current_folder'''
 
-if '$message':
+if '''$message''':
     data['messages'].append({
         'timestamp': datetime.now().isoformat(),
-        'message': '$message'
+        'message': '''$message'''
     })
     # Keep only last 20 messages
     data['messages'] = data['messages'][-20:]

@@ -154,9 +154,15 @@ def get_sync_progress(sync_id):
     """Get progress for a specific sync operation"""
     progress_dir = os.path.join(SYNC_LOG_DIR, 'progress')
     progress_file = os.path.join(progress_dir, f"sync_progress_{sync_id}.json")
+    
+    logger.debug(f"Looking for progress file: {progress_file}")
+    logger.debug(f"Progress file exists: {os.path.exists(progress_file)}")
+    
     data = _load_json(progress_file)
     
     if data:
+        logger.debug(f"Progress data loaded: {data}")
         return {"success": True, "progress": data}
     else:
+        logger.warning(f"Sync progress not found for sync_id: {sync_id} at {progress_file}")
         return {"success": False, "message": "Sync progress not found"}

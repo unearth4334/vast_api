@@ -480,7 +480,10 @@ def test_ssh():
 @app.route('/sync/progress/<sync_id>')
 def get_sync_progress_route(sync_id):
     """Get progress for a specific sync operation"""
-    return jsonify(get_sync_progress(sync_id))
+    logger.debug(f"Progress requested for sync_id: {sync_id}")
+    result = get_sync_progress(sync_id)
+    logger.debug(f"Progress result: {result}")
+    return jsonify(result)
 
 
 @app.route('/logs/info', methods=['GET', 'OPTIONS'])

@@ -158,8 +158,12 @@ def run_sync(host, port, sync_type="unknown", cleanup=True):
         if cleanup_arg:
             cmd.append(cleanup_arg)
         
+        # Pass LOG_BASE environment variable to the script
+        env = os.environ.copy()
+        env['LOG_BASE'] = LOG_BASE
+        
         # Run the sync
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
         
         end_time = datetime.now()
         
