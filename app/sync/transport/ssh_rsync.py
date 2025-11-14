@@ -137,7 +137,7 @@ class SSHRsyncAdapter(TransportAdapter):
             "--info=stats2",
             "--itemize-changes",
             "--no-perms", "--no-owner", "--no-group",
-            "--no-times", "--omit-dir-times",
+            "--times",  # preserve modification times from remote files
             "--partial",
             "--partial-dir=.rsync-tmp",
             "-e", f"ssh -p {self.port} -i {self.ssh_key} -o StrictHostKeyChecking=no",
