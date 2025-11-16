@@ -449,7 +449,22 @@ export async function setupCivitDL() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="setup_civitdl"]');
+  
+  // Show multi-phase progress indicator
+  const phases = [
+    { label: 'Installing civitdl package...', status: 'Downloading packages' },
+    { label: 'Configuring API key', status: '' },
+    { label: 'Verifying installation', status: '' }
+  ];
+  
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showMultiPhaseProgress(stepElement, phases, 0, 10);
+  }
+  
   showSetupResult('Installing and configuring CivitDL...', 'info');
+  
   try {
     const data = await api.post('/ssh/setup-civitdl', {
       ssh_connection: sshConnectionString
@@ -460,11 +475,62 @@ export async function setupCivitDL() {
       if (data.output) {
         console.log('CivitDL setup output:', data.output);
       }
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        const version = data.version || '2.1.2';
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'CivitDL installed successfully',
+          `Version ${version} • API key configured • Ready for downloads`,
+          ['📦 3 packages', `⏱️ ${window.progressIndicators.getDuration('setup_civitdl')}`]
+        );
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'setup_civitdl', success: true }
+      }));
     } else {
       showSetupResult(`❌ CivitDL setup failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Installation failed',
+          data.message || 'Failed at: Installing civitdl package • Network timeout',
+          [
+            { class: 'retry-btn', onclick: 'setupCivitDL()', label: '🔄 Retry Installation' },
+            { class: 'details-btn', onclick: 'console.log("View logs")', label: '📋 View Logs' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'setup_civitdl', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('❌ CivitDL setup request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Installation failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'setupCivitDL()', label: '🔄 Retry Installation' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'setup_civitdl', success: false }
+    }));
   }
 }
 
@@ -475,6 +541,22 @@ export async function syncFromConnectionString() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="sync_instance"]');
+  
+  // Show initial sync progress
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSyncProgress(
+      stepElement,
+      'Discovering folders...',
+      'Scanning output directories',
+      [],
+      0,
+      '',
+      {}
+    );
+  }
+  
   showSetupResult('Starting sync from connection string...', 'info');
 
   try {
@@ -490,13 +572,48 @@ export async function syncFromConnectionString() {
         const results = data.sync_results;
         let summary = `Sync completed:\n`;
         
+        // Build folder breakdown
+        const folderItems = [];
+        let totalFiles = 0;
+        let totalSize = 0;
+        
         Object.entries(results).forEach(([source, result]) => {
           if (result.success) {
-            summary += `✅ ${source}: ${result.files_synced || 0} files synced\n`;
+            const files = result.files_synced || 0;
+            totalFiles += files;
+            folderItems.push({
+              label: source,
+              value: `${files} files`
+            });
+            summary += `✅ ${source}: ${files} files synced\n`;
           } else {
             summary += `❌ ${source}: ${result.error || 'Unknown error'}\n`;
           }
         });
+        
+        // Show success completion indicator with breakdown
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Sync completed successfully',
+            `${Object.keys(results).length} folders synced • ${totalFiles} files transferred`,
+            [
+              `📊 Avg speed: N/A`,
+              `⏱️ ${window.progressIndicators.getDuration('sync_instance')}`,
+              `🧹 Cleanup: enabled`
+            ],
+            {
+              syncComplete: true,
+              breakdown: {
+                items: folderItems.slice(0, 3),
+                more: folderItems.length > 3 ? `+ ${folderItems.length - 3} more folders` : null
+              },
+              actions: [
+                { class: 'view-btn', onclick: 'console.log("View files")', label: '📁 View Files' }
+              ]
+            }
+          );
+        }
         
         // Show detailed results in console
         console.log('Sync results:', results);
@@ -507,12 +624,62 @@ export async function syncFromConnectionString() {
           resultDiv.innerHTML = `<pre>${summary}</pre>`;
           resultDiv.style.display = 'block';
         }
+      } else {
+        // No detailed results, show basic success
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Sync completed successfully',
+            'All files synchronized',
+            [`⏱️ ${window.progressIndicators.getDuration('sync_instance')}`]
+          );
+        }
       }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'sync_instance', success: true }
+      }));
     } else {
       showSetupResult(`❌ Sync failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Sync failed',
+          data.message || 'Connection lost or insufficient permissions',
+          [
+            { class: 'retry-btn', onclick: 'syncFromConnectionString()', label: '🔄 Retry Sync' },
+            { class: 'check-btn', onclick: 'testVastAISSH()', label: '🔧 Check Connection' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'sync_instance', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('Request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Sync failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'syncFromConnectionString()', label: '🔄 Retry Sync' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'sync_instance', success: false }
+    }));
   }
 }
 

@@ -126,21 +126,25 @@
                         <div id="workflow-steps" class="workflow-steps">
                             <!-- Default steps before template is loaded -->
                             <div class="workflow-step" data-action="test_ssh">
-                                <button class="step-button" onclick="testVastAISSH()">
-                                    🔧 Test SSH Connection
-                                </button>
-                                <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
-                                    <span class="toggle-icon">✓</span>
-                                </button>
+                                <div class="step-button-container">
+                                    <button class="step-button" onclick="testVastAISSH()">
+                                        🔧 Test SSH Connection
+                                    </button>
+                                    <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
+                                        <span class="toggle-icon"></span>
+                                    </button>
+                                </div>
                             </div>
                             <div class="workflow-arrow">↓</div>
                             <div class="workflow-step" data-action="sync_instance">
-                                <button class="step-button" onclick="syncFromConnectionString()">
-                                    🔄 Sync Instance
-                                </button>
-                                <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
-                                    <span class="toggle-icon">✓</span>
-                                </button>
+                                <div class="step-button-container">
+                                    <button class="step-button" onclick="syncFromConnectionString()">
+                                        🔄 Sync Instance
+                                    </button>
+                                    <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
+                                        <span class="toggle-icon"></span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

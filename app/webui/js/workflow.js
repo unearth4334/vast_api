@@ -261,6 +261,10 @@ function updateWorkflowSteps(template) {
     stepDiv.className = 'workflow-step';
     stepDiv.dataset.action = button.action;
     
+    // Create button container for horizontal layout
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'step-button-container';
+    
     // Create step button
     const stepButton = document.createElement('button');
     stepButton.className = 'step-button';
@@ -306,9 +310,12 @@ function updateWorkflowSteps(template) {
     toggleIcon.className = 'toggle-icon';
     toggleButton.appendChild(toggleIcon);
     
-    // Add elements to step
-    stepDiv.appendChild(stepButton);
-    stepDiv.appendChild(toggleButton);
+    // Add buttons to container
+    buttonContainer.appendChild(stepButton);
+    buttonContainer.appendChild(toggleButton);
+    
+    // Add container to step
+    stepDiv.appendChild(buttonContainer);
     
     // Add step to container
     container.appendChild(stepDiv);
@@ -347,6 +354,10 @@ function resetWorkflowSteps() {
     stepDiv.className = 'workflow-step';
     stepDiv.dataset.action = step.action;
     
+    // Create button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'step-button-container';
+    
     const stepButton = document.createElement('button');
     stepButton.className = 'step-button';
     stepButton.textContent = step.label;
@@ -366,8 +377,9 @@ function resetWorkflowSteps() {
     toggleIcon.className = 'toggle-icon';
     toggleButton.appendChild(toggleIcon);
     
-    stepDiv.appendChild(stepButton);
-    stepDiv.appendChild(toggleButton);
+    buttonContainer.appendChild(stepButton);
+    buttonContainer.appendChild(toggleButton);
+    stepDiv.appendChild(buttonContainer);
     container.appendChild(stepDiv);
     
     if (index < defaultSteps.length - 1) {
