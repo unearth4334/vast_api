@@ -67,10 +67,6 @@ ui_config:
       action: "test_ssh"
       style: "primary"
       
-    - label: "🔄 Sync Instance"
-      action: "sync_instance" 
-      style: "primary"
-      
     - label: "🎨 Setup CivitDL"
       action: "setup_civitdl"
       style: "primary"
@@ -86,6 +82,10 @@ ui_config:
       action: "set_ui_home"
       style: "primary"
       
+    - label: "📖 Read UI_HOME"
+      action: "get_ui_home"
+      style: "secondary"
+      
     - label: "🐍 Setup Python venv"
       action: "setup_python_venv"
       style: "primary"
@@ -93,14 +93,6 @@ ui_config:
     - label: "📥 Clone Auto Installer"
       action: "clone_auto_installer"
       style: "primary"
-      
-    - label: "📖 Read UI_HOME"
-      action: "get_ui_home"
-      style: "secondary"
-      
-    - label: "🔌 Terminate Connection"
-      action: "terminate_connection"
-      style: "danger"
 
 # Additional metadata
 metadata:
