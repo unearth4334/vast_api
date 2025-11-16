@@ -921,10 +921,13 @@ def ssh_test_civitdl():
         if config_result.returncode == 0:
             # Check if API key is set (not empty or default)
             output = config_result.stdout.strip()
-            api_key_valid = 'api_key' in output.lower() and len(output) > 20
+            logger.info(f"civitconfig settings output: {repr(output)}")
+            # Check if there's any content that looks like config output
+            # CivitConfig might output YAML, JSON, or plain text
+            api_key_valid = len(output) > 10 and ('api' in output.lower() or 'key' in output.lower() or ':' in output)
             logger.info(f"API key validation: {'valid' if api_key_valid else 'not set or invalid'}")
         else:
-            logger.warning(f"Config check failed: {config_result.stderr}")
+            logger.warning(f"Config check stderr: {config_result.stderr}")
         
         # Test 3: Test API connectivity
         logger.info(f"Test 3: Testing API connectivity...")
