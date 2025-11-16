@@ -475,6 +475,222 @@ def test_ssh():
         })
 
 
+@app.route('/ssh/test', methods=['POST', 'OPTIONS'])
+def ssh_test():
+    """Test SSH connection with provided connection string"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Testing SSH connection to {ssh_host}:{ssh_port}")
+        
+        # Test basic SSH connectivity
+        ssh_key = '/root/.ssh/id_ed25519'
+        ssh_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'echo "SSH connection successful"'
+        ]
+        
+        result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=15)
+        
+        if result.returncode == 0:
+            logger.info(f"SSH connection test successful for {ssh_host}:{ssh_port}")
+            return jsonify({
+                'success': True,
+                'message': 'SSH connection successful',
+                'output': result.stdout
+            })
+        else:
+            logger.error(f"SSH connection test failed for {ssh_host}:{ssh_port}: {result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection failed',
+                'error': result.stderr
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"SSH connection test timed out")
+        return jsonify({
+            'success': False,
+            'message': 'SSH connection test timed out'
+        })
+    except Exception as e:
+        logger.error(f"SSH test error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH test error: {str(e)}'
+        })
+
+
+@app.route('/ssh/get-ui-home', methods=['POST', 'OPTIONS'])
+def ssh_get_ui_home():
+    """Get UI_HOME value from remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Getting UI_HOME from {ssh_host}:{ssh_port}")
+        
+        # Get UI_HOME from remote instance
+        ssh_key = '/root/.ssh/id_ed25519'
+        ssh_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'source /etc/environment 2>/dev/null || true; echo "${UI_HOME:-Not set}"'
+        ]
+        
+        result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=15)
+        
+        if result.returncode == 0:
+            ui_home = result.stdout.strip()
+            logger.info(f"UI_HOME retrieved: {ui_home}")
+            return jsonify({
+                'success': True,
+                'message': 'UI_HOME retrieved successfully',
+                'ui_home': ui_home,
+                'output': result.stdout
+            })
+        else:
+            logger.error(f"Failed to get UI_HOME from {ssh_host}:{ssh_port}: {result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to get UI_HOME',
+                'error': result.stderr
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"Get UI_HOME timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Get UI_HOME request timed out'
+        })
+    except Exception as e:
+        logger.error(f"Get UI_HOME error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Get UI_HOME error: {str(e)}'
+        })
+
+
+@app.route('/ssh/set-ui-home', methods=['POST', 'OPTIONS'])
+def ssh_set_ui_home():
+    """Set UI_HOME value on remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        ui_home = data.get('ui_home', '/workspace/ComfyUI')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Setting UI_HOME={ui_home} on {ssh_host}:{ssh_port}")
+        
+        # Set UI_HOME on remote instance
+        ssh_key = '/root/.ssh/id_ed25519'
+        ssh_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            f'echo "UI_HOME={ui_home}" | sudo tee -a /etc/environment && source /etc/environment && echo "UI_HOME set to: $UI_HOME"'
+        ]
+        
+        result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=15)
+        
+        if result.returncode == 0:
+            logger.info(f"UI_HOME set successfully on {ssh_host}:{ssh_port}")
+            return jsonify({
+                'success': True,
+                'message': 'UI_HOME set successfully',
+                'output': result.stdout
+            })
+        else:
+            logger.error(f"Failed to set UI_HOME on {ssh_host}:{ssh_port}: {result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to set UI_HOME',
+                'error': result.stderr
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"Set UI_HOME timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Set UI_HOME request timed out'
+        })
+    except Exception as e:
+        logger.error(f"Set UI_HOME error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Set UI_HOME error: {str(e)}'
+        })
+
+
 # --- Progress and Logging Routes ---
 
 @app.route('/sync/progress/<sync_id>')
