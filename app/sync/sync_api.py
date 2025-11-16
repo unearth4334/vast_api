@@ -917,15 +917,41 @@ def ssh_test_civitdl():
         
         config_result = subprocess.run(config_test_cmd, capture_output=True, text=True, timeout=15)
         
+        # civitconfig settings often returns empty output even when configured
+        # We'll validate by checking if we can read the config file directly
         api_key_valid = False
         if config_result.returncode == 0:
-            # Check if API key is set (not empty or default)
             output = config_result.stdout.strip()
             logger.info(f"civitconfig settings output: {repr(output)}")
-            # Check if there's any content that looks like config output
-            # CivitConfig might output YAML, JSON, or plain text
-            api_key_valid = len(output) > 10 and ('api' in output.lower() or 'key' in output.lower() or ':' in output)
-            logger.info(f"API key validation: {'valid' if api_key_valid else 'not set or invalid'}")
+            
+            # If output is not empty and looks like config, that's good
+            if output and len(output) > 10:
+                api_key_valid = True
+                logger.info(f"API key validation: valid (config output present)")
+            else:
+                # Empty output - check the config file directly
+                logger.info(f"civitconfig returned empty, checking config file directly...")
+                check_config_cmd = [
+                    'ssh',
+                    '-p', str(ssh_port),
+                    '-i', ssh_key,
+                    '-o', 'ConnectTimeout=10',
+                    '-o', 'StrictHostKeyChecking=yes',
+                    '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                    '-o', 'IdentitiesOnly=yes',
+                    f'root@{ssh_host}',
+                    'cat ~/.civitdl/config.yaml 2>/dev/null || echo "no config"'
+                ]
+                config_file_result = subprocess.run(check_config_cmd, capture_output=True, text=True, timeout=10)
+                config_file_content = config_file_result.stdout.strip()
+                logger.info(f"Config file content: {repr(config_file_content[:200])}")
+                
+                # Check if config file exists and has api_key
+                if config_file_content and 'no config' not in config_file_content and len(config_file_content) > 20:
+                    api_key_valid = True
+                    logger.info(f"API key validation: valid (config file present)")
+                else:
+                    logger.info(f"API key validation: not set or invalid")
         else:
             logger.warning(f"Config check stderr: {config_result.stderr}")
         
