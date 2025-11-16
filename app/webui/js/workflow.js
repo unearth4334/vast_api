@@ -279,16 +279,19 @@ function updateWorkflowSteps(template) {
         stepButton.onclick = syncFromConnectionString;
         break;
       case 'setup_civitdl':
-        stepButton.onclick = () => executeTemplateStep('Install CivitDL');
+        stepButton.onclick = setupCivitDL;
+        break;
+      case 'test_civitdl':
+        stepButton.onclick = testCivitDL;
         break;
       case 'set_ui_home':
-        stepButton.onclick = () => executeTemplateStep('Set UI Home');
+        stepButton.onclick = setUIHome;
         break;
       case 'setup_python_venv':
-        stepButton.onclick = () => executeTemplateStep('Setup Python Virtual Environment');
+        stepButton.onclick = setupPythonVenv;
         break;
       case 'clone_auto_installer':
-        stepButton.onclick = () => executeTemplateStep('Clone ComfyUI Auto Installer');
+        stepButton.onclick = cloneAutoInstaller;
         break;
       case 'get_ui_home':
         stepButton.onclick = getUIHome;

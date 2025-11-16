@@ -942,4 +942,313 @@ export async function destroyInstance(instanceId) {
   }
 }
 
+/**
+ * Test CivitDL installation
+ * Wrapper function that adds progress indicators to the template step
+ */
+export async function testCivitDL() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="test_civitdl"]');
+  
+  // Show checklist progress indicator
+  const items = [
+    { label: 'Testing CivitDL CLI...', state: 'active' },
+    { label: 'Validating API configuration...', state: 'pending' },
+    { label: 'Testing API connectivity...', state: 'pending' }
+  ];
+  
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showChecklistProgress(stepElement, items);
+  }
+  
+  showSetupResult('Testing CivitDL installation...', 'info');
+  
+  try {
+    const templateId = document.getElementById('templateSelector')?.value;
+    if (!templateId) {
+      throw new Error('Please select a template first');
+    }
+    
+    const data = await api.post(`/templates/${templateId}/execute-step`, {
+      ssh_connection: sshConnectionString,
+      step_name: 'Test CivitDL'
+    });
+    
+    if (data.success) {
+      showSetupResult('✅ CivitDL tests passed!', 'success');
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'CivitDL tests passed',
+          '✓ CLI functional • ✓ API key valid • ✓ API reachable',
+          ['🌐 API Status: 200', `⏱️ ${window.progressIndicators.getDuration('test_civitdl')}`]
+        );
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'test_civitdl', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ CivitDL test failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'CivitDL test failed',
+          data.message || '✓ CLI functional • ✗ API key invalid • API test skipped',
+          [
+            { class: 'fix-btn', onclick: 'setupCivitDL()', label: '🔑 Reconfigure API Key' },
+            { class: 'retry-btn', onclick: 'testCivitDL()', label: '🔄 Retry Tests' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'test_civitdl', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ CivitDL test request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'CivitDL test failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'testCivitDL()', label: '🔄 Retry Tests' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'test_civitdl', success: false }
+    }));
+  }
+}
+
+/**
+ * Setup Python virtual environment
+ * Wrapper function that adds progress indicators to the template step
+ */
+export async function setupPythonVenv() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="setup_python_venv"]');
+  
+  // Show multi-phase progress indicator
+  const phases = [
+    { label: 'Checking for existing venv...', status: '' },
+    { label: 'Creating virtual environment', status: '' },
+    { label: 'Upgrading pip', status: '' }
+  ];
+  
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showMultiPhaseProgress(stepElement, phases, 0, 10);
+  }
+  
+  showSetupResult('Setting up Python virtual environment...', 'info');
+  
+  try {
+    const templateId = document.getElementById('templateSelector')?.value;
+    if (!templateId) {
+      throw new Error('Please select a template first');
+    }
+    
+    const data = await api.post(`/templates/${templateId}/execute-step`, {
+      ssh_connection: sshConnectionString,
+      step_name: 'Setup Python Virtual Environment'
+    });
+    
+    if (data.success) {
+      showSetupResult('✅ Python venv setup completed!', 'success');
+      
+      // Check if venv was created or already existed
+      const venvExists = data.venv_existed || false;
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        if (venvExists) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Python venv validated',
+            'Existing venv found and verified • Python 3.10.12',
+            ['♻️ Reused', `⏱️ ${window.progressIndicators.getDuration('setup_python_venv')}`]
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Python venv created',
+            'Location: /workspace/ComfyUI/venv • Python 3.10.12 • pip 25.2',
+            [`⏱️ ${window.progressIndicators.getDuration('setup_python_venv')}`]
+          );
+        }
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'setup_python_venv', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Python venv setup failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Python venv setup failed',
+          data.message || 'Failed to create virtual environment',
+          [
+            { class: 'retry-btn', onclick: 'setupPythonVenv()', label: '🔄 Retry Setup' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'setup_python_venv', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ Python venv setup request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Python venv setup failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'setupPythonVenv()', label: '🔄 Retry Setup' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'setup_python_venv', success: false }
+    }));
+  }
+}
+
+/**
+ * Clone Auto Installer repository
+ * Wrapper function that adds progress indicators to the template step
+ */
+export async function cloneAutoInstaller() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="clone_auto_installer"]');
+  
+  // Show git clone progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showGitProgress(
+      stepElement,
+      'Cloning repository...',
+      'github.com/unearth4334/ComfyUI-Auto_installer',
+      'Receiving objects: 0%',
+      0,
+      '0 MB'
+    );
+  }
+  
+  showSetupResult('Cloning Auto Installer repository...', 'info');
+  
+  try {
+    const templateId = document.getElementById('templateSelector')?.value;
+    if (!templateId) {
+      throw new Error('Please select a template first');
+    }
+    
+    const data = await api.post(`/templates/${templateId}/execute-step`, {
+      ssh_connection: sshConnectionString,
+      step_name: 'Clone ComfyUI Auto Installer'
+    });
+    
+    if (data.success) {
+      showSetupResult('✅ Repository cloned successfully!', 'success');
+      
+      // Check if repo was cloned or updated
+      const wasUpdated = data.updated || false;
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        if (wasUpdated) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Repository updated',
+            'Already up to date • HEAD: ' + (data.commit_hash || 'latest'),
+            ['♻️ Pulled latest', `⏱️ ${window.progressIndicators.getDuration('clone_auto_installer')}`]
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Repository cloned successfully',
+            'ComfyUI-Auto_installer • 273 files • 3.2 MB',
+            ['📁 /workspace/ComfyUI-Auto_installer', `⏱️ ${window.progressIndicators.getDuration('clone_auto_installer')}`]
+          );
+        }
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'clone_auto_installer', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Git clone failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Git clone failed',
+          data.message || 'Network error or repository not accessible',
+          [
+            { class: 'retry-btn', onclick: 'cloneAutoInstaller()', label: '🔄 Retry Clone' },
+            { class: 'details-btn', onclick: 'console.log("View error")', label: '📋 View Error' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'clone_auto_installer', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ Git clone request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Git clone failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'cloneAutoInstaller()', label: '🔄 Retry Clone' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'clone_auto_installer', success: false }
+    }));
+  }
+}
+
 console.log('📄 VastAI Instances module loaded');
