@@ -843,6 +843,147 @@ def ssh_setup_civitdl():
         })
 
 
+@app.route('/ssh/test-civitdl', methods=['POST', 'OPTIONS'])
+def ssh_test_civitdl():
+    """Test CivitDL installation on remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            })
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        logger.info(f"Testing CivitDL on {ssh_host}:{ssh_port}")
+        
+        # Test 1: Check CLI is functional
+        logger.info(f"Test 1: Checking CivitDL CLI...")
+        cli_test_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/civitdl --help'
+        ]
+        
+        cli_result = subprocess.run(cli_test_cmd, capture_output=True, text=True, timeout=15)
+        
+        if cli_result.returncode != 0:
+            logger.error(f"CivitDL CLI test failed: {cli_result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'CivitDL CLI test failed',
+                'error': cli_result.stderr,
+                'tests': {
+                    'cli': False,
+                    'config': None,
+                    'api': None
+                }
+            })
+        
+        logger.info(f"CivitDL CLI test passed")
+        
+        # Test 2: Check API key configuration
+        logger.info(f"Test 2: Validating API configuration...")
+        config_test_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/civitconfig settings'
+        ]
+        
+        config_result = subprocess.run(config_test_cmd, capture_output=True, text=True, timeout=15)
+        
+        api_key_valid = False
+        if config_result.returncode == 0:
+            # Check if API key is set (not empty or default)
+            output = config_result.stdout.strip()
+            api_key_valid = 'api_key' in output.lower() and len(output) > 20
+            logger.info(f"API key validation: {'valid' if api_key_valid else 'not set or invalid'}")
+        else:
+            logger.warning(f"Config check failed: {config_result.stderr}")
+        
+        # Test 3: Test API connectivity
+        logger.info(f"Test 3: Testing API connectivity...")
+        api_test_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/python -c "import requests; r = requests.get(\'https://civitai.com/api/v1/models\', timeout=10); print(r.status_code)"'
+        ]
+        
+        api_result = subprocess.run(api_test_cmd, capture_output=True, text=True, timeout=20)
+        
+        api_reachable = False
+        api_status = None
+        if api_result.returncode == 0:
+            try:
+                api_status = int(api_result.stdout.strip())
+                api_reachable = api_status == 200
+                logger.info(f"API connectivity test: status {api_status}")
+            except ValueError:
+                logger.warning(f"Could not parse API status: {api_result.stdout}")
+        else:
+            logger.warning(f"API test failed: {api_result.stderr}")
+        
+        # All tests must pass
+        all_passed = cli_result.returncode == 0 and api_key_valid and api_reachable
+        
+        logger.info(f"CivitDL tests completed. All passed: {all_passed}")
+        
+        return jsonify({
+            'success': all_passed,
+            'message': 'CivitDL tests passed' if all_passed else 'Some CivitDL tests failed',
+            'tests': {
+                'cli': cli_result.returncode == 0,
+                'config': api_key_valid,
+                'api': api_reachable
+            },
+            'api_status': api_status
+        })
+    
+    except subprocess.TimeoutExpired:
+        logger.error("CivitDL test timed out")
+        return jsonify({
+            'success': False,
+            'message': 'CivitDL test timed out'
+        })
+    except Exception as e:
+        logger.error(f"Error testing CivitDL: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'CivitDL test error: {str(e)}'
+        })
+
+
 # --- Progress and Logging Routes ---
 
 @app.route('/sync/progress/<sync_id>')

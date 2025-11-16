@@ -967,14 +967,8 @@ export async function testCivitDL() {
   showSetupResult('Testing CivitDL installation...', 'info');
   
   try {
-    const templateId = document.getElementById('templateSelector')?.value;
-    if (!templateId) {
-      throw new Error('Please select a template first');
-    }
-    
-    const data = await api.post(`/templates/${templateId}/execute-step`, {
-      ssh_connection: sshConnectionString,
-      step_name: 'Test CivitDL'
+    const data = await api.post('/ssh/test-civitdl', {
+      ssh_connection: sshConnectionString
     });
     
     if (data.success) {
@@ -982,11 +976,12 @@ export async function testCivitDL() {
       
       // Show success completion indicator
       if (stepElement && window.progressIndicators) {
+        const apiStatus = data.api_status || 200;
         window.progressIndicators.showSuccess(
           stepElement,
           'CivitDL tests passed',
           '✓ CLI functional • ✓ API key valid • ✓ API reachable',
-          ['🌐 API Status: 200', `⏱️ ${window.progressIndicators.getDuration('test_civitdl')}`]
+          [`🌐 API Status: ${apiStatus}`, `⏱️ ${window.progressIndicators.getDuration('test_civitdl')}`]
         );
       }
       
@@ -995,6 +990,14 @@ export async function testCivitDL() {
         detail: { stepAction: 'test_civitdl', success: true }
       }));
     } else {
+      // Build detailed error message based on test results
+      const tests = data.tests || {};
+      const details = [
+        tests.cli ? '✓ CLI functional' : '✗ CLI failed',
+        tests.config ? '✓ API key valid' : '✗ API key invalid',
+        tests.api ? '✓ API reachable' : '✗ API unreachable'
+      ].join(' • ');
+      
       showSetupResult(`❌ CivitDL test failed: ${data.message}`, 'error');
       
       // Show error completion indicator
@@ -1002,7 +1005,7 @@ export async function testCivitDL() {
         window.progressIndicators.showError(
           stepElement,
           'CivitDL test failed',
-          data.message || '✓ CLI functional • ✗ API key invalid • API test skipped',
+          details,
           [
             { class: 'fix-btn', onclick: 'setupCivitDL()', label: '🔑 Reconfigure API Key' },
             { class: 'retry-btn', onclick: 'testCivitDL()', label: '🔄 Retry Tests' }
