@@ -691,6 +691,152 @@ def ssh_set_ui_home():
         })
 
 
+@app.route('/ssh/setup-civitdl', methods=['POST', 'OPTIONS'])
+def ssh_setup_civitdl():
+    """Install and configure CivitDL on remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        # Try to get API key from request, or load from api_key.txt
+        api_key = data.get('api_key', '')
+        if not api_key:
+            try:
+                with open('/app/api_key.txt', 'r') as f:
+                    for line in f:
+                        if line.startswith('civitdl:'):
+                            api_key = line.split(':', 1)[1].strip()
+                            logger.info("Loaded CivitAI API key from api_key.txt")
+                            break
+            except Exception as e:
+                logger.warning(f"Could not read API key from file: {e}")
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Setting up CivitDL on {ssh_host}:{ssh_port}")
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Phase 1: Install CivitDL package
+        logger.info(f"Installing CivitDL package...")
+        install_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/python -m pip install --root-user-action=ignore civitdl'
+        ]
+        
+        install_result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=60)
+        
+        if install_result.returncode != 0:
+            logger.error(f"CivitDL installation failed: {install_result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'CivitDL installation failed',
+                'error': install_result.stderr,
+                'phase': 'install'
+            })
+        
+        logger.info(f"CivitDL installed successfully")
+        
+        # Phase 2: Configure API key (if provided)
+        if api_key:
+            logger.info(f"Configuring CivitDL API key...")
+            config_cmd = [
+                'ssh',
+                '-p', str(ssh_port),
+                '-i', ssh_key,
+                '-o', 'ConnectTimeout=10',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
+                f'root@{ssh_host}',
+                f'echo "{api_key}" | /venv/main/bin/civitconfig default --api-key'
+            ]
+            
+            config_result = subprocess.run(config_cmd, capture_output=True, text=True, timeout=15)
+            
+            if config_result.returncode != 0:
+                logger.warning(f"API key configuration failed: {config_result.stderr}")
+                return jsonify({
+                    'success': True,  # Installation succeeded
+                    'warning': True,
+                    'message': 'CivitDL installed but API key configuration failed',
+                    'error': config_result.stderr,
+                    'phase': 'config'
+                })
+            
+            logger.info(f"API key configured successfully")
+        
+        # Phase 3: Verify installation
+        logger.info(f"Verifying CivitDL installation...")
+        verify_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/python -c "import civitdl; print(civitdl.__version__)"'
+        ]
+        
+        verify_result = subprocess.run(verify_cmd, capture_output=True, text=True, timeout=15)
+        
+        if verify_result.returncode != 0:
+            logger.error(f"CivitDL verification failed: {verify_result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'CivitDL verification failed',
+                'error': verify_result.stderr,
+                'phase': 'verify'
+            })
+        
+        version = verify_result.stdout.strip()
+        logger.info(f"CivitDL setup completed successfully. Version: {version}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'CivitDL installed and configured successfully',
+            'version': version,
+            'api_key_configured': bool(api_key)
+        })
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"CivitDL setup timed out")
+        return jsonify({
+            'success': False,
+            'message': 'CivitDL setup timed out'
+        })
+    except Exception as e:
+        logger.error(f"CivitDL setup error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'CivitDL setup error: {str(e)}'
+        })
+
+
 # --- Progress and Logging Routes ---
 
 @app.route('/sync/progress/<sync_id>')
