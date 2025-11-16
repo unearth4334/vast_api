@@ -99,14 +99,35 @@
                 <p id="template-description"></p>
             </div>
             
-            <div id="setup-buttons-container" class="setup-buttons">
-                <!-- Dynamic buttons will be populated based on selected template -->
-                <button class="setup-button" onclick="testVastAISSH()">
-                    🔧 Test SSH Connection
-                </button>
-                <button class="setup-button" onclick="syncFromConnectionString()">
+            <div id="workflow-container" class="workflow-container">
+                <!-- Workflow controls -->
+                <div class="workflow-controls">
+                    <button id="run-workflow-btn" class="workflow-run-button" onclick="runWorkflow()">
+                        ▶️ Run Workflow
+                    </button>
+                </div>
+                
+                <!-- Workflow steps will be dynamically populated here -->
+                <div id="workflow-steps" class="workflow-steps">
+                    <!-- Default steps before template is loaded -->
+                    <div class="workflow-step" data-action="test_ssh">
+                        <button class="step-button" onclick="testVastAISSH()">
+                            🔧 Test SSH Connection
+                        </button>
+                        <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
+                            <span class="toggle-icon">✓</span>
+                        </button>
+                    </div>
+                    <div class="workflow-arrow">↓</div>
+                    <div class="workflow-step" data-action="sync_instance">
+                        <button class="step-button" onclick="syncFromConnectionString()">
                     � Sync Instance
-                </button>
+                        </button>
+                        <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
+                            <span class="toggle-icon">✓</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <div id="setup-result" class="setup-result">
@@ -279,6 +300,7 @@
     <script src="js/sync.js?v=20251020-v3"></script>
     <script src="js/logs.js?v=20251020-v3"></script>
     <script src="js/ssh-host-key.js?v=20251103-v1"></script>
+    <script src="js/workflow.js?v=20251116-v1"></script>
     
     <!-- VastAI Modular System -->
     <script type="module" src="js/vastai-modular.js?v=20251020-v3"></script>

@@ -1455,6 +1455,31 @@ def destroy_vastai_instance(instance_id):
         })
 
 
+# --- Configuration Routes ---
+
+@app.route('/config/workflow', methods=['GET', 'OPTIONS'])
+def get_workflow_config():
+    """Get workflow configuration"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        config = load_config()
+        workflow_step_delay = config.get('workflow_step_delay', 5)
+        
+        return jsonify({
+            'success': True,
+            'workflow_step_delay': workflow_step_delay
+        })
+    except Exception as e:
+        logger.error(f"Error getting workflow config: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting workflow config: {str(e)}',
+            'workflow_step_delay': 5  # Default fallback
+        })
+
+
 # --- Template Management Routes ---
 
 @app.route('/templates', methods=['GET', 'OPTIONS'])
