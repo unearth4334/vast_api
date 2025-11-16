@@ -799,7 +799,7 @@ def ssh_setup_civitdl():
             '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
             '-o', 'IdentitiesOnly=yes',
             f'root@{ssh_host}',
-            '/venv/main/bin/python -c "import civitdl; print(civitdl.__version__)"'
+            '/venv/main/bin/civitdl --version 2>&1 || /venv/main/bin/python -c "import civitdl; print(\'civitdl module imported successfully\')"'
         ]
         
         verify_result = subprocess.run(verify_cmd, capture_output=True, text=True, timeout=15)
@@ -813,7 +813,13 @@ def ssh_setup_civitdl():
                 'phase': 'verify'
             })
         
-        version = verify_result.stdout.strip()
+        output = verify_result.stdout.strip()
+        # Extract version if available, otherwise just confirm it's installed
+        if 'civitdl module imported successfully' in output:
+            version = 'installed'
+        else:
+            version = output.split('\n')[0] if output else 'installed'
+        
         logger.info(f"CivitDL setup completed successfully. Version: {version}")
         
         return jsonify({
