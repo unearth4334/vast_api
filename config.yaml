@@ -41,6 +41,9 @@ max_rows: 10
 
 disk_size_gb: 100  # Disk space in GB
 
+# Workflow settings
+workflow_step_delay: 5  # Delay in seconds between workflow steps
+
 # Template hashes for various configurations. Select only one at a time.
 
 # ComfyUI (https://cloud.vast.ai/?ref_id=62897&creator_id=62897&name=ComfyUI)

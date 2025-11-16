@@ -801,6 +801,183 @@ body {
 }
 
 /* =========================
+   WORKFLOW UI
+   ========================= */
+
+.workflow-container {
+    margin: var(--size-4-4) 0;
+}
+
+.workflow-controls {
+    margin-bottom: var(--size-4-4);
+    display: flex;
+    justify-content: center;
+}
+
+.workflow-run-button {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: var(--radius-m);
+    padding: var(--size-4-3) var(--size-4-6);
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px var(--background-modifier-box-shadow);
+    min-width: 200px;
+}
+
+.workflow-run-button:hover {
+    background: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px var(--background-modifier-box-shadow);
+}
+
+.workflow-run-button.cancel {
+    background: #dc2626;
+    color: white;
+}
+
+.workflow-run-button.cancel:hover {
+    background: #b91c1c;
+}
+
+.workflow-run-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.workflow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.workflow-step {
+    display: flex;
+    align-items: stretch;
+    gap: var(--size-4-2);
+    position: relative;
+}
+
+.workflow-step.disabled {
+    opacity: 0.5;
+}
+
+.workflow-step.disabled .step-toggle {
+    background: var(--interactive-normal);
+}
+
+.workflow-step.disabled .step-toggle .toggle-icon::before {
+    content: '✗';
+}
+
+.workflow-step.in-progress .step-button {
+    background: #f59e0b;
+    animation: pulse 2s infinite;
+    pointer-events: none;
+}
+
+.workflow-step.completed .step-button {
+    background: var(--text-success);
+    color: white;
+}
+
+.workflow-step.failed .step-button {
+    background: var(--text-error);
+    color: white;
+}
+
+.step-button {
+    flex: 1;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: var(--radius-s);
+    padding: var(--size-4-3) var(--size-4-4);
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    min-height: 48px;
+}
+
+.step-button:hover {
+    background: var(--interactive-accent-hover);
+    transform: translateX(2px);
+}
+
+.step-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.step-toggle {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    background: var(--text-success);
+    color: white;
+    border: none;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.step-toggle:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 6px var(--background-modifier-box-shadow);
+}
+
+.step-toggle .toggle-icon::before {
+    content: '✓';
+}
+
+.workflow-arrow {
+    text-align: center;
+    color: var(--interactive-accent);
+    font-size: 24px;
+    padding: var(--size-4-1) 0;
+    font-weight: bold;
+}
+
+.workflow-arrow.hidden {
+    visibility: hidden;
+}
+
+/* Progress visualization for workflow steps */
+.workflow-step .step-progress {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: rgba(124, 58, 237, 0.2);
+    border-radius: var(--radius-s);
+    width: 0%;
+    transition: width 0.3s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.workflow-step .step-button,
+.workflow-step .step-toggle {
+    position: relative;
+    z-index: 1;
+}
+
+/* =========================
    VASTAI INSTANCES
    ========================= */
 

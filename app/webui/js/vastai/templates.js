@@ -144,6 +144,13 @@ function hideTemplateInfo() {
  * @param {object} template - Template object containing button configuration
  */
 function updateSetupButtons(template) {
+  // Use the new workflow UI instead
+  if (typeof updateWorkflowSteps === 'function') {
+    updateWorkflowSteps(template);
+    return;
+  }
+  
+  // Fallback to old button container if workflow module not loaded
   const container = document.getElementById('setup-buttons-container');
   if (!container) return;
   
@@ -210,6 +217,13 @@ function updateSetupButtons(template) {
  * Reset setup buttons to defaults
  */
 function resetSetupButtons() {
+  // Use the new workflow UI instead
+  if (typeof resetWorkflowSteps === 'function') {
+    resetWorkflowSteps();
+    return;
+  }
+  
+  // Fallback to old button container if workflow module not loaded
   const container = document.getElementById('setup-buttons-container');
   if (container) {
     container.innerHTML = '';
