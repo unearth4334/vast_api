@@ -804,6 +804,60 @@ body {
    WORKFLOW UI
    ========================= */
 
+/* =========================
+   WORKFLOW TILES
+   ========================= */
+
+.workflow-tile {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: 0;
+    margin-bottom: var(--size-4-4);
+    box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.workflow-tile:hover {
+    box-shadow: 0 4px 12px var(--background-modifier-box-shadow);
+    transform: translateY(-2px);
+}
+
+.tile-header {
+    background: var(--background-modifier-form-field);
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding: var(--size-4-3) var(--size-4-4);
+    margin: 0;
+    font-size: var(--font-ui-large);
+    font-weight: 600;
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+.tile-content {
+    padding: var(--size-4-4);
+}
+
+.tile-content .setup-field {
+    margin-bottom: 0;
+}
+
+.tile-content .template-info {
+    margin-top: var(--size-4-3);
+    margin-bottom: 0;
+}
+
+.tile-content #workflow-container {
+    margin: 0;
+}
+
+/* =========================
+   WORKFLOW EXECUTION
+   ========================= */
+
 .workflow-container {
     margin: var(--size-4-4) 0;
 }
@@ -852,8 +906,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0;
-    max-width: 600px;
-    margin: 0 auto;
+    max-width: 100%;
+    margin: var(--size-4-3) 0 0 0;
 }
 
 .workflow-step {

@@ -77,55 +77,71 @@
             
             <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
             
-            <div class="setup-fields-grid">
-                <div class="setup-field">
-                    <label for="sshConnectionString">SSH Connection String:</label>
-                    <input type="text" id="sshConnectionString" 
-                           placeholder="ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
-                           title="Enter the SSH connection string from your VastAI instance">
-                </div>
-                
-                <div class="setup-field">
-                    <label for="templateSelector">Setup Template:</label>
-                    <select id="templateSelector" onchange="onTemplateChange()" 
-                            title="Select a setup template for your VastAI instance">
-                        <option value="">Loading templates...</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div id="template-info" class="template-info" style="display: none;">
-                <h4 id="template-title">Template: <span id="template-name"></span></h4>
-                <p id="template-description"></p>
-            </div>
-            
-            <div id="workflow-container" class="workflow-container">
-                <!-- Workflow controls -->
-                <div class="workflow-controls">
-                    <button id="run-workflow-btn" class="workflow-run-button" onclick="runWorkflow()">
-                        ▶️ Run Workflow
-                    </button>
-                </div>
-                
-                <!-- Workflow steps will be dynamically populated here -->
-                <div id="workflow-steps" class="workflow-steps">
-                    <!-- Default steps before template is loaded -->
-                    <div class="workflow-step" data-action="test_ssh">
-                        <button class="step-button" onclick="testVastAISSH()">
-                            🔧 Test SSH Connection
-                        </button>
-                        <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
-                            <span class="toggle-icon">✓</span>
-                        </button>
+            <!-- Step 1: SSH Connection -->
+            <div class="workflow-tile">
+                <h4 class="tile-header">🔌 Step 1: SSH Connection</h4>
+                <div class="tile-content">
+                    <div class="setup-field">
+                        <label for="sshConnectionString">SSH Connection String:</label>
+                        <input type="text" id="sshConnectionString" 
+                               placeholder="ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
+                               title="Enter the SSH connection string from your VastAI instance">
                     </div>
-                    <div class="workflow-arrow">↓</div>
-                    <div class="workflow-step" data-action="sync_instance">
-                        <button class="step-button" onclick="syncFromConnectionString()">
-                    � Sync Instance
-                        </button>
-                        <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
-                            <span class="toggle-icon">✓</span>
-                        </button>
+                </div>
+            </div>
+            
+            <!-- Step 2: Template Selection -->
+            <div class="workflow-tile">
+                <h4 class="tile-header">📋 Step 2: Template Selection</h4>
+                <div class="tile-content">
+                    <div class="setup-field">
+                        <label for="templateSelector">Setup Template:</label>
+                        <select id="templateSelector" onchange="onTemplateChange()" 
+                                title="Select a setup template for your VastAI instance">
+                            <option value="">Loading templates...</option>
+                        </select>
+                    </div>
+                    
+                    <div id="template-info" class="template-info" style="display: none;">
+                        <h4 id="template-title">Template: <span id="template-name"></span></h4>
+                        <p id="template-description"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Step 3: Workflow Execution -->
+            <div class="workflow-tile">
+                <h4 class="tile-header">▶️ Step 3: Execute Workflow</h4>
+                <div class="tile-content">
+                    <div id="workflow-container" class="workflow-container">
+                        <!-- Workflow controls -->
+                        <div class="workflow-controls">
+                            <button id="run-workflow-btn" class="workflow-run-button" onclick="runWorkflow()">
+                                ▶️ Run Workflow
+                            </button>
+                        </div>
+                        
+                        <!-- Workflow steps will be dynamically populated here -->
+                        <div id="workflow-steps" class="workflow-steps">
+                            <!-- Default steps before template is loaded -->
+                            <div class="workflow-step" data-action="test_ssh">
+                                <button class="step-button" onclick="testVastAISSH()">
+                                    🔧 Test SSH Connection
+                                </button>
+                                <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
+                                    <span class="toggle-icon">✓</span>
+                                </button>
+                            </div>
+                            <div class="workflow-arrow">↓</div>
+                            <div class="workflow-step" data-action="sync_instance">
+                                <button class="step-button" onclick="syncFromConnectionString()">
+                                    🔄 Sync Instance
+                                </button>
+                                <button class="step-toggle" onclick="toggleStep(this)" title="Enable/Disable this step">
+                                    <span class="toggle-icon">✓</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
