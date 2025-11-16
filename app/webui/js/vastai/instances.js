@@ -143,7 +143,24 @@ export async function testVastAISSH() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="test_ssh"]');
+  
+  // Extract host and port for display
+  const match = sshConnectionString.match(/root@([^\s]+)/);
+  const hostPort = match ? match[1] : 'remote host';
+  
+  // Show progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSimpleProgress(
+      stepElement,
+      'Testing SSH connection...',
+      `Connecting to ${hostPort}`
+    );
+  }
+  
   showSetupResult('Testing SSH connection...', 'info');
+  
   try {
     const data = await api.post('/ssh/test', {
       ssh_connection: sshConnectionString
@@ -151,11 +168,62 @@ export async function testVastAISSH() {
     
     if (data.success) {
       showSetupResult('✅ SSH connection successful!', 'success');
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        const hostname = data.hostname || 'remote';
+        const uptime = data.uptime || 'unknown';
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'SSH connection verified',
+          `Host: ${hostname} • Uptime: ${uptime}`,
+          []
+        );
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'test_ssh', success: true }
+      }));
     } else {
       showSetupResult(`❌ SSH test failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'SSH connection failed',
+          data.message || 'Connection timeout or refused',
+          [
+            { class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'test_ssh', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('❌ SSH test request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'SSH connection failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'test_ssh', success: false }
+    }));
   }
 }
 
@@ -166,7 +234,20 @@ export async function setUIHome() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="set_ui_home"]');
+  
+  // Show progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSimpleProgress(
+      stepElement,
+      'Setting UI_HOME environment variable...',
+      'Path: /workspace/ComfyUI'
+    );
+  }
+  
   showSetupResult('Setting UI_HOME to /workspace/ComfyUI/...', 'info');
+  
   try {
     const data = await api.post('/ssh/set-ui-home', {
       ssh_connection: sshConnectionString
@@ -177,11 +258,65 @@ export async function setUIHome() {
       if (data.output) {
         console.log('UI_HOME output:', data.output);
       }
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'UI_HOME configured',
+          'Environment variable set: UI_HOME=/workspace/ComfyUI',
+          [],
+          {
+            actions: [
+              { class: 'verify-btn', onclick: 'getUIHome()', label: '👁️ Verify' }
+            ]
+          }
+        );
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'set_ui_home', success: true }
+      }));
     } else {
       showSetupResult(`❌ Failed to set UI_HOME: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Failed to set UI_HOME',
+          data.message || 'Permission denied or file system error',
+          [
+            { class: 'retry-btn', onclick: 'setUIHome()', label: '🔄 Retry' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'set_ui_home', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('❌ Set UI_HOME request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Failed to set UI_HOME',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'setUIHome()', label: '🔄 Retry' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'set_ui_home', success: false }
+    }));
   }
 }
 
@@ -192,7 +327,20 @@ export async function getUIHome() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="get_ui_home"]');
+  
+  // Show progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSimpleProgress(
+      stepElement,
+      'Reading UI_HOME from environment...',
+      ''
+    );
+  }
+  
   showSetupResult('Reading UI_HOME...', 'info');
+  
   try {
     const data = await api.post('/ssh/get-ui-home', {
       ssh_connection: sshConnectionString
@@ -201,11 +349,79 @@ export async function getUIHome() {
     if (data.success) {
       const uiHome = data.ui_home || 'Not set';
       showSetupResult(`UI_HOME: ${uiHome}`, 'success');
+      
+      if (uiHome && uiHome !== 'Not set') {
+        // Show success completion indicator
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'UI_HOME retrieved',
+            `Current value: ${uiHome}`,
+            ['✓ Valid path']
+          );
+        }
+        
+        // Emit success event for workflow
+        document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+          detail: { stepAction: 'get_ui_home', success: true }
+        }));
+      } else {
+        // Show warning completion indicator
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showWarning(
+            stepElement,
+            'UI_HOME not configured',
+            'Environment variable is not set',
+            [
+              { class: 'fix-btn', onclick: 'setUIHome()', label: '📁 Set UI_HOME' }
+            ]
+          );
+        }
+        
+        // Emit partial success event for workflow
+        document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+          detail: { stepAction: 'get_ui_home', success: true }
+        }));
+      }
     } else {
       showSetupResult(`❌ Failed to get UI_HOME: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Failed to get UI_HOME',
+          data.message || 'Request failed',
+          [
+            { class: 'retry-btn', onclick: 'getUIHome()', label: '🔄 Retry' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'get_ui_home', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('❌ Get UI_HOME request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Failed to get UI_HOME',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'getUIHome()', label: '🔄 Retry' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'get_ui_home', success: false }
+    }));
   }
 }
 
