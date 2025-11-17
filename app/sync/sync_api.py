@@ -525,6 +525,19 @@ def ssh_test():
                 'output': result.stdout
             })
         else:
+            # Check if the error is due to host key verification failure
+            stderr = result.stderr.lower()
+            if 'host key verification failed' in stderr or 'no matching host key type found' in stderr or 'connection refused' not in stderr and result.returncode == 255:
+                logger.warning(f"Host key verification needed for {ssh_host}:{ssh_port}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Host key verification required',
+                    'error': result.stderr,
+                    'host_verification_needed': True,
+                    'host': ssh_host,
+                    'port': ssh_port
+                })
+            
             logger.error(f"SSH connection test failed for {ssh_host}:{ssh_port}: {result.stderr}")
             return jsonify({
                 'success': False,
@@ -543,6 +556,134 @@ def ssh_test():
         return jsonify({
             'success': False,
             'message': f'SSH test error: {str(e)}'
+        })
+
+
+@app.route('/ssh/verify-host', methods=['POST', 'OPTIONS'])
+def ssh_verify_host():
+    """Get host key fingerprint and optionally add to known_hosts"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        accept = data.get('accept', False)  # True to add host key to known_hosts
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Verifying host key for {ssh_host}:{ssh_port}")
+        
+        # Get host key fingerprint using ssh-keyscan
+        keyscan_cmd = ['ssh-keyscan', '-p', str(ssh_port), ssh_host]
+        keyscan_result = subprocess.run(keyscan_cmd, capture_output=True, text=True, timeout=10)
+        
+        if keyscan_result.returncode != 0 or not keyscan_result.stdout:
+            logger.error(f"Failed to get host key: {keyscan_result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve host key',
+                'error': keyscan_result.stderr
+            })
+        
+        # Parse the host key to get fingerprint
+        host_keys = [line for line in keyscan_result.stdout.split('\n') if line and not line.startswith('#')]
+        if not host_keys:
+            return jsonify({
+                'success': False,
+                'message': 'No host keys found'
+            })
+        
+        # Get fingerprint using ssh-keygen
+        fingerprints = []
+        for host_key in host_keys:
+            # Write key to temp file for fingerprint calculation
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pub') as f:
+                f.write(host_key)
+                temp_key_file = f.name
+            
+            try:
+                fingerprint_cmd = ['ssh-keygen', '-lf', temp_key_file]
+                fp_result = subprocess.run(fingerprint_cmd, capture_output=True, text=True)
+                if fp_result.returncode == 0:
+                    fingerprints.append(fp_result.stdout.strip())
+            finally:
+                os.unlink(temp_key_file)
+        
+        # If accept=True, add host key to known_hosts
+        if accept:
+            known_hosts_file = '/root/.ssh/known_hosts'
+            
+            # Ensure .ssh directory exists
+            os.makedirs('/root/.ssh', mode=0o700, exist_ok=True)
+            
+            # Check if host key already exists
+            check_cmd = ['ssh-keygen', '-F', f'[{ssh_host}]:{ssh_port}', '-f', known_hosts_file]
+            check_result = subprocess.run(check_cmd, capture_output=True, text=True)
+            
+            if check_result.returncode == 0:
+                # Host key already exists
+                logger.info(f"Host key for {ssh_host}:{ssh_port} already in known_hosts")
+                return jsonify({
+                    'success': True,
+                    'message': 'Host key already trusted',
+                    'fingerprints': fingerprints,
+                    'already_known': True
+                })
+            
+            # Add the host keys to known_hosts
+            # Format: [host]:port key-type key-data
+            with open(known_hosts_file, 'a') as f:
+                for host_key in host_keys:
+                    # Reformat to include port in brackets
+                    parts = host_key.split(' ', 2)
+                    if len(parts) >= 3:
+                        # Format: [host]:port ssh-rsa/ed25519 key
+                        formatted_key = f"[{ssh_host}]:{ssh_port} {parts[1]} {parts[2]}\n"
+                        f.write(formatted_key)
+            
+            logger.info(f"Added host key for {ssh_host}:{ssh_port} to known_hosts")
+            return jsonify({
+                'success': True,
+                'message': 'Host key added to known_hosts',
+                'fingerprints': fingerprints,
+                'added': True
+            })
+        else:
+            # Just return fingerprints for user confirmation
+            return jsonify({
+                'success': True,
+                'message': 'Host key retrieved',
+                'host': ssh_host,
+                'port': ssh_port,
+                'fingerprints': fingerprints,
+                'needs_confirmation': True
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"Host key verification timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Host key verification timed out'
+        })
+    except Exception as e:
+        logger.error(f"Host verification error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Host verification error: {str(e)}'
         })
 
 

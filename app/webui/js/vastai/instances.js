@@ -185,6 +185,90 @@ export async function testVastAISSH() {
       document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
         detail: { stepAction: 'test_ssh', success: true }
       }));
+    } else if (data.host_verification_needed) {
+      // Host key verification required - prompt user
+      showSetupResult('⚠️ Host key verification required...', 'info');
+      
+      // Get host key fingerprints first
+      try {
+        const verifyData = await api.post('/ssh/verify-host', {
+          ssh_connection: sshConnectionString,
+          accept: false
+        });
+        
+        if (verifyData.success && verifyData.needs_confirmation) {
+          // Show modal to user
+          const { showSSHHostVerificationModal } = await import('./ui.js');
+          const userAccepted = await showSSHHostVerificationModal({
+            host: verifyData.host,
+            port: verifyData.port,
+            fingerprints: verifyData.fingerprints
+          });
+          
+          if (userAccepted) {
+            // User accepted - add host key to known_hosts
+            showSetupResult('Adding host key to known_hosts...', 'info');
+            const addKeyData = await api.post('/ssh/verify-host', {
+              ssh_connection: sshConnectionString,
+              accept: true
+            });
+            
+            if (addKeyData.success) {
+              showSetupResult('Host key added. Retrying SSH connection...', 'info');
+              // Retry the SSH test
+              setTimeout(() => testVastAISSH(), 500);
+            } else {
+              showSetupResult(`❌ Failed to add host key: ${addKeyData.message}`, 'error');
+              
+              if (stepElement && window.progressIndicators) {
+                window.progressIndicators.showError(
+                  stepElement,
+                  'Failed to add host key',
+                  addKeyData.message || 'Could not update known_hosts',
+                  [{ class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }]
+                );
+              }
+              
+              document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+                detail: { stepAction: 'test_ssh', success: false }
+              }));
+            }
+          } else {
+            // User rejected
+            showSetupResult('❌ Host key verification rejected by user', 'error');
+            
+            if (stepElement && window.progressIndicators) {
+              window.progressIndicators.showError(
+                stepElement,
+                'Host key verification rejected',
+                'You declined to trust this host',
+                [{ class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Try Again' }]
+              );
+            }
+            
+            document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+              detail: { stepAction: 'test_ssh', success: false }
+            }));
+          }
+        } else {
+          throw new Error(verifyData.message || 'Failed to get host key fingerprints');
+        }
+      } catch (verifyError) {
+        showSetupResult(`❌ Host verification failed: ${verifyError.message}`, 'error');
+        
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showError(
+            stepElement,
+            'Host verification failed',
+            verifyError.message || 'Could not retrieve host key',
+            [{ class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }]
+          );
+        }
+        
+        document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+          detail: { stepAction: 'test_ssh', success: false }
+        }));
+      }
     } else {
       showSetupResult(`❌ SSH test failed: ${data.message}`, 'error');
       
