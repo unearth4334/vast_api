@@ -76,6 +76,11 @@ def parse_host_port(ssh_connection):
 
     host, port = parts
     host = host.strip()
+    
+    # Strip username if present (e.g., "root@79.116.177.128" -> "79.116.177.128")
+    if '@' in host:
+        host = host.split('@', 1)[1]
+    
     if not host:
         raise ValueError("Host cannot be empty")
 
