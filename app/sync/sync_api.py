@@ -1212,7 +1212,7 @@ def ssh_install_custom_nodes():
             '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
             '-o', 'IdentitiesOnly=yes',
             f'root@{ssh_host}',
-            f'source /etc/environment 2>/dev/null; /workspace/ComfyUI-Auto_installer/install-custom-nodes.sh {ui_home} 2>&1'
+            f'source /etc/environment 2>/dev/null; cd /workspace/ComfyUI-Auto_installer/scripts && ./install-custom-nodes.sh {ui_home} 2>&1'
         ]
         
         # Use Popen for real-time output streaming (important for long-running process)
