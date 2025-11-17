@@ -93,6 +93,11 @@ ui_config:
     - label: "📥 Clone Auto Installer"
       action: "clone_auto_installer"
       style: "primary"
+      
+    - label: "🔌 Install Custom Nodes"
+      action: "install_custom_nodes"
+      style: "primary"
+      tooltip: "Install ComfyUI custom nodes using the auto-installer"
 
 # Additional metadata
 metadata:

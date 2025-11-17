@@ -1154,6 +1154,138 @@ def ssh_test_civitdl():
         })
 
 
+@app.route('/ssh/install-custom-nodes', methods=['POST', 'OPTIONS'])
+def ssh_install_custom_nodes():
+    """Install ComfyUI custom nodes on remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        ui_home = data.get('ui_home', '/workspace/ComfyUI')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Installing custom nodes on {ssh_host}:{ssh_port}")
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Run the custom nodes installer
+        install_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            f'source /etc/environment 2>/dev/null; /workspace/ComfyUI-Auto_installer/install-custom-nodes.sh {ui_home} 2>&1'
+        ]
+        
+        # Use Popen for real-time output streaming (important for long-running process)
+        process = subprocess.Popen(
+            install_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        
+        # Parse output to track progress
+        total_nodes = 0
+        processed_nodes = 0
+        successful_clones = 0
+        failed_clones = 0
+        successful_requirements = 0
+        failed_requirements = 0
+        current_node = None
+        output_lines = []
+        
+        for line in process.stdout:
+            output_lines.append(line.rstrip())
+            logger.debug(f"Install output: {line.rstrip()}")
+            
+            # Parse progress: [X/Y] Processing custom node: NodeName
+            if 'Processing custom node:' in line:
+                import re
+                match = re.search(r'\[(\d+)/(\d+)\]\s+Processing custom node:\s+(.+)', line)
+                if match:
+                    processed_nodes = int(match.group(1))
+                    total_nodes = int(match.group(2))
+                    current_node = match.group(3).strip()
+                    logger.info(f"Processing node {processed_nodes}/{total_nodes}: {current_node}")
+            
+            # Track successes and failures
+            elif 'Successfully cloned' in line:
+                successful_clones += 1
+            elif 'Failed to clone' in line:
+                failed_clones += 1
+            elif 'Successfully installed requirements' in line:
+                successful_requirements += 1
+            elif 'Failed to install requirements' in line:
+                failed_requirements += 1
+        
+        # Wait for process to complete
+        return_code = process.wait(timeout=1800)  # 30 minute timeout for all nodes
+        
+        # Determine success - installation is successful even if some requirements fail
+        # Only fail if the script itself fails (return code != 0 and not just requirements failures)
+        installation_succeeded = return_code == 0 or (failed_requirements > 0 and failed_clones == 0)
+        
+        if installation_succeeded:
+            logger.info(f"Custom nodes installation completed. Processed: {processed_nodes}/{total_nodes}, " +
+                       f"Clones: {successful_clones} success / {failed_clones} failed, " +
+                       f"Requirements: {successful_requirements} success / {failed_requirements} failed")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Custom nodes installation completed',
+                'total_nodes': total_nodes,
+                'processed': processed_nodes,
+                'successful_clones': successful_clones,
+                'failed_clones': failed_clones,
+                'successful_requirements': successful_requirements,
+                'failed_requirements': failed_requirements,
+                'has_warnings': failed_requirements > 0 or failed_clones > 0,
+                'output': output_lines[-50:] if len(output_lines) > 50 else output_lines  # Last 50 lines
+            })
+        else:
+            logger.error(f"Custom nodes installation failed with return code {return_code}")
+            return jsonify({
+                'success': False,
+                'message': 'Custom nodes installation failed',
+                'return_code': return_code,
+                'output': output_lines[-50:] if len(output_lines) > 50 else output_lines
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Custom nodes installation timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Custom nodes installation timed out (exceeded 30 minutes)'
+        })
+    except Exception as e:
+        logger.error(f"Custom nodes installation error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Custom nodes installation error: {str(e)}'
+        })
+
+
 # --- Progress and Logging Routes ---
 
 @app.route('/sync/progress/<sync_id>')

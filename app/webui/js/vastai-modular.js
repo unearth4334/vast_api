@@ -32,6 +32,7 @@ window.getUIHome = VastAIInstances.getUIHome;
 window.terminateConnection = VastAIInstances.terminateConnection;
 window.setupCivitDL = VastAIInstances.setupCivitDL;
 window.testCivitDL = VastAIInstances.testCivitDL;
+window.installCustomNodes = VastAIInstances.installCustomNodes;
 window.setupPythonVenv = VastAIInstances.setupPythonVenv;
 window.cloneAutoInstaller = VastAIInstances.cloneAutoInstaller;
 window.syncFromConnectionString = VastAIInstances.syncFromConnectionString;

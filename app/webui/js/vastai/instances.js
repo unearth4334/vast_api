@@ -1164,6 +1164,121 @@ export async function testCivitDL() {
 }
 
 /**
+ * Install ComfyUI custom nodes
+ * Runs the ComfyUI-Auto_installer custom nodes installation script
+ */
+export async function installCustomNodes() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="install_custom_nodes"]');
+  
+  // Show progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSimpleProgress(
+      stepElement,
+      'Installing custom nodes...',
+      'Processing node 0/34'
+    );
+  }
+  
+  showSetupResult('Installing custom nodes (this may take several minutes)...', 'info');
+  
+  try {
+    const data = await api.post('/ssh/install-custom-nodes', {
+      ssh_connection: sshConnectionString,
+      ui_home: '/workspace/ComfyUI'
+    });
+    
+    if (data.success) {
+      const hasWarnings = data.has_warnings || false;
+      const cloneFailures = data.failed_clones || 0;
+      const reqFailures = data.failed_requirements || 0;
+      
+      if (hasWarnings) {
+        showSetupResult(`⚠️ Custom nodes installed with warnings (${cloneFailures} clone failures, ${reqFailures} requirement failures)`, 'warning');
+      } else {
+        showSetupResult('✅ All custom nodes installed successfully!', 'success');
+      }
+      
+      // Show completion indicator with detailed stats
+      if (stepElement && window.progressIndicators) {
+        const detailMessage = hasWarnings
+          ? `${data.successful_clones}/${data.total_nodes} nodes cloned • ${reqFailures} requirement warnings`
+          : `${data.successful_clones} nodes installed successfully`;
+        
+        const stats = [
+          `📦 ${data.total_nodes} nodes`,
+          cloneFailures > 0 ? `⚠️ ${cloneFailures} clone failures` : null,
+          reqFailures > 0 ? `⚠️ ${reqFailures} requirement warnings` : null
+        ].filter(Boolean);
+        
+        if (hasWarnings) {
+          window.progressIndicators.showWarning(
+            stepElement,
+            'Custom nodes installed with warnings',
+            detailMessage,
+            stats
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Custom nodes installed successfully',
+            detailMessage,
+            stats
+          );
+        }
+      }
+      
+      // Emit success event for workflow - warnings don't fail the workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'install_custom_nodes', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Custom nodes installation failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Installation failed',
+          data.message || 'Custom nodes installation script failed',
+          [
+            { class: 'retry-btn', onclick: 'installCustomNodes()', label: '🔄 Retry Installation' },
+            { class: 'details-btn', onclick: 'console.log("Output:", ' + JSON.stringify(data.output) + ')', label: '📋 View Output' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'install_custom_nodes', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ Custom nodes installation request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Installation failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'installCustomNodes()', label: '🔄 Retry Installation' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'install_custom_nodes', success: false }
+    }));
+  }
+}
+
+/**
  * Setup Python virtual environment
  * Wrapper function that adds progress indicators to the template step
  */

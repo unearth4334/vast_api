@@ -284,6 +284,9 @@ function updateWorkflowSteps(template) {
       case 'test_civitdl':
         stepButton.onclick = testCivitDL;
         break;
+      case 'install_custom_nodes':
+        stepButton.onclick = installCustomNodes;
+        break;
       case 'set_ui_home':
         stepButton.onclick = setUIHome;
         break;
