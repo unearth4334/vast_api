@@ -1192,14 +1192,22 @@ export async function testCivitDL() {
  * Runs the ComfyUI-Auto_installer custom nodes installation script
  */
 export async function installCustomNodes() {
+  console.log('🔌 installCustomNodes called');
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
-  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+  if (!sshConnectionString) {
+    console.error('❌ No SSH connection string found');
+    return showSetupResult('Please enter an SSH connection string first.', 'error');
+  }
+  
+  console.log('📡 SSH connection string:', sshConnectionString);
 
   // Get the workflow step element
   const stepElement = document.querySelector('.workflow-step[data-action="install_custom_nodes"]');
+  console.log('📍 Step element found:', !!stepElement);
   
   // Show initial progress indicator
   if (stepElement && window.progressIndicators) {
+    console.log('📊 Showing initial progress indicator');
     window.progressIndicators.showChecklistProgress(stepElement, [
       { label: 'Initializing...', state: 'active' }
     ]);
@@ -1208,6 +1216,7 @@ export async function installCustomNodes() {
   showSetupResult('Installing custom nodes (this may take several minutes)...', 'info');
   
   // Start the installation (non-blocking)
+  console.log('🚀 Starting installation API call...');
   const installPromise = api.post('/ssh/install-custom-nodes', {
     ssh_connection: sshConnectionString,
     ui_home: '/workspace/ComfyUI'
@@ -1219,16 +1228,22 @@ export async function installCustomNodes() {
   
   const pollProgress = async () => {
     try {
+      console.log('🔄 Polling progress...');
       const progressResponse = await api.post('/ssh/install-custom-nodes/progress', {
         ssh_connection: sshConnectionString
       });
+      
+      console.log('📥 Progress response:', progressResponse);
       
       if (progressResponse.success && progressResponse.progress) {
         const progress = progressResponse.progress;
         lastProgressData = progress;
         
+        console.log('📊 Progress data:', progress);
+        
         // Update the checklist UI with all nodes
         if (stepElement && window.progressIndicators && progress.nodes && progress.nodes.length > 0) {
+          console.log(`📋 Updating UI with ${progress.nodes.length} nodes`);
           const checklistItems = progress.nodes.map(node => {
             let state = 'pending';
             let label = node.name;
@@ -1307,28 +1322,35 @@ export async function installCustomNodes() {
         
         // Check if installation is complete
         if (progress.status === 'completed' || progress.status === 'failed') {
+          console.log('✅ Installation complete, stopping polling');
           clearInterval(pollInterval);
         }
       }
     } catch (error) {
-      console.error('Progress polling error:', error);
+      console.error('❌ Progress polling error:', error);
       // Don't stop polling on transient errors
     }
   };
   
   // Start polling every second
+  console.log('⏱️ Starting progress polling (every 1s)');
   pollInterval = setInterval(pollProgress, 1000);
   
   // Also poll immediately
+  console.log('🔄 Initial progress poll');
   pollProgress();
   
   try {
+    console.log('⏳ Waiting for installation to complete...');
     const data = await installPromise;
+    console.log('✅ Installation API call completed:', data);
     
     // Stop polling
     clearInterval(pollInterval);
+    console.log('🛑 Stopped polling');
     
     // Do one final poll to get the complete state
+    console.log('🔄 Final progress poll');
     await pollProgress();
     
     if (data.success) {
