@@ -1188,6 +1188,20 @@ def ssh_install_custom_nodes():
         
         ssh_key = '/root/.ssh/id_ed25519'
         
+        # Clear any existing progress file first
+        clear_progress_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'rm -f /tmp/custom_nodes_progress.json'
+        ]
+        subprocess.run(clear_progress_cmd, timeout=10, capture_output=True)
+        
         # Run the custom nodes installer
         install_cmd = [
             'ssh',
@@ -1282,6 +1296,94 @@ def ssh_install_custom_nodes():
         return jsonify({
             'success': False,
             'message': 'Custom nodes installation timed out (exceeded 30 minutes)'
+        })
+    except Exception as e:
+        logger.error(f"Custom nodes installation error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Custom nodes installation error: {str(e)}'
+        })
+
+
+@app.route('/ssh/install-custom-nodes/progress', methods=['POST', 'OPTIONS'])
+def ssh_install_custom_nodes_progress():
+    """Get real-time progress of custom nodes installation"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Read the progress file from the remote instance
+        read_progress_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=5',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'cat /tmp/custom_nodes_progress.json 2>/dev/null || echo "{}"'
+        ]
+        
+        result = subprocess.run(
+            read_progress_cmd,
+            timeout=10,
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            import json
+            try:
+                progress_data = json.loads(result.stdout)
+                return jsonify({
+                    'success': True,
+                    'progress': progress_data
+                })
+            except json.JSONDecodeError:
+                # File might not exist yet or is empty
+                return jsonify({
+                    'success': True,
+                    'progress': {
+                        'status': 'not_started',
+                        'total_nodes': 0,
+                        'processed': 0,
+                        'successful': 0,
+                        'failed': 0,
+                        'nodes': []
+                    }
+                })
+        else:
+            logger.warning(f"Failed to read progress file: {result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to read progress file from remote instance'
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Progress check timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Progress check timed out'
         })
     except Exception as e:
         logger.error(f"Custom nodes installation error: {str(e)}")

@@ -1198,22 +1198,138 @@ export async function installCustomNodes() {
   // Get the workflow step element
   const stepElement = document.querySelector('.workflow-step[data-action="install_custom_nodes"]');
   
-  // Show progress indicator
+  // Show initial progress indicator
   if (stepElement && window.progressIndicators) {
-    window.progressIndicators.showSimpleProgress(
-      stepElement,
-      'Installing custom nodes...',
-      'Processing node 0/34'
-    );
+    window.progressIndicators.showChecklistProgress(stepElement, [
+      { label: 'Initializing...', state: 'active' }
+    ]);
   }
   
   showSetupResult('Installing custom nodes (this may take several minutes)...', 'info');
   
+  // Start the installation (non-blocking)
+  const installPromise = api.post('/ssh/install-custom-nodes', {
+    ssh_connection: sshConnectionString,
+    ui_home: '/workspace/ComfyUI'
+  });
+  
+  // Poll for progress updates
+  let pollInterval;
+  let lastProgressData = null;
+  
+  const pollProgress = async () => {
+    try {
+      const progressResponse = await api.post('/ssh/install-custom-nodes/progress', {
+        ssh_connection: sshConnectionString
+      });
+      
+      if (progressResponse.success && progressResponse.progress) {
+        const progress = progressResponse.progress;
+        lastProgressData = progress;
+        
+        // Update the checklist UI with all nodes
+        if (stepElement && window.progressIndicators && progress.nodes && progress.nodes.length > 0) {
+          const checklistItems = progress.nodes.map(node => {
+            let state = 'pending';
+            let label = node.name;
+            
+            // Map status to state
+            switch (node.status) {
+              case 'installing':
+              case 'cloning':
+              case 'installing_requirements':
+                state = 'active';
+                label = `${node.name} - ${node.message || 'Processing...'}`;
+                break;
+              case 'success':
+                state = 'completed';
+                label = `${node.name}`;
+                break;
+              case 'failed':
+                state = 'pending';  // Use pending style for failed (will show as dot, not spinner)
+                label = `${node.name} - ❌ ${node.message || 'Failed'}`;
+                break;
+              case 'partial':
+                state = 'completed';
+                label = `${node.name} - ⚠️ ${node.message || 'Partial'}`;
+                break;
+              default:
+                state = 'pending';
+            }
+            
+            return { label, state };
+          });
+          
+          // Limit visible items to 10 most recent/active
+          const activeIndex = checklistItems.findIndex(item => item.state === 'active');
+          let visibleItems;
+          
+          if (activeIndex !== -1) {
+            // Show items around the active one
+            const start = Math.max(0, activeIndex - 5);
+            const end = Math.min(checklistItems.length, activeIndex + 5);
+            visibleItems = checklistItems.slice(start, end);
+            
+            // Add summary if we're hiding items
+            if (start > 0 || end < checklistItems.length) {
+              const completedCount = checklistItems.filter((item, idx) => 
+                idx < start && item.state === 'completed'
+              ).length;
+              
+              if (completedCount > 0) {
+                visibleItems.unshift({
+                  label: `✓ ${completedCount} nodes completed`,
+                  state: 'completed'
+                });
+              }
+              
+              if (end < checklistItems.length) {
+                const remainingCount = checklistItems.length - end;
+                visibleItems.push({
+                  label: `${remainingCount} more nodes...`,
+                  state: 'pending'
+                });
+              }
+            }
+          } else {
+            // No active item, show first 10
+            visibleItems = checklistItems.slice(0, 10);
+            if (checklistItems.length > 10) {
+              visibleItems.push({
+                label: `${checklistItems.length - 10} more nodes...`,
+                state: 'pending'
+              });
+            }
+          }
+          
+          window.progressIndicators.showChecklistProgress(stepElement, visibleItems);
+        }
+        
+        // Check if installation is complete
+        if (progress.status === 'completed' || progress.status === 'failed') {
+          clearInterval(pollInterval);
+        }
+      }
+    } catch (error) {
+      console.error('Progress polling error:', error);
+      // Don't stop polling on transient errors
+    }
+  };
+  
+  // Start polling every second
+  pollInterval = setInterval(pollProgress, 1000);
+  
+  // Also poll immediately
+  pollProgress();
+  
   try {
-    const data = await api.post('/ssh/install-custom-nodes', {
-      ssh_connection: sshConnectionString,
-      ui_home: '/workspace/ComfyUI'
-    });
+    const data = await installPromise;
+    
+    // Stop polling
+    clearInterval(pollInterval);
+    
+    // Do one final poll to get the complete state
+    await pollProgress();
     
     if (data.success) {
       const hasWarnings = data.has_warnings || false;
@@ -1281,13 +1397,16 @@ export async function installCustomNodes() {
       }));
     }
   } catch (error) {
+    // Stop polling
+    clearInterval(pollInterval);
+    
     showSetupResult('❌ Custom nodes installation request failed: ' + error.message, 'error');
     
     // Show error completion indicator
     if (stepElement && window.progressIndicators) {
       window.progressIndicators.showError(
         stepElement,
-        'Installation failed',
+        'Installation request failed',
         error.message || 'Request failed',
         [
           { class: 'retry-btn', onclick: 'installCustomNodes()', label: '🔄 Retry Installation' }
