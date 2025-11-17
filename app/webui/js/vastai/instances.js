@@ -215,8 +215,47 @@ export async function testVastAISSH() {
             
             if (addKeyData.success) {
               showSetupResult('Host key added. Retrying SSH connection...', 'info');
-              // Retry the SSH test
-              setTimeout(() => testVastAISSH(), 500);
+              
+              // Retry the SSH test now that host key is added
+              const retryData = await api.post('/ssh/test', {
+                ssh_connection: sshConnectionString
+              });
+              
+              if (retryData.success) {
+                showSetupResult('✅ SSH connection successful!', 'success');
+                
+                // Show success completion indicator
+                if (stepElement && window.progressIndicators) {
+                  const hostname = retryData.hostname || 'remote';
+                  const uptime = retryData.uptime || 'unknown';
+                  window.progressIndicators.showSuccess(
+                    stepElement,
+                    'SSH connection verified',
+                    `Host: ${hostname} • Uptime: ${uptime}`,
+                    []
+                  );
+                }
+                
+                // Emit success event for workflow
+                document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+                  detail: { stepAction: 'test_ssh', success: true }
+                }));
+              } else {
+                showSetupResult(`❌ SSH test still failed after adding host key: ${retryData.message}`, 'error');
+                
+                if (stepElement && window.progressIndicators) {
+                  window.progressIndicators.showError(
+                    stepElement,
+                    'SSH connection failed',
+                    retryData.message || 'Connection failed even after adding host key',
+                    [{ class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }]
+                  );
+                }
+                
+                document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+                  detail: { stepAction: 'test_ssh', success: false }
+                }));
+              }
             } else {
               showSetupResult(`❌ Failed to add host key: ${addKeyData.message}`, 'error');
               
