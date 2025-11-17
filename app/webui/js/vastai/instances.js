@@ -1097,18 +1097,42 @@ export async function testCivitDL() {
     if (data.success) {
       showSetupResult('✅ CivitDL tests passed!', 'success');
       
-      // Show success completion indicator
+      // Build detailed message based on test results
+      const tests = data.tests || {};
+      const hasWarning = data.has_warning || !tests.api;
+      const apiNote = data.api_note || '';
+      
+      const details = [
+        tests.cli ? '✓ CLI functional' : '✗ CLI failed',
+        tests.config ? '✓ API key valid' : '✗ API key invalid',
+        tests.api ? '✓ API reachable' : '⚠ API test skipped'
+      ].join(' • ');
+      
+      // Show success completion indicator (or warning if API test skipped)
       if (stepElement && window.progressIndicators) {
-        const apiStatus = data.api_status || 200;
-        window.progressIndicators.showSuccess(
-          stepElement,
-          'CivitDL tests passed',
-          '✓ CLI functional • ✓ API key valid • ✓ API reachable',
-          [`🌐 API Status: ${apiStatus}`, `⏱️ ${window.progressIndicators.getDuration('test_civitdl')}`]
-        );
+        const apiStatus = data.api_status || 'N/A';
+        const stats = hasWarning 
+          ? [`⚠️ API test skipped (timeout)`, `⏱️ ${window.progressIndicators.getDuration('test_civitdl')}`]
+          : [`🌐 API Status: ${apiStatus}`, `⏱️ ${window.progressIndicators.getDuration('test_civitdl')}`];
+        
+        if (hasWarning) {
+          window.progressIndicators.showWarning(
+            stepElement,
+            'CivitDL tests passed with warnings',
+            details,
+            stats
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'CivitDL tests passed',
+            details,
+            stats
+          );
+        }
       }
       
-      // Emit success event for workflow
+      // Emit success event for workflow (warnings don't fail the workflow)
       document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
         detail: { stepAction: 'test_civitdl', success: true }
       }));

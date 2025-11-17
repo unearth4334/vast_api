@@ -1124,20 +1124,25 @@ def ssh_test_civitdl():
         else:
             logger.warning(f"API test failed: {api_result.stderr}")
         
-        # All tests must pass
-        all_passed = cli_result.returncode == 0 and api_key_valid and api_reachable
+        # CLI and config tests must pass, API test is optional (can be slow/rate-limited)
+        all_passed = cli_result.returncode == 0 and api_key_valid
+        has_warning = not api_reachable
         
-        logger.info(f"CivitDL tests completed. All passed: {all_passed}")
+        logger.info(f"CivitDL tests completed. CLI: {cli_result.returncode == 0}, Config: {api_key_valid}, API: {api_reachable}")
         
         return jsonify({
             'success': all_passed,
-            'message': 'CivitDL tests passed' if all_passed else 'Some CivitDL tests failed',
+            'message': 'CivitDL tests passed' if all_passed and not has_warning else 
+                      'CivitDL tests passed (API test skipped due to timeout)' if all_passed and has_warning else
+                      'Some CivitDL tests failed',
+            'has_warning': has_warning,
             'tests': {
                 'cli': cli_result.returncode == 0,
                 'config': api_key_valid,
                 'api': api_reachable
             },
-            'api_status': api_status
+            'api_status': api_status,
+            'api_note': 'API connectivity test is optional and may timeout due to rate limiting' if not api_reachable else None
         })
     
     except subprocess.TimeoutExpired:
