@@ -940,16 +940,16 @@ def ssh_test_civitdl():
                     '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
                     '-o', 'IdentitiesOnly=yes',
                     f'root@{ssh_host}',
-                    'cat ~/.civitdl/config.yaml 2>/dev/null || echo "no config"'
+                    'cat ~/.config/civitdl/config.json 2>/dev/null || echo "no config"'
                 ]
                 config_file_result = subprocess.run(check_config_cmd, capture_output=True, text=True, timeout=10)
                 config_file_content = config_file_result.stdout.strip()
                 logger.info(f"Config file content: {repr(config_file_content[:200])}")
                 
                 # Check if config file exists and has api_key
-                if config_file_content and 'no config' not in config_file_content and len(config_file_content) > 20:
+                if config_file_content and 'no config' not in config_file_content and 'api_key' in config_file_content:
                     api_key_valid = True
-                    logger.info(f"API key validation: valid (config file present)")
+                    logger.info(f"API key validation: valid (config file present with api_key)")
                 else:
                     logger.info(f"API key validation: not set or invalid")
         else:
