@@ -1307,7 +1307,7 @@ def ssh_install_custom_nodes():
 
 @app.route('/ssh/install-custom-nodes/progress', methods=['POST', 'OPTIONS'])
 def ssh_install_custom_nodes_progress():
-    """Get real-time progress of custom nodes installation"""
+    """Get real-time progress of custom nodes installation by parsing log file"""
     if request.method == 'OPTIONS':
         return ("", 204)
     
@@ -1331,8 +1331,8 @@ def ssh_install_custom_nodes_progress():
         
         ssh_key = '/root/.ssh/id_ed25519'
         
-        # Read the progress file from the remote instance
-        read_progress_cmd = [
+        # Read the progress log file from the remote instance
+        read_log_cmd = [
             'ssh',
             '-p', str(ssh_port),
             '-i', ssh_key,
@@ -1341,42 +1341,91 @@ def ssh_install_custom_nodes_progress():
             '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
             '-o', 'IdentitiesOnly=yes',
             f'root@{ssh_host}',
-            'cat /tmp/custom_nodes_progress.json 2>/dev/null || echo "{}"'
+            'cat /tmp/custom_nodes_install.log 2>/dev/null || echo ""'
         ]
         
         result = subprocess.run(
-            read_progress_cmd,
+            read_log_cmd,
             timeout=10,
             capture_output=True,
             text=True
         )
         
         if result.returncode == 0:
-            import json
-            try:
-                progress_data = json.loads(result.stdout)
-                return jsonify({
-                    'success': True,
-                    'progress': progress_data
-                })
-            except json.JSONDecodeError:
-                # File might not exist yet or is empty
-                return jsonify({
-                    'success': True,
-                    'progress': {
-                        'status': 'not_started',
-                        'total_nodes': 0,
-                        'processed': 0,
-                        'successful': 0,
-                        'failed': 0,
-                        'nodes': []
-                    }
-                })
+            log_content = result.stdout
+            
+            # Parse the log file to extract progress information
+            progress_data = {
+                'status': 'not_started',
+                'total_nodes': 0,
+                'processed': 0,
+                'successful': 0,
+                'failed': 0,
+                'nodes': []
+            }
+            
+            node_map = {}  # Track nodes by name
+            
+            for line in log_content.splitlines():
+                # Look for structured progress log entries
+                # Format: [TIMESTAMP] EVENT_TYPE|NODE_NAME|STATUS|MESSAGE
+                if '|' in line and '] ' in line:
+                    try:
+                        # Extract the structured part after timestamp
+                        parts = line.split('] ', 1)[1].split('|')
+                        if len(parts) >= 3:
+                            event_type = parts[0].strip()
+                            node_name = parts[1].strip()
+                            status = parts[2].strip()
+                            message = parts[3].strip() if len(parts) > 3 else ''
+                            
+                            if event_type == 'START':
+                                progress_data['status'] = 'initializing'
+                            elif event_type == 'INFO':
+                                if 'Found' in message and 'nodes to install' in message:
+                                    # Extract total nodes count
+                                    import re
+                                    match = re.search(r'(\d+)\s+nodes', message)
+                                    if match:
+                                        progress_data['total_nodes'] = int(match.group(1))
+                                progress_data['status'] = 'installing'
+                            elif event_type == 'NODE':
+                                # Track node status
+                                if node_name not in node_map:
+                                    node_map[node_name] = {
+                                        'name': node_name,
+                                        'status': status,
+                                        'message': message
+                                    }
+                                else:
+                                    # Update existing node
+                                    node_map[node_name]['status'] = status
+                                    node_map[node_name]['message'] = message
+                            elif event_type == 'COMPLETE':
+                                progress_data['status'] = 'completed'
+                    except (IndexError, ValueError):
+                        continue
+            
+            # Convert node_map to list and calculate stats
+            progress_data['nodes'] = list(node_map.values())
+            
+            for node in progress_data['nodes']:
+                if node['status'] in ['success', 'partial']:
+                    progress_data['successful'] += 1
+                    progress_data['processed'] += 1
+                elif node['status'] == 'failed':
+                    progress_data['failed'] += 1
+                    progress_data['processed'] += 1
+            
+            return jsonify({
+                'success': True,
+                'progress': progress_data
+            })
         else:
-            logger.warning(f"Failed to read progress file: {result.stderr}")
+            logger.warning(f"Failed to read progress log: {result.stderr}")
             return jsonify({
                 'success': False,
-                'message': 'Failed to read progress file from remote instance'
+                'message': 'Failed to read progress log from remote instance'
             })
             
     except subprocess.TimeoutExpired:
