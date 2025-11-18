@@ -168,6 +168,14 @@
     font-size: var(--font-ui-small);
 }
 
+.phase-countdown {
+    font-size: var(--font-ui-small);
+    color: var(--interactive-accent);
+    font-weight: 600;
+    margin-left: var(--size-4-2);
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+}
+
 .phase-status {
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);

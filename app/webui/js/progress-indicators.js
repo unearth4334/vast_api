@@ -141,6 +141,114 @@ class ProgressIndicatorManager {
   }
 
   /**
+   * Show multi-phase progress with countdown in active phase
+   * @param {HTMLElement} stepElement - The workflow step element
+   * @param {Array<{label: string, status?: string, countdown?: number}>} phases - Array of phases
+   * @param {number} activePhaseIndex - Index of currently active phase (0-based)
+   * @param {number} countdownSeconds - Duration in seconds for countdown
+   * @param {Function} onComplete - Callback when countdown completes
+   * @returns {Promise} - Resolves when countdown completes
+   */
+  async showMultiPhaseProgressWithCountdown(stepElement, phases, activePhaseIndex, countdownSeconds, onComplete = null) {
+    this.clearIndicators(stepElement);
+    const container = this.getIndicatorContainer(stepElement);
+    const action = stepElement.dataset.action;
+    
+    // Track start time
+    if (!this.startTimes.has(action)) {
+      this.startTimes.set(action, Date.now());
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'step-progress-indicator multi-phase';
+    indicator.setAttribute('role', 'status');
+    indicator.setAttribute('aria-live', 'polite');
+    
+    // Build phases HTML
+    const phasesHTML = phases.map((phase, index) => {
+      let phaseClass = 'pending';
+      let iconHTML = '<div class="phase-dot"></div>';
+      
+      if (index < activePhaseIndex) {
+        phaseClass = 'completed';
+        iconHTML = '<span class="folder-icon">✓</span>';
+      } else if (index === activePhaseIndex) {
+        phaseClass = 'active';
+        iconHTML = '<div class="phase-spinner"></div>';
+      }
+      
+      // Add countdown display for active phase with countdown
+      let countdownHTML = '';
+      if (index === activePhaseIndex && phase.countdown) {
+        countdownHTML = `<span class="phase-countdown">${phase.countdown}s remaining</span>`;
+      }
+      
+      return `
+        <div class="phase ${phaseClass}" data-phase-index="${index}">
+          ${iconHTML}
+          <span class="phase-label">${this.escapeHtml(phase.label)}</span>
+          ${countdownHTML}
+        </div>
+      `;
+    }).join('');
+    
+    indicator.innerHTML = `
+      <div class="progress-phases">
+        ${phasesHTML}
+      </div>
+      <div class="progress-bar-container">
+        <div class="progress-bar countdown-bar" style="width: 0%"></div>
+      </div>
+      <div class="progress-timer">0s</div>
+    `;
+    
+    container.appendChild(indicator);
+    
+    // Start timer if not already running
+    if (!this.timers.has(action)) {
+      this.startTimer(action, indicator.querySelector('.progress-timer'));
+    }
+    
+    // Animate countdown
+    const startTime = Date.now();
+    const endTime = startTime + (countdownSeconds * 1000);
+    const progressBar = indicator.querySelector('.countdown-bar');
+    const activePhase = indicator.querySelector(`.phase[data-phase-index="${activePhaseIndex}"]`);
+    const countdownEl = activePhase ? activePhase.querySelector('.phase-countdown') : null;
+    
+    return new Promise((resolve) => {
+      const updateCountdown = () => {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+        const progress = Math.min(100, (elapsed / (countdownSeconds * 1000)) * 100);
+        
+        // Update progress bar
+        if (progressBar) {
+          progressBar.style.width = `${progress}%`;
+        }
+        
+        // Update countdown text
+        if (countdownEl) {
+          countdownEl.textContent = `${remaining}s remaining`;
+        }
+        
+        // Check if complete
+        if (now >= endTime) {
+          if (onComplete) {
+            onComplete();
+          }
+          resolve();
+        } else {
+          requestAnimationFrame(updateCountdown);
+        }
+      };
+      
+      updateCountdown();
+    });
+  }
+
+  /**
    * Show checklist progress indicator
    * @param {HTMLElement} stepElement - The workflow step element
    * @param {Array<{label: string, state: 'pending'|'active'|'completed'}>} items - Checklist items

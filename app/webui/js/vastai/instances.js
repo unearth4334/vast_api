@@ -1791,21 +1791,28 @@ export async function rebootInstance() {
             { label: 'Initiating reboot command...', status: 'completed' },
             { label: 'Stopping container...', status: 'completed' },
             { label: 'Starting container...', status: 'completed' },
-            { label: 'Verifying instance status...', status: 'pending' }
+            { label: 'Waiting for startup (30s)...', status: 'pending' }
           ],
           3,
-          4
+          75
         );
       }
       
-      // Wait 30 seconds for the reboot to complete with a countdown progress bar
+      // Wait 30 seconds for the reboot to complete with a countdown progress bar as part of the phase list
       console.log('🐛 DEBUG: Starting 30-second countdown for reboot to complete...');
       showSetupResult('⏳ Waiting for instance to reboot...', 'info');
       
       if (stepElement && window.progressIndicators) {
-        await window.progressIndicators.showCountdownProgress(
+        // Show the countdown as part of the multi-phase progress
+        await window.progressIndicators.showMultiPhaseProgressWithCountdown(
           stepElement,
-          'Instance rebooting - waiting for startup...',
+          [
+            { label: 'Initiating reboot command...', status: 'completed' },
+            { label: 'Stopping container...', status: 'completed' },
+            { label: 'Starting container...', status: 'completed' },
+            { label: 'Waiting for startup...', status: 'active', countdown: 30 }
+          ],
+          3,
           30,
           () => {
             console.log('🐛 DEBUG: 30-second countdown complete');
@@ -1826,10 +1833,10 @@ export async function rebootInstance() {
             { label: 'Initiating reboot command...', status: 'completed' },
             { label: 'Stopping container...', status: 'completed' },
             { label: 'Starting container...', status: 'completed' },
-            { label: 'Verifying instance status...', status: 'completed' }
+            { label: 'Waiting for startup...', status: 'completed' }
           ],
           4,
-          4
+          100
         );
       }
       
