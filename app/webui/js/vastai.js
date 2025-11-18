@@ -148,3 +148,10 @@ window.showSetupResult = window.showSetupResult || function(message, type) {
   console.log(`📢 showSetupResult: "${message}" (${type})`);
   const resultDiv = document.getElementById('setup-result');
   if (!resultDiv) return;
+  
+  resultDiv.className = `setup-result ${type || 'info'}`;
+  resultDiv.textContent = message;
+  resultDiv.style.display = 'block';
+};
+
+console.log('📄 VastAI Legacy Support module loaded');

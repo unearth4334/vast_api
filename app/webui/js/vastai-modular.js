@@ -36,6 +36,7 @@ window.installCustomNodes = VastAIInstances.installCustomNodes;
 window.setupPythonVenv = VastAIInstances.setupPythonVenv;
 window.cloneAutoInstaller = VastAIInstances.cloneAutoInstaller;
 window.syncFromConnectionString = VastAIInstances.syncFromConnectionString;
+window.rebootInstance = VastAIInstances.rebootInstance;
 window.loadVastaiInstances = VastAIInstances.loadVastaiInstances;
 window.useInstance = VastAIInstances.useInstance;
 window.refreshInstanceCard = VastAIInstances.refreshInstanceCard;
