@@ -208,14 +208,17 @@ async function executeWorkflowStep(stepElement) {
       try {
         originalOnclick.call(stepButton);
         
-        // If no result is received within 30 seconds, consider it a success
-        // (for steps that don't emit events)
+        // If no result is received within a reasonable time, consider it a timeout
+        // For long-running operations like install_custom_nodes, use a longer timeout
+        const timeout = action === 'install_custom_nodes' ? 1200000 : 30000; // 20 min for install, 30s for others
+        
         setTimeout(() => {
           if (!resultReceived) {
+            console.warn(`⏱️ Step ${action} timed out after ${timeout/1000}s without completion event`);
             document.removeEventListener('stepExecutionComplete', resultListener);
-            resolve(true);
+            resolve(false); // Changed from true to false - timeout should be treated as failure
           }
-        }, 30000);
+        }, timeout);
       } catch (error) {
         console.error('Error executing step:', error);
         document.removeEventListener('stepExecutionComplete', resultListener);
