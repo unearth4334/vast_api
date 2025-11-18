@@ -135,7 +135,12 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="workflow-arrow">↓</div>
+                            <div class="workflow-arrow">
+                                <svg viewBox="0 0 40 60" xmlns="http://www.w3.org/2000/svg">
+                                    <rect class="arrow-body" x="14" y="0" width="12" height="40" />
+                                    <path class="arrow-body" d="M 14 40 L 20 60 L 26 40 Z" />
+                                </svg>
+                            </div>
                             <div class="workflow-step" data-action="sync_instance">
                                 <div class="step-button-container">
                                     <button class="step-button" onclick="syncFromConnectionString()">

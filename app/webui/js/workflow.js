@@ -11,6 +11,61 @@ let workflowConfig = {
 };
 
 /**
+ * Create an SVG arrow with fill progress
+ * @param {number} progress - Progress from 0 to 1 (0% to 100%)
+ * @returns {string} - SVG markup
+ */
+function createArrowSVG(progress = 0) {
+  // Arrow dimensions
+  const width = 40;
+  const height = 60;
+  const bodyWidth = 12;
+  const headHeight = 20;
+  
+  // Calculate filled height based on progress
+  const filledHeight = height * progress;
+  
+  // Arrow body: rectangle at top
+  const bodyX = (width - bodyWidth) / 2;
+  const bodyHeight = height - headHeight;
+  
+  // Arrow head: triangle at bottom
+  const headY = bodyHeight;
+  const headPath = `M ${bodyX} ${headY} L ${width/2} ${height} L ${bodyX + bodyWidth} ${headY} Z`;
+  
+  // Generate unique ID for this arrow's clip path
+  const clipId = `arrow-clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  return `
+    <svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+      <!-- Arrow outline/background -->
+      <rect class="arrow-body" x="${bodyX}" y="0" width="${bodyWidth}" height="${bodyHeight}" />
+      <path class="arrow-body" d="${headPath}" />
+      
+      <!-- Progress fill (clips from top) -->
+      <defs>
+        <clipPath id="${clipId}">
+          <rect x="0" y="0" width="${width}" height="${filledHeight}" />
+        </clipPath>
+      </defs>
+      <g clip-path="url(#${clipId})">
+        <rect class="arrow-fill" x="${bodyX}" y="0" width="${bodyWidth}" height="${bodyHeight}" />
+        <path class="arrow-fill" d="${headPath}" />
+      </g>
+    </svg>
+  `;
+}
+
+/**
+ * Update arrow SVG with new progress
+ * @param {HTMLElement} arrowElement - The arrow element
+ * @param {number} progress - Progress from 0 to 1
+ */
+function updateArrowProgress(arrowElement, progress) {
+  arrowElement.innerHTML = createArrowSVG(progress);
+}
+
+/**
  * Initialize workflow system
  */
 async function initWorkflow() {
@@ -95,10 +150,12 @@ async function runWorkflow() {
   runButton.textContent = '⏸️ Cancel Workflow';
   runButton.classList.add('cancel');
   
-  // Reset all arrows to initial hidden state
+  // Set all arrows to grey/loading state with 0% progress
   const allArrows = workflowStepsContainer.querySelectorAll('.workflow-arrow');
   allArrows.forEach(arrow => {
-    arrow.classList.remove('revealing', 'revealed');
+    arrow.classList.remove('completed');
+    arrow.classList.add('loading');
+    updateArrowProgress(arrow, 0);
   });
   
   // Disable all step buttons and toggles during execution
@@ -145,13 +202,31 @@ async function runWorkflow() {
         stepElement.classList.add('completed');
         console.log(`✅ Step ${i + 1} completed: ${action}`);
         
-        // Trigger arrow animation if not the last step
+        // Animate arrow with 11-step loading bar if not the last step
         if (i < stepElements.length - 1 && !workflowCancelled) {
-          // Get the next arrow element (it's the next sibling after the current step)
           const nextArrow = stepElement.nextElementSibling;
           if (nextArrow && nextArrow.classList.contains('workflow-arrow')) {
-            console.log(`🎬 Starting arrow reveal animation`);
-            nextArrow.classList.add('revealing');
+            console.log(`🎬 Starting arrow loading animation (11 steps)`);
+            
+            // Animate arrow filling over the delay period with 11 discrete steps
+            const steps = 11; // 0%, 10%, 20%, ..., 100%
+            const stepDuration = workflowConfig.stepDelay / (steps - 1);
+            
+            for (let step = 0; step < steps; step++) {
+              if (workflowCancelled) break;
+              
+              const progress = step / (steps - 1); // 0.0 to 1.0
+              updateArrowProgress(nextArrow, progress);
+              
+              // Wait for next step (except on the last step)
+              if (step < steps - 1) {
+                await sleep(stepDuration);
+              }
+            }
+            
+            // Mark arrow as completed (full color)
+            nextArrow.classList.remove('loading');
+            nextArrow.classList.add('completed');
           }
         }
       } else {
@@ -162,19 +237,8 @@ async function runWorkflow() {
         break; // Stop workflow on failure
       }
       
-      // Wait between steps (except after the last step)
-      if (i < stepElements.length - 1 && !workflowCancelled) {
-        console.log(`⏳ Waiting ${workflowConfig.stepDelay / 1000} seconds before next step...`);
-        showSetupResult(`Waiting ${workflowConfig.stepDelay / 1000} seconds before next step...`, 'info');
-        await sleep(workflowConfig.stepDelay);
-        
-        // After the delay, mark the arrow as revealed
-        const nextArrow = stepElement.nextElementSibling;
-        if (nextArrow && nextArrow.classList.contains('workflow-arrow')) {
-          nextArrow.classList.remove('revealing');
-          nextArrow.classList.add('revealed');
-        }
-      }
+      // Note: Arrow animation now happens inline above, no separate wait needed
+      // The arrow fills during the delay, so we don't need additional waiting
     }
     
     if (!workflowCancelled) {
@@ -359,7 +423,7 @@ function updateWorkflowSteps(template) {
     if (index < buttons.length - 1) {
       const arrow = document.createElement('div');
       arrow.className = 'workflow-arrow';
-      arrow.textContent = '↓';
+      arrow.innerHTML = createArrowSVG(1.0); // Start with full arrow visible
       container.appendChild(arrow);
     }
     

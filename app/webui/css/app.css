@@ -1008,40 +1008,43 @@ body {
 
 .workflow-arrow {
     text-align: center;
-    color: var(--interactive-accent);
-    font-size: 24px;
     padding: var(--size-4-1) 0;
-    font-weight: bold;
-    overflow: hidden;
     position: relative;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .workflow-arrow.hidden {
     visibility: hidden;
 }
 
-/* Arrow reveal animation - starts hidden with clip-path */
-.workflow-arrow {
-    clip-path: inset(0 0 100% 0);
+/* SVG arrow container */
+.workflow-arrow svg {
+    width: 40px;
+    height: 60px;
+    display: block;
 }
 
-/* Revealing state - animates from top to bottom */
-.workflow-arrow.revealing {
-    animation: revealTopDown 5s linear forwards;
+/* Default state - full color arrow */
+.workflow-arrow svg .arrow-body {
+    fill: var(--interactive-accent);
 }
 
-@keyframes revealTopDown {
-    from {
-        clip-path: inset(0 0 100% 0);
-    }
-    to {
-        clip-path: inset(0 0 0 0);
-    }
+/* Grey state when workflow starts */
+.workflow-arrow.loading svg .arrow-body {
+    fill: #4a4a4a;
 }
 
-/* Once revealed, keep it visible */
-.workflow-arrow.revealed {
-    clip-path: inset(0 0 0 0);
+/* Filled state - shows progress */
+.workflow-arrow.loading svg .arrow-fill {
+    fill: var(--interactive-accent);
+}
+
+/* Completed state - full color */
+.workflow-arrow.completed svg .arrow-body {
+    fill: var(--interactive-accent);
 }
 
 /* Progress visualization for workflow steps */
