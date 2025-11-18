@@ -4,13 +4,14 @@
  * Main component for browsing, filtering, and selecting resources
  */
 
-import { createResourceCard, updateCardSelection } from './resource-card.js';
+import { createResourceCard, updateCardSelection, expandCard, collapseCard } from './resource-card.js';
 
 export class ResourceBrowser {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
         this.selectedResources = new Set();
         this.resources = [];
+        this.expandedCard = null; // Track currently expanded card
         this.filters = {
             ecosystem: null,
             type: null,
@@ -231,6 +232,28 @@ export class ResourceBrowser {
         }
         
         this.updateSelectionUI();
+    }
+    
+    /**
+     * Expand a card to show full details
+     */
+    expandCard(filepath) {
+        const card = document.querySelector(`[data-resource-path="${filepath}"]`);
+        if (!card) return;
+        
+        // Collapse previously expanded card
+        if (this.expandedCard && this.expandedCard !== card) {
+            collapseCard(this.expandedCard);
+        }
+        
+        // Toggle current card
+        if (this.expandedCard === card) {
+            collapseCard(card);
+            this.expandedCard = null;
+        } else {
+            expandCard(card);
+            this.expandedCard = card;
+        }
     }
     
     /**

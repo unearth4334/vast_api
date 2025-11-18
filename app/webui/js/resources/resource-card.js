@@ -24,7 +24,7 @@ function extractTitle(description) {
 }
 
 /**
- * Create a resource card element
+ * Create a resource card element (compact with expand-on-tap)
  * @param {Object} resource - Resource object from API
  * @returns {HTMLElement} Card element
  */
@@ -45,8 +45,8 @@ export function createResourceCard(resource) {
             break;
         }
     }
-    if (shortDesc.length > 100) {
-        shortDesc = shortDesc.substring(0, 97) + '...';
+    if (shortDesc.length > 150) {
+        shortDesc = shortDesc.substring(0, 147) + '...';
     }
     
     // Build card HTML
@@ -54,46 +54,68 @@ export function createResourceCard(resource) {
     const sizeStr = metadata.size ? formatBytes(metadata.size) : null;
     const hasDeps = metadata.dependencies && metadata.dependencies.length > 0;
     
+    // Determine status badge
+    const isSelected = window.resourceBrowser?.selectedResources?.has(resource.filepath);
+    const statusBadge = isSelected ? 
+        '<span class="status-badge status-selected">Selected</span>' : 
+        '<span class="status-badge status-available">Available</span>';
+    
     card.innerHTML = `
-        <div class="resource-card-header">
-            <img src="/resources/images/${imagePath}" 
-                 alt="${title}"
-                 class="resource-thumbnail"
-                 onerror="this.src='/resources/images/placeholder.png'">
-        </div>
-        <div class="resource-card-body">
-            <h3 class="resource-title">${title}</h3>
-            <div class="resource-tags">
-                <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
-                <span class="tag tag-type">${metadata.type}</span>
+        <div class="resource-card-compact">
+            <div class="compact-header">
+                <h3 class="compact-title">${title}</h3>
+                ${statusBadge}
             </div>
-            ${shortDesc ? `<p class="resource-description">${shortDesc}</p>` : ''}
-            ${sizeStr ? `<div class="resource-size">Size: ${sizeStr}</div>` : ''}
-            ${hasDeps ? `<div class="resource-deps">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+            <div class="compact-meta">
+                <span class="compact-type">${metadata.type}</span>
+                <span class="compact-ecosystem">${metadata.ecosystem}</span>
+            </div>
         </div>
-        <div class="resource-card-footer">
-            <button class="btn-view" data-action="view">
-                View Details
-            </button>
-            <button class="btn-select" data-action="select">
-                <span class="icon">☐</span> Select
-            </button>
+        <div class="resource-card-expanded" style="display: none;">
+            <div class="resource-card-header">
+                <img src="/resources/images/${imagePath}" 
+                     alt="${title}"
+                     class="resource-thumbnail"
+                     onerror="this.src='/resources/images/placeholder.png'">
+            </div>
+            <div class="resource-card-body">
+                <h3 class="resource-title">${title}</h3>
+                <div class="resource-tags">
+                    <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
+                    <span class="tag tag-type">${metadata.type}</span>
+                </div>
+                ${shortDesc ? `<p class="resource-description">${shortDesc}</p>` : ''}
+                ${sizeStr ? `<div class="resource-size">Size: ${sizeStr}</div>` : ''}
+                ${hasDeps ? `<div class="resource-deps">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+            </div>
+            <div class="resource-card-footer">
+                <button class="btn-select" data-action="select">
+                    <span class="icon">☐</span> Select
+                </button>
+            </div>
         </div>
     `;
     
-    // Add event listeners
-    const viewBtn = card.querySelector('.btn-view');
+    // Add click listener to expand/collapse
+    card.addEventListener('click', (e) => {
+        // Don't expand if clicking the select button
+        if (e.target.closest('.btn-select')) {
+            e.stopPropagation();
+            window.resourceBrowser?.toggleSelection(resource.filepath);
+            return;
+        }
+        
+        window.resourceBrowser?.expandCard(resource.filepath);
+    });
+    
+    // Add select button listener in expanded view
     const selectBtn = card.querySelector('.btn-select');
-    
-    viewBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.resourceBrowser?.viewResource(resource);
-    });
-    
-    selectBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.resourceBrowser?.toggleSelection(resource.filepath);
-    });
+    if (selectBtn) {
+        selectBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.resourceBrowser?.toggleSelection(resource.filepath);
+        });
+    }
     
     return card;
 }
@@ -103,19 +125,62 @@ export function createResourceCard(resource) {
  */
 export function updateCardSelection(card, selected) {
     const selectBtn = card.querySelector('.btn-select');
-    const icon = selectBtn.querySelector('.icon');
+    const icon = selectBtn?.querySelector('.icon');
     
-    if (selected) {
-        card.classList.add('selected');
-        icon.textContent = '☑';
-        selectBtn.textContent = '';
-        selectBtn.appendChild(icon);
-        selectBtn.append(' Selected');
-    } else {
-        card.classList.remove('selected');
-        icon.textContent = '☐';
-        selectBtn.textContent = '';
-        selectBtn.appendChild(icon);
-        selectBtn.append(' Select');
+    // Update compact view status badge
+    const compactStatus = card.querySelector('.status-badge');
+    if (compactStatus) {
+        if (selected) {
+            compactStatus.className = 'status-badge status-selected';
+            compactStatus.textContent = 'Selected';
+        } else {
+            compactStatus.className = 'status-badge status-available';
+            compactStatus.textContent = 'Available';
+        }
+    }
+    
+    // Update expanded view button
+    if (selectBtn && icon) {
+        if (selected) {
+            card.classList.add('selected');
+            icon.textContent = '☑';
+            selectBtn.textContent = '';
+            selectBtn.appendChild(icon);
+            selectBtn.append(' Selected');
+        } else {
+            card.classList.remove('selected');
+            icon.textContent = '☐';
+            selectBtn.textContent = '';
+            selectBtn.appendChild(icon);
+            selectBtn.append(' Select');
+        }
+    }
+}
+
+/**
+ * Expand a card to show full details
+ */
+export function expandCard(card) {
+    const compact = card.querySelector('.resource-card-compact');
+    const expanded = card.querySelector('.resource-card-expanded');
+    
+    if (compact && expanded) {
+        compact.style.display = 'none';
+        expanded.style.display = 'block';
+        card.classList.add('expanded');
+    }
+}
+
+/**
+ * Collapse a card to compact view
+ */
+export function collapseCard(card) {
+    const compact = card.querySelector('.resource-card-compact');
+    const expanded = card.querySelector('.resource-card-expanded');
+    
+    if (compact && expanded) {
+        compact.style.display = 'block';
+        expanded.style.display = 'none';
+        card.classList.remove('expanded');
     }
 }
