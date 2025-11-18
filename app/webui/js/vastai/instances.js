@@ -1690,17 +1690,23 @@ export async function cloneAutoInstaller() {
  */
 export async function rebootInstance() {
   console.log('🔄 rebootInstance called');
+  console.log('🐛 DEBUG: Starting reboot workflow');
+  console.log('🐛 DEBUG: Timestamp:', new Date().toISOString());
   
   // Get instance ID from the active instance or SSH connection
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  console.log('🐛 DEBUG: SSH Connection String:', sshConnectionString ? '(exists)' : '(empty)');
+  
   if (!sshConnectionString) {
     console.error('❌ No SSH connection string found');
+    console.log('🐛 DEBUG: Reboot aborted - No SSH connection');
     return showSetupResult('Please enter an SSH connection string first.', 'error');
   }
 
   // Get the workflow step element
   const stepElement = document.querySelector('.workflow-step[data-action="reboot_instance"]');
   console.log('📍 Step element found:', !!stepElement);
+  console.log('🐛 DEBUG: Workflow step element:', stepElement ? 'Found' : 'Not found');
   
   // Show initial progress indicator - countdown timer
   if (stepElement && window.progressIndicators) {
@@ -1723,20 +1729,29 @@ export async function rebootInstance() {
   try {
     // First, get the instance ID from the instances list
     console.log('🔍 Fetching instance list to get instance ID...');
+    console.log('🐛 DEBUG: Calling API: GET /vastai/instances');
     const instancesResponse = await api.get('/vastai/instances');
+    console.log('🐛 DEBUG: Instance API response:', JSON.stringify(instancesResponse, null, 2));
     
     if (!instancesResponse.success || !instancesResponse.instances || instancesResponse.instances.length === 0) {
+      console.error('🐛 DEBUG: No instances found in response');
       throw new Error('No active VastAI instances found');
     }
+    
+    console.log('🐛 DEBUG: Found', instancesResponse.instances.length, 'instance(s)');
     
     // Get the first running instance (or any instance if none are running)
     let targetInstance = instancesResponse.instances.find(i => i.status === 'running');
     if (!targetInstance) {
+      console.log('🐛 DEBUG: No running instances found, using first instance');
       targetInstance = instancesResponse.instances[0];
+    } else {
+      console.log('🐛 DEBUG: Found running instance');
     }
     
     const instanceId = targetInstance.id;
     console.log(`🎯 Target instance ID: ${instanceId}`);
+    console.log('🐛 DEBUG: Instance details:', JSON.stringify(targetInstance, null, 2));
     
     // Update progress to show we're sending the reboot command
     if (stepElement && window.progressIndicators) {
@@ -1755,13 +1770,19 @@ export async function rebootInstance() {
     
     // Call the reboot API
     console.log('🚀 Calling reboot API...');
+    console.log('🐛 DEBUG: Calling API: POST /ssh/reboot-instance');
+    console.log('🐛 DEBUG: Request payload:', JSON.stringify({ instance_id: instanceId }, null, 2));
     const data = await api.post('/ssh/reboot-instance', {
       instance_id: instanceId
     });
 
     console.log('✅ Reboot API call completed:', data);
+    console.log('🐛 DEBUG: Reboot API response:', JSON.stringify(data, null, 2));
+    console.log('🐛 DEBUG: Response success:', data.success);
+    console.log('🐛 DEBUG: Response message:', data.message);
 
     if (data.success) {
+      console.log('🐛 DEBUG: Reboot initiated successfully');
       // Update progress to show container is restarting
       if (stepElement && window.progressIndicators) {
         window.progressIndicators.showMultiPhaseProgress(
@@ -1769,16 +1790,40 @@ export async function rebootInstance() {
           [
             { label: 'Initiating reboot command...', status: 'completed' },
             { label: 'Stopping container...', status: 'completed' },
-            { label: 'Starting container...', status: 'active' },
-            { label: 'Verifying instance status...', status: 'pending' }
+            { label: 'Starting container...', status: 'completed' },
+            { label: 'Waiting for startup (30s)...', status: 'pending' }
           ],
-          2,
-          4
+          3,
+          75
         );
       }
       
-      // Wait a moment for the reboot to process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait 30 seconds for the reboot to complete with a countdown progress bar as part of the phase list
+      console.log('🐛 DEBUG: Starting 30-second countdown for reboot to complete...');
+      showSetupResult('⏳ Waiting for instance to reboot...', 'info');
+      
+      if (stepElement && window.progressIndicators) {
+        // Show the countdown as part of the multi-phase progress
+        await window.progressIndicators.showMultiPhaseProgressWithCountdown(
+          stepElement,
+          [
+            { label: 'Initiating reboot command...', status: 'completed' },
+            { label: 'Stopping container...', status: 'completed' },
+            { label: 'Starting container...', status: 'completed' },
+            { label: 'Waiting for startup...', status: 'active', countdown: 30 }
+          ],
+          3,
+          30,
+          () => {
+            console.log('🐛 DEBUG: 30-second countdown complete');
+          }
+        );
+      } else {
+        // Fallback if progress indicators not available
+        await new Promise(resolve => setTimeout(resolve, 30000));
+      }
+      
+      console.log('🐛 DEBUG: Wait complete');
       
       // Show final success state
       if (stepElement && window.progressIndicators) {
@@ -1788,17 +1833,19 @@ export async function rebootInstance() {
             { label: 'Initiating reboot command...', status: 'completed' },
             { label: 'Stopping container...', status: 'completed' },
             { label: 'Starting container...', status: 'completed' },
-            { label: 'Verifying instance status...', status: 'completed' }
+            { label: 'Waiting for startup...', status: 'completed' }
           ],
           4,
-          4
+          100
         );
       }
       
       showSetupResult('✅ Instance reboot initiated successfully!', 'success');
+      console.log('🐛 DEBUG: Showing success message');
       
       // Show completion indicator with reboot information
       if (stepElement && window.progressIndicators) {
+        console.log('🐛 DEBUG: Showing completion indicator');
         window.progressIndicators.showSuccess(
           stepElement,
           'Instance rebooted successfully',
@@ -1811,11 +1858,15 @@ export async function rebootInstance() {
         );
       }
 
+      console.log('🐛 DEBUG: Emitting success event for workflow');
       // Emit success event for workflow
       document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
         detail: { stepAction: 'reboot_instance', success: true }
       }));
+      console.log('🐛 DEBUG: Reboot workflow completed successfully');
     } else {
+      console.log('🐛 DEBUG: Reboot failed - API returned success: false');
+      console.log('🐛 DEBUG: Error message:', data.message);
       showSetupResult(`❌ Instance reboot failed: ${data.message}`, 'error');
       
       // Show error completion indicator
@@ -1832,12 +1883,17 @@ export async function rebootInstance() {
       }
 
       // Emit failure event for workflow
+      console.log('🐛 DEBUG: Emitting failure event for workflow');
       document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
         detail: { stepAction: 'reboot_instance', success: false }
       }));
     }
   } catch (error) {
     console.error('❌ Reboot error:', error);
+    console.log('🐛 DEBUG: Exception caught during reboot');
+    console.log('🐛 DEBUG: Error type:', error.constructor.name);
+    console.log('🐛 DEBUG: Error message:', error.message);
+    console.log('🐛 DEBUG: Error stack:', error.stack);
     showSetupResult('❌ Reboot request failed: ' + error.message, 'error');
     
     // Show error completion indicator
@@ -1853,9 +1909,11 @@ export async function rebootInstance() {
     }
 
     // Emit failure event for workflow
+    console.log('🐛 DEBUG: Emitting failure event for workflow after exception');
     document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
       detail: { stepAction: 'reboot_instance', success: false }
     }));
+    console.log('🐛 DEBUG: Reboot workflow completed with error');
   }
 }
 
