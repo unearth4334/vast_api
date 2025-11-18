@@ -1,0 +1,748 @@
+/* =========================
+   PROGRESS INDICATORS
+   Design specifications for VastAI workflow progress and completion indicators
+   ========================= */
+
+/* =========================
+   BASE PROGRESS INDICATOR STYLES
+   ========================= */
+
+.step-progress-indicator {
+    margin-top: var(--size-4-2);
+    padding: var(--size-4-3);
+    background: rgba(124, 58, 237, 0.05);
+    border-radius: var(--radius-s);
+    border-left: 3px solid var(--interactive-accent);
+    font-size: var(--font-ui-small);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--size-4-2);
+    position: relative;
+}
+
+/* Simple progress indicator layout */
+.step-progress-indicator.simple {
+    align-items: center;
+}
+
+/* Multi-phase progress indicator layout */
+.step-progress-indicator.multi-phase {
+    flex-direction: column;
+    gap: var(--size-4-1);
+}
+
+/* Git clone specific layout */
+.step-progress-indicator.git-clone {
+    flex-direction: column;
+    gap: var(--size-4-2);
+}
+
+/* Sync operation specific layout */
+.step-progress-indicator.sync {
+    flex-direction: column;
+    gap: var(--size-4-2);
+}
+
+/* =========================
+   PROGRESS SPINNER
+   ========================= */
+
+.progress-spinner,
+.phase-spinner,
+.check-spinner,
+.git-spinner,
+.sync-spinner,
+.folder-spinner {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    border: 2px solid rgba(124, 58, 237, 0.2);
+    border-top-color: var(--interactive-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* =========================
+   PROGRESS MESSAGE
+   ========================= */
+
+.progress-message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.status-text {
+    font-weight: 600;
+    color: var(--text-normal);
+    line-height: 1.4;
+}
+
+.progress-detail {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    line-height: 1.3;
+}
+
+/* =========================
+   PROGRESS TIMER
+   ========================= */
+
+.progress-timer {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    font-weight: 500;
+    min-width: 40px;
+    text-align: right;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+}
+
+/* =========================
+   MULTI-PHASE PROGRESS
+   ========================= */
+
+.progress-phases {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+    width: 100%;
+}
+
+.phase {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-4-1) 0;
+}
+
+.phase.active .phase-label {
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.phase.pending .phase-label {
+    color: var(--text-muted);
+}
+
+.phase.completed .phase-label {
+    color: var(--text-success);
+}
+
+.phase-dot {
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin-left: 4px;
+}
+
+.phase-label {
+    flex: 1;
+    font-size: var(--font-ui-small);
+}
+
+.phase-status {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+/* =========================
+   PROGRESS BAR CONTAINER
+   ========================= */
+
+.progress-bar-container {
+    position: relative;
+    height: 6px;
+    background: var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    overflow: hidden;
+    width: 100%;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--interactive-accent);
+    border-radius: var(--radius-s);
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.progress-bar-container .progress-text {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+/* =========================
+   CHECKLIST PROGRESS
+   ========================= */
+
+.progress-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+    flex: 1;
+}
+
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-4-1) 0;
+}
+
+.check-item.active {
+    color: var(--text-normal);
+    font-weight: 500;
+}
+
+.check-item.pending {
+    color: var(--text-muted);
+}
+
+.check-item.completed {
+    color: var(--text-success);
+}
+
+.check-dot {
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin-left: 4px;
+}
+
+.check-item span {
+    flex: 1;
+    font-size: var(--font-ui-small);
+}
+
+/* =========================
+   GIT CLONE PROGRESS
+   ========================= */
+
+.progress-git {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+}
+
+.git-status {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+.git-action {
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.git-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-left: 32px;
+}
+
+.git-url {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+}
+
+.git-progress {
+    font-size: var(--font-ui-smaller);
+    color: var(--interactive-accent);
+}
+
+.progress-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.data-received {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+    font-weight: 500;
+}
+
+/* =========================
+   SYNC PROGRESS
+   ========================= */
+
+.sync-overview {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    width: 100%;
+}
+
+.sync-status {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sync-stage {
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.sync-detail {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.sync-folders {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+    width: 100%;
+    margin: var(--size-4-1) 0;
+}
+
+.folder-progress {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-4-1);
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+}
+
+.folder-progress.completed {
+    opacity: 0.7;
+}
+
+.folder-progress.active {
+    background: rgba(124, 58, 237, 0.1);
+}
+
+.folder-progress.pending {
+    opacity: 0.5;
+}
+
+.folder-icon {
+    font-size: 14px;
+    min-width: 16px;
+    text-align: center;
+}
+
+.folder-name {
+    flex: 1;
+    font-size: var(--font-ui-small);
+    font-weight: 500;
+    color: var(--text-normal);
+}
+
+.folder-stats {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+}
+
+.sync-progress-bar {
+    position: relative;
+    height: 8px;
+    background: var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    overflow: hidden;
+    width: 100%;
+    margin: var(--size-4-1) 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--interactive-accent);
+    border-radius: var(--radius-s);
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.sync-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.speed,
+.eta,
+.timer {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+}
+
+/* =========================
+   COMPLETION INDICATORS
+   ========================= */
+
+.step-completion-indicator {
+    margin-top: var(--size-4-2);
+    padding: var(--size-4-3);
+    border-radius: var(--radius-s);
+    border-left: 3px solid;
+    font-size: var(--font-ui-small);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--size-4-2);
+    transition: all 0.3s ease;
+}
+
+.step-completion-indicator.success {
+    background: rgba(46, 160, 67, 0.1);
+    border-left-color: var(--text-success);
+}
+
+.step-completion-indicator.error {
+    background: rgba(220, 38, 38, 0.1);
+    border-left-color: var(--text-error);
+}
+
+.step-completion-indicator.warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-left-color: #f59e0b;
+}
+
+.step-completion-indicator.sync-complete {
+    flex-direction: column;
+}
+
+/* =========================
+   COMPLETION ICONS
+   ========================= */
+
+.completion-icon {
+    font-size: 20px;
+    min-width: 20px;
+    line-height: 1;
+}
+
+/* =========================
+   COMPLETION MESSAGE
+   ========================= */
+
+.completion-message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.completion-text {
+    font-weight: 600;
+    color: var(--text-normal);
+    line-height: 1.4;
+}
+
+.completion-details {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* =========================
+   COMPLETION STATS
+   ========================= */
+
+.completion-stats {
+    display: flex;
+    gap: var(--size-4-3);
+    flex-wrap: wrap;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.completion-time {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    min-width: 50px;
+    text-align: right;
+}
+
+/* =========================
+   COMPLETION ACTIONS
+   ========================= */
+
+.completion-action {
+    display: flex;
+    gap: var(--size-4-2);
+    flex-wrap: wrap;
+    margin-top: var(--size-4-2);
+}
+
+.retry-btn,
+.fix-btn,
+.verify-btn,
+.view-btn,
+.details-btn,
+.check-btn {
+    padding: var(--size-4-1) var(--size-4-3);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.retry-btn {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.retry-btn:hover {
+    background: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+}
+
+.fix-btn {
+    background: #f59e0b;
+    color: white;
+}
+
+.fix-btn:hover {
+    filter: brightness(0.9);
+    transform: translateY(-1px);
+}
+
+.verify-btn,
+.view-btn,
+.check-btn {
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+}
+
+.verify-btn:hover,
+.view-btn:hover,
+.check-btn:hover {
+    background: var(--interactive-hover);
+    transform: translateY(-1px);
+}
+
+.details-btn {
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+}
+
+.details-btn:hover {
+    background: var(--interactive-hover);
+    transform: translateY(-1px);
+}
+
+/* =========================
+   COMPLETION BREAKDOWN (for sync)
+   ========================= */
+
+.completion-breakdown {
+    width: 100%;
+    margin-top: var(--size-4-2);
+}
+
+.sync-summary,
+.error-summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+}
+
+.summary-item,
+.error-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--size-4-1);
+    background: var(--background-primary);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-smaller);
+}
+
+.item-label {
+    color: var(--text-muted);
+}
+
+.item-value {
+    color: var(--text-normal);
+    font-weight: 500;
+}
+
+.summary-more {
+    padding: var(--size-4-1);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-style: italic;
+}
+
+.error-icon {
+    margin-right: 4px;
+}
+
+.error-item {
+    color: var(--text-error);
+}
+
+/* =========================
+   COMPLETION META
+   ========================= */
+
+.completion-meta {
+    display: flex;
+    gap: var(--size-4-2);
+    flex-wrap: wrap;
+    margin-top: var(--size-4-1);
+}
+
+.info-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: var(--background-modifier-success);
+    color: var(--text-success);
+    border-radius: 9999px;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+}
+
+/* =========================
+   ANIMATIONS
+   ========================= */
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.step-progress-indicator,
+.step-completion-indicator {
+    animation: fadeIn 0.3s ease;
+}
+
+/* =========================
+   ACCESSIBILITY
+   ========================= */
+
+.sr-only-progress {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Progress indicators should be announced to screen readers */
+.step-progress-indicator[role="status"],
+.step-completion-indicator[role="alert"] {
+    /* Already visible, ARIA roles added in HTML */
+}
+
+/* =========================
+   RESPONSIVE BEHAVIOR
+   ========================= */
+
+@media (max-width: 560px) {
+    .step-progress-indicator,
+    .step-completion-indicator {
+        padding: var(--size-4-2);
+        font-size: var(--font-ui-smaller);
+    }
+    
+    .progress-stats,
+    .sync-stats,
+    .completion-stats {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--size-4-1);
+    }
+    
+    .completion-action {
+        width: 100%;
+    }
+    
+    .completion-action button {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+/* =========================
+   INTEGRATION WITH WORKFLOW STEPS
+   ========================= */
+
+/* Ensure indicators appear below step buttons */
+.workflow-step {
+    flex-direction: column;
+}
+
+.workflow-step .step-progress-indicator,
+.workflow-step .step-completion-indicator {
+    width: 100%;
+}
+
+/* Hide progress when workflow is not running */
+.workflow-step:not(.in-progress) .step-progress-indicator {
+    display: none;
+}
+
+/* Show completion indicator for completed/failed steps */
+.workflow-step.completed .step-completion-indicator.success,
+.workflow-step.failed .step-completion-indicator.error {
+    display: flex;
+}
+
+/* Hide completion indicator by default */
+.step-completion-indicator {
+    display: none;
+}

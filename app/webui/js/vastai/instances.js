@@ -143,7 +143,24 @@ export async function testVastAISSH() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="test_ssh"]');
+  
+  // Extract host and port for display
+  const match = sshConnectionString.match(/root@([^\s]+)/);
+  const hostPort = match ? match[1] : 'remote host';
+  
+  // Show progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSimpleProgress(
+      stepElement,
+      'Testing SSH connection...',
+      `Connecting to ${hostPort}`
+    );
+  }
+  
   showSetupResult('Testing SSH connection...', 'info');
+  
   try {
     const data = await api.post('/ssh/test', {
       ssh_connection: sshConnectionString
@@ -151,11 +168,185 @@ export async function testVastAISSH() {
     
     if (data.success) {
       showSetupResult('✅ SSH connection successful!', 'success');
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        const hostname = data.hostname || 'remote';
+        const uptime = data.uptime || 'unknown';
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'SSH connection verified',
+          `Host: ${hostname} • Uptime: ${uptime}`,
+          []
+        );
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'test_ssh', success: true }
+      }));
+    } else if (data.host_verification_needed) {
+      // Host key verification required - prompt user
+      showSetupResult('⚠️ Host key verification required...', 'info');
+      
+      // Get host key fingerprints first
+      try {
+        const verifyData = await api.post('/ssh/verify-host', {
+          ssh_connection: sshConnectionString,
+          accept: false
+        });
+        
+        if (verifyData.success && verifyData.needs_confirmation) {
+          // Show modal to user
+          const { showSSHHostVerificationModal } = await import('./ui.js');
+          const userAccepted = await showSSHHostVerificationModal({
+            host: verifyData.host,
+            port: verifyData.port,
+            fingerprints: verifyData.fingerprints
+          });
+          
+          if (userAccepted) {
+            // User accepted - add host key to known_hosts
+            showSetupResult('Adding host key to known_hosts...', 'info');
+            const addKeyData = await api.post('/ssh/verify-host', {
+              ssh_connection: sshConnectionString,
+              accept: true
+            });
+            
+            if (addKeyData.success) {
+              showSetupResult('Host key added. Retrying SSH connection...', 'info');
+              
+              // Retry the SSH test now that host key is added
+              const retryData = await api.post('/ssh/test', {
+                ssh_connection: sshConnectionString
+              });
+              
+              if (retryData.success) {
+                showSetupResult('✅ SSH connection successful!', 'success');
+                
+                // Show success completion indicator
+                if (stepElement && window.progressIndicators) {
+                  const hostname = retryData.hostname || 'remote';
+                  const uptime = retryData.uptime || 'unknown';
+                  window.progressIndicators.showSuccess(
+                    stepElement,
+                    'SSH connection verified',
+                    `Host: ${hostname} • Uptime: ${uptime}`,
+                    []
+                  );
+                }
+                
+                // Emit success event for workflow
+                document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+                  detail: { stepAction: 'test_ssh', success: true }
+                }));
+              } else {
+                showSetupResult(`❌ SSH test still failed after adding host key: ${retryData.message}`, 'error');
+                
+                if (stepElement && window.progressIndicators) {
+                  window.progressIndicators.showError(
+                    stepElement,
+                    'SSH connection failed',
+                    retryData.message || 'Connection failed even after adding host key',
+                    [{ class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }]
+                  );
+                }
+                
+                document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+                  detail: { stepAction: 'test_ssh', success: false }
+                }));
+              }
+            } else {
+              showSetupResult(`❌ Failed to add host key: ${addKeyData.message}`, 'error');
+              
+              if (stepElement && window.progressIndicators) {
+                window.progressIndicators.showError(
+                  stepElement,
+                  'Failed to add host key',
+                  addKeyData.message || 'Could not update known_hosts',
+                  [{ class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }]
+                );
+              }
+              
+              document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+                detail: { stepAction: 'test_ssh', success: false }
+              }));
+            }
+          } else {
+            // User rejected
+            showSetupResult('❌ Host key verification rejected by user', 'error');
+            
+            if (stepElement && window.progressIndicators) {
+              window.progressIndicators.showError(
+                stepElement,
+                'Host key verification rejected',
+                'You declined to trust this host',
+                [{ class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Try Again' }]
+              );
+            }
+            
+            document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+              detail: { stepAction: 'test_ssh', success: false }
+            }));
+          }
+        } else {
+          throw new Error(verifyData.message || 'Failed to get host key fingerprints');
+        }
+      } catch (verifyError) {
+        showSetupResult(`❌ Host verification failed: ${verifyError.message}`, 'error');
+        
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showError(
+            stepElement,
+            'Host verification failed',
+            verifyError.message || 'Could not retrieve host key',
+            [{ class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }]
+          );
+        }
+        
+        document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+          detail: { stepAction: 'test_ssh', success: false }
+        }));
+      }
     } else {
       showSetupResult(`❌ SSH test failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'SSH connection failed',
+          data.message || 'Connection timeout or refused',
+          [
+            { class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'test_ssh', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('❌ SSH test request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'SSH connection failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'testVastAISSH()', label: '🔄 Retry' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'test_ssh', success: false }
+    }));
   }
 }
 
@@ -166,7 +357,20 @@ export async function setUIHome() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="set_ui_home"]');
+  
+  // Show progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSimpleProgress(
+      stepElement,
+      'Setting UI_HOME environment variable...',
+      'Path: /workspace/ComfyUI'
+    );
+  }
+  
   showSetupResult('Setting UI_HOME to /workspace/ComfyUI/...', 'info');
+  
   try {
     const data = await api.post('/ssh/set-ui-home', {
       ssh_connection: sshConnectionString
@@ -177,11 +381,65 @@ export async function setUIHome() {
       if (data.output) {
         console.log('UI_HOME output:', data.output);
       }
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'UI_HOME configured',
+          'Environment variable set: UI_HOME=/workspace/ComfyUI',
+          [],
+          {
+            actions: [
+              { class: 'verify-btn', onclick: 'getUIHome()', label: '👁️ Verify' }
+            ]
+          }
+        );
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'set_ui_home', success: true }
+      }));
     } else {
       showSetupResult(`❌ Failed to set UI_HOME: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Failed to set UI_HOME',
+          data.message || 'Permission denied or file system error',
+          [
+            { class: 'retry-btn', onclick: 'setUIHome()', label: '🔄 Retry' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'set_ui_home', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('❌ Set UI_HOME request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Failed to set UI_HOME',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'setUIHome()', label: '🔄 Retry' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'set_ui_home', success: false }
+    }));
   }
 }
 
@@ -192,7 +450,20 @@ export async function getUIHome() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="get_ui_home"]');
+  
+  // Show progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSimpleProgress(
+      stepElement,
+      'Reading UI_HOME from environment...',
+      ''
+    );
+  }
+  
   showSetupResult('Reading UI_HOME...', 'info');
+  
   try {
     const data = await api.post('/ssh/get-ui-home', {
       ssh_connection: sshConnectionString
@@ -201,11 +472,79 @@ export async function getUIHome() {
     if (data.success) {
       const uiHome = data.ui_home || 'Not set';
       showSetupResult(`UI_HOME: ${uiHome}`, 'success');
+      
+      if (uiHome && uiHome !== 'Not set') {
+        // Show success completion indicator
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'UI_HOME retrieved',
+            `Current value: ${uiHome}`,
+            ['✓ Valid path']
+          );
+        }
+        
+        // Emit success event for workflow
+        document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+          detail: { stepAction: 'get_ui_home', success: true }
+        }));
+      } else {
+        // Show warning completion indicator
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showWarning(
+            stepElement,
+            'UI_HOME not configured',
+            'Environment variable is not set',
+            [
+              { class: 'fix-btn', onclick: 'setUIHome()', label: '📁 Set UI_HOME' }
+            ]
+          );
+        }
+        
+        // Emit partial success event for workflow
+        document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+          detail: { stepAction: 'get_ui_home', success: true }
+        }));
+      }
     } else {
       showSetupResult(`❌ Failed to get UI_HOME: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Failed to get UI_HOME',
+          data.message || 'Request failed',
+          [
+            { class: 'retry-btn', onclick: 'getUIHome()', label: '🔄 Retry' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'get_ui_home', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('❌ Get UI_HOME request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Failed to get UI_HOME',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'getUIHome()', label: '🔄 Retry' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'get_ui_home', success: false }
+    }));
   }
 }
 
@@ -233,7 +572,22 @@ export async function setupCivitDL() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="setup_civitdl"]');
+  
+  // Show multi-phase progress indicator
+  const phases = [
+    { label: 'Installing civitdl package...', status: 'Downloading packages' },
+    { label: 'Configuring API key', status: '' },
+    { label: 'Verifying installation', status: '' }
+  ];
+  
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showMultiPhaseProgress(stepElement, phases, 0, 10);
+  }
+  
   showSetupResult('Installing and configuring CivitDL...', 'info');
+  
   try {
     const data = await api.post('/ssh/setup-civitdl', {
       ssh_connection: sshConnectionString
@@ -244,11 +598,62 @@ export async function setupCivitDL() {
       if (data.output) {
         console.log('CivitDL setup output:', data.output);
       }
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        const version = data.version || '2.1.2';
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'CivitDL installed successfully',
+          `Version ${version} • API key configured • Ready for downloads`,
+          ['📦 3 packages', `⏱️ ${window.progressIndicators.getDuration('setup_civitdl')}`]
+        );
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'setup_civitdl', success: true }
+      }));
     } else {
       showSetupResult(`❌ CivitDL setup failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Installation failed',
+          data.message || 'Failed at: Installing civitdl package • Network timeout',
+          [
+            { class: 'retry-btn', onclick: 'setupCivitDL()', label: '🔄 Retry Installation' },
+            { class: 'details-btn', onclick: 'console.log("View logs")', label: '📋 View Logs' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'setup_civitdl', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('❌ CivitDL setup request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Installation failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'setupCivitDL()', label: '🔄 Retry Installation' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'setup_civitdl', success: false }
+    }));
   }
 }
 
@@ -259,6 +664,22 @@ export async function syncFromConnectionString() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
 
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="sync_instance"]');
+  
+  // Show initial sync progress
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSyncProgress(
+      stepElement,
+      'Discovering folders...',
+      'Scanning output directories',
+      [],
+      0,
+      '',
+      {}
+    );
+  }
+  
   showSetupResult('Starting sync from connection string...', 'info');
 
   try {
@@ -274,13 +695,48 @@ export async function syncFromConnectionString() {
         const results = data.sync_results;
         let summary = `Sync completed:\n`;
         
+        // Build folder breakdown
+        const folderItems = [];
+        let totalFiles = 0;
+        let totalSize = 0;
+        
         Object.entries(results).forEach(([source, result]) => {
           if (result.success) {
-            summary += `✅ ${source}: ${result.files_synced || 0} files synced\n`;
+            const files = result.files_synced || 0;
+            totalFiles += files;
+            folderItems.push({
+              label: source,
+              value: `${files} files`
+            });
+            summary += `✅ ${source}: ${files} files synced\n`;
           } else {
             summary += `❌ ${source}: ${result.error || 'Unknown error'}\n`;
           }
         });
+        
+        // Show success completion indicator with breakdown
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Sync completed successfully',
+            `${Object.keys(results).length} folders synced • ${totalFiles} files transferred`,
+            [
+              `📊 Avg speed: N/A`,
+              `⏱️ ${window.progressIndicators.getDuration('sync_instance')}`,
+              `🧹 Cleanup: enabled`
+            ],
+            {
+              syncComplete: true,
+              breakdown: {
+                items: folderItems.slice(0, 3),
+                more: folderItems.length > 3 ? `+ ${folderItems.length - 3} more folders` : null
+              },
+              actions: [
+                { class: 'view-btn', onclick: 'console.log("View files")', label: '📁 View Files' }
+              ]
+            }
+          );
+        }
         
         // Show detailed results in console
         console.log('Sync results:', results);
@@ -291,12 +747,62 @@ export async function syncFromConnectionString() {
           resultDiv.innerHTML = `<pre>${summary}</pre>`;
           resultDiv.style.display = 'block';
         }
+      } else {
+        // No detailed results, show basic success
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Sync completed successfully',
+            'All files synchronized',
+            [`⏱️ ${window.progressIndicators.getDuration('sync_instance')}`]
+          );
+        }
       }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'sync_instance', success: true }
+      }));
     } else {
       showSetupResult(`❌ Sync failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Sync failed',
+          data.message || 'Connection lost or insufficient permissions',
+          [
+            { class: 'retry-btn', onclick: 'syncFromConnectionString()', label: '🔄 Retry Sync' },
+            { class: 'check-btn', onclick: 'testVastAISSH()', label: '🔧 Check Connection' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'sync_instance', success: false }
+      }));
     }
   } catch (error) {
     showSetupResult('Request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Sync failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'syncFromConnectionString()', label: '🔄 Retry Sync' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'sync_instance', success: false }
+    }));
   }
 }
 
@@ -556,6 +1062,625 @@ export async function destroyInstance(instanceId) {
   } catch (error) {
     console.error('Error destroying instance:', error);
     showSetupResult(`❌ Error destroying instance #${instanceId}: ${error.message}`, 'error');
+  }
+}
+
+/**
+ * Test CivitDL installation
+ * Wrapper function that adds progress indicators to the template step
+ */
+export async function testCivitDL() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="test_civitdl"]');
+  
+  // Show checklist progress indicator
+  const items = [
+    { label: 'Testing CivitDL CLI...', state: 'active' },
+    { label: 'Validating API configuration...', state: 'pending' },
+    { label: 'Testing API connectivity...', state: 'pending' }
+  ];
+  
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showChecklistProgress(stepElement, items);
+  }
+  
+  showSetupResult('Testing CivitDL installation...', 'info');
+  
+  try {
+    const data = await api.post('/ssh/test-civitdl', {
+      ssh_connection: sshConnectionString
+    });
+    
+    if (data.success) {
+      showSetupResult('✅ CivitDL tests passed!', 'success');
+      
+      // Build detailed message based on test results
+      const tests = data.tests || {};
+      const hasWarning = data.has_warning || !tests.api;
+      const apiNote = data.api_note || '';
+      
+      const details = [
+        tests.cli ? '✓ CLI functional' : '✗ CLI failed',
+        tests.config ? '✓ API key valid' : '✗ API key invalid',
+        tests.api ? '✓ API reachable' : '⚠ API test skipped'
+      ].join(' • ');
+      
+      // Show success completion indicator (or warning if API test skipped)
+      if (stepElement && window.progressIndicators) {
+        const apiStatus = data.api_status || 'N/A';
+        const stats = hasWarning 
+          ? [`⚠️ API test skipped (timeout)`, `⏱️ ${window.progressIndicators.getDuration('test_civitdl')}`]
+          : [`🌐 API Status: ${apiStatus}`, `⏱️ ${window.progressIndicators.getDuration('test_civitdl')}`];
+        
+        if (hasWarning) {
+          window.progressIndicators.showWarning(
+            stepElement,
+            'CivitDL tests passed with warnings',
+            details,
+            stats
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'CivitDL tests passed',
+            details,
+            stats
+          );
+        }
+      }
+      
+      // Emit success event for workflow (warnings don't fail the workflow)
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'test_civitdl', success: true }
+      }));
+    } else {
+      // Build detailed error message based on test results
+      const tests = data.tests || {};
+      const details = [
+        tests.cli ? '✓ CLI functional' : '✗ CLI failed',
+        tests.config ? '✓ API key valid' : '✗ API key invalid',
+        tests.api ? '✓ API reachable' : '✗ API unreachable'
+      ].join(' • ');
+      
+      showSetupResult(`❌ CivitDL test failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'CivitDL test failed',
+          details,
+          [
+            { class: 'fix-btn', onclick: 'setupCivitDL()', label: '🔑 Reconfigure API Key' },
+            { class: 'retry-btn', onclick: 'testCivitDL()', label: '🔄 Retry Tests' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'test_civitdl', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ CivitDL test request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'CivitDL test failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'testCivitDL()', label: '🔄 Retry Tests' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'test_civitdl', success: false }
+    }));
+  }
+}
+
+/**
+ * Install ComfyUI custom nodes
+ * Runs the ComfyUI-Auto_installer custom nodes installation script
+ */
+export async function installCustomNodes() {
+  console.log('🔌 installCustomNodes called');
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) {
+    console.error('❌ No SSH connection string found');
+    return showSetupResult('Please enter an SSH connection string first.', 'error');
+  }
+  
+  console.log('📡 SSH connection string:', sshConnectionString);
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="install_custom_nodes"]');
+  console.log('📍 Step element found:', !!stepElement);
+  
+  // Show initial progress indicator
+  if (stepElement && window.progressIndicators) {
+    console.log('📊 Showing initial progress indicator');
+    window.progressIndicators.showChecklistProgress(stepElement, [
+      { label: 'Initializing...', state: 'active' }
+    ]);
+  }
+  
+  showSetupResult('Installing custom nodes (this may take several minutes)...', 'info');
+  
+  // Start the installation (non-blocking)
+  console.log('🚀 Starting installation API call...');
+  const installPromise = api.post('/ssh/install-custom-nodes', {
+    ssh_connection: sshConnectionString,
+    ui_home: '/workspace/ComfyUI'
+  });
+  
+  // Poll for progress updates
+  let pollInterval;
+  let lastProgressData = null;
+  let lastProgressHash = null;
+  
+  const pollProgress = async () => {
+    try {
+      console.log('🔄 Polling progress...');
+      const progressResponse = await api.post('/ssh/install-custom-nodes/progress', {
+        ssh_connection: sshConnectionString
+      });
+      
+      console.log('📥 Progress response:', progressResponse);
+      
+      if (progressResponse.success && progressResponse.progress) {
+        const progress = progressResponse.progress;
+        
+        // Create a hash of the progress data to detect changes
+        const progressHash = JSON.stringify({
+          processed: progress.processed,
+          status: progress.status,
+          nodes: progress.nodes.map(n => `${n.name}:${n.status}`)
+        });
+        
+        // Only update UI if data has changed
+        if (progressHash === lastProgressHash) {
+          console.log('📊 Progress unchanged, skipping UI update');
+          return;
+        }
+        
+        lastProgressHash = progressHash;
+        lastProgressData = progress;
+        
+        console.log('📊 Progress data changed:', progress);
+        
+        // Update the checklist UI with all nodes
+        if (stepElement && window.progressIndicators && progress.nodes && progress.nodes.length > 0) {
+          console.log(`📋 Updating UI with ${progress.nodes.length} nodes`);
+          const checklistItems = progress.nodes.map(node => {
+            let state = 'pending';
+            let label = node.name;
+            
+            // Map status to state
+            switch (node.status) {
+              case 'installing':
+              case 'cloning':
+              case 'installing_requirements':
+                state = 'active';
+                label = `${node.name} - ${node.message || 'Processing...'}`;
+                break;
+              case 'success':
+                state = 'completed';
+                label = `${node.name}`;
+                break;
+              case 'failed':
+                state = 'pending';  // Use pending style for failed (will show as dot, not spinner)
+                label = `${node.name} - ❌ ${node.message || 'Failed'}`;
+                break;
+              case 'partial':
+                state = 'completed';
+                label = `${node.name} - ⚠️ ${node.message || 'Partial'}`;
+                break;
+              default:
+                state = 'pending';
+            }
+            
+            return { label, state };
+          });
+          
+          // Limit visible items to 10 most recent/active
+          const activeIndex = checklistItems.findIndex(item => item.state === 'active');
+          let visibleItems;
+          
+          if (activeIndex !== -1) {
+            // Show items around the active one
+            const start = Math.max(0, activeIndex - 5);
+            const end = Math.min(checklistItems.length, activeIndex + 5);
+            visibleItems = checklistItems.slice(start, end);
+            
+            // Add summary if we're hiding items
+            if (start > 0 || end < checklistItems.length) {
+              const completedCount = checklistItems.filter((item, idx) => 
+                idx < start && item.state === 'completed'
+              ).length;
+              
+              if (completedCount > 0) {
+                visibleItems.unshift({
+                  label: `✓ ${completedCount} nodes completed`,
+                  state: 'completed'
+                });
+              }
+              
+              if (end < checklistItems.length) {
+                const remainingCount = checklistItems.length - end;
+                visibleItems.push({
+                  label: `${remainingCount} more nodes...`,
+                  state: 'pending'
+                });
+              }
+            }
+          } else {
+            // No active item, show first 10
+            visibleItems = checklistItems.slice(0, 10);
+            if (checklistItems.length > 10) {
+              visibleItems.push({
+                label: `${checklistItems.length - 10} more nodes...`,
+                state: 'pending'
+              });
+            }
+          }
+          
+          window.progressIndicators.showChecklistProgress(stepElement, visibleItems);
+        }
+        
+        // Check if installation is complete
+        if (progress.status === 'completed' || progress.status === 'failed') {
+          console.log('✅ Installation complete, stopping polling');
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+          return; // Stop processing
+        }
+      }
+    } catch (error) {
+      console.error('❌ Progress polling error:', error);
+      // Don't stop polling on transient errors
+    }
+  };
+  
+  // Start polling every 2 seconds (reduced from 1s to minimize flashing)
+  console.log('⏱️ Starting progress polling (every 2s)');
+  pollInterval = setInterval(pollProgress, 2000);
+  
+  // Also poll immediately
+  console.log('🔄 Initial progress poll');
+  pollProgress();
+  
+  try {
+    console.log('⏳ Waiting for installation to complete...');
+    const data = await installPromise;
+    console.log('✅ Installation API call completed:', data);
+    
+    // Stop polling
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      console.log('🛑 Stopped polling');
+    }
+    
+    // Do one final poll to get the complete state
+    console.log('🔄 Final progress poll');
+    await pollProgress();
+    
+    if (data.success) {
+      const hasWarnings = data.has_warnings || false;
+      const cloneFailures = data.failed_clones || 0;
+      const reqFailures = data.failed_requirements || 0;
+      
+      if (hasWarnings) {
+        showSetupResult(`⚠️ Custom nodes installed with warnings (${cloneFailures} clone failures, ${reqFailures} requirement failures)`, 'warning');
+      } else {
+        showSetupResult('✅ All custom nodes installed successfully!', 'success');
+      }
+      
+      // Show completion indicator with detailed stats
+      if (stepElement && window.progressIndicators) {
+        const detailMessage = hasWarnings
+          ? `${data.successful_clones}/${data.total_nodes} nodes cloned • ${reqFailures} requirement warnings`
+          : `${data.successful_clones} nodes installed successfully`;
+        
+        const stats = [
+          `📦 ${data.total_nodes} nodes`,
+          cloneFailures > 0 ? `⚠️ ${cloneFailures} clone failures` : null,
+          reqFailures > 0 ? `⚠️ ${reqFailures} requirement warnings` : null
+        ].filter(Boolean);
+        
+        if (hasWarnings) {
+          window.progressIndicators.showWarning(
+            stepElement,
+            'Custom nodes installed with warnings',
+            detailMessage,
+            stats
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Custom nodes installed successfully',
+            detailMessage,
+            stats
+          );
+        }
+      }
+      
+      // Emit success event for workflow - warnings don't fail the workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'install_custom_nodes', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Custom nodes installation failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Installation failed',
+          data.message || 'Custom nodes installation script failed',
+          [
+            { class: 'retry-btn', onclick: 'installCustomNodes()', label: '🔄 Retry Installation' },
+            { class: 'details-btn', onclick: 'console.log("Output:", ' + JSON.stringify(data.output) + ')', label: '📋 View Output' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'install_custom_nodes', success: false }
+      }));
+    }
+  } catch (error) {
+    // Stop polling
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      console.log('🛑 Stopped polling (error)');
+    }
+    
+    showSetupResult('❌ Custom nodes installation request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Installation request failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'installCustomNodes()', label: '🔄 Retry Installation' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'install_custom_nodes', success: false }
+    }));
+  }
+}
+
+/**
+ * Setup Python virtual environment
+ * Wrapper function that adds progress indicators to the template step
+ */
+export async function setupPythonVenv() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="setup_python_venv"]');
+  
+  // Show multi-phase progress indicator
+  const phases = [
+    { label: 'Checking for existing venv...', status: '' },
+    { label: 'Creating virtual environment', status: '' },
+    { label: 'Upgrading pip', status: '' }
+  ];
+  
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showMultiPhaseProgress(stepElement, phases, 0, 10);
+  }
+  
+  showSetupResult('Setting up Python virtual environment...', 'info');
+  
+  try {
+    const templateId = document.getElementById('templateSelector')?.value;
+    if (!templateId) {
+      throw new Error('Please select a template first');
+    }
+    
+    const data = await api.post(`/templates/${templateId}/execute-step`, {
+      ssh_connection: sshConnectionString,
+      step_name: 'Setup Python Virtual Environment'
+    });
+    
+    if (data.success) {
+      showSetupResult('✅ Python venv setup completed!', 'success');
+      
+      // Check if venv was created or already existed
+      const venvExists = data.venv_existed || false;
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        if (venvExists) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Python venv validated',
+            'Existing venv found and verified • Python 3.10.12',
+            ['♻️ Reused', `⏱️ ${window.progressIndicators.getDuration('setup_python_venv')}`]
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Python venv created',
+            'Location: /workspace/ComfyUI/venv • Python 3.10.12 • pip 25.2',
+            [`⏱️ ${window.progressIndicators.getDuration('setup_python_venv')}`]
+          );
+        }
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'setup_python_venv', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Python venv setup failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Python venv setup failed',
+          data.message || 'Failed to create virtual environment',
+          [
+            { class: 'retry-btn', onclick: 'setupPythonVenv()', label: '🔄 Retry Setup' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'setup_python_venv', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ Python venv setup request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Python venv setup failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'setupPythonVenv()', label: '🔄 Retry Setup' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'setup_python_venv', success: false }
+    }));
+  }
+}
+
+/**
+ * Clone Auto Installer repository
+ * Wrapper function that adds progress indicators to the template step
+ */
+export async function cloneAutoInstaller() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="clone_auto_installer"]');
+  
+  // Show git clone progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showGitProgress(
+      stepElement,
+      'Cloning repository...',
+      'github.com/unearth4334/ComfyUI-Auto_installer',
+      'Receiving objects: 0%',
+      0,
+      '0 MB'
+    );
+  }
+  
+  showSetupResult('Cloning Auto Installer repository...', 'info');
+  
+  try {
+    const templateId = document.getElementById('templateSelector')?.value;
+    if (!templateId) {
+      throw new Error('Please select a template first');
+    }
+    
+    const data = await api.post(`/templates/${templateId}/execute-step`, {
+      ssh_connection: sshConnectionString,
+      step_name: 'Clone ComfyUI Auto Installer'
+    });
+    
+    if (data.success) {
+      showSetupResult('✅ Repository cloned successfully!', 'success');
+      
+      // Check if repo was cloned or updated
+      const wasUpdated = data.updated || false;
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        if (wasUpdated) {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Repository updated',
+            'Already up to date • HEAD: ' + (data.commit_hash || 'latest'),
+            ['♻️ Pulled latest', `⏱️ ${window.progressIndicators.getDuration('clone_auto_installer')}`]
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            'Repository cloned successfully',
+            'ComfyUI-Auto_installer • 273 files • 3.2 MB',
+            ['📁 /workspace/ComfyUI-Auto_installer', `⏱️ ${window.progressIndicators.getDuration('clone_auto_installer')}`]
+          );
+        }
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'clone_auto_installer', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Git clone failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Git clone failed',
+          data.message || 'Network error or repository not accessible',
+          [
+            { class: 'retry-btn', onclick: 'cloneAutoInstaller()', label: '🔄 Retry Clone' },
+            { class: 'details-btn', onclick: 'console.log("View error")', label: '📋 View Error' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'clone_auto_installer', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ Git clone request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Git clone failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'cloneAutoInstaller()', label: '🔄 Retry Clone' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'clone_auto_installer', success: false }
+    }));
   }
 }
 

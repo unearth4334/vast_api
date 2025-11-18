@@ -208,14 +208,17 @@ async function executeWorkflowStep(stepElement) {
       try {
         originalOnclick.call(stepButton);
         
-        // If no result is received within 30 seconds, consider it a success
-        // (for steps that don't emit events)
+        // If no result is received within a reasonable time, consider it a timeout
+        // For long-running operations like install_custom_nodes, use a longer timeout
+        const timeout = action === 'install_custom_nodes' ? 1200000 : 30000; // 20 min for install, 30s for others
+        
         setTimeout(() => {
           if (!resultReceived) {
+            console.warn(`⏱️ Step ${action} timed out after ${timeout/1000}s without completion event`);
             document.removeEventListener('stepExecutionComplete', resultListener);
-            resolve(true);
+            resolve(false); // Changed from true to false - timeout should be treated as failure
           }
-        }, 30000);
+        }, timeout);
       } catch (error) {
         console.error('Error executing step:', error);
         document.removeEventListener('stepExecutionComplete', resultListener);
@@ -261,6 +264,10 @@ function updateWorkflowSteps(template) {
     stepDiv.className = 'workflow-step';
     stepDiv.dataset.action = button.action;
     
+    // Create button container for horizontal layout
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'step-button-container';
+    
     // Create step button
     const stepButton = document.createElement('button');
     stepButton.className = 'step-button';
@@ -275,16 +282,22 @@ function updateWorkflowSteps(template) {
         stepButton.onclick = syncFromConnectionString;
         break;
       case 'setup_civitdl':
-        stepButton.onclick = () => executeTemplateStep('Install CivitDL');
+        stepButton.onclick = setupCivitDL;
+        break;
+      case 'test_civitdl':
+        stepButton.onclick = testCivitDL;
+        break;
+      case 'install_custom_nodes':
+        stepButton.onclick = installCustomNodes;
         break;
       case 'set_ui_home':
-        stepButton.onclick = () => executeTemplateStep('Set UI Home');
+        stepButton.onclick = setUIHome;
         break;
       case 'setup_python_venv':
-        stepButton.onclick = () => executeTemplateStep('Setup Python Virtual Environment');
+        stepButton.onclick = setupPythonVenv;
         break;
       case 'clone_auto_installer':
-        stepButton.onclick = () => executeTemplateStep('Clone ComfyUI Auto Installer');
+        stepButton.onclick = cloneAutoInstaller;
         break;
       case 'get_ui_home':
         stepButton.onclick = getUIHome;
@@ -306,9 +319,12 @@ function updateWorkflowSteps(template) {
     toggleIcon.className = 'toggle-icon';
     toggleButton.appendChild(toggleIcon);
     
-    // Add elements to step
-    stepDiv.appendChild(stepButton);
-    stepDiv.appendChild(toggleButton);
+    // Add buttons to container
+    buttonContainer.appendChild(stepButton);
+    buttonContainer.appendChild(toggleButton);
+    
+    // Add container to step
+    stepDiv.appendChild(buttonContainer);
     
     // Add step to container
     container.appendChild(stepDiv);
@@ -347,6 +363,10 @@ function resetWorkflowSteps() {
     stepDiv.className = 'workflow-step';
     stepDiv.dataset.action = step.action;
     
+    // Create button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'step-button-container';
+    
     const stepButton = document.createElement('button');
     stepButton.className = 'step-button';
     stepButton.textContent = step.label;
@@ -366,8 +386,9 @@ function resetWorkflowSteps() {
     toggleIcon.className = 'toggle-icon';
     toggleButton.appendChild(toggleIcon);
     
-    stepDiv.appendChild(stepButton);
-    stepDiv.appendChild(toggleButton);
+    buttonContainer.appendChild(stepButton);
+    buttonContainer.appendChild(toggleButton);
+    stepDiv.appendChild(buttonContainer);
     container.appendChild(stepDiv);
     
     if (index < defaultSteps.length - 1) {

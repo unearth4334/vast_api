@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progress Indicators Test</title>
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/progress-indicators.css">
+    <style>
+        body {
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid var(--background-modifier-border);
+            border-radius: 8px;
+            background: var(--background-secondary);
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: var(--text-normal);
+        }
+        h1 {
+            color: var(--text-normal);
+        }
+        .test-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        .test-controls button {
+            padding: 8px 16px;
+            background: var(--interactive-accent);
+            color: var(--text-on-accent);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-controls button:hover {
+            background: var(--interactive-accent-hover);
+        }
+        .workflow-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Progress Indicators Test Page</h1>
+    <p>This page demonstrates the progress and completion indicators for VastAI workflow steps.</p>
+    
+    <div class="test-section">
+        <h3>Test 1: Simple Progress (SSH Test)</h3>
+        <p>Shows a simple progress indicator with timer and host info.</p>
+        <div class="workflow-steps">
+            <div class="workflow-step" data-action="test_ssh">
+                <div class="step-button-container">
+                    <button class="step-button">
+                        🔧 Test SSH Connection
+                    </button>
+                    <button class="step-toggle" title="Enable/Disable this step">
+                        <span class="toggle-icon"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="test-controls">
+            <button onclick="testSimpleProgress()">▶️ Run Test</button>
+            <button onclick="clearTest('test_ssh')">🗑️ Clear</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: Multi-Phase Progress (CivitDL Setup)</h3>
+        <p>Shows a multi-phase progress indicator with progress bar.</p>
+        <div class="workflow-steps">
+            <div class="workflow-step" data-action="setup_civitdl">
+                <div class="step-button-container">
+                    <button class="step-button">
+                        📦 Setup CivitDL
+                    </button>
+                    <button class="step-toggle" title="Enable/Disable this step">
+                        <span class="toggle-icon"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="test-controls">
+            <button onclick="testMultiPhaseProgress()">▶️ Run Test</button>
+            <button onclick="clearTest('setup_civitdl')">🗑️ Clear</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 3: Checklist Progress (CivitDL Test)</h3>
+        <p>Shows a checklist-style progress indicator.</p>
+        <div class="workflow-steps">
+            <div class="workflow-step" data-action="test_civitdl">
+                <div class="step-button-container">
+                    <button class="step-button">
+                        ✅ Test CivitDL
+                    </button>
+                    <button class="step-toggle" title="Enable/Disable this step">
+                        <span class="toggle-icon"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="test-controls">
+            <button onclick="testChecklistProgress()">▶️ Run Test</button>
+            <button onclick="clearTest('test_civitdl')">🗑️ Clear</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 4: Git Clone Progress</h3>
+        <p>Shows a git clone progress indicator with download stats.</p>
+        <div class="workflow-steps">
+            <div class="workflow-step" data-action="clone_auto_installer">
+                <div class="step-button-container">
+                    <button class="step-button">
+                        📥 Clone Auto Installer
+                    </button>
+                    <button class="step-toggle" title="Enable/Disable this step">
+                        <span class="toggle-icon"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="test-controls">
+            <button onclick="testGitProgress()">▶️ Run Test</button>
+            <button onclick="clearTest('clone_auto_installer')">🗑️ Clear</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 5: Sync Progress</h3>
+        <p>Shows comprehensive sync progress with folder breakdown.</p>
+        <div class="workflow-steps">
+            <div class="workflow-step" data-action="sync_instance">
+                <div class="step-button-container">
+                    <button class="step-button">
+                        🔄 Sync Instance
+                    </button>
+                    <button class="step-toggle" title="Enable/Disable this step">
+                        <span class="toggle-icon"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="test-controls">
+            <button onclick="testSyncProgress()">▶️ Run Test</button>
+            <button onclick="clearTest('sync_instance')">🗑️ Clear</button>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 6: Error State</h3>
+        <p>Shows an error completion indicator.</p>
+        <div class="workflow-steps">
+            <div class="workflow-step" data-action="error_test">
+                <div class="step-button-container">
+                    <button class="step-button">
+                        ❌ Error Test
+                    </button>
+                    <button class="step-toggle" title="Enable/Disable this step">
+                        <span class="toggle-icon"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="test-controls">
+            <button onclick="testErrorState()">▶️ Run Test</button>
+            <button onclick="clearTest('error_test')">🗑️ Clear</button>
+        </div>
+    </div>
+    
+    <script src="js/progress-indicators.js"></script>
+    <script>
+        function clearTest(action) {
+            const stepElement = document.querySelector(`.workflow-step[data-action="${action}"]`);
+            if (stepElement && window.progressIndicators) {
+                window.progressIndicators.clearIndicators(stepElement);
+            }
+        }
+        
+        function testSimpleProgress() {
+            const stepElement = document.querySelector('.workflow-step[data-action="test_ssh"]');
+            progressIndicators.showSimpleProgress(
+                stepElement,
+                'Testing SSH connection...',
+                'Connecting to 72.19.60.156:43274'
+            );
+            
+            setTimeout(() => {
+                progressIndicators.showSuccess(
+                    stepElement,
+                    'SSH connection verified',
+                    'Host: 6ecc5da8c823 • Uptime: 6 days',
+                    []
+                );
+            }, 3000);
+        }
+        
+        function testMultiPhaseProgress() {
+            const stepElement = document.querySelector('.workflow-step[data-action="setup_civitdl"]');
+            const phases = [
+                { label: 'Installing civitdl package...', status: 'Downloading 2.3 MB' },
+                { label: 'Configuring API key', status: '' },
+                { label: 'Verifying installation', status: '' }
+            ];
+            
+            progressIndicators.showMultiPhaseProgress(stepElement, phases, 0, 10);
+            
+            setTimeout(() => {
+                progressIndicators.showMultiPhaseProgress(stepElement, phases, 0, 30);
+                setTimeout(() => {
+                    progressIndicators.showMultiPhaseProgress(stepElement, phases, 1, 70);
+                    setTimeout(() => {
+                        progressIndicators.showMultiPhaseProgress(stepElement, phases, 2, 90);
+                        setTimeout(() => {
+                            progressIndicators.showSuccess(
+                                stepElement,
+                                'CivitDL installed successfully',
+                                'Version 2.1.2 • API key configured • Ready for downloads',
+                                ['📦 3 packages', '⏱️ 12.4s']
+                            );
+                        }, 1000);
+                    }, 1000);
+                }, 2000);
+            }, 2000);
+        }
+        
+        function testChecklistProgress() {
+            const stepElement = document.querySelector('.workflow-step[data-action="test_civitdl"]');
+            
+            const items = [
+                { label: 'Testing CivitDL CLI...', state: 'active' },
+                { label: 'Validating API configuration...', state: 'pending' },
+                { label: 'Testing API connectivity...', state: 'pending' }
+            ];
+            
+            progressIndicators.showChecklistProgress(stepElement, items);
+            
+            setTimeout(() => {
+                items[0].state = 'completed';
+                items[1].state = 'active';
+                progressIndicators.showChecklistProgress(stepElement, items);
+                
+                setTimeout(() => {
+                    items[1].state = 'completed';
+                    items[2].state = 'active';
+                    progressIndicators.showChecklistProgress(stepElement, items);
+                    
+                    setTimeout(() => {
+                        progressIndicators.showSuccess(
+                            stepElement,
+                            'CivitDL tests passed',
+                            '✓ CLI functional • ✓ API key valid • ✓ API reachable',
+                            ['🌐 API Status: 200', '⏱️ 3.2s']
+                        );
+                    }, 2000);
+                }, 2000);
+            }, 2000);
+        }
+        
+        function testGitProgress() {
+            const stepElement = document.querySelector('.workflow-step[data-action="clone_auto_installer"]');
+            
+            progressIndicators.showGitProgress(
+                stepElement,
+                'Cloning repository...',
+                'github.com/unearth4334/ComfyUI-Auto_installer',
+                'Receiving objects: 45% (123/273)',
+                45,
+                '2.3 MB'
+            );
+            
+            let progress = 45;
+            const interval = setInterval(() => {
+                progress += 10;
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    progressIndicators.showSuccess(
+                        stepElement,
+                        'Repository cloned successfully',
+                        'ComfyUI-Auto_installer • 273 files • 3.2 MB',
+                        ['📁 /workspace/ComfyUI-Auto_installer', '⏱️ 11.4s']
+                    );
+                } else {
+                    progressIndicators.showGitProgress(
+                        stepElement,
+                        'Cloning repository...',
+                        'github.com/unearth4334/ComfyUI-Auto_installer',
+                        `Receiving objects: ${progress}% (${Math.floor(progress * 2.73)}/273)`,
+                        progress,
+                        `${(progress * 0.032).toFixed(1)} MB`
+                    );
+                }
+            }, 1000);
+        }
+        
+        function testSyncProgress() {
+            const stepElement = document.querySelector('.workflow-step[data-action="sync_instance"]');
+            
+            let folders = [
+                { name: 'txt2img-images', state: 'pending', stats: 'Waiting...' },
+                { name: 'img2img-images', state: 'pending', stats: 'Waiting...' },
+                { name: 'extras-images', state: 'pending', stats: 'Waiting...' }
+            ];
+            
+            progressIndicators.showSyncProgress(
+                stepElement,
+                'Discovering folders...',
+                'Scanning output directories',
+                folders,
+                0,
+                '',
+                {}
+            );
+            
+            setTimeout(() => {
+                folders[0].state = 'active';
+                folders[0].stats = '0/45 files...';
+                progressIndicators.showSyncProgress(
+                    stepElement,
+                    'Syncing files...',
+                    'Found 3 output directories',
+                    folders,
+                    15,
+                    '15% • 20/135 files • 75 MB',
+                    { speed: '↓ 15.2 MB/s', eta: '~15s remaining' }
+                );
+                
+                setTimeout(() => {
+                    folders[0].state = 'completed';
+                    folders[0].stats = '45 files • 125 MB';
+                    folders[1].state = 'active';
+                    folders[1].stats = '12/28 files...';
+                    progressIndicators.showSyncProgress(
+                        stepElement,
+                        'Syncing files...',
+                        'Found 3 output directories',
+                        folders,
+                        60,
+                        '60% • 80/135 files • 300 MB',
+                        { speed: '↓ 18.5 MB/s', eta: '~8s remaining' }
+                    );
+                    
+                    setTimeout(() => {
+                        folders[1].state = 'completed';
+                        folders[1].stats = '28 files • 180 MB';
+                        folders[2].state = 'active';
+                        folders[2].stats = '5/12 files...';
+                        progressIndicators.showSyncProgress(
+                            stepElement,
+                            'Syncing files...',
+                            'Found 3 output directories',
+                            folders,
+                            85,
+                            '85% • 115/135 files • 420 MB',
+                            { speed: '↓ 20.1 MB/s', eta: '~3s remaining' }
+                        );
+                        
+                        setTimeout(() => {
+                            progressIndicators.showSuccess(
+                                stepElement,
+                                'Sync completed successfully',
+                                '3 folders synced • 135 files transferred • 487 MB',
+                                ['📊 Avg speed: 18.3 MB/s', '⏱️ 26.7s', '🧹 Cleanup: enabled'],
+                                {
+                                    syncComplete: true,
+                                    breakdown: {
+                                        items: [
+                                            { label: 'txt2img-images', value: '45 files' },
+                                            { label: 'img2img-images', value: '28 files' },
+                                            { label: 'extras-images', value: '12 files' }
+                                        ],
+                                        more: null
+                                    },
+                                    actions: [
+                                        { class: 'view-btn', onclick: 'alert("View files")', label: '📁 View Files' }
+                                    ]
+                                }
+                            );
+                        }, 3000);
+                    }, 3000);
+                }, 3000);
+            }, 2000);
+        }
+        
+        function testErrorState() {
+            const stepElement = document.querySelector('.workflow-step[data-action="error_test"]');
+            progressIndicators.showSimpleProgress(
+                stepElement,
+                'Processing...',
+                'This will fail'
+            );
+            
+            setTimeout(() => {
+                progressIndicators.showError(
+                    stepElement,
+                    'Operation failed',
+                    'Connection timeout or network error',
+                    [
+                        { class: 'retry-btn', onclick: 'testErrorState()', label: '🔄 Retry' },
+                        { class: 'details-btn', onclick: 'alert("View error details")', label: '📋 View Logs' }
+                    ]
+                );
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

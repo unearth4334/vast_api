@@ -525,6 +525,19 @@ def ssh_test():
                 'output': result.stdout
             })
         else:
+            # Check if the error is due to host key verification failure
+            stderr = result.stderr.lower()
+            if 'host key verification failed' in stderr or 'no matching host key type found' in stderr or 'connection refused' not in stderr and result.returncode == 255:
+                logger.warning(f"Host key verification needed for {ssh_host}:{ssh_port}")
+                return jsonify({
+                    'success': False,
+                    'message': 'Host key verification required',
+                    'error': result.stderr,
+                    'host_verification_needed': True,
+                    'host': ssh_host,
+                    'port': ssh_port
+                })
+            
             logger.error(f"SSH connection test failed for {ssh_host}:{ssh_port}: {result.stderr}")
             return jsonify({
                 'success': False,
@@ -543,6 +556,134 @@ def ssh_test():
         return jsonify({
             'success': False,
             'message': f'SSH test error: {str(e)}'
+        })
+
+
+@app.route('/ssh/verify-host', methods=['POST', 'OPTIONS'])
+def ssh_verify_host():
+    """Get host key fingerprint and optionally add to known_hosts"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        accept = data.get('accept', False)  # True to add host key to known_hosts
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Verifying host key for {ssh_host}:{ssh_port}")
+        
+        # Get host key fingerprint using ssh-keyscan
+        keyscan_cmd = ['ssh-keyscan', '-p', str(ssh_port), ssh_host]
+        keyscan_result = subprocess.run(keyscan_cmd, capture_output=True, text=True, timeout=10)
+        
+        if keyscan_result.returncode != 0 or not keyscan_result.stdout:
+            logger.error(f"Failed to get host key: {keyscan_result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to retrieve host key',
+                'error': keyscan_result.stderr
+            })
+        
+        # Parse the host key to get fingerprint
+        host_keys = [line for line in keyscan_result.stdout.split('\n') if line and not line.startswith('#')]
+        if not host_keys:
+            return jsonify({
+                'success': False,
+                'message': 'No host keys found'
+            })
+        
+        # Get fingerprint using ssh-keygen
+        fingerprints = []
+        for host_key in host_keys:
+            # Write key to temp file for fingerprint calculation
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pub') as f:
+                f.write(host_key)
+                temp_key_file = f.name
+            
+            try:
+                fingerprint_cmd = ['ssh-keygen', '-lf', temp_key_file]
+                fp_result = subprocess.run(fingerprint_cmd, capture_output=True, text=True)
+                if fp_result.returncode == 0:
+                    fingerprints.append(fp_result.stdout.strip())
+            finally:
+                os.unlink(temp_key_file)
+        
+        # If accept=True, add host key to known_hosts
+        if accept:
+            known_hosts_file = '/root/.ssh/known_hosts'
+            
+            # Ensure .ssh directory exists
+            os.makedirs('/root/.ssh', mode=0o700, exist_ok=True)
+            
+            # Check if host key already exists
+            check_cmd = ['ssh-keygen', '-F', f'[{ssh_host}]:{ssh_port}', '-f', known_hosts_file]
+            check_result = subprocess.run(check_cmd, capture_output=True, text=True)
+            
+            if check_result.returncode == 0:
+                # Host key already exists
+                logger.info(f"Host key for {ssh_host}:{ssh_port} already in known_hosts")
+                return jsonify({
+                    'success': True,
+                    'message': 'Host key already trusted',
+                    'fingerprints': fingerprints,
+                    'already_known': True
+                })
+            
+            # Add the host keys to known_hosts
+            # Format: [host]:port key-type key-data
+            with open(known_hosts_file, 'a') as f:
+                for host_key in host_keys:
+                    # Reformat to include port in brackets
+                    parts = host_key.split(' ', 2)
+                    if len(parts) >= 3:
+                        # Format: [host]:port ssh-rsa/ed25519 key
+                        formatted_key = f"[{ssh_host}]:{ssh_port} {parts[1]} {parts[2]}\n"
+                        f.write(formatted_key)
+            
+            logger.info(f"Added host key for {ssh_host}:{ssh_port} to known_hosts")
+            return jsonify({
+                'success': True,
+                'message': 'Host key added to known_hosts',
+                'fingerprints': fingerprints,
+                'added': True
+            })
+        else:
+            # Just return fingerprints for user confirmation
+            return jsonify({
+                'success': True,
+                'message': 'Host key retrieved',
+                'host': ssh_host,
+                'port': ssh_port,
+                'fingerprints': fingerprints,
+                'needs_confirmation': True
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"Host key verification timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Host key verification timed out'
+        })
+    except Exception as e:
+        logger.error(f"Host verification error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Host verification error: {str(e)}'
         })
 
 
@@ -688,6 +829,616 @@ def ssh_set_ui_home():
         return jsonify({
             'success': False,
             'message': f'Set UI_HOME error: {str(e)}'
+        })
+
+
+@app.route('/ssh/setup-civitdl', methods=['POST', 'OPTIONS'])
+def ssh_setup_civitdl():
+    """Install and configure CivitDL on remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        # Try to get API key from request, or load from api_key.txt
+        api_key = data.get('api_key', '')
+        if not api_key:
+            try:
+                with open('/app/api_key.txt', 'r') as f:
+                    for line in f:
+                        if line.startswith('civitdl:'):
+                            api_key = line.split(':', 1)[1].strip()
+                            logger.info("Loaded CivitAI API key from api_key.txt")
+                            break
+            except Exception as e:
+                logger.warning(f"Could not read API key from file: {e}")
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Setting up CivitDL on {ssh_host}:{ssh_port}")
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Phase 1: Install CivitDL package
+        logger.info(f"Installing CivitDL package...")
+        install_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/python -m pip install --root-user-action=ignore civitdl'
+        ]
+        
+        install_result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=60)
+        
+        if install_result.returncode != 0:
+            logger.error(f"CivitDL installation failed: {install_result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'CivitDL installation failed',
+                'error': install_result.stderr,
+                'phase': 'install'
+            })
+        
+        logger.info(f"CivitDL installed successfully")
+        
+        # Phase 2: Configure API key (if provided)
+        if api_key:
+            logger.info(f"Configuring CivitDL API key...")
+            config_cmd = [
+                'ssh',
+                '-p', str(ssh_port),
+                '-i', ssh_key,
+                '-o', 'ConnectTimeout=10',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
+                f'root@{ssh_host}',
+                f'echo "{api_key}" | /venv/main/bin/civitconfig default --api-key'
+            ]
+            
+            config_result = subprocess.run(config_cmd, capture_output=True, text=True, timeout=15)
+            
+            if config_result.returncode != 0:
+                logger.warning(f"API key configuration failed: {config_result.stderr}")
+                return jsonify({
+                    'success': True,  # Installation succeeded
+                    'warning': True,
+                    'message': 'CivitDL installed but API key configuration failed',
+                    'error': config_result.stderr,
+                    'phase': 'config'
+                })
+            
+            logger.info(f"API key configured successfully")
+        
+        # Phase 3: Verify installation
+        logger.info(f"Verifying CivitDL installation...")
+        verify_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/civitdl --version 2>&1 || /venv/main/bin/python -c "import civitdl; print(\'civitdl module imported successfully\')"'
+        ]
+        
+        verify_result = subprocess.run(verify_cmd, capture_output=True, text=True, timeout=15)
+        
+        if verify_result.returncode != 0:
+            logger.error(f"CivitDL verification failed: {verify_result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'CivitDL verification failed',
+                'error': verify_result.stderr,
+                'phase': 'verify'
+            })
+        
+        output = verify_result.stdout.strip()
+        # Extract version if available, otherwise just confirm it's installed
+        if 'civitdl module imported successfully' in output:
+            version = 'installed'
+        else:
+            version = output.split('\n')[0] if output else 'installed'
+        
+        logger.info(f"CivitDL setup completed successfully. Version: {version}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'CivitDL installed and configured successfully',
+            'version': version,
+            'api_key_configured': bool(api_key)
+        })
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"CivitDL setup timed out")
+        return jsonify({
+            'success': False,
+            'message': 'CivitDL setup timed out'
+        })
+    except Exception as e:
+        logger.error(f"CivitDL setup error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'CivitDL setup error: {str(e)}'
+        })
+
+
+@app.route('/ssh/test-civitdl', methods=['POST', 'OPTIONS'])
+def ssh_test_civitdl():
+    """Test CivitDL installation on remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            })
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        logger.info(f"Testing CivitDL on {ssh_host}:{ssh_port}")
+        
+        # Test 1: Check CLI is functional
+        logger.info(f"Test 1: Checking CivitDL CLI...")
+        cli_test_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/civitdl --help'
+        ]
+        
+        cli_result = subprocess.run(cli_test_cmd, capture_output=True, text=True, timeout=15)
+        
+        if cli_result.returncode != 0:
+            logger.error(f"CivitDL CLI test failed: {cli_result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'CivitDL CLI test failed',
+                'error': cli_result.stderr,
+                'tests': {
+                    'cli': False,
+                    'config': None,
+                    'api': None
+                }
+            })
+        
+        logger.info(f"CivitDL CLI test passed")
+        
+        # Test 2: Check API key configuration
+        logger.info(f"Test 2: Validating API configuration...")
+        config_test_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/civitconfig settings'
+        ]
+        
+        config_result = subprocess.run(config_test_cmd, capture_output=True, text=True, timeout=15)
+        
+        # civitconfig settings often returns empty output even when configured
+        # We'll validate by checking if we can read the config file directly
+        api_key_valid = False
+        if config_result.returncode == 0:
+            output = config_result.stdout.strip()
+            logger.info(f"civitconfig settings output: {repr(output)}")
+            
+            # If output is not empty and looks like config, that's good
+            if output and len(output) > 10:
+                api_key_valid = True
+                logger.info(f"API key validation: valid (config output present)")
+            else:
+                # Empty output - check the config file directly
+                logger.info(f"civitconfig returned empty, checking config file directly...")
+                check_config_cmd = [
+                    'ssh',
+                    '-p', str(ssh_port),
+                    '-i', ssh_key,
+                    '-o', 'ConnectTimeout=10',
+                    '-o', 'StrictHostKeyChecking=yes',
+                    '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                    '-o', 'IdentitiesOnly=yes',
+                    f'root@{ssh_host}',
+                    'cat ~/.config/civitdl/config.json 2>/dev/null || echo "no config"'
+                ]
+                config_file_result = subprocess.run(check_config_cmd, capture_output=True, text=True, timeout=10)
+                config_file_content = config_file_result.stdout.strip()
+                logger.info(f"Config file content: {repr(config_file_content[:200])}")
+                
+                # Check if config file exists and has api_key
+                if config_file_content and 'no config' not in config_file_content and 'api_key' in config_file_content:
+                    api_key_valid = True
+                    logger.info(f"API key validation: valid (config file present with api_key)")
+                else:
+                    logger.info(f"API key validation: not set or invalid")
+        else:
+            logger.warning(f"Config check stderr: {config_result.stderr}")
+        
+        # Test 3: Test API connectivity
+        logger.info(f"Test 3: Testing API connectivity...")
+        api_test_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            '/venv/main/bin/python -c "import requests; r = requests.get(\'https://civitai.com/api/v1/models\', timeout=10); print(r.status_code)"'
+        ]
+        
+        api_result = subprocess.run(api_test_cmd, capture_output=True, text=True, timeout=20)
+        
+        api_reachable = False
+        api_status = None
+        if api_result.returncode == 0:
+            try:
+                api_status = int(api_result.stdout.strip())
+                api_reachable = api_status == 200
+                logger.info(f"API connectivity test: status {api_status}")
+            except ValueError:
+                logger.warning(f"Could not parse API status: {api_result.stdout}")
+        else:
+            logger.warning(f"API test failed: {api_result.stderr}")
+        
+        # CLI and config tests must pass, API test is optional (can be slow/rate-limited)
+        all_passed = cli_result.returncode == 0 and api_key_valid
+        has_warning = not api_reachable
+        
+        logger.info(f"CivitDL tests completed. CLI: {cli_result.returncode == 0}, Config: {api_key_valid}, API: {api_reachable}")
+        
+        return jsonify({
+            'success': all_passed,
+            'message': 'CivitDL tests passed' if all_passed and not has_warning else 
+                      'CivitDL tests passed (API test skipped due to timeout)' if all_passed and has_warning else
+                      'Some CivitDL tests failed',
+            'has_warning': has_warning,
+            'tests': {
+                'cli': cli_result.returncode == 0,
+                'config': api_key_valid,
+                'api': api_reachable
+            },
+            'api_status': api_status,
+            'api_note': 'API connectivity test is optional and may timeout due to rate limiting' if not api_reachable else None
+        })
+    
+    except subprocess.TimeoutExpired:
+        logger.error("CivitDL test timed out")
+        return jsonify({
+            'success': False,
+            'message': 'CivitDL test timed out'
+        })
+    except Exception as e:
+        logger.error(f"Error testing CivitDL: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'CivitDL test error: {str(e)}'
+        })
+
+
+@app.route('/ssh/install-custom-nodes', methods=['POST', 'OPTIONS'])
+def ssh_install_custom_nodes():
+    """Install ComfyUI custom nodes on remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        ui_home = data.get('ui_home', '/workspace/ComfyUI')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Installing custom nodes on {ssh_host}:{ssh_port}")
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Clear any existing progress file first
+        clear_progress_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'rm -f /tmp/custom_nodes_progress.json'
+        ]
+        subprocess.run(clear_progress_cmd, timeout=10, capture_output=True)
+        
+        # Run the custom nodes installer
+        install_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            f'source /etc/environment 2>/dev/null; cd /workspace/ComfyUI-Auto_installer/scripts && ./install-custom-nodes.sh {ui_home} 2>&1'
+        ]
+        
+        # Use Popen for real-time output streaming (important for long-running process)
+        process = subprocess.Popen(
+            install_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        
+        # Parse output to track progress
+        total_nodes = 0
+        processed_nodes = 0
+        successful_clones = 0
+        failed_clones = 0
+        successful_requirements = 0
+        failed_requirements = 0
+        current_node = None
+        output_lines = []
+        
+        for line in process.stdout:
+            output_lines.append(line.rstrip())
+            logger.debug(f"Install output: {line.rstrip()}")
+            
+            # Parse progress: [X/Y] Processing custom node: NodeName
+            if 'Processing custom node:' in line:
+                import re
+                match = re.search(r'\[(\d+)/(\d+)\]\s+Processing custom node:\s+(.+)', line)
+                if match:
+                    processed_nodes = int(match.group(1))
+                    total_nodes = int(match.group(2))
+                    current_node = match.group(3).strip()
+                    logger.info(f"Processing node {processed_nodes}/{total_nodes}: {current_node}")
+            
+            # Track successes and failures
+            elif 'Successfully cloned' in line:
+                successful_clones += 1
+            elif 'Failed to clone' in line:
+                failed_clones += 1
+            elif 'Successfully installed requirements' in line:
+                successful_requirements += 1
+            elif 'Failed to install requirements' in line:
+                failed_requirements += 1
+        
+        # Wait for process to complete
+        return_code = process.wait(timeout=1800)  # 30 minute timeout for all nodes
+        
+        # Determine success - installation is successful even if some requirements fail
+        # Only fail if the script itself fails (return code != 0 and not just requirements failures)
+        installation_succeeded = return_code == 0 or (failed_requirements > 0 and failed_clones == 0)
+        
+        if installation_succeeded:
+            logger.info(f"Custom nodes installation completed. Processed: {processed_nodes}/{total_nodes}, " +
+                       f"Clones: {successful_clones} success / {failed_clones} failed, " +
+                       f"Requirements: {successful_requirements} success / {failed_requirements} failed")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Custom nodes installation completed',
+                'total_nodes': total_nodes,
+                'processed': processed_nodes,
+                'successful_clones': successful_clones,
+                'failed_clones': failed_clones,
+                'successful_requirements': successful_requirements,
+                'failed_requirements': failed_requirements,
+                'has_warnings': failed_requirements > 0 or failed_clones > 0,
+                'output': output_lines[-50:] if len(output_lines) > 50 else output_lines  # Last 50 lines
+            })
+        else:
+            logger.error(f"Custom nodes installation failed with return code {return_code}")
+            return jsonify({
+                'success': False,
+                'message': 'Custom nodes installation failed',
+                'return_code': return_code,
+                'output': output_lines[-50:] if len(output_lines) > 50 else output_lines
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Custom nodes installation timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Custom nodes installation timed out (exceeded 30 minutes)'
+        })
+    except Exception as e:
+        logger.error(f"Custom nodes installation error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Custom nodes installation error: {str(e)}'
+        })
+
+
+@app.route('/ssh/install-custom-nodes/progress', methods=['POST', 'OPTIONS'])
+def ssh_install_custom_nodes_progress():
+    """Get real-time progress of custom nodes installation by parsing log file"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Read the progress log file from the remote instance
+        read_log_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=5',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'cat /tmp/custom_nodes_install.log 2>/dev/null || echo ""'
+        ]
+        
+        result = subprocess.run(
+            read_log_cmd,
+            timeout=10,
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            log_content = result.stdout
+            
+            # Parse the log file to extract progress information
+            progress_data = {
+                'status': 'not_started',
+                'total_nodes': 0,
+                'processed': 0,
+                'successful': 0,
+                'failed': 0,
+                'nodes': []
+            }
+            
+            node_map = {}  # Track nodes by name
+            
+            for line in log_content.splitlines():
+                # Look for structured progress log entries
+                # Format: [TIMESTAMP] EVENT_TYPE|NODE_NAME|STATUS|MESSAGE
+                if '|' in line and '] ' in line:
+                    try:
+                        # Extract the structured part after timestamp
+                        parts = line.split('] ', 1)[1].split('|')
+                        if len(parts) >= 3:
+                            event_type = parts[0].strip()
+                            node_name = parts[1].strip()
+                            status = parts[2].strip()
+                            message = parts[3].strip() if len(parts) > 3 else ''
+                            
+                            if event_type == 'START':
+                                progress_data['status'] = 'initializing'
+                            elif event_type == 'INFO':
+                                if 'Found' in message and 'nodes to install' in message:
+                                    # Extract total nodes count
+                                    import re
+                                    match = re.search(r'(\d+)\s+nodes', message)
+                                    if match:
+                                        progress_data['total_nodes'] = int(match.group(1))
+                                progress_data['status'] = 'installing'
+                            elif event_type == 'NODE':
+                                # Track node status
+                                if node_name not in node_map:
+                                    node_map[node_name] = {
+                                        'name': node_name,
+                                        'status': status,
+                                        'message': message
+                                    }
+                                else:
+                                    # Update existing node
+                                    node_map[node_name]['status'] = status
+                                    node_map[node_name]['message'] = message
+                            elif event_type == 'COMPLETE':
+                                progress_data['status'] = 'completed'
+                    except (IndexError, ValueError):
+                        continue
+            
+            # Convert node_map to list and calculate stats
+            progress_data['nodes'] = list(node_map.values())
+            
+            for node in progress_data['nodes']:
+                if node['status'] in ['success', 'partial']:
+                    progress_data['successful'] += 1
+                    progress_data['processed'] += 1
+                elif node['status'] == 'failed':
+                    progress_data['failed'] += 1
+                    progress_data['processed'] += 1
+            
+            return jsonify({
+                'success': True,
+                'progress': progress_data
+            })
+        else:
+            logger.warning(f"Failed to read progress log: {result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to read progress log from remote instance'
+            })
+            
+    except subprocess.TimeoutExpired:
+        logger.error("Progress check timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Progress check timed out'
+        })
+    except Exception as e:
+        logger.error(f"Custom nodes installation error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Custom nodes installation error: {str(e)}'
         })
 
 
