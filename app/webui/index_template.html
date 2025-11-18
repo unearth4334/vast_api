@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/progress-indicators.css">
+    <link rel="stylesheet" href="css/resources.css">
 </head>
 <body>
     <div class="container">
@@ -24,6 +25,9 @@
             </button>
             <button class="tab-button" onclick="showTab('vastai-setup')">
                 ⚙️ VastAI Setup
+            </button>
+            <button class="tab-button" onclick="showTab('resources')">
+                📦 Resource Manager
             </button>
         </div>
         
@@ -257,6 +261,13 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Resources Tab -->
+        <div id="resources-tab" class="tab-content">
+            <div id="resource-manager-container">
+                <!-- Resource manager will be initialized here by JavaScript -->
+            </div>
+        </div>
     </div>
     
     <!-- SSH Host Key Error Modal -->
@@ -326,6 +337,9 @@
     
     <!-- VastAI Modular System -->
     <script src="js/vastai-modular.js?v=20251117-v6" type="module"></script>
+    
+    <!-- Resource Manager -->
+    <script src="js/resources/resource-browser.js?v=20251118-v1" type="module"></script>
     
     <!-- Legacy Support (temporary) -->
     <script src="js/vastai.js?v=20251116-v2"></script>

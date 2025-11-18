@@ -1,0 +1,2 @@
+This is a placeholder for resource preview images.
+In production, actual PNG/JPG images should be placed here.
