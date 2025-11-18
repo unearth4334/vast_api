@@ -25,6 +25,31 @@
     align-items: center;
 }
 
+/* Countdown progress indicator layout */
+.step-progress-indicator.countdown {
+    flex-direction: column;
+    gap: var(--size-4-2);
+}
+
+.step-progress-indicator.countdown .progress-message {
+    width: 100%;
+}
+
+.step-progress-indicator.countdown .countdown-text {
+    font-size: var(--font-ui-small);
+    color: var(--text-accent);
+}
+
+.step-progress-indicator.countdown .countdown-seconds {
+    font-weight: 700;
+    color: var(--interactive-accent);
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+}
+
+.step-progress-indicator.countdown .progress-bar-container {
+    margin-top: var(--size-4-1);
+}
+
 /* Multi-phase progress indicator layout */
 .step-progress-indicator.multi-phase {
     flex-direction: column;

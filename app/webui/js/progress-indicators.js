@@ -318,6 +318,86 @@ class ProgressIndicatorManager {
   }
 
   /**
+   * Show countdown progress with loading bar
+   * @param {HTMLElement} stepElement - The workflow step element
+   * @param {string} message - Message to display during countdown
+   * @param {number} durationSeconds - Duration in seconds
+   * @param {Function} onComplete - Callback when countdown completes
+   * @returns {Promise} - Resolves when countdown completes
+   */
+  async showCountdownProgress(stepElement, message, durationSeconds, onComplete = null) {
+    this.clearIndicators(stepElement);
+    const container = this.getIndicatorContainer(stepElement);
+    const action = stepElement.dataset.action;
+    
+    // Track start time
+    if (!this.startTimes.has(action)) {
+      this.startTimes.set(action, Date.now());
+    }
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'step-progress-indicator countdown';
+    indicator.setAttribute('role', 'status');
+    indicator.setAttribute('aria-live', 'polite');
+    
+    indicator.innerHTML = `
+      <div class="progress-spinner"></div>
+      <div class="progress-message">
+        <span class="status-text">${this.escapeHtml(message)}</span>
+        <span class="progress-detail countdown-text">Waiting <span class="countdown-seconds">${durationSeconds}</span> seconds...</span>
+      </div>
+      <div class="progress-timer">0s</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar countdown-bar" style="width: 0%"></div>
+      </div>
+    `;
+    
+    container.appendChild(indicator);
+    
+    // Start timer if not already running
+    if (!this.timers.has(action)) {
+      this.startTimer(action, indicator.querySelector('.progress-timer'));
+    }
+    
+    // Animate countdown
+    const startTime = Date.now();
+    const endTime = startTime + (durationSeconds * 1000);
+    const progressBar = indicator.querySelector('.countdown-bar');
+    const countdownSecondsEl = indicator.querySelector('.countdown-seconds');
+    
+    return new Promise((resolve) => {
+      const updateCountdown = () => {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        const remaining = Math.max(0, durationSeconds - Math.floor(elapsed / 1000));
+        const progress = Math.min(100, (elapsed / (durationSeconds * 1000)) * 100);
+        
+        // Update progress bar
+        if (progressBar) {
+          progressBar.style.width = `${progress}%`;
+        }
+        
+        // Update countdown text
+        if (countdownSecondsEl) {
+          countdownSecondsEl.textContent = remaining;
+        }
+        
+        // Check if complete
+        if (now >= endTime) {
+          if (onComplete) {
+            onComplete();
+          }
+          resolve();
+        } else {
+          requestAnimationFrame(updateCountdown);
+        }
+      };
+      
+      updateCountdown();
+    });
+  }
+
+  /**
    * Show success completion indicator
    * @param {HTMLElement} stepElement - The workflow step element
    * @param {string} text - Completion text

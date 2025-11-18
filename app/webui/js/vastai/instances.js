@@ -1790,17 +1790,32 @@ export async function rebootInstance() {
           [
             { label: 'Initiating reboot command...', status: 'completed' },
             { label: 'Stopping container...', status: 'completed' },
-            { label: 'Starting container...', status: 'active' },
+            { label: 'Starting container...', status: 'completed' },
             { label: 'Verifying instance status...', status: 'pending' }
           ],
-          2,
+          3,
           4
         );
       }
       
-      // Wait a moment for the reboot to process
-      console.log('🐛 DEBUG: Waiting 2 seconds for reboot to process...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait 30 seconds for the reboot to complete with a countdown progress bar
+      console.log('🐛 DEBUG: Starting 30-second countdown for reboot to complete...');
+      showSetupResult('⏳ Waiting for instance to reboot...', 'info');
+      
+      if (stepElement && window.progressIndicators) {
+        await window.progressIndicators.showCountdownProgress(
+          stepElement,
+          'Instance rebooting - waiting for startup...',
+          30,
+          () => {
+            console.log('🐛 DEBUG: 30-second countdown complete');
+          }
+        );
+      } else {
+        // Fallback if progress indicators not available
+        await new Promise(resolve => setTimeout(resolve, 30000));
+      }
+      
       console.log('🐛 DEBUG: Wait complete');
       
       // Show final success state
