@@ -66,6 +66,7 @@ CORS(
         r"/status": {"origins": ALLOWED_ORIGINS},
         r"/test/*": {"origins": ALLOWED_ORIGINS},
         r"/logs/*": {"origins": ALLOWED_ORIGINS},
+        r"/resources/*": {"origins": ALLOWED_ORIGINS},
         r"/": {"origins": ALLOWED_ORIGINS},
     },
     supports_credentials=False,
@@ -3318,6 +3319,272 @@ try:
     logger.info("Registered Sync API v2")
 except Exception as e:
     logger.warning(f"Failed to register Sync API v2: {e}")
+
+# --- Resource Management Routes ---
+
+# Initialize resource management
+resources_path = '/app/resources'
+resource_manager = None
+resource_installer = None
+
+try:
+    from ..resources import ResourceManager, ResourceInstaller
+    resource_manager = ResourceManager(resources_path)
+    resource_installer = ResourceInstaller()
+    logger.info("Resource management initialized")
+except Exception as e:
+    logger.warning(f"Failed to initialize resource management: {e}")
+
+@app.route('/resources/list', methods=['GET', 'OPTIONS'])
+def resources_list():
+    """List available resources with optional filtering"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    resource_type = request.args.get('type')
+    ecosystem = request.args.get('ecosystem')
+    tags_str = request.args.get('tags', '')
+    tags = [t.strip() for t in tags_str.split(',') if t.strip()] if tags_str else None
+    search = request.args.get('search')
+    
+    try:
+        resources = resource_manager.list_resources(
+            resource_type=resource_type,
+            ecosystem=ecosystem,
+            tags=tags,
+            search=search
+        )
+        
+        return jsonify({
+            'success': True,
+            'count': len(resources),
+            'resources': resources
+        })
+    except Exception as e:
+        logger.error(f"Error listing resources: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/get/<path:resource_path>', methods=['GET', 'OPTIONS'])
+def resources_get(resource_path):
+    """Get details of a specific resource"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        resource = resource_manager.get_resource(resource_path)
+        
+        if not resource:
+            return jsonify({
+                'success': False,
+                'message': f'Resource not found: {resource_path}'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'resource': resource
+        })
+    except Exception as e:
+        logger.error(f"Error getting resource: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/install', methods=['POST', 'OPTIONS'])
+def resources_install():
+    """Install resources to remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager or not resource_installer:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        data = request.get_json()
+        ssh_connection = data.get('ssh_connection')
+        resource_paths = data.get('resources', [])
+        ui_home = data.get('ui_home', '/workspace/ComfyUI')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            }), 400
+        
+        if not resource_paths:
+            return jsonify({
+                'success': False,
+                'message': 'At least one resource is required'
+            }), 400
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            }), 400
+        
+        # Parse all requested resources
+        resources = []
+        for path in resource_paths:
+            resource = resource_manager.get_resource(path)
+            if not resource:
+                return jsonify({
+                    'success': False,
+                    'message': f'Resource not found: {path}'
+                }), 404
+            resources.append(resource)
+        
+        # Install
+        logger.info(f"Installing {len(resources)} resources to {ssh_host}:{ssh_port}")
+        result = resource_installer.install_multiple(
+            ssh_host,
+            ssh_port,
+            ui_home,
+            resources
+        )
+        
+        return jsonify({
+            'success': result['success'],
+            'installed': result['installed'],
+            'total': result['total'],
+            'details': result['results']
+        })
+        
+    except Exception as e:
+        logger.error(f"Error installing resources: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/ecosystems', methods=['GET', 'OPTIONS'])
+def resources_ecosystems():
+    """Get list of all available ecosystems"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        ecosystems = resource_manager.get_ecosystems()
+        return jsonify({
+            'success': True,
+            'ecosystems': ecosystems
+        })
+    except Exception as e:
+        logger.error(f"Error getting ecosystems: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/types', methods=['GET', 'OPTIONS'])
+def resources_types():
+    """Get list of all available resource types"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        types = resource_manager.get_types()
+        return jsonify({
+            'success': True,
+            'types': types
+        })
+    except Exception as e:
+        logger.error(f"Error getting types: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/tags', methods=['GET', 'OPTIONS'])
+def resources_tags():
+    """Get list of all available tags"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        tags = resource_manager.get_tags()
+        return jsonify({
+            'success': True,
+            'tags': tags
+        })
+    except Exception as e:
+        logger.error(f"Error getting tags: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/search', methods=['GET', 'OPTIONS'])
+def resources_search():
+    """Search resources by query string"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    query = request.args.get('q', '')
+    
+    if not query:
+        return jsonify({
+            'success': False,
+            'message': 'Search query is required'
+        }), 400
+    
+    try:
+        resources = resource_manager.search_resources(query)
+        return jsonify({
+            'success': True,
+            'count': len(resources),
+            'resources': resources
+        })
+    except Exception as e:
+        logger.error(f"Error searching resources: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
 
 
 if __name__ == '__main__':
