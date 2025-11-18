@@ -1022,7 +1022,7 @@ body {
 
 /* SVG arrow container */
 .workflow-arrow svg {
-    width: 40px;
+    width: 50px;
     height: 60px;
     display: block;
 }

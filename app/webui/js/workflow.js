@@ -16,11 +16,12 @@ let workflowConfig = {
  * @returns {string} - SVG markup
  */
 function createArrowSVG(progress = 0) {
-  // Arrow dimensions
-  const width = 40;
+  // Arrow dimensions - bolder design
+  const width = 50;
   const height = 60;
-  const bodyWidth = 12;
-  const headHeight = 20;
+  const bodyWidth = 18;  // Increased from 12 for bolder appearance
+  const headHeight = 22; // Increased from 20 for more prominent head
+  const headWidth = 36;  // Wider arrow head for better visibility
   
   // Calculate filled height based on progress
   const filledHeight = height * progress;
@@ -29,9 +30,12 @@ function createArrowSVG(progress = 0) {
   const bodyX = (width - bodyWidth) / 2;
   const bodyHeight = height - headHeight;
   
-  // Arrow head: triangle at bottom
+  // Arrow head: triangle at bottom - wider and more prominent
   const headY = bodyHeight;
-  const headPath = `M ${bodyX} ${headY} L ${width/2} ${height} L ${bodyX + bodyWidth} ${headY} Z`;
+  const headTipX = width / 2;
+  const headLeftX = (width - headWidth) / 2;
+  const headRightX = (width + headWidth) / 2;
+  const headPath = `M ${headLeftX} ${headY} L ${headTipX} ${height} L ${headRightX} ${headY} Z`;
   
   // Generate unique ID for this arrow's clip path
   const clipId = `arrow-clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -39,7 +43,7 @@ function createArrowSVG(progress = 0) {
   return `
     <svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
       <!-- Arrow outline/background -->
-      <rect class="arrow-body" x="${bodyX}" y="0" width="${bodyWidth}" height="${bodyHeight}" />
+      <rect class="arrow-body" x="${bodyX}" y="0" width="${bodyWidth}" height="${bodyHeight}" rx="2" />
       <path class="arrow-body" d="${headPath}" />
       
       <!-- Progress fill (clips from top) -->
@@ -49,7 +53,7 @@ function createArrowSVG(progress = 0) {
         </clipPath>
       </defs>
       <g clip-path="url(#${clipId})">
-        <rect class="arrow-fill" x="${bodyX}" y="0" width="${bodyWidth}" height="${bodyHeight}" />
+        <rect class="arrow-fill" x="${bodyX}" y="0" width="${bodyWidth}" height="${bodyHeight}" rx="2" />
         <path class="arrow-fill" d="${headPath}" />
       </g>
     </svg>
