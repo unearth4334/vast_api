@@ -1449,34 +1449,48 @@ def ssh_reboot_instance():
         return ("", 204)
     
     try:
+        logger.info("🐛 DEBUG: Reboot endpoint called")
         data = request.get_json() if request.is_json else {}
+        logger.info(f"🐛 DEBUG: Request data: {data}")
+        
         instance_id = data.get('instance_id')
+        logger.info(f"🐛 DEBUG: Instance ID from request: {instance_id}")
         
         if not instance_id:
+            logger.warning("🐛 DEBUG: No instance ID provided in request")
             return jsonify({
                 'success': False,
                 'message': 'Instance ID is required'
             })
         
         logger.info(f"Rebooting VastAI instance {instance_id}")
+        logger.info(f"🐛 DEBUG: Attempting to reboot instance {instance_id}")
         
         # Import VastAI API function
+        logger.info("🐛 DEBUG: Importing VastAI API modules")
         from ..utils.vastai_api import reboot_instance
         from ..utils.config_loader import load_api_key
         
         # Load API key
+        logger.info("🐛 DEBUG: Loading VastAI API key")
         api_key = load_api_key()
         if not api_key:
+            logger.error("🐛 DEBUG: VastAI API key not found")
             return jsonify({
                 'success': False,
                 'message': 'VastAI API key not found'
             })
         
+        logger.info(f"🐛 DEBUG: API key loaded successfully (length: {len(api_key)})")
+        
         # Call the VastAI API to reboot the instance
+        logger.info(f"🐛 DEBUG: Calling reboot_instance API for instance {instance_id}")
         result = reboot_instance(api_key, instance_id)
+        logger.info(f"🐛 DEBUG: Reboot API response: {result}")
         
         if result.get('success'):
             logger.info(f"Successfully initiated reboot for instance {instance_id}")
+            logger.info(f"🐛 DEBUG: Reboot successful - returning success response")
             return jsonify({
                 'success': True,
                 'message': f'Instance {instance_id} is rebooting',
@@ -1484,6 +1498,7 @@ def ssh_reboot_instance():
             })
         else:
             logger.error(f"Failed to reboot instance {instance_id}: {result}")
+            logger.error(f"🐛 DEBUG: Reboot failed - API returned unsuccessful result")
             return jsonify({
                 'success': False,
                 'message': 'Failed to initiate instance reboot',
@@ -1492,6 +1507,10 @@ def ssh_reboot_instance():
             
     except Exception as e:
         logger.error(f"Reboot instance error: {str(e)}")
+        logger.error(f"🐛 DEBUG: Exception during reboot: {type(e).__name__}")
+        logger.error(f"🐛 DEBUG: Exception message: {str(e)}")
+        import traceback
+        logger.error(f"🐛 DEBUG: Traceback: {traceback.format_exc()}")
         return jsonify({
             'success': False,
             'message': f'Reboot instance error: {str(e)}'
