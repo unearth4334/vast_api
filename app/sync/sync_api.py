@@ -1455,6 +1455,133 @@ def destroy_vastai_instance(instance_id):
         })
 
 
+@app.route('/vastai/instances/<int:instance_id>/reboot', methods=['PUT', 'OPTIONS'])
+def reboot_vastai_instance(instance_id):
+    """Reboot a VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Import the API function
+        from ..utils.vastai_api import reboot_instance, VastAIAPIError
+        
+        # Read API key
+        api_key = read_api_key_from_file()
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found. Please check api_key.txt file.'
+            })
+        
+        # Reboot the instance
+        logger.info(f"Rebooting VastAI instance {instance_id}")
+        result = reboot_instance(api_key, instance_id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Instance {instance_id} reboot initiated successfully',
+            'result': result
+        })
+        
+    except VastAIAPIError as e:
+        logger.error(f"VastAI API error rebooting instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'VastAI API error: {str(e)}'
+        })
+    except Exception as e:
+        logger.error(f"Error rebooting VastAI instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error rebooting instance: {str(e)}'
+        })
+
+
+@app.route('/ssh/reboot-instance', methods=['POST', 'OPTIONS'])
+def reboot_instance_from_ssh():
+    """Reboot a VastAI instance identified by SSH connection string"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json()
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        # Import required functions
+        from ..utils.vastai_api import list_instances, reboot_instance, VastAIAPIError
+        
+        # Read API key
+        api_key = read_api_key_from_file()
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found. Please check api_key.txt file.'
+            })
+        
+        # Parse SSH connection to extract host and port
+        parsed = parse_ssh_connection(ssh_connection)
+        if not parsed:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            })
+        
+        ssh_host = parsed['host']
+        ssh_port = parsed['port']
+        
+        # Find the instance that matches this SSH connection
+        logger.info(f"Looking for instance with SSH host {ssh_host}:{ssh_port}")
+        instances = list_instances(api_key)
+        
+        matching_instance = None
+        for instance in instances:
+            instance_ssh_host = instance.get('ssh_host')
+            instance_ssh_port = get_ssh_port(instance)
+            
+            if instance_ssh_host == ssh_host and str(instance_ssh_port) == str(ssh_port):
+                matching_instance = instance
+                break
+        
+        if not matching_instance:
+            return jsonify({
+                'success': False,
+                'message': f'No instance found matching SSH connection {ssh_host}:{ssh_port}'
+            })
+        
+        instance_id = matching_instance.get('id')
+        logger.info(f"Found matching instance ID: {instance_id}")
+        
+        # Reboot the instance
+        result = reboot_instance(api_key, instance_id)
+        
+        # Notify workflow completion
+        return jsonify({
+            'success': True,
+            'message': f'Instance {instance_id} reboot initiated successfully',
+            'instance_id': instance_id,
+            'result': result
+        })
+        
+    except VastAIAPIError as e:
+        logger.error(f"VastAI API error rebooting instance: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'VastAI API error: {str(e)}'
+        })
+    except Exception as e:
+        logger.error(f"Error rebooting instance: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error rebooting instance: {str(e)}'
+        })
+
+
 # --- Template Management Routes ---
 
 @app.route('/templates', methods=['GET', 'OPTIONS'])

@@ -824,6 +824,106 @@ def get_running_instance(api_key):
         return None
 
 
+def reboot_instance(api_key, instance_id):
+    """
+    Reboot a VastAI instance (stops and starts without losing GPU priority).
+    
+    Args:
+        api_key (str): VastAI API key
+        instance_id (str): ID of the instance to reboot
+        
+    Returns:
+        dict: JSON response from VastAI API
+        
+    Raises:
+        VastAIAPIError: If API request fails
+    """
+    context = create_enhanced_context("reboot_instance", instance_id=instance_id)
+    start_time = time.time()
+    endpoint = f"/instances/reboot/{instance_id}/"
+    method = "PUT"
+    
+    headers = create_headers(api_key)
+    
+    enhanced_logger.log_operation(
+        message=f"Rebooting VastAI instance {instance_id}",
+        operation="reboot_instance",
+        context=context,
+        extra_data={"instance_id": instance_id, "endpoint": endpoint}
+    )
+    
+    try:
+        response = requests.put(f"{VAST_API_BASE_URL}{endpoint}", headers=headers)
+        response.raise_for_status()
+        response_data = response.json()
+        duration_ms = (time.time() - start_time) * 1000
+        
+        # Enhanced success logging
+        enhanced_logger.log_api(
+            message=f"Successfully initiated reboot for VastAI instance {instance_id}",
+            status_code=response.status_code,
+            context=context,
+            extra_data={
+                "instance_id": instance_id,
+                "response_time_ms": duration_ms,
+                "response_data": response_data
+            }
+        )
+        
+        enhanced_logger.log_performance(
+            message="Instance reboot initiated",
+            operation="reboot_instance",
+            duration=duration_ms / 1000,
+            context=context,
+            extra_data={
+                "instance_id": instance_id,
+                "status_code": response.status_code
+            }
+        )
+        
+        # Log successful API interaction (backward compatibility)
+        log_api_interaction(
+            method=method,
+            endpoint=endpoint,
+            request_data={"instance_id": instance_id},
+            response_data=response_data,
+            status_code=response.status_code,
+            duration_ms=duration_ms
+        )
+        
+        return response_data
+        
+    except requests.RequestException as e:
+        duration_ms = (time.time() - start_time) * 1000
+        
+        # Enhanced error logging
+        enhanced_logger.log_error(
+            message=f"Failed to reboot VastAI instance {instance_id}: {str(e)}",
+            error_type="instance_reboot_error",
+            context=context,
+            extra_data={
+                "exception": str(e),
+                "exception_type": type(e).__name__,
+                "response_time_ms": duration_ms,
+                "instance_id": instance_id,
+                "status_code": getattr(response, 'status_code', None) if 'response' in locals() else None
+            }
+        )
+        
+        # Log failed API interaction (backward compatibility)
+        log_api_interaction(
+            method=method,
+            endpoint=endpoint,
+            request_data={"instance_id": instance_id},
+            status_code=getattr(response, 'status_code', None) if 'response' in locals() else None,
+            error=str(e),
+            duration_ms=duration_ms
+        )
+        
+        logger.error(f"Failed to reboot VastAI instance: {e}")
+        raise VastAIAPIError(f"Failed to reboot instance: {e}") from e
+
+
 def parse_instance_details(instance_data):
     """
     Parse and format instance details from VastAI API response.

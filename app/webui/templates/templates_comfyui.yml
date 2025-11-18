@@ -59,6 +59,10 @@ setup_steps:
     type: "python_venv"
     path: "/workspace/ComfyUI/venv"
     description: "Create Python virtual environment for ComfyUI"
+    
+  - name: "Reboot Instance"
+    type: "reboot_instance"
+    description: "Reboot the instance to apply all changes"
 
 # UI Configuration
 ui_config:
@@ -94,7 +98,12 @@ ui_config:
       action: "clone_auto_installer"
       style: "primary"
       
-    - label: "📖 Read UI_HOME"
+    - label: "� Reboot Instance"
+      action: "reboot_instance"
+      style: "primary"
+      tooltip: "Reboot the instance to apply all changes"
+      
+    - label: "�📖 Read UI_HOME"
       action: "get_ui_home"
       style: "secondary"
       

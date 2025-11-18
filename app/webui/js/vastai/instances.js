@@ -221,8 +221,69 @@ export async function terminateConnection() {
   try {
     // Implementation would depend on backend API
     showSetupResult('✅ SSH connection terminated', 'success');
+    
+    // Dispatch step completion event
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'terminate_connection', success: true }
+    }));
   } catch (error) {
     showSetupResult('❌ Failed to terminate connection: ' + error.message, 'error');
+    
+    // Dispatch step completion event
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'terminate_connection', success: false }
+    }));
+  }
+}
+
+/**
+ * Reboot VastAI instance
+ */
+export async function rebootInstance() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) {
+    showSetupResult('Please enter an SSH connection string first.', 'error');
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: false }
+    }));
+    return;
+  }
+  
+  if (!confirm('Are you sure you want to reboot this instance?\n\nThe instance will stop and restart without losing GPU priority. This may take a few minutes.')) {
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: false }
+    }));
+    return;
+  }
+
+  showSetupResult('Initiating instance reboot...', 'info');
+  try {
+    const data = await api.post('/ssh/reboot-instance', {
+      ssh_connection: sshConnectionString
+    });
+    
+    if (data.success) {
+      showSetupResult(`✅ Instance reboot initiated successfully! Instance ID: ${data.instance_id || 'unknown'}`, 'success');
+      
+      // Dispatch step completion event
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'reboot_instance', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Failed to reboot instance: ${data.message}`, 'error');
+      
+      // Dispatch step completion event
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'reboot_instance', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ Reboot request failed: ' + error.message, 'error');
+    
+    // Dispatch step completion event
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: false }
+    }));
   }
 }
 

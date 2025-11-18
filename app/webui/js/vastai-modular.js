@@ -30,6 +30,7 @@ window.testVastAISSH = VastAIInstances.testVastAISSH;
 window.setUIHome = VastAIInstances.setUIHome;
 window.getUIHome = VastAIInstances.getUIHome;
 window.terminateConnection = VastAIInstances.terminateConnection;
+window.rebootInstance = VastAIInstances.rebootInstance;
 window.setupCivitDL = VastAIInstances.setupCivitDL;
 window.syncFromConnectionString = VastAIInstances.syncFromConnectionString;
 window.loadVastaiInstances = VastAIInstances.loadVastaiInstances;
