@@ -305,6 +305,9 @@ function updateWorkflowSteps(template) {
       case 'terminate_connection':
         stepButton.onclick = terminateConnection;
         break;
+      case 'reboot_instance':
+        stepButton.onclick = rebootInstance;
+        break;
       default:
         stepButton.onclick = () => console.log(`Unknown action: ${button.action}`);
     }

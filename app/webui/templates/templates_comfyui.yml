@@ -98,6 +98,11 @@ ui_config:
       action: "install_custom_nodes"
       style: "primary"
       tooltip: "Install ComfyUI custom nodes using the auto-installer"
+      
+    - label: "🔄 Reboot Instance"
+      action: "reboot_instance"
+      style: "primary"
+      tooltip: "Reboot the VastAI instance to apply all changes (stops and starts the container)"
 
 # Additional metadata
 metadata:

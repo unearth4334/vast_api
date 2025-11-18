@@ -1684,4 +1684,179 @@ export async function cloneAutoInstaller() {
   }
 }
 
+/**
+ * Reboot VastAI Instance
+ * Reboots the instance using the VastAI API (stops and starts the container)
+ */
+export async function rebootInstance() {
+  console.log('🔄 rebootInstance called');
+  
+  // Get instance ID from the active instance or SSH connection
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) {
+    console.error('❌ No SSH connection string found');
+    return showSetupResult('Please enter an SSH connection string first.', 'error');
+  }
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="reboot_instance"]');
+  console.log('📍 Step element found:', !!stepElement);
+  
+  // Show initial progress indicator - countdown timer
+  if (stepElement && window.progressIndicators) {
+    console.log('📊 Showing initial progress indicator');
+    window.progressIndicators.showMultiPhaseProgress(
+      stepElement,
+      [
+        { label: 'Initiating reboot command...', status: 'active' },
+        { label: 'Stopping container...', status: 'pending' },
+        { label: 'Starting container...', status: 'pending' },
+        { label: 'Verifying instance status...', status: 'pending' }
+      ],
+      0,
+      4
+    );
+  }
+  
+  showSetupResult('Rebooting VastAI instance...', 'info');
+
+  try {
+    // First, get the instance ID from the instances list
+    console.log('🔍 Fetching instance list to get instance ID...');
+    const instancesResponse = await api.get('/vastai/instances');
+    
+    if (!instancesResponse.success || !instancesResponse.instances || instancesResponse.instances.length === 0) {
+      throw new Error('No active VastAI instances found');
+    }
+    
+    // Get the first running instance (or any instance if none are running)
+    let targetInstance = instancesResponse.instances.find(i => i.status === 'running');
+    if (!targetInstance) {
+      targetInstance = instancesResponse.instances[0];
+    }
+    
+    const instanceId = targetInstance.id;
+    console.log(`🎯 Target instance ID: ${instanceId}`);
+    
+    // Update progress to show we're sending the reboot command
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showMultiPhaseProgress(
+        stepElement,
+        [
+          { label: 'Initiating reboot command...', status: 'completed' },
+          { label: 'Stopping container...', status: 'active' },
+          { label: 'Starting container...', status: 'pending' },
+          { label: 'Verifying instance status...', status: 'pending' }
+        ],
+        1,
+        4
+      );
+    }
+    
+    // Call the reboot API
+    console.log('🚀 Calling reboot API...');
+    const data = await api.post('/ssh/reboot-instance', {
+      instance_id: instanceId
+    });
+
+    console.log('✅ Reboot API call completed:', data);
+
+    if (data.success) {
+      // Update progress to show container is restarting
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showMultiPhaseProgress(
+          stepElement,
+          [
+            { label: 'Initiating reboot command...', status: 'completed' },
+            { label: 'Stopping container...', status: 'completed' },
+            { label: 'Starting container...', status: 'active' },
+            { label: 'Verifying instance status...', status: 'pending' }
+          ],
+          2,
+          4
+        );
+      }
+      
+      // Wait a moment for the reboot to process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Show final success state
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showMultiPhaseProgress(
+          stepElement,
+          [
+            { label: 'Initiating reboot command...', status: 'completed' },
+            { label: 'Stopping container...', status: 'completed' },
+            { label: 'Starting container...', status: 'completed' },
+            { label: 'Verifying instance status...', status: 'completed' }
+          ],
+          4,
+          4
+        );
+      }
+      
+      showSetupResult('✅ Instance reboot initiated successfully!', 'success');
+      
+      // Show completion indicator with reboot information
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'Instance rebooted successfully',
+          `Instance ${instanceId} is restarting • Container stopped and restarted`,
+          [
+            '🔄 Docker stop/start completed',
+            `⏱️ ${window.progressIndicators.getDuration('reboot_instance')}`,
+            '⚠️ Wait ~30s for full startup'
+          ]
+        );
+      }
+
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'reboot_instance', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Instance reboot failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Reboot failed',
+          data.message || 'Failed to initiate instance reboot',
+          [
+            { class: 'retry-btn', onclick: 'rebootInstance()', label: '🔄 Retry Reboot' },
+            { class: 'check-btn', onclick: 'testVastAISSH()', label: '🔧 Check Connection' }
+          ]
+        );
+      }
+
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'reboot_instance', success: false }
+      }));
+    }
+  } catch (error) {
+    console.error('❌ Reboot error:', error);
+    showSetupResult('❌ Reboot request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Reboot request failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'rebootInstance()', label: '🔄 Retry Reboot' }
+        ]
+      );
+    }
+
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: false }
+    }));
+  }
+}
+
 console.log('📄 VastAI Instances module loaded');

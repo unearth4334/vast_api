@@ -1442,6 +1442,62 @@ def ssh_install_custom_nodes_progress():
         })
 
 
+@app.route('/ssh/reboot-instance', methods=['POST', 'OPTIONS'])
+def ssh_reboot_instance():
+    """Reboot a VastAI instance using the VastAI API"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        instance_id = data.get('instance_id')
+        
+        if not instance_id:
+            return jsonify({
+                'success': False,
+                'message': 'Instance ID is required'
+            })
+        
+        logger.info(f"Rebooting VastAI instance {instance_id}")
+        
+        # Import VastAI API function
+        from ..utils.vastai_api import reboot_instance
+        from ..utils.config_loader import load_api_key
+        
+        # Load API key
+        api_key = load_api_key()
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found'
+            })
+        
+        # Call the VastAI API to reboot the instance
+        result = reboot_instance(api_key, instance_id)
+        
+        if result.get('success'):
+            logger.info(f"Successfully initiated reboot for instance {instance_id}")
+            return jsonify({
+                'success': True,
+                'message': f'Instance {instance_id} is rebooting',
+                'instance_id': instance_id
+            })
+        else:
+            logger.error(f"Failed to reboot instance {instance_id}: {result}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to initiate instance reboot',
+                'error': result
+            })
+            
+    except Exception as e:
+        logger.error(f"Reboot instance error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Reboot instance error: {str(e)}'
+        })
+
+
 # --- Progress and Logging Routes ---
 
 @app.route('/sync/progress/<sync_id>')

@@ -148,11 +148,3 @@ window.showSetupResult = window.showSetupResult || function(message, type) {
   console.log(`📢 showSetupResult: "${message}" (${type})`);
   const resultDiv = document.getElementById('setup-result');
   if (!resultDiv) return;
-  
-  resultDiv.textContent = message;
-  resultDiv.className = `setup-result ${type || 'info'}`;
-  resultDiv.style.display = 'block';
-};
-
-console.log('✅ VastAI Legacy Layer initialized');
-
