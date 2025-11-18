@@ -64,6 +64,11 @@ export class ResourceBrowser {
                     <div id="resource-grid" class="resource-grid">
                         <div class="loading">Loading resources...</div>
                     </div>
+                    <div id="resource-preview-pane" class="resource-preview-pane" style="display: none;">
+                        <div class="preview-close" id="preview-close">✕</div>
+                        <div id="preview-content" class="preview-content">
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="resource-footer">
@@ -128,6 +133,14 @@ export class ResourceBrowser {
         installBtn.addEventListener('click', () => {
             this.installSelected();
         });
+        
+        // Preview pane close button
+        const previewClose = document.getElementById('preview-close');
+        if (previewClose) {
+            previewClose.addEventListener('click', () => {
+                this.closePreview();
+            });
+        }
     }
     
     /**
@@ -241,19 +254,132 @@ export class ResourceBrowser {
         const card = document.querySelector(`[data-resource-path="${filepath}"]`);
         if (!card) return;
         
-        // Collapse previously expanded card
-        if (this.expandedCard && this.expandedCard !== card) {
-            collapseCard(this.expandedCard);
+        // Check if we're on mobile (viewport width < 768px)
+        const isMobile = window.innerWidth < 768;
+        
+        if (isMobile) {
+            // Mobile: Use inline expansion with 4:3 aspect ratio
+            // Collapse previously expanded card
+            if (this.expandedCard && this.expandedCard !== card) {
+                collapseCard(this.expandedCard);
+            }
+            
+            // Toggle current card
+            if (this.expandedCard === card) {
+                collapseCard(card);
+                this.expandedCard = null;
+            } else {
+                expandCard(card);
+                this.expandedCard = card;
+            }
+        } else {
+            // Desktop: Use preview pane on the right
+            this.showPreview(filepath);
+        }
+    }
+    
+    /**
+     * Show resource preview in the desktop preview pane
+     */
+    showPreview(filepath) {
+        const resource = this.resources.find(r => r.filepath === filepath);
+        if (!resource) return;
+        
+        const previewPane = document.getElementById('resource-preview-pane');
+        const previewContent = document.getElementById('preview-content');
+        
+        if (!previewPane || !previewContent) return;
+        
+        // Get resource details
+        const metadata = resource.metadata;
+        const title = this._extractTitle(resource.description);
+        const imagePath = metadata.image || 'placeholder.png';
+        const sizeStr = metadata.size ? this._formatBytes(metadata.size) : null;
+        const hasDeps = metadata.dependencies && metadata.dependencies.length > 0;
+        
+        // Extract description
+        const descLines = resource.description.split('\n').filter(l => l.trim());
+        let fullDesc = '';
+        for (let i = 0; i < descLines.length; i++) {
+            if (!descLines[i].startsWith('#')) {
+                fullDesc += descLines[i] + '\n';
+            }
         }
         
-        // Toggle current card
-        if (this.expandedCard === card) {
-            collapseCard(card);
-            this.expandedCard = null;
-        } else {
-            expandCard(card);
-            this.expandedCard = card;
+        const isSelected = this.selectedResources.has(filepath);
+        
+        // Build preview HTML
+        previewContent.innerHTML = `
+            <div class="preview-header">
+                <div class="preview-thumbnail">
+                    <img src="/resources/images/${imagePath}" 
+                         alt="${title}"
+                         onerror="this.src='/resources/images/placeholder.png'">
+                </div>
+            </div>
+            <div class="preview-body">
+                <h3 class="preview-title">${title}</h3>
+                <div class="preview-tags">
+                    <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
+                    <span class="tag tag-type">${metadata.type}</span>
+                </div>
+                ${fullDesc ? `<p class="preview-description">${fullDesc}</p>` : ''}
+                ${sizeStr ? `<div class="preview-meta">📦 Size: ${sizeStr}</div>` : ''}
+                ${hasDeps ? `<div class="preview-meta">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+                ${metadata.author ? `<div class="preview-meta">👤 Author: ${metadata.author}</div>` : ''}
+                ${metadata.version ? `<div class="preview-meta">🏷 Version: ${metadata.version}</div>` : ''}
+            </div>
+            <div class="preview-footer">
+                <button class="btn-select-preview ${isSelected ? 'selected' : ''}" 
+                        data-filepath="${filepath}">
+                    ${isSelected ? '☑ Selected' : '☐ Select'}
+                </button>
+            </div>
+        `;
+        
+        // Show the preview pane
+        previewPane.style.display = 'block';
+        
+        // Add event listener to select button
+        const selectBtn = previewContent.querySelector('.btn-select-preview');
+        if (selectBtn) {
+            selectBtn.addEventListener('click', () => {
+                this.toggleSelection(filepath);
+                // Update button state
+                const isNowSelected = this.selectedResources.has(filepath);
+                selectBtn.className = `btn-select-preview ${isNowSelected ? 'selected' : ''}`;
+                selectBtn.textContent = isNowSelected ? '☑ Selected' : '☐ Select';
+            });
         }
+    }
+    
+    /**
+     * Close the preview pane
+     */
+    closePreview() {
+        const previewPane = document.getElementById('resource-preview-pane');
+        if (previewPane) {
+            previewPane.style.display = 'none';
+        }
+    }
+    
+    /**
+     * Helper: Extract title from description
+     */
+    _extractTitle(description) {
+        const match = description.match(/^#\s+(.+)$/m);
+        return match ? match[1] : 'Untitled Resource';
+    }
+    
+    /**
+     * Helper: Format bytes to human-readable
+     */
+    _formatBytes(bytes) {
+        if (!bytes || bytes === 0) return null;
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
     }
     
     /**
