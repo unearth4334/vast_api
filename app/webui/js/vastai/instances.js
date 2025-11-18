@@ -1783,7 +1783,8 @@ export async function rebootInstance() {
 
     if (data.success) {
       console.log('🐛 DEBUG: Reboot initiated successfully');
-      // Update progress to show container is restarting
+      
+      // Show final success state immediately after reboot command sent
       if (stepElement && window.progressIndicators) {
         window.progressIndicators.showMultiPhaseProgress(
           stepElement,
@@ -1791,49 +1792,7 @@ export async function rebootInstance() {
             { label: 'Initiating reboot command...', status: 'completed' },
             { label: 'Stopping container...', status: 'completed' },
             { label: 'Starting container...', status: 'completed' },
-            { label: 'Waiting for startup (30s)...', status: 'pending' }
-          ],
-          3,
-          75
-        );
-      }
-      
-      // Wait 30 seconds for the reboot to complete with a countdown progress bar as part of the phase list
-      console.log('🐛 DEBUG: Starting 30-second countdown for reboot to complete...');
-      showSetupResult('⏳ Waiting for instance to reboot...', 'info');
-      
-      if (stepElement && window.progressIndicators) {
-        // Show the countdown as part of the multi-phase progress
-        await window.progressIndicators.showMultiPhaseProgressWithCountdown(
-          stepElement,
-          [
-            { label: 'Initiating reboot command...', status: 'completed' },
-            { label: 'Stopping container...', status: 'completed' },
-            { label: 'Starting container...', status: 'completed' },
-            { label: 'Waiting for startup...', status: 'active', countdown: 30 }
-          ],
-          3,
-          30,
-          () => {
-            console.log('🐛 DEBUG: 30-second countdown complete');
-          }
-        );
-      } else {
-        // Fallback if progress indicators not available
-        await new Promise(resolve => setTimeout(resolve, 30000));
-      }
-      
-      console.log('🐛 DEBUG: Wait complete');
-      
-      // Show final success state
-      if (stepElement && window.progressIndicators) {
-        window.progressIndicators.showMultiPhaseProgress(
-          stepElement,
-          [
-            { label: 'Initiating reboot command...', status: 'completed' },
-            { label: 'Stopping container...', status: 'completed' },
-            { label: 'Starting container...', status: 'completed' },
-            { label: 'Waiting for startup...', status: 'completed' }
+            { label: 'Reboot command sent', status: 'completed' }
           ],
           4,
           100
@@ -1848,12 +1807,12 @@ export async function rebootInstance() {
         console.log('🐛 DEBUG: Showing completion indicator');
         window.progressIndicators.showSuccess(
           stepElement,
-          'Instance rebooted successfully',
-          `Instance ${instanceId} is restarting • Container stopped and restarted`,
+          'Instance reboot initiated',
+          `Instance ${instanceId} reboot command sent successfully`,
           [
-            '🔄 Docker stop/start completed',
+            '🔄 Docker stop/start initiated',
             `⏱️ ${window.progressIndicators.getDuration('reboot_instance')}`,
-            '⚠️ Wait ~30s for full startup'
+            '⚠️ Instance will restart automatically'
           ]
         );
       }
