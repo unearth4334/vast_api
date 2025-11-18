@@ -1225,6 +1225,7 @@ export async function installCustomNodes() {
   // Poll for progress updates
   let pollInterval;
   let lastProgressData = null;
+  let lastProgressHash = null;
   
   const pollProgress = async () => {
     try {
@@ -1237,9 +1238,24 @@ export async function installCustomNodes() {
       
       if (progressResponse.success && progressResponse.progress) {
         const progress = progressResponse.progress;
+        
+        // Create a hash of the progress data to detect changes
+        const progressHash = JSON.stringify({
+          processed: progress.processed,
+          status: progress.status,
+          nodes: progress.nodes.map(n => `${n.name}:${n.status}`)
+        });
+        
+        // Only update UI if data has changed
+        if (progressHash === lastProgressHash) {
+          console.log('📊 Progress unchanged, skipping UI update');
+          return;
+        }
+        
+        lastProgressHash = progressHash;
         lastProgressData = progress;
         
-        console.log('📊 Progress data:', progress);
+        console.log('📊 Progress data changed:', progress);
         
         // Update the checklist UI with all nodes
         if (stepElement && window.progressIndicators && progress.nodes && progress.nodes.length > 0) {
@@ -1323,7 +1339,11 @@ export async function installCustomNodes() {
         // Check if installation is complete
         if (progress.status === 'completed' || progress.status === 'failed') {
           console.log('✅ Installation complete, stopping polling');
-          clearInterval(pollInterval);
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+          return; // Stop processing
         }
       }
     } catch (error) {
@@ -1332,9 +1352,9 @@ export async function installCustomNodes() {
     }
   };
   
-  // Start polling every second
-  console.log('⏱️ Starting progress polling (every 1s)');
-  pollInterval = setInterval(pollProgress, 1000);
+  // Start polling every 2 seconds (reduced from 1s to minimize flashing)
+  console.log('⏱️ Starting progress polling (every 2s)');
+  pollInterval = setInterval(pollProgress, 2000);
   
   // Also poll immediately
   console.log('🔄 Initial progress poll');
@@ -1346,8 +1366,11 @@ export async function installCustomNodes() {
     console.log('✅ Installation API call completed:', data);
     
     // Stop polling
-    clearInterval(pollInterval);
-    console.log('🛑 Stopped polling');
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      console.log('🛑 Stopped polling');
+    }
     
     // Do one final poll to get the complete state
     console.log('🔄 Final progress poll');
@@ -1420,7 +1443,11 @@ export async function installCustomNodes() {
     }
   } catch (error) {
     // Stop polling
-    clearInterval(pollInterval);
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      console.log('🛑 Stopped polling (error)');
+    }
     
     showSetupResult('❌ Custom nodes installation request failed: ' + error.message, 'error');
     
