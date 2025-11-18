@@ -1695,7 +1695,13 @@ export async function rebootInstance() {
   const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
   if (!sshConnectionString) {
     console.error('❌ No SSH connection string found');
-    return showSetupResult('Please enter an SSH connection string first.', 'error');
+    showSetupResult('Please enter an SSH connection string first.', 'error');
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: false }
+    }));
+    return;
   }
 
   // Get the workflow step element

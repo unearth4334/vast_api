@@ -209,8 +209,13 @@ async function executeWorkflowStep(stepElement) {
         originalOnclick.call(stepButton);
         
         // If no result is received within a reasonable time, consider it a timeout
-        // For long-running operations like install_custom_nodes, use a longer timeout
-        const timeout = action === 'install_custom_nodes' ? 1200000 : 30000; // 20 min for install, 30s for others
+        // For long-running operations like install_custom_nodes and reboot_instance, use a longer timeout
+        let timeout = 30000; // Default 30s for most steps
+        if (action === 'install_custom_nodes') {
+          timeout = 1200000; // 20 minutes for custom nodes installation
+        } else if (action === 'reboot_instance') {
+          timeout = 120000; // 2 minutes for reboot (container stop/start + verification)
+        }
         
         setTimeout(() => {
           if (!resultReceived) {
