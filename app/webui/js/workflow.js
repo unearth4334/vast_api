@@ -95,6 +95,12 @@ async function runWorkflow() {
   runButton.textContent = '⏸️ Cancel Workflow';
   runButton.classList.add('cancel');
   
+  // Reset all arrows to initial hidden state
+  const allArrows = workflowStepsContainer.querySelectorAll('.workflow-arrow');
+  allArrows.forEach(arrow => {
+    arrow.classList.remove('revealing', 'revealed');
+  });
+  
   // Disable all step buttons and toggles during execution
   const allSteps = workflowStepsContainer.querySelectorAll('.workflow-step');
   allSteps.forEach(step => {
@@ -138,6 +144,16 @@ async function runWorkflow() {
         // Mark step as completed
         stepElement.classList.add('completed');
         console.log(`✅ Step ${i + 1} completed: ${action}`);
+        
+        // Trigger arrow animation if not the last step
+        if (i < stepElements.length - 1 && !workflowCancelled) {
+          // Get the next arrow element (it's the next sibling after the current step)
+          const nextArrow = stepElement.nextElementSibling;
+          if (nextArrow && nextArrow.classList.contains('workflow-arrow')) {
+            console.log(`🎬 Starting arrow reveal animation`);
+            nextArrow.classList.add('revealing');
+          }
+        }
       } else {
         // Mark step as failed
         stepElement.classList.add('failed');
@@ -151,6 +167,13 @@ async function runWorkflow() {
         console.log(`⏳ Waiting ${workflowConfig.stepDelay / 1000} seconds before next step...`);
         showSetupResult(`Waiting ${workflowConfig.stepDelay / 1000} seconds before next step...`, 'info');
         await sleep(workflowConfig.stepDelay);
+        
+        // After the delay, mark the arrow as revealed
+        const nextArrow = stepElement.nextElementSibling;
+        if (nextArrow && nextArrow.classList.contains('workflow-arrow')) {
+          nextArrow.classList.remove('revealing');
+          nextArrow.classList.add('revealed');
+        }
       }
     }
     

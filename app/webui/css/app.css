@@ -1012,10 +1012,36 @@ body {
     font-size: 24px;
     padding: var(--size-4-1) 0;
     font-weight: bold;
+    overflow: hidden;
+    position: relative;
 }
 
 .workflow-arrow.hidden {
     visibility: hidden;
+}
+
+/* Arrow reveal animation - starts hidden with clip-path */
+.workflow-arrow {
+    clip-path: inset(0 0 100% 0);
+}
+
+/* Revealing state - animates from top to bottom */
+.workflow-arrow.revealing {
+    animation: revealTopDown 5s linear forwards;
+}
+
+@keyframes revealTopDown {
+    from {
+        clip-path: inset(0 0 100% 0);
+    }
+    to {
+        clip-path: inset(0 0 0 0);
+    }
+}
+
+/* Once revealed, keep it visible */
+.workflow-arrow.revealed {
+    clip-path: inset(0 0 0 0);
 }
 
 /* Progress visualization for workflow steps */
