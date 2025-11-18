@@ -11,54 +11,83 @@ let workflowConfig = {
 };
 
 /**
- * Create an SVG arrow with fill progress
+ * Create an SVG downward arrow with vertical fill progress
+ * The arrow is revealed from the top down as `progress` goes from 0 → 1.
+ *
  * @param {number} progress - Progress from 0 to 1 (0% to 100%)
  * @returns {string} - SVG markup
  */
 function createArrowSVG(progress = 0) {
-  // Arrow dimensions - bolder design
+  // Clamp progress to [0, 1]
+  const clamped = Math.max(0, Math.min(1, progress));
+
   const width = 50;
   const height = 60;
-  const bodyWidth = 18;  // Increased from 12 for bolder appearance
-  const headHeight = 22; // Increased from 20 for more prominent head
-  const headWidth = 36;  // Wider arrow head for better visibility
-  
-  // Calculate filled height based on progress
-  const filledHeight = height * progress;
-  
-  // Arrow body: rectangle at top
-  const bodyX = (width - bodyWidth) / 2;
-  const bodyHeight = height - headHeight;
-  
-  // Arrow head: triangle at bottom - wider and more prominent
-  const headY = bodyHeight;
-  const headTipX = width / 2;
-  const headLeftX = (width - headWidth) / 2;
-  const headRightX = (width + headWidth) / 2;
-  const headPath = `M ${headLeftX} ${headY} L ${headTipX} ${height} L ${headRightX} ${headY} Z`;
-  
-  // Generate unique ID for this arrow's clip path
-  const clipId = `arrow-clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
+  // Arrow geometry
+  const shaftWidth = 14;
+  const shaftHeight = 32;      // straight vertical part
+  const headWidth = 32;
+  const headHeight = height - shaftHeight; // remaining height for the head
+
+  const centerX = width / 2;
+
+  const shaftLeft   = centerX - shaftWidth / 2;
+  const shaftRight  = centerX + shaftWidth / 2;
+  const shaftTopY   = 0;
+  const shaftBotY   = shaftHeight;
+
+  const headBaseY   = shaftBotY;      // where the head starts
+  const headTipY    = height;         // bottom point
+  const headLeftX   = centerX - headWidth / 2;
+  const headRightX  = centerX + headWidth / 2;
+
+  // Single path for a clean, bold downward arrow
+  const arrowPath = [
+    // Shaft top edge
+    `M ${shaftLeft} ${shaftTopY}`,
+    `L ${shaftRight} ${shaftTopY}`,
+    // Shaft sides down
+    `L ${shaftRight} ${headBaseY}`,
+    // Head right edge
+    `L ${headRightX} ${headBaseY}`,
+    // Tip
+    `L ${centerX} ${headTipY}`,
+    // Head left edge
+    `L ${headLeftX} ${headBaseY}`,
+    // Back up left side of shaft
+    `L ${shaftLeft} ${headBaseY}`,
+    'Z'
+  ].join(' ');
+
+  // If you want literal “row of pixels at a time”, quantize the fill height:
+  // const pixelStepHeight = 1; // 1 SVG unit per "row"; tweak if needed
+  // const filledHeight = Math.floor(clamped * height / pixelStepHeight) * pixelStepHeight;
+  const filledHeight = clamped * height;
+
+  // Unique clipPath ID
+  const clipId = `arrow-clip-${Math.random().toString(36).slice(2)}`;
+
   return `
-    <svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-      <!-- Arrow outline/background -->
-      <rect class="arrow-body" x="${bodyX}" y="0" width="${bodyWidth}" height="${bodyHeight}" rx="2" />
-      <path class="arrow-body" d="${headPath}" />
-      
-      <!-- Progress fill (clips from top) -->
-      <defs>
-        <clipPath id="${clipId}">
-          <rect x="0" y="0" width="${width}" height="${filledHeight}" />
-        </clipPath>
-      </defs>
-      <g clip-path="url(#${clipId})">
-        <rect class="arrow-fill" x="${bodyX}" y="0" width="${bodyWidth}" height="${bodyHeight}" rx="2" />
-        <path class="arrow-fill" d="${headPath}" />
-      </g>
-    </svg>
+<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <!-- Arrow outline -->
+  <path class="arrow-body" d="${arrowPath}" />
+
+  <defs>
+    <!-- Rect that grows from the top downward -->
+    <clipPath id="${clipId}">
+      <rect x="0" y="0" width="${width}" height="${filledHeight}" />
+    </clipPath>
+  </defs>
+
+  <!-- Filled portion of the arrow, revealed from top down -->
+  <g clip-path="url(#${clipId})">
+    <path class="arrow-fill" d="${arrowPath}" />
+  </g>
+</svg>
   `;
 }
+
 
 /**
  * Update arrow SVG with new progress
