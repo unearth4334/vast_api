@@ -1684,4 +1684,209 @@ export async function cloneAutoInstaller() {
   }
 }
 
+/**
+ * Reboot VastAI Instance
+ * Reboots the instance using the VastAI API (stops and starts the container)
+ */
+export async function rebootInstance() {
+  console.log('🔄 rebootInstance called');
+  
+  // Get instance ID from the active instance or SSH connection
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) {
+    console.error('❌ No SSH connection string found');
+    showSetupResult('Please enter an SSH connection string first.', 'error');
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: false }
+    }));
+    return;
+  }
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="reboot_instance"]');
+  console.log('📍 Step element found:', !!stepElement);
+  
+  // Show initial progress indicator
+  if (stepElement && window.progressIndicators) {
+    console.log('📊 Showing initial progress indicator');
+    window.progressIndicators.showChecklistProgress(
+      stepElement,
+      [
+        { label: 'Initiating reboot...', state: 'active' },
+        { label: 'Waiting...', state: 'pending' },
+        { label: 'Verifying instance status...', state: 'pending' }
+      ]
+    );
+  }
+  
+  showSetupResult('Rebooting VastAI instance...', 'info');
+
+  try {
+    // First, get the instance ID from the instances list
+    console.log('🔍 Fetching instance list to get instance ID...');
+    const instancesResponse = await api.get('/vastai/instances');
+    
+    if (!instancesResponse.success || !instancesResponse.instances || instancesResponse.instances.length === 0) {
+      throw new Error('No active VastAI instances found');
+    }
+    
+    // Get the first running instance (or any instance if none are running)
+    let targetInstance = instancesResponse.instances.find(i => i.status === 'running');
+    if (!targetInstance) {
+      targetInstance = instancesResponse.instances[0];
+    }
+    
+    const instanceId = targetInstance.id;
+    console.log(`🎯 Target instance ID: ${instanceId}`);
+    
+    // Get SSH connection string for testing
+    const sshConnectionString = document.getElementById('sshConnectionString')?.value?.trim();
+    if (!sshConnectionString) {
+      throw new Error('SSH connection string not found');
+    }
+    
+    // Call the reboot API
+    console.log('🚀 Calling reboot API...');
+    const data = await api.post('/ssh/reboot-instance', {
+      instance_id: instanceId
+    });
+
+    console.log('✅ Reboot API call completed:', data);
+
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to initiate instance reboot');
+    }
+    
+    // Update progress to waiting phase
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showChecklistProgress(
+        stepElement,
+        [
+          { label: 'Initiating reboot...', state: 'completed' },
+          { label: 'Waiting...', state: 'active' },
+          { label: 'Verifying instance status...', state: 'pending' }
+        ]
+      );
+    }    // Wait and verify loop
+    let sshConnected = false;
+    let waitCycles = 0;
+    const WAIT_DURATION_SECONDS = 30;
+    
+    while (!sshConnected) {
+      waitCycles++;
+      console.log(`🕐 Wait cycle ${waitCycles}: Starting ${WAIT_DURATION_SECONDS} second countdown...`);
+      
+      // Show initial waiting state
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showChecklistProgress(
+          stepElement,
+          [
+            { label: 'Initiating reboot...', state: 'completed' },
+            { label: `Waiting... ${WAIT_DURATION_SECONDS}s`, state: 'active' },
+            { label: 'Verifying instance status...', state: 'pending' }
+          ]
+        );
+      }
+      
+      // Get the waiting label element for efficient updates
+      const waitingLabel = stepElement.querySelector('.check-item.active span');
+      
+      // Countdown from 30 to 0
+      for (let remaining = WAIT_DURATION_SECONDS - 1; remaining >= 0; remaining--) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Update only the text content, not the entire DOM
+        if (waitingLabel) {
+          waitingLabel.textContent = `Waiting... ${remaining}s`;
+        }
+      }
+      
+      // Now verify instance status (SSH test)
+      console.log('🔍 Testing SSH connection...');
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showChecklistProgress(
+          stepElement,
+          [
+            { label: 'Initiating reboot...', state: 'completed' },
+            { label: 'Waiting...', state: 'completed' },
+            { label: 'Verifying instance status...', state: 'active' }
+          ]
+        );
+      }
+      
+      try {
+        // Test SSH connection
+        const sshTestData = await api.post('/ssh/test', {
+          ssh_connection: sshConnectionString
+        });
+        
+        if (sshTestData.success) {
+          console.log('✅ SSH connection successful!');
+          sshConnected = true;
+        } else {
+          console.log(`⚠️ SSH test failed (attempt ${waitCycles}): ${sshTestData.message}`);
+          // Continue to next wait cycle
+        }
+      } catch (sshError) {
+        console.log(`⚠️ SSH test error (attempt ${waitCycles}): ${sshError.message}`);
+        // Continue to next wait cycle
+      }
+    }
+    
+    // SSH connection successful - show completion
+    console.log(`✅ Instance ${instanceId} rebooted successfully after ${waitCycles} wait cycle(s)`);
+    
+    // Show final completion state briefly
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showChecklistProgress(
+        stepElement,
+        [
+          { label: 'Initiating reboot...', state: 'completed' },
+          { label: 'Waiting...', state: 'completed' },
+          { label: 'Verifying instance status...', state: 'completed' }
+        ]
+      );
+      
+      // After a brief moment, show the success message
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      window.progressIndicators.showSuccess(
+        stepElement,
+        `Instance ${instanceId} rebooted successfully`,
+        `SSH connection verified after ${waitCycles * WAIT_DURATION_SECONDS} seconds`,
+        []
+      );
+    }
+    
+    showSetupResult(`✅ Instance ${instanceId} rebooted successfully!`, 'success');
+
+    // Emit success event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: true }
+    }));
+    
+  } catch (error) {
+    console.error('❌ Reboot error:', error);
+    showSetupResult('❌ Reboot request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Reboot request failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'rebootInstance()', label: '🔄 Retry Reboot' }
+        ]
+      );
+    }
+
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: false }
+    }));
+  }
+}
+
 console.log('📄 VastAI Instances module loaded');

@@ -1008,14 +1008,43 @@ body {
 
 .workflow-arrow {
     text-align: center;
-    color: var(--interactive-accent);
-    font-size: 24px;
     padding: var(--size-4-1) 0;
-    font-weight: bold;
+    position: relative;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .workflow-arrow.hidden {
     visibility: hidden;
+}
+
+/* SVG arrow container */
+.workflow-arrow svg {
+    width: 50px;
+    height: 60px;
+    display: block;
+}
+
+/* Default state - full color arrow */
+.workflow-arrow svg .arrow-body {
+    fill: var(--interactive-accent);
+}
+
+/* Grey state when workflow starts */
+.workflow-arrow.loading svg .arrow-body {
+    fill: #4a4a4a;
+}
+
+/* Filled state - shows progress */
+.workflow-arrow.loading svg .arrow-fill {
+    fill: var(--interactive-accent);
+}
+
+/* Completed state - full color */
+.workflow-arrow.completed svg .arrow-body {
+    fill: var(--interactive-accent);
 }
 
 /* Progress visualization for workflow steps */

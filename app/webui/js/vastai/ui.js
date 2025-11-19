@@ -273,37 +273,12 @@ export async function showInstanceDetails(instanceId) {
 }
 
 /**
- * Open the search offers modal
- */
-export function openSearchOffersModal() {
-  const overlay = document.getElementById('searchOffersOverlay');
-  if (overlay) {
-    overlay.style.display = 'flex';
-    // Initialize pill bar after modal opens (if search module is loaded)
-    if (window.VastAISearch && window.VastAISearch.initializePillBar) {
-      window.VastAISearch.initializePillBar();
-    }
-  }
-}
-
-/**
- * Close the search offers modal
- */
-export function closeSearchOffersModal() {
-  const overlay = document.getElementById('searchOffersOverlay');
-  if (overlay) {
-    overlay.style.display = 'none';
-    // Clean up any open editors (if search module is loaded)
-    if (window.VastAISearch && window.VastAISearch.closePillEditor) {
-      window.VastAISearch.closePillEditor();
-    }
-  }
-}
-
-/**
  * Show SSH host key verification modal
- * @param {Object} hostInfo - Host information {host, port, fingerprints}
- * @returns {Promise<boolean>} - Resolves to true if user accepts, false if rejects
+ * @param {Object} hostInfo - Host information
+ * @param {string} hostInfo.host - The host address
+ * @param {number} hostInfo.port - The SSH port
+ * @param {Array<string>} hostInfo.fingerprints - Array of fingerprint strings
+ * @returns {Promise<boolean>} - True if user accepts, false if rejected
  */
 export function showSSHHostVerificationModal(hostInfo) {
   return new Promise((resolve) => {
@@ -499,6 +474,34 @@ export function showSSHHostVerificationModal(hostInfo) {
     // Focus accept button
     acceptBtn.focus();
   });
+}
+
+/**
+ * Open the search offers modal
+ */
+export function openSearchOffersModal() {
+  const overlay = document.getElementById('searchOffersOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    // Initialize pill bar after modal opens (if search module is loaded)
+    if (window.VastAISearch && window.VastAISearch.initializePillBar) {
+      window.VastAISearch.initializePillBar();
+    }
+  }
+}
+
+/**
+ * Close the search offers modal
+ */
+export function closeSearchOffersModal() {
+  const overlay = document.getElementById('searchOffersOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    // Clean up any open editors (if search module is loaded)
+    if (window.VastAISearch && window.VastAISearch.closePillEditor) {
+      window.VastAISearch.closePillEditor();
+    }
+  }
 }
 
 console.log('📄 VastAI UI module loaded');

@@ -29,7 +29,3 @@ const api = {
         body: JSON.stringify(data) 
     })
 };
-
-// Make api available globally for ES6 modules
-window.api = api;
-window.api = api;
