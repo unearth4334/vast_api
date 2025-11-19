@@ -1708,19 +1708,16 @@ export async function rebootInstance() {
   const stepElement = document.querySelector('.workflow-step[data-action="reboot_instance"]');
   console.log('📍 Step element found:', !!stepElement);
   
-  // Show initial progress indicator - countdown timer
+  // Show initial progress indicator
   if (stepElement && window.progressIndicators) {
     console.log('📊 Showing initial progress indicator');
-    window.progressIndicators.showMultiPhaseProgress(
+    window.progressIndicators.showChecklistProgress(
       stepElement,
       [
-        { label: 'Initiating reboot command...', status: 'active' },
-        { label: 'Stopping container...', status: 'pending' },
-        { label: 'Starting container...', status: 'pending' },
-        { label: 'Verifying instance status...', status: 'pending' }
-      ],
-      0,
-      4
+        { label: 'Initiating reboot...', state: 'active' },
+        { label: 'Waiting...', state: 'pending' },
+        { label: 'Verifying instance status...', state: 'pending' }
+      ]
     );
   }
   
@@ -1744,19 +1741,10 @@ export async function rebootInstance() {
     const instanceId = targetInstance.id;
     console.log(`🎯 Target instance ID: ${instanceId}`);
     
-    // Update progress to show we're sending the reboot command
-    if (stepElement && window.progressIndicators) {
-      window.progressIndicators.showMultiPhaseProgress(
-        stepElement,
-        [
-          { label: 'Initiating reboot command...', status: 'completed' },
-          { label: 'Stopping container...', status: 'active' },
-          { label: 'Starting container...', status: 'pending' },
-          { label: 'Verifying instance status...', status: 'pending' }
-        ],
-        1,
-        4
-      );
+    // Get SSH connection string for testing
+    const sshConnectionString = document.getElementById('ssh-connection-string')?.value;
+    if (!sshConnectionString) {
+      throw new Error('SSH connection string not found');
     }
     
     // Call the reboot API
@@ -1767,81 +1755,109 @@ export async function rebootInstance() {
 
     console.log('✅ Reboot API call completed:', data);
 
-    if (data.success) {
-      // Update progress to show container is restarting
-      if (stepElement && window.progressIndicators) {
-        window.progressIndicators.showMultiPhaseProgress(
-          stepElement,
-          [
-            { label: 'Initiating reboot command...', status: 'completed' },
-            { label: 'Stopping container...', status: 'completed' },
-            { label: 'Starting container...', status: 'active' },
-            { label: 'Verifying instance status...', status: 'pending' }
-          ],
-          2,
-          4
-        );
-      }
-      
-      // Wait a moment for the reboot to process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Show final success state
-      if (stepElement && window.progressIndicators) {
-        window.progressIndicators.showMultiPhaseProgress(
-          stepElement,
-          [
-            { label: 'Initiating reboot command...', status: 'completed' },
-            { label: 'Stopping container...', status: 'completed' },
-            { label: 'Starting container...', status: 'completed' },
-            { label: 'Verifying instance status...', status: 'completed' }
-          ],
-          4,
-          4
-        );
-      }
-      
-      showSetupResult('✅ Instance reboot initiated successfully!', 'success');
-      
-      // Show completion indicator with reboot information
-      if (stepElement && window.progressIndicators) {
-        window.progressIndicators.showSuccess(
-          stepElement,
-          'Instance rebooted successfully',
-          `Instance ${instanceId} is restarting • Container stopped and restarted`,
-          [
-            '🔄 Docker stop/start completed',
-            `⏱️ ${window.progressIndicators.getDuration('reboot_instance')}`,
-            '⚠️ Wait ~30s for full startup'
-          ]
-        );
-      }
-
-      // Emit success event for workflow
-      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
-        detail: { stepAction: 'reboot_instance', success: true }
-      }));
-    } else {
-      showSetupResult(`❌ Instance reboot failed: ${data.message}`, 'error');
-      
-      // Show error completion indicator
-      if (stepElement && window.progressIndicators) {
-        window.progressIndicators.showError(
-          stepElement,
-          'Reboot failed',
-          data.message || 'Failed to initiate instance reboot',
-          [
-            { class: 'retry-btn', onclick: 'rebootInstance()', label: '🔄 Retry Reboot' },
-            { class: 'check-btn', onclick: 'testVastAISSH()', label: '🔧 Check Connection' }
-          ]
-        );
-      }
-
-      // Emit failure event for workflow
-      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
-        detail: { stepAction: 'reboot_instance', success: false }
-      }));
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to initiate instance reboot');
     }
+    
+    // Update progress to waiting phase
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showChecklistProgress(
+        stepElement,
+        [
+          { label: 'Initiating reboot...', state: 'completed' },
+          { label: 'Waiting...', state: 'active' },
+          { label: 'Verifying instance status...', state: 'pending' }
+        ]
+      );
+    }    // Wait and verify loop
+    let sshConnected = false;
+    let waitCycles = 0;
+    const WAIT_DURATION_SECONDS = 30;
+    
+    while (!sshConnected) {
+      waitCycles++;
+      console.log(`🕐 Wait cycle ${waitCycles}: Starting ${WAIT_DURATION_SECONDS} second countdown...`);
+      
+      // Countdown from 30 to 0
+      for (let remaining = WAIT_DURATION_SECONDS; remaining >= 0; remaining--) {
+        // Update progress with countdown
+        if (stepElement && window.progressIndicators) {
+          window.progressIndicators.showChecklistProgress(
+            stepElement,
+            [
+              { label: 'Initiating reboot...', state: 'completed' },
+              { label: `Waiting... ${remaining}s`, state: 'active' },
+              { label: 'Verifying instance status...', state: 'pending' }
+            ]
+          );
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Now verify instance status (SSH test)
+      console.log('🔍 Testing SSH connection...');
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showChecklistProgress(
+          stepElement,
+          [
+            { label: 'Initiating reboot...', state: 'completed' },
+            { label: 'Waiting...', state: 'completed' },
+            { label: 'Verifying instance status...', state: 'active' }
+          ]
+        );
+      }
+      
+      try {
+        // Test SSH connection
+        const sshTestData = await api.post('/ssh/test', {
+          ssh_connection: sshConnectionString
+        });
+        
+        if (sshTestData.success) {
+          console.log('✅ SSH connection successful!');
+          sshConnected = true;
+        } else {
+          console.log(`⚠️ SSH test failed (attempt ${waitCycles}): ${sshTestData.message}`);
+          // Continue to next wait cycle
+        }
+      } catch (sshError) {
+        console.log(`⚠️ SSH test error (attempt ${waitCycles}): ${sshError.message}`);
+        // Continue to next wait cycle
+      }
+    }
+    
+    // SSH connection successful - show completion
+    console.log(`✅ Instance ${instanceId} rebooted successfully after ${waitCycles} wait cycle(s)`);
+    
+    // Show final completion state briefly
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showChecklistProgress(
+        stepElement,
+        [
+          { label: 'Initiating reboot...', state: 'completed' },
+          { label: 'Waiting...', state: 'completed' },
+          { label: 'Verifying instance status...', state: 'completed' }
+        ]
+      );
+      
+      // After a brief moment, show the success message
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      window.progressIndicators.showSuccess(
+        stepElement,
+        `Instance ${instanceId} rebooted successfully`,
+        `SSH connection verified after ${waitCycles * WAIT_DURATION_SECONDS} seconds`,
+        []
+      );
+    }
+    
+    showSetupResult(`✅ Instance ${instanceId} rebooted successfully!`, 'success');
+
+    // Emit success event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'reboot_instance', success: true }
+    }));
+    
   } catch (error) {
     console.error('❌ Reboot error:', error);
     showSetupResult('❌ Reboot request failed: ' + error.message, 'error');
