@@ -1778,20 +1778,28 @@ export async function rebootInstance() {
       waitCycles++;
       console.log(`🕐 Wait cycle ${waitCycles}: Starting ${WAIT_DURATION_SECONDS} second countdown...`);
       
+      // Show initial waiting state
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showChecklistProgress(
+          stepElement,
+          [
+            { label: 'Initiating reboot...', state: 'completed' },
+            { label: `Waiting... ${WAIT_DURATION_SECONDS}s`, state: 'active' },
+            { label: 'Verifying instance status...', state: 'pending' }
+          ]
+        );
+      }
+      
+      // Get the waiting label element for efficient updates
+      const waitingLabel = stepElement.querySelector('.check-item.active span');
+      
       // Countdown from 30 to 0
-      for (let remaining = WAIT_DURATION_SECONDS; remaining >= 0; remaining--) {
-        // Update progress with countdown
-        if (stepElement && window.progressIndicators) {
-          window.progressIndicators.showChecklistProgress(
-            stepElement,
-            [
-              { label: 'Initiating reboot...', state: 'completed' },
-              { label: `Waiting... ${remaining}s`, state: 'active' },
-              { label: 'Verifying instance status...', state: 'pending' }
-            ]
-          );
-        }
+      for (let remaining = WAIT_DURATION_SECONDS - 1; remaining >= 0; remaining--) {
         await new Promise(resolve => setTimeout(resolve, 1000));
+        // Update only the text content, not the entire DOM
+        if (waitingLabel) {
+          waitingLabel.textContent = `Waiting... ${remaining}s`;
+        }
       }
       
       // Now verify instance status (SSH test)
