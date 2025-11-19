@@ -561,7 +561,646 @@ export async function createInstanceFromOffer(offerId, gpuName) {
   }
 }
 
-// Note: Mobile and desktop editor implementations would continue here...
-// For brevity, I'm focusing on the core restructuring pattern
+/**
+ * Open mobile inline editor
+ * @param {string} filterType - Type of filter to edit
+ */
+function openMobileEditor(filterType) {
+  const editorContainer = document.getElementById('pill-editor');
+  if (!editorContainer) return;
+  
+  editorContainer.innerHTML = '';
+  editorContainer.style.display = 'block';
+  
+  // Build header
+  const header = document.createElement('div');
+  header.className = 'pill-editor__header';
+  const filterNames = {
+    sort: 'Sort Options',
+    vram: 'GPU RAM Filter',
+    pcie: 'PCIe Bandwidth Filter',
+    net: 'Network Speed Filter',
+    location: 'Location Filter',
+    gpuModel: 'GPU Model Filter',
+    priceCap: 'Price Cap Filter'
+  };
+  header.innerHTML = `
+    <strong>${filterNames[filterType] || 'Filter'}</strong>
+    <button class="pill-editor__close" aria-label="Close ${filterNames[filterType] || 'Filter'} editor">×</button>
+  `;
+  
+  // Build content
+  const content = document.createElement('div');
+  content.className = 'pill-editor__content';
+  content.appendChild(buildEditor(filterType));
+  
+  // Build actions
+  const actions = document.createElement('div');
+  actions.className = 'pill-editor__actions';
+  actions.innerHTML = `
+    <button class="search-button" data-action="apply">Apply</button>
+    <button class="search-button secondary" data-action="clear">Clear</button>
+  `;
+  
+  editorContainer.appendChild(header);
+  editorContainer.appendChild(content);
+  editorContainer.appendChild(actions);
+  
+  // Wire up event handlers
+  header.querySelector('.pill-editor__close').addEventListener('click', closePillEditor);
+  actions.querySelector('[data-action="apply"]').addEventListener('click', () => applyEditorChanges(filterType));
+  actions.querySelector('[data-action="clear"]').addEventListener('click', () => clearEditorFilter(filterType));
+  
+  // Set focus to first interactive element
+  const firstInput = content.querySelector('input, select, button');
+  if (firstInput) {
+    setTimeout(() => firstInput.focus(), 100);
+  }
+}
+
+/**
+ * Open desktop popover editor
+ * @param {string} filterType - Type of filter to edit
+ * @param {Element} pill - Pill element to attach to
+ */
+function openDesktopPopover(filterType, pill) {
+  const popover = document.createElement('div');
+  popover.className = 'pill-popover';
+  popover.setAttribute('role', 'dialog');
+  popover.setAttribute('aria-labelledby', pill.id);
+  
+  // Build editor content
+  popover.appendChild(buildEditor(filterType));
+  
+  // Position popover
+  document.body.appendChild(popover);
+  positionPopover(popover, pill);
+  popover.style.display = 'block';
+  
+  // Set focus to first interactive element
+  const firstInput = popover.querySelector('input, select, button');
+  if (firstInput) {
+    setTimeout(() => firstInput.focus(), 100);
+  }
+  
+  // Setup popover event handlers
+  setupPopoverHandlers(popover, filterType);
+}
+
+/**
+ * Position popover relative to pill
+ * @param {Element} popover - Popover element
+ * @param {Element} pill - Pill element
+ */
+function positionPopover(popover, pill) {
+  const pillRect = pill.getBoundingClientRect();
+  const popoverRect = popover.getBoundingClientRect();
+  
+  let left = pillRect.left;
+  let top = pillRect.bottom + 8;
+  
+  // Adjust if popover would go off-screen
+  if (left + popoverRect.width > window.innerWidth) {
+    left = window.innerWidth - popoverRect.width - 16;
+  }
+  if (left < 16) {
+    left = 16;
+  }
+  
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
+/**
+ * Setup popover event handlers
+ * @param {Element} popover - Popover element
+ * @param {string} filterType - Type of filter
+ */
+function setupPopoverHandlers(popover, filterType) {
+  // Apply button (if editor supports it)
+  popover.addEventListener('change', (e) => {
+    // Auto-apply for some editor types
+    if (filterType === 'sort') {
+      applyEditorChanges(filterType);
+    }
+  });
+  
+  // Add apply/clear buttons for non-auto-apply editors
+  if (filterType !== 'sort') {
+    const actions = document.createElement('div');
+    actions.className = 'pill-editor__actions';
+    actions.style.marginTop = '8px';
+    actions.innerHTML = `
+      <button class="search-button" data-action="apply" style="flex: 1;">Apply</button>
+      <button class="search-button secondary" data-action="clear" style="flex: 1;">Clear</button>
+    `;
+    popover.appendChild(actions);
+    
+    actions.querySelector('[data-action="apply"]').addEventListener('click', () => applyEditorChanges(filterType));
+    actions.querySelector('[data-action="clear"]').addEventListener('click', () => clearEditorFilter(filterType));
+  }
+}
+
+/**
+ * Build editor content based on filter type
+ * @param {string} filterType - Type of filter
+ * @returns {Element} Editor element
+ */
+function buildEditor(filterType) {
+  switch (filterType) {
+    case 'sort':
+      return buildSortEditor();
+    case 'vram':
+      return buildVramEditor();
+    case 'pcie':
+      return buildPcieEditor();
+    case 'net':
+      return buildNetEditor();
+    case 'location':
+      return buildLocationEditor();
+    case 'gpuModel':
+      return buildGpuModelEditor();
+    case 'priceCap':
+      return buildPriceCapEditor();
+    default:
+      const section = document.createElement('div');
+      section.textContent = 'Editor not implemented';
+      return section;
+  }
+}
+
+/**
+ * Build sort editor (radio buttons)
+ * @returns {Element} Editor element
+ */
+function buildSortEditor() {
+  const section = document.createElement('div');
+  section.className = 'editor-section';
+  
+  const options = [
+    { value: 'dph_total', label: 'Price per hour' },
+    { value: 'score', label: 'Score' },
+    { value: 'gpu_ram', label: 'GPU RAM' },
+    { value: 'reliability', label: 'Reliability' }
+  ];
+  
+  const radioList = document.createElement('div');
+  radioList.className = 'editor-radio-list';
+  
+  options.forEach(option => {
+    const item = document.createElement('div');
+    item.className = 'editor-radio-item';
+    
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'sort-option';
+    radio.value = option.value;
+    radio.id = `sort-${option.value}`;
+    radio.checked = vastaiSearchState.sortBy === option.value;
+    
+    const label = document.createElement('label');
+    label.htmlFor = radio.id;
+    label.textContent = option.label;
+    
+    item.appendChild(radio);
+    item.appendChild(label);
+    radioList.appendChild(item);
+  });
+  
+  section.appendChild(radioList);
+  return section;
+}
+
+/**
+ * Build VRAM editor (slider + input + chips)
+ * @returns {Element} Editor element
+ */
+function buildVramEditor() {
+  const section = document.createElement('div');
+  section.className = 'editor-section';
+  
+  const label = document.createElement('label');
+  label.className = 'editor-label';
+  label.textContent = 'Minimum GB VRAM';
+  
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'editor-input';
+  input.id = 'vram-input';
+  input.min = '1';
+  input.max = '128';
+  input.value = vastaiSearchState.vramMinGb || '';
+  input.placeholder = 'Any amount';
+  
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'editor-slider';
+  slider.id = 'vram-slider';
+  slider.min = '1';
+  slider.max = '128';
+  slider.value = vastaiSearchState.vramMinGb || '16';
+  
+  const chips = document.createElement('div');
+  chips.className = 'editor-chips';
+  [8, 16, 24, 32, 48, 80].forEach(value => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'editor-chip';
+    chip.textContent = `${value} GB`;
+    chip.dataset.value = value;
+    if (vastaiSearchState.vramMinGb == value) {
+      chip.classList.add('selected');
+    }
+    chips.appendChild(chip);
+  });
+  
+  const helper = document.createElement('div');
+  helper.className = 'editor-helper-text';
+  helper.textContent = 'Set minimum GPU VRAM requirement';
+  
+  // Sync slider and input
+  input.addEventListener('input', () => {
+    slider.value = input.value || '16';
+    updateChipSelection(chips, input.value);
+  });
+  
+  slider.addEventListener('input', () => {
+    input.value = slider.value;
+    updateChipSelection(chips, slider.value);
+  });
+  
+  // Handle chip clicks
+  chips.addEventListener('click', (e) => {
+    if (e.target.classList.contains('editor-chip')) {
+      const value = e.target.dataset.value;
+      input.value = value;
+      slider.value = value;
+      updateChipSelection(chips, value);
+    }
+  });
+  
+  section.appendChild(label);
+  section.appendChild(input);
+  section.appendChild(slider);
+  section.appendChild(chips);
+  section.appendChild(helper);
+  
+  return section;
+}
+
+/**
+ * Build PCIe editor (number input)
+ * @returns {Element} Editor element
+ */
+function buildPcieEditor() {
+  const section = document.createElement('div');
+  section.className = 'editor-section';
+  
+  const label = document.createElement('label');
+  label.className = 'editor-label';
+  label.textContent = 'Minimum PCIe Bandwidth (GB/s)';
+  
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'editor-input';
+  input.id = 'pcie-input';
+  input.min = '0';
+  input.max = '64';
+  input.step = '0.1';
+  input.value = vastaiSearchState.pcieMinGbps || '';
+  input.placeholder = 'Any speed';
+  
+  const helper = document.createElement('div');
+  helper.className = 'editor-helper-text';
+  helper.textContent = 'Set minimum PCIe bandwidth requirement';
+  
+  section.appendChild(label);
+  section.appendChild(input);
+  section.appendChild(helper);
+  
+  return section;
+}
+
+/**
+ * Build network speed editor (dual inputs)
+ * @returns {Element} Editor element
+ */
+function buildNetEditor() {
+  const section = document.createElement('div');
+  section.className = 'editor-section';
+  
+  // Upload speed
+  const upLabel = document.createElement('label');
+  upLabel.className = 'editor-label';
+  upLabel.textContent = 'Minimum Upload Speed (Mbps)';
+  
+  const upInput = document.createElement('input');
+  upInput.type = 'number';
+  upInput.className = 'editor-input';
+  upInput.id = 'net-up-input';
+  upInput.min = '0';
+  upInput.max = '10000';
+  upInput.value = vastaiSearchState.netUpMinMbps || '';
+  upInput.placeholder = 'Any speed';
+  upInput.style.marginBottom = '12px';
+  
+  // Download speed
+  const downLabel = document.createElement('label');
+  downLabel.className = 'editor-label';
+  downLabel.textContent = 'Minimum Download Speed (Mbps)';
+  
+  const downInput = document.createElement('input');
+  downInput.type = 'number';
+  downInput.className = 'editor-input';
+  downInput.id = 'net-down-input';
+  downInput.min = '0';
+  downInput.max = '10000';
+  downInput.value = vastaiSearchState.netDownMinMbps || '';
+  downInput.placeholder = 'Any speed';
+  
+  const helper = document.createElement('div');
+  helper.className = 'editor-helper-text';
+  helper.textContent = 'Set minimum network speed requirements';
+  
+  section.appendChild(upLabel);
+  section.appendChild(upInput);
+  section.appendChild(downLabel);
+  section.appendChild(downInput);
+  section.appendChild(helper);
+  
+  return section;
+}
+
+/**
+ * Build location editor (searchable checkboxes)
+ * @returns {Element} Editor element
+ */
+function buildLocationEditor() {
+  const section = document.createElement('div');
+  section.className = 'editor-section';
+  
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'editor-search';
+  searchInput.placeholder = 'Search countries...';
+  
+  const checkboxList = document.createElement('div');
+  checkboxList.className = 'editor-checkbox-list';
+  
+  const countries = [
+    { code: 'US', name: 'United States' },
+    { code: 'CA', name: 'Canada' },
+    { code: 'DE', name: 'Germany' },
+    { code: 'FR', name: 'France' },
+    { code: 'GB', name: 'United Kingdom' },
+    { code: 'JP', name: 'Japan' },
+    { code: 'KR', name: 'South Korea' },
+    { code: 'AU', name: 'Australia' },
+    { code: 'SG', name: 'Singapore' },
+    { code: 'NL', name: 'Netherlands' },
+    { code: 'BR', name: 'Brazil' },
+    { code: 'IN', name: 'India' },
+    { code: 'CN', name: 'China' },
+    { code: 'HK', name: 'Hong Kong' }
+  ];
+  
+  countries.forEach(country => {
+    const item = document.createElement('div');
+    item.className = 'editor-checkbox-item';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `loc-${country.code}`;
+    checkbox.value = country.code;
+    checkbox.checked = vastaiSearchState.locations.includes(country.code);
+    
+    const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
+    label.textContent = `${country.name} (${country.code})`;
+    
+    item.appendChild(checkbox);
+    item.appendChild(label);
+    checkboxList.appendChild(item);
+  });
+  
+  // Search functionality
+  searchInput.addEventListener('input', () => {
+    const query = searchInput.value.toLowerCase();
+    checkboxList.querySelectorAll('.editor-checkbox-item').forEach(item => {
+      const label = item.querySelector('label').textContent.toLowerCase();
+      item.style.display = label.includes(query) ? 'flex' : 'none';
+    });
+  });
+  
+  section.appendChild(searchInput);
+  section.appendChild(checkboxList);
+  
+  return section;
+}
+
+/**
+ * Build GPU model editor (text input)
+ * @returns {Element} Editor element
+ */
+function buildGpuModelEditor() {
+  const section = document.createElement('div');
+  section.className = 'editor-section';
+  
+  const label = document.createElement('label');
+  label.className = 'editor-label';
+  label.textContent = 'GPU Model';
+  
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'editor-input';
+  input.id = 'gpu-model-input';
+  input.value = vastaiSearchState.gpuModelQuery || '';
+  input.placeholder = 'e.g., RTX 4090, A100, V100...';
+  
+  const helper = document.createElement('div');
+  helper.className = 'editor-helper-text';
+  helper.textContent = 'Enter GPU model name or part of it';
+  
+  section.appendChild(label);
+  section.appendChild(input);
+  section.appendChild(helper);
+  
+  return section;
+}
+
+/**
+ * Build price cap editor (number input)
+ * @returns {Element} Editor element
+ */
+function buildPriceCapEditor() {
+  const section = document.createElement('div');
+  section.className = 'editor-section';
+  
+  const label = document.createElement('label');
+  label.className = 'editor-label';
+  label.textContent = 'Maximum Price per Hour ($)';
+  
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'editor-input';
+  input.id = 'price-cap-input';
+  input.min = '0.01';
+  input.max = '50';
+  input.step = '0.01';
+  input.value = vastaiSearchState.priceMaxPerHour || '';
+  input.placeholder = 'No limit';
+  
+  const helper = document.createElement('div');
+  helper.className = 'editor-helper-text';
+  helper.textContent = 'Set maximum price per hour limit';
+  
+  section.appendChild(label);
+  section.appendChild(input);
+  section.appendChild(helper);
+  
+  return section;
+}
+
+/**
+ * Update chip selection state
+ * @param {Element} chipsContainer - Container with chip buttons
+ * @param {string|number} value - Selected value
+ */
+function updateChipSelection(chipsContainer, value) {
+  chipsContainer.querySelectorAll('.editor-chip').forEach(chip => {
+    chip.classList.toggle('selected', chip.dataset.value == value);
+  });
+}
+
+/**
+ * Apply editor changes to state
+ * @param {string} filterType - Type of filter
+ */
+function applyEditorChanges(filterType) {
+  const state = vastaiSearchState;
+  
+  switch (filterType) {
+    case 'sort':
+      const selectedSort = document.querySelector('input[name="sort-option"]:checked');
+      if (selectedSort) {
+        state.sortBy = selectedSort.value;
+      }
+      break;
+      
+    case 'vram':
+      const vramValue = document.getElementById('vram-input')?.value;
+      state.vramMinGb = vramValue && vramValue > 0 ? parseInt(vramValue) : null;
+      break;
+      
+    case 'pcie':
+      const pcieValue = document.getElementById('pcie-input')?.value;
+      state.pcieMinGbps = pcieValue && pcieValue > 0 ? parseFloat(pcieValue) : null;
+      break;
+      
+    case 'net':
+      const upValue = document.getElementById('net-up-input')?.value;
+      const downValue = document.getElementById('net-down-input')?.value;
+      state.netUpMinMbps = upValue && upValue > 0 ? parseInt(upValue) : null;
+      state.netDownMinMbps = downValue && downValue > 0 ? parseInt(downValue) : null;
+      break;
+      
+    case 'location':
+      const selectedLocations = [];
+      document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+        if (cb.id && cb.id.startsWith('loc-')) {
+          selectedLocations.push(cb.value);
+        }
+      });
+      state.locations = selectedLocations;
+      break;
+      
+    case 'gpuModel':
+      const gpuValue = document.getElementById('gpu-model-input')?.value;
+      state.gpuModelQuery = gpuValue ? gpuValue.trim() : '';
+      break;
+      
+    case 'priceCap':
+      const priceValue = document.getElementById('price-cap-input')?.value;
+      state.priceMaxPerHour = priceValue && priceValue > 0 ? parseFloat(priceValue) : null;
+      break;
+  }
+  
+  // Update pill label and close editor
+  updatePillLabel(filterType);
+  closePillEditor();
+  
+  // Announce the change
+  announceFilterChange(filterType);
+}
+
+/**
+ * Clear filter and reset to default
+ * @param {string} filterType - Type of filter
+ */
+function clearEditorFilter(filterType) {
+  const state = vastaiSearchState;
+  
+  switch (filterType) {
+    case 'sort':
+      state.sortBy = 'dph_total';
+      break;
+    case 'vram':
+      state.vramMinGb = null;
+      break;
+    case 'pcie':
+      state.pcieMinGbps = null;
+      break;
+    case 'net':
+      state.netUpMinMbps = null;
+      state.netDownMinMbps = null;
+      break;
+    case 'location':
+      state.locations = [];
+      break;
+    case 'gpuModel':
+      state.gpuModelQuery = '';
+      break;
+    case 'priceCap':
+      state.priceMaxPerHour = null;
+      break;
+  }
+  
+  // Update pill label and close editor
+  updatePillLabel(filterType);
+  closePillEditor();
+  
+  // Announce the change
+  announceFilterChange(filterType, true);
+}
+
+/**
+ * Announce filter change for screen readers
+ * @param {string} filterType - Type of filter
+ * @param {boolean} cleared - Whether filter was cleared
+ */
+function announceFilterChange(filterType, cleared = false) {
+  const liveRegion = document.getElementById('pill-announcements');
+  if (!liveRegion) return;
+  
+  const filterNames = {
+    sort: 'Sort',
+    vram: 'VRAM',
+    pcie: 'PCIe',
+    net: 'Network',
+    location: 'Location',
+    gpuModel: 'GPU Model',
+    priceCap: 'Price Cap'
+  };
+  
+  const name = filterNames[filterType] || 'Filter';
+  const message = cleared ? `${name} filter cleared` : `${name} filter updated`;
+  
+  liveRegion.textContent = message;
+  
+  // Clear after announcement
+  setTimeout(() => {
+    liveRegion.textContent = '';
+  }, 1000);
+}
 
 console.log('📄 VastAI Search module loaded');
