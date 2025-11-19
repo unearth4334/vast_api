@@ -1742,7 +1742,7 @@ export async function rebootInstance() {
     console.log(`🎯 Target instance ID: ${instanceId}`);
     
     // Get SSH connection string for testing
-    const sshConnectionString = document.getElementById('ssh-connection-string')?.value;
+    const sshConnectionString = document.getElementById('sshConnectionString')?.value?.trim();
     if (!sshConnectionString) {
       throw new Error('SSH connection string not found');
     }
