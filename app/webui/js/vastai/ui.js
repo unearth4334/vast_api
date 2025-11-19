@@ -274,101 +274,81 @@ export async function showInstanceDetails(instanceId) {
 
 /**
  * Show SSH host key verification modal
- * @param {Object} params - Verification parameters
- * @param {string} params.host - The host address
- * @param {number} params.port - The SSH port
- * @param {Object} params.fingerprints - Object containing fingerprint info
+ * @param {Object} hostInfo - Host information
+ * @param {string} hostInfo.host - The host address
+ * @param {number} hostInfo.port - The SSH port
+ * @param {Array<string>} hostInfo.fingerprints - Array of fingerprint strings
  * @returns {Promise<boolean>} - True if user accepts, false if rejected
  */
-export function showSSHHostVerificationModal({ host, port, fingerprints }) {
+export function showSSHHostVerificationModal(hostInfo) {
   return new Promise((resolve) => {
     // Inject modal CSS if not already present
-    if (!document.getElementById('ssh-host-verification-modal-style')) {
+    if (!document.getElementById('ssh-verify-modal-style')) {
       const style = document.createElement('style');
-      style.id = 'ssh-host-verification-modal-style';
+      style.id = 'ssh-verify-modal-style';
       style.textContent = `
-        .ssh-modal-overlay {
+        .ssh-verify-overlay {
           position: fixed;
           top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0,0,0,0.6);
+          background: rgba(0,0,0,0.5);
           z-index: 10000;
           display: flex;
           align-items: center;
           justify-content: center;
-          animation: fadeIn 0.2s;
         }
-        .ssh-modal {
-          background: #fff;
+        .ssh-verify-modal {
+          background: var(--background-primary, #fff);
+          color: var(--text-normal, #000);
           border-radius: 8px;
           max-width: 600px;
           width: 90%;
           box-shadow: 0 4px 24px rgba(0,0,0,0.3);
           padding: 24px;
           position: relative;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          animation: slideIn 0.3s;
+          font-family: inherit;
+          animation: slideIn 0.2s ease-out;
         }
-        .ssh-modal-header {
+        .ssh-verify-modal h2 {
+          margin-top: 0;
+          margin-bottom: 16px;
+          color: var(--text-warning, #f59e0b);
           display: flex;
           align-items: center;
-          margin-bottom: 16px;
-          border-bottom: 2px solid #f0f0f0;
-          padding-bottom: 12px;
+          gap: 8px;
         }
-        .ssh-modal-icon {
-          font-size: 32px;
-          margin-right: 12px;
+        .ssh-verify-modal p {
+          margin: 12px 0;
+          line-height: 1.6;
         }
-        .ssh-modal h2 {
-          margin: 0;
-          font-size: 1.4em;
-          color: #d32f2f;
-        }
-        .ssh-modal-warning {
-          background: #fff3cd;
-          border-left: 4px solid #ffc107;
+        .ssh-verify-host {
+          background: var(--background-secondary, #f3f4f6);
           padding: 12px;
-          margin: 16px 0;
           border-radius: 4px;
-        }
-        .ssh-modal-warning p {
-          margin: 0 0 8px 0;
-          color: #856404;
-          font-weight: 500;
-        }
-        .ssh-modal-warning ul {
-          margin: 8px 0 0 20px;
-          color: #856404;
-        }
-        .ssh-modal-info {
-          background: #f5f5f5;
-          border-radius: 4px;
-          padding: 12px;
-          margin: 16px 0;
-          font-family: 'Courier New', monospace;
+          margin: 12px 0;
+          font-family: monospace;
           font-size: 0.9em;
         }
-        .ssh-modal-info-row {
-          margin: 8px 0;
+        .ssh-verify-fingerprints {
+          background: var(--background-secondary, #f3f4f6);
+          padding: 12px;
+          border-radius: 4px;
+          margin: 12px 0;
+          max-height: 150px;
+          overflow-y: auto;
+        }
+        .ssh-verify-fingerprint {
+          font-family: monospace;
+          font-size: 0.85em;
+          margin: 4px 0;
+          color: var(--text-muted, #666);
+        }
+        .ssh-verify-buttons {
           display: flex;
-          word-break: break-all;
-        }
-        .ssh-modal-info-label {
-          font-weight: bold;
-          color: #333;
-          min-width: 100px;
-        }
-        .ssh-modal-info-value {
-          color: #666;
-          flex: 1;
-        }
-        .ssh-modal-actions {
-          display: flex;
-          justify-content: flex-end;
           gap: 12px;
-          margin-top: 24px;
+          margin-top: 20px;
+          justify-content: flex-end;
         }
-        .ssh-modal-btn {
+        .ssh-verify-button {
           padding: 10px 20px;
           border: none;
           border-radius: 4px;
@@ -377,138 +357,108 @@ export function showSSHHostVerificationModal({ host, port, fingerprints }) {
           cursor: pointer;
           transition: all 0.2s;
         }
-        .ssh-modal-btn-cancel {
-          background: #f5f5f5;
-          color: #333;
-        }
-        .ssh-modal-btn-cancel:hover {
-          background: #e0e0e0;
-        }
-        .ssh-modal-btn-accept {
-          background: #4caf50;
+        .ssh-verify-button.accept {
+          background: var(--interactive-accent, #7c3aed);
           color: white;
         }
-        .ssh-modal-btn-accept:hover {
-          background: #45a049;
+        .ssh-verify-button.accept:hover {
+          background: var(--interactive-accent-hover, #6d28d9);
         }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+        .ssh-verify-button.reject {
+          background: var(--background-modifier-border, #ddd);
+          color: var(--text-normal, #333);
+        }
+        .ssh-verify-button.reject:hover {
+          background: var(--background-modifier-border-hover, #ccc);
         }
         @keyframes slideIn {
-          from { transform: translateY(-20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+          from { 
+            opacity: 0; 
+            transform: translateY(-20px);
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0);
+          }
         }
       `;
       document.head.appendChild(style);
     }
 
     // Remove any existing modal
-    const existing = document.getElementById('ssh-host-verification-overlay');
-    if (existing) existing.remove();
-
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'ssh-modal-overlay';
-    overlay.id = 'ssh-host-verification-overlay';
-
-    // Create modal
-    const modal = document.createElement('div');
-    modal.className = 'ssh-modal';
-
-    // Format fingerprints for display
-    let fingerprintHtml = '';
-    if (fingerprints) {
-      if (typeof fingerprints === 'object') {
-        // If fingerprints is an object with key types
-        Object.keys(fingerprints).forEach(keyType => {
-          fingerprintHtml += `
-            <div class="ssh-modal-info-row">
-              <span class="ssh-modal-info-label">${keyType}:</span>
-              <span class="ssh-modal-info-value">${fingerprints[keyType]}</span>
-            </div>
-          `;
-        });
-      } else if (typeof fingerprints === 'string') {
-        // If fingerprints is a single string
-        fingerprintHtml = `
-          <div class="ssh-modal-info-row">
-            <span class="ssh-modal-info-label">Fingerprint:</span>
-            <span class="ssh-modal-info-value">${fingerprints}</span>
-          </div>
-        `;
-      }
+    const existing = document.querySelector('.ssh-verify-overlay');
+    if (existing) {
+      existing.remove();
     }
 
-    // Build modal HTML
-    modal.innerHTML = `
-      <div class="ssh-modal-header">
-        <span class="ssh-modal-icon">⚠️</span>
-        <h2>SSH Host Key Verification</h2>
-      </div>
-      
-      <div class="ssh-modal-warning">
-        <p><strong>⚠️ Security Warning</strong></p>
-        <p>You are connecting to a new host for the first time. Before proceeding, please verify:</p>
-        <ul>
-          <li>The host address and port are correct</li>
-          <li>This is a trusted connection</li>
-          <li>You are not experiencing a man-in-the-middle attack</li>
-        </ul>
-      </div>
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'ssh-verify-overlay';
 
-      <div class="ssh-modal-info">
-        <div class="ssh-modal-info-row">
-          <span class="ssh-modal-info-label">Host:</span>
-          <span class="ssh-modal-info-value">${host || 'Unknown'}</span>
-        </div>
-        <div class="ssh-modal-info-row">
-          <span class="ssh-modal-info-label">Port:</span>
-          <span class="ssh-modal-info-value">${port || 'Unknown'}</span>
-        </div>
-        ${fingerprintHtml}
-      </div>
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.className = 'ssh-verify-modal';
 
-      <p style="color: #666; font-size: 0.9em; margin: 16px 0;">
-        Do you want to trust this host and add its key to known_hosts?
-      </p>
+    const title = document.createElement('h2');
+    title.innerHTML = '⚠️ SSH Host Key Verification';
+    modal.appendChild(title);
 
-      <div class="ssh-modal-actions">
-        <button class="ssh-modal-btn ssh-modal-btn-cancel" id="ssh-modal-reject">
-          Cancel
-        </button>
-        <button class="ssh-modal-btn ssh-modal-btn-accept" id="ssh-modal-accept">
-          Accept and Trust Host
-        </button>
-      </div>
-    `;
+    const intro = document.createElement('p');
+    intro.textContent = "The authenticity of this host can't be established. This is normal for new cloud instances.";
+    modal.appendChild(intro);
 
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
+    const hostDiv = document.createElement('div');
+    hostDiv.className = 'ssh-verify-host';
+    hostDiv.textContent = `Host: ${hostInfo.host}:${hostInfo.port}`;
+    modal.appendChild(hostDiv);
 
-    // Handle accept
-    const acceptBtn = document.getElementById('ssh-modal-accept');
-    acceptBtn.addEventListener('click', () => {
-      overlay.remove();
-      resolve(true);
-    });
+    if (hostInfo.fingerprints && hostInfo.fingerprints.length > 0) {
+      const fpLabel = document.createElement('p');
+      fpLabel.innerHTML = '<strong>Host key fingerprints:</strong>';
+      modal.appendChild(fpLabel);
 
-    // Handle reject
-    const rejectBtn = document.getElementById('ssh-modal-reject');
-    rejectBtn.addEventListener('click', () => {
+      const fpDiv = document.createElement('div');
+      fpDiv.className = 'ssh-verify-fingerprints';
+      hostInfo.fingerprints.forEach(fp => {
+        const fpLine = document.createElement('div');
+        fpLine.className = 'ssh-verify-fingerprint';
+        fpLine.textContent = fp;
+        fpDiv.appendChild(fpLine);
+      });
+      modal.appendChild(fpDiv);
+    }
+
+    const question = document.createElement('p');
+    question.innerHTML = '<strong>Do you want to continue connecting and add this host to known hosts?</strong>';
+    modal.appendChild(question);
+
+    // Create buttons
+    const buttonDiv = document.createElement('div');
+    buttonDiv.className = 'ssh-verify-buttons';
+
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'ssh-verify-button reject';
+    rejectBtn.textContent = 'No, Cancel';
+    rejectBtn.onclick = () => {
       overlay.remove();
       resolve(false);
-    });
+    };
 
-    // Handle overlay click (outside modal)
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        overlay.remove();
-        resolve(false);
-      }
-    });
+    const acceptBtn = document.createElement('button');
+    acceptBtn.className = 'ssh-verify-button accept';
+    acceptBtn.textContent = 'Yes, Continue';
+    acceptBtn.onclick = () => {
+      overlay.remove();
+      resolve(true);
+    };
 
-    // Handle Escape key
+    buttonDiv.appendChild(rejectBtn);
+    buttonDiv.appendChild(acceptBtn);
+    modal.appendChild(buttonDiv);
+
+    overlay.appendChild(modal);
+
+    // Escape key handler
     const escapeHandler = (e) => {
       if (e.key === 'Escape') {
         overlay.remove();
@@ -517,6 +467,12 @@ export function showSSHHostVerificationModal({ host, port, fingerprints }) {
       }
     };
     document.addEventListener('keydown', escapeHandler);
+
+    // Add to page
+    document.body.appendChild(overlay);
+
+    // Focus accept button
+    acceptBtn.focus();
   });
 }
 
