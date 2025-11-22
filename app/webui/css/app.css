@@ -1092,7 +1092,6 @@ body {
 /* Accessibility: Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
     .workflow-arrow.loading .spinner {
-        animation: none;
         /* Show a pulsing opacity instead for reduced motion */
         animation: pulse-opacity 2s ease-in-out infinite;
     }
@@ -1101,8 +1100,6 @@ body {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
     }
-}
-    100% { transform: rotate(360deg); }
 }
 
 /* Progress visualization for workflow steps */
