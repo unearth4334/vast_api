@@ -1106,16 +1106,17 @@ body {
     100% { transform: rotate(360deg); }
 }
 
+/* Pulse opacity animation for reduced motion */
+@keyframes pulse-opacity {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 /* Accessibility: Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
     .workflow-arrow.loading .spinner {
         /* Show a pulsing opacity instead for reduced motion */
         animation: pulse-opacity 2s ease-in-out infinite;
-    }
-    
-    @keyframes pulse-opacity {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
     }
 }
 
