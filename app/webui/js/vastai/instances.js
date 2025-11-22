@@ -1471,6 +1471,148 @@ export async function installCustomNodes() {
 }
 
 /**
+ * Verify and install missing Python dependencies
+ * Checks ComfyUI logs for import errors and installs missing packages
+ */
+export async function verifyDependencies() {
+  console.log('✅ verifyDependencies called');
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) {
+    console.error('❌ No SSH connection string found');
+    return showSetupResult('Please enter an SSH connection string first.', 'error');
+  }
+  
+  console.log('📡 SSH connection string:', sshConnectionString);
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="verify_dependencies"]');
+  console.log('📍 Step element found:', !!stepElement);
+  
+  // Show initial progress indicator
+  if (stepElement && window.progressIndicators) {
+    console.log('📊 Showing initial progress indicator');
+    window.progressIndicators.showChecklistProgress(stepElement, [
+      { label: 'Checking ComfyUI logs for import errors...', state: 'active' }
+    ]);
+  }
+  
+  showSetupResult('Verifying dependencies...', 'info');
+  
+  try {
+    console.log('🚀 Starting dependency verification...');
+    const data = await api.post('/ssh/verify-dependencies', {
+      ssh_connection: sshConnectionString,
+      ui_home: '/workspace/ComfyUI'
+    });
+    
+    console.log('✅ Verification completed:', data);
+    
+    if (data.success) {
+      const hasMissing = data.missing_modules && data.missing_modules.length > 0;
+      const hasInstalled = data.installed && data.installed.length > 0;
+      const hasFailed = data.failed && data.failed.length > 0;
+      
+      let message;
+      let type;
+      
+      if (!hasMissing) {
+        message = '✅ All dependencies are satisfied!';
+        type = 'success';
+      } else if (hasFailed) {
+        message = `⚠️ Installed ${data.installed.length} dependencies, ${data.failed.length} failed`;
+        type = 'warning';
+      } else {
+        message = `✅ Installed ${data.installed.length} missing dependencies!`;
+        type = 'success';
+      }
+      
+      showSetupResult(message, type);
+      
+      // Show completion indicator with detailed stats
+      if (stepElement && window.progressIndicators) {
+        const detailMessage = hasMissing
+          ? `Found and fixed ${data.installed.length} missing dependencies`
+          : 'All dependencies verified successfully';
+        
+        const stats = [];
+        if (hasMissing) {
+          stats.push(`📦 ${data.missing_modules.length} missing`);
+        }
+        if (hasInstalled) {
+          stats.push(`✅ ${data.installed.length} installed`);
+        }
+        if (hasFailed) {
+          stats.push(`❌ ${data.failed.length} failed`);
+        }
+        if (data.failed_nodes && data.failed_nodes.length > 0) {
+          stats.push(`⚠️ ${data.failed_nodes.length} nodes affected`);
+        }
+        
+        if (hasFailed) {
+          window.progressIndicators.showWarning(
+            stepElement,
+            'Dependencies partially resolved',
+            detailMessage,
+            stats
+          );
+        } else {
+          window.progressIndicators.showSuccess(
+            stepElement,
+            hasMissing ? 'Missing dependencies installed' : 'All dependencies verified',
+            detailMessage,
+            stats
+          );
+        }
+      }
+      
+      // Emit success event for workflow - warnings don't fail the workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'verify_dependencies', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Dependency verification failed: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Verification failed',
+          data.message || 'Dependency verification failed',
+          [
+            { class: 'retry-btn', onclick: 'verifyDependencies()', label: '🔄 Retry Verification' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'verify_dependencies', success: false }
+      }));
+    }
+  } catch (error) {
+    console.error('❌ Verification error:', error);
+    showSetupResult('❌ Dependency verification request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Verification request failed',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'verifyDependencies()', label: '🔄 Retry Verification' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'verify_dependencies', success: false }
+    }));
+  }
+}
+
+/**
  * Setup Python virtual environment
  * Wrapper function that adds progress indicators to the template step
  */

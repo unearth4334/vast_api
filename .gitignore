@@ -103,3 +103,5 @@ $RECYCLE.BIN/
 /tmp/sync_progress_*.json
 
 logs/*
+
+test/workflow_testing/

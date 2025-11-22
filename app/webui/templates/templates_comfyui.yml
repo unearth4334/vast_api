@@ -99,6 +99,11 @@ ui_config:
       style: "primary"
       tooltip: "Install ComfyUI custom nodes using the auto-installer"
       
+    - label: "✅ Verify Dependencies"
+      action: "verify_dependencies"
+      style: "primary"
+      tooltip: "Check for missing Python dependencies and install them"
+      
     - label: "🔄 Reboot Instance"
       action: "reboot_instance"
       style: "primary"

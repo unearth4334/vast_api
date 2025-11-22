@@ -415,6 +415,9 @@ function updateWorkflowSteps(template) {
       case 'install_custom_nodes':
         stepButton.onclick = installCustomNodes;
         break;
+      case 'verify_dependencies':
+        stepButton.onclick = verifyDependencies;
+        break;
       case 'set_ui_home':
         stepButton.onclick = setUIHome;
         break;
