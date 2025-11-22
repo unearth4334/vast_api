@@ -374,6 +374,100 @@ function stopWorkflowPolling() {
 }
 
 /**
+ * Handle workflow blockage (e.g., host key verification required)
+ * @param {object} state - Workflow state with block_info
+ */
+async function handleWorkflowBlockage(state) {
+  const blockInfo = state.block_info;
+  const blockReason = blockInfo.block_reason;
+  
+  if (blockReason === 'host_verification_needed') {
+    console.log('🔐 Host verification required, showing modal...');
+    
+    try {
+      // Show SSH host verification modal (from VastAIUI module)
+      const userAccepted = await window.VastAIUI.showSSHHostVerificationModal({
+        host: blockInfo.host,
+        port: blockInfo.port,
+        fingerprints: blockInfo.fingerprints || []
+      });
+      
+      if (userAccepted) {
+        console.log('✅ User accepted host key, adding to known_hosts...');
+        
+        // Call verify-host endpoint to add the key
+        const sshConnection = state.ssh_connection;
+        const verifyResponse = await fetch('/ssh/verify-host', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ssh_connection: sshConnection,
+            accept: true
+          })
+        });
+        
+        const verifyResult = await verifyResponse.json();
+        
+        if (verifyResult.success) {
+          console.log('✅ Host key added successfully, resuming workflow...');
+          
+          // Resume the workflow
+          const resumeResponse = await fetch('/workflow/resume', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              workflow_id: state.workflow_id
+            })
+          });
+          
+          const resumeResult = await resumeResponse.json();
+          
+          if (resumeResult.success) {
+            console.log('✅ Workflow resumed');
+            // Restart polling
+            startWorkflowPolling();
+          } else {
+            console.error('❌ Failed to resume workflow:', resumeResult.message);
+            showSetupResult(`Failed to resume workflow: ${resumeResult.message}`, 'error');
+            currentWorkflowId = null;
+          }
+        } else {
+          console.error('❌ Failed to add host key:', verifyResult.message);
+          showSetupResult(`Failed to add host key: ${verifyResult.message}`, 'error');
+          
+          // Stop the workflow
+          await stopWorkflow();
+          currentWorkflowId = null;
+        }
+      } else {
+        console.log('❌ User rejected host key, stopping workflow...');
+        showSetupResult('Host key verification rejected. Workflow cancelled.', 'error');
+        
+        // Stop the workflow
+        await stopWorkflow();
+        currentWorkflowId = null;
+      }
+    } catch (error) {
+      console.error('❌ Error handling host verification:', error);
+      showSetupResult(`Error during host verification: ${error.message}`, 'error');
+      
+      // Stop the workflow
+      await stopWorkflow();
+      currentWorkflowId = null;
+    }
+  } else {
+    console.warn('⚠️ Unknown block reason:', blockReason);
+    showSetupResult(`Workflow blocked: ${blockReason}`, 'error');
+    await stopWorkflow();
+    currentWorkflowId = null;
+  }
+}
+
+/**
  * Update workflow visualization from server state
  */
 async function updateWorkflowVisualization() {
@@ -395,6 +489,14 @@ async function updateWorkflowVisualization() {
     
     // Update visualization based on state
     renderWorkflowState(state);
+    
+    // Check if workflow is blocked (e.g., needs host verification)
+    if (state.status === 'blocked' && state.block_info) {
+      console.log('⚠️ Workflow blocked, handling user interaction:', state.block_info.block_reason);
+      stopWorkflowPolling(); // Stop polling while modal is shown
+      await handleWorkflowBlockage(state);
+      return;
+    }
     
     // Check if workflow finished
     if (state.status === 'completed' || state.status === 'failed' || state.status === 'cancelled') {
@@ -454,7 +556,7 @@ function renderWorkflowState(state) {
     const stepStatus = stepData.status;
     
     // Remove all status classes
-    stepElement.classList.remove('pending', 'in-progress', 'completed', 'failed');
+    stepElement.classList.remove('pending', 'in-progress', 'completed', 'failed', 'blocked');
     
     // Add current status class
     if (stepStatus) {
@@ -505,6 +607,9 @@ function renderWorkflowState(state) {
     if (currentStepData) {
       showSetupResult(`Executing: ${currentStepData.label}... (${currentStepIndex + 1}/${stepsData.length})`, 'info');
     }
+  } else if (state.status === 'blocked') {
+    const blockReason = state.block_info?.block_reason || 'unknown';
+    showSetupResult(`⚠️ Workflow paused: ${blockReason.replace(/_/g, ' ')}`, 'warning');
   }
 }
 
@@ -520,7 +625,7 @@ function resetWorkflowVisualization() {
   
   // Reset all steps
   stepElements.forEach(step => {
-    step.classList.remove('in-progress', 'completed', 'failed');
+    step.classList.remove('in-progress', 'completed', 'failed', 'blocked');
   });
   
   // Reset all arrows

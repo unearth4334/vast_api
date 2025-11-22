@@ -146,7 +146,49 @@ class WorkflowExecutor:
                 state_manager.save_state(state)
                 
                 # Execute the step
-                success, error_message = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index)
+                result = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index)
+                
+                # Check if step returned blocking information (3-element tuple)
+                if isinstance(result, tuple) and len(result) == 3:
+                    success, error_message, block_info = result
+                    if not success and block_info and block_info.get('block_reason'):
+                        # Step needs user interaction - enter blocked state
+                        logger.info(f"Step {step_index + 1} requires user interaction: {block_info.get('block_reason')}")
+                        state['status'] = 'blocked'
+                        state['steps'][step_index]['status'] = 'blocked'
+                        state['steps'][step_index]['error'] = error_message
+                        state['block_info'] = block_info
+                        state_manager.save_state(state)
+                        
+                        # Wait for workflow to be resumed (polling for state change)
+                        while not stop_flag.is_set():
+                            time.sleep(1)
+                            current_state = state_manager.get_state()
+                            if current_state.get('status') != 'blocked':
+                                # State changed - reload and continue
+                                state = current_state
+                                if state.get('status') == 'running':
+                                    # Retry the failed step
+                                    logger.info(f"Workflow resumed, retrying step {step_index + 1}")
+                                    state['steps'][step_index]['status'] = 'in_progress'
+                                    state_manager.save_state(state)
+                                    success, error_message = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index)
+                                    break
+                                elif state.get('status') == 'cancelled':
+                                    logger.info(f"Workflow {workflow_id} cancelled during blocked state")
+                                    return
+                                elif state.get('status') == 'failed':
+                                    logger.info(f"Workflow {workflow_id} failed during blocked state")
+                                    return
+                        
+                        if stop_flag.is_set():
+                            logger.info(f"Workflow {workflow_id} stopped during blocked state")
+                            state['status'] = 'cancelled'
+                            state_manager.save_state(state)
+                            return
+                else:
+                    # Normal 2-element tuple
+                    success, error_message = result
                 
                 # Update state - step completed or failed
                 if success:
@@ -272,7 +314,14 @@ class WorkflowExecutor:
                 
                 # Check if it's a host key verification issue
                 if result.get('host_verification_needed'):
-                    error_msg = "Host key verification required. Please verify the SSH host key first using the 'Verify Host Key' button."
+                    # Return a special tuple that signals blocking
+                    # Format: (success=False, error_msg, block_reason_dict)
+                    return False, "Host key verification required", {
+                        'block_reason': 'host_verification_needed',
+                        'host': result.get('host'),
+                        'port': result.get('port'),
+                        'fingerprints': result.get('fingerprints', [])
+                    }
                 
                 return False, error_msg
                 

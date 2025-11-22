@@ -952,6 +952,21 @@ body {
     color: white;
 }
 
+.workflow-step.blocked .step-button {
+    background: var(--text-warning);
+    color: var(--text-normal);
+    animation: pulse-warning 2s ease-in-out infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
 .step-button {
     flex: 1;
     background: var(--interactive-accent);

@@ -3918,6 +3918,60 @@ def workflow_stop():
         })
 
 
+@app.route('/workflow/resume', methods=['POST', 'OPTIONS'])
+def workflow_resume():
+    """Resume a blocked workflow after user interaction (e.g., host key verification)"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .workflow_state import get_workflow_state_manager
+        
+        data = request.get_json() if request.is_json else {}
+        workflow_id = data.get('workflow_id')
+        
+        if not workflow_id:
+            return jsonify({
+                'success': False,
+                'message': 'Workflow ID is required'
+            })
+        
+        logger.info(f"Resuming workflow {workflow_id}")
+        
+        # Get state manager and update state
+        state_manager = get_workflow_state_manager()
+        state = state_manager.load_state()
+        
+        if not state or state.get('workflow_id') != workflow_id:
+            return jsonify({
+                'success': False,
+                'message': 'Workflow not found'
+            })
+        
+        if state.get('status') != 'blocked':
+            return jsonify({
+                'success': False,
+                'message': f'Workflow is not in blocked state (current: {state.get("status")})'
+            })
+        
+        # Change state back to running and clear block_info
+        state['status'] = 'running'
+        state.pop('block_info', None)
+        state_manager.save_state(state)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Workflow resumed'
+        })
+            
+    except Exception as e:
+        logger.error(f"Error resuming workflow: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error resuming workflow: {str(e)}'
+        })
+
+
 @app.route('/workflow/state', methods=['GET', 'OPTIONS'])
 def workflow_state():
     """Get the full state of a workflow or the current workflow"""
