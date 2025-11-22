@@ -70,39 +70,18 @@ ui_config:
     - label: "🎨 Setup CivitDL"
       action: "setup_civitdl"
       style: "primary"
-      tooltip: "Install CivitDL package and configure API key for model downloads"
+      tooltip: "Install and test CivitDL package for model downloads"
       requires_api_key: true
-      
-    - label: "🧪 Test CivitDL"
-      action: "test_civitdl"
-      style: "secondary"
-      tooltip: "Test CivitDL installation and API key configuration"
       
     - label: "📁 Set UI_HOME"
       action: "set_ui_home"
       style: "primary"
-      
-    - label: "📖 Read UI_HOME"
-      action: "get_ui_home"
-      style: "secondary"
-      
-    - label: "🐍 Setup Python venv"
-      action: "setup_python_venv"
-      style: "primary"
-      
-    - label: "📥 Clone Auto Installer"
-      action: "clone_auto_installer"
-      style: "primary"
+      tooltip: "Set and verify UI_HOME environment variable"
       
     - label: "🔌 Install Custom Nodes"
       action: "install_custom_nodes"
       style: "primary"
-      tooltip: "Install ComfyUI custom nodes using the auto-installer"
-      
-    - label: "✅ Verify Dependencies"
-      action: "verify_dependencies"
-      style: "primary"
-      tooltip: "Check for missing Python dependencies and install them"
+      tooltip: "Clone auto-installer, install custom nodes, and verify dependencies"
       
     - label: "🔄 Reboot Instance"
       action: "reboot_instance"
