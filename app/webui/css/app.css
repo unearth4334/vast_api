@@ -1059,10 +1059,12 @@ body {
     font-size: 32px;
     font-weight: bold;
     display: none;
+    align-items: center;
+    justify-content: center;
 }
 
 .workflow-arrow.completed .checkmark {
-    display: block;
+    display: flex;
 }
 
 /* Down arrow icon for pending state */
@@ -1071,7 +1073,9 @@ body {
     height: 40px;
     color: var(--text-muted);
     font-size: 32px;
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .workflow-arrow.loading .down-arrow,
@@ -1082,6 +1086,22 @@ body {
 /* Spin animation for spinner */
 @keyframes spin {
     0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Accessibility: Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .workflow-arrow.loading .spinner {
+        animation: none;
+        /* Show a pulsing opacity instead for reduced motion */
+        animation: pulse-opacity 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse-opacity {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+}
     100% { transform: rotate(360deg); }
 }
 
