@@ -221,11 +221,35 @@ async function restoreWorkflowState() {
   
   // Update UI to show workflow status
   if (state.status === 'running') {
-    showSetupResult('⚠️ Workflow was in progress. You may need to restart it.', 'warning');
+    // Count completed steps
+    const completedSteps = steps.filter(s => s.status === 'completed').length;
+    const totalSteps = steps.length;
+    const currentStepIndex = state.current_step;
+    
+    // Build detailed message
+    let message = `⚠️ Workflow was interrupted (page refresh/navigation). Progress: ${completedSteps}/${totalSteps} steps completed.`;
+    
+    if (completedSteps > 0) {
+      message += ` The workflow stopped and is NOT running. Click "Run Workflow" to restart from the beginning.`;
+    } else {
+      message += ` Click "Run Workflow" to start.`;
+    }
+    
+    showSetupResult(message, 'warning');
+    
+    // Also clear the workflow state since it's not actually running anymore
+    // This prevents confusion on subsequent refreshes
+    setTimeout(() => {
+      clearWorkflowState();
+    }, 5000); // Clear after 5 seconds to give user time to see the message
+    
   } else if (state.status === 'completed') {
-    showSetupResult('✅ Previous workflow completed successfully!', 'success');
+    const totalSteps = steps.length;
+    showSetupResult(`✅ Previous workflow completed successfully! All ${totalSteps} steps finished.`, 'success');
   } else if (state.status === 'failed') {
-    showSetupResult('❌ Previous workflow failed.', 'error');
+    const completedSteps = steps.filter(s => s.status === 'completed').length;
+    const totalSteps = steps.length;
+    showSetupResult(`❌ Previous workflow failed at step ${completedSteps + 1} of ${totalSteps}.`, 'error');
   }
 }
 
