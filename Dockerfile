@@ -25,11 +25,11 @@ RUN .venv/bin/pip install --no-cache-dir --trusted-host pypi.org --trusted-host 
 
 # Copy application files
 COPY app/ ./app/
-COPY *.sh ./
+COPY scripts/ ./scripts/
 COPY config.yaml ./ 
 
 # Make scripts executable
-RUN chmod +x *.sh
+RUN chmod +x scripts/*.sh
 
 # Create directory for SSH keys (will be mounted as volume)
 RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
