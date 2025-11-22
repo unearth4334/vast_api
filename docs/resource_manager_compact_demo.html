@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Manager - Compact Card Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .demo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .demo-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .demo-content {
+            padding: 30px;
+        }
+        
+        .section-title {
+            color: #007bff;
+            margin: 30px 0 20px 0;
+            font-size: 20px;
+        }
+        
+        /* Resource Grid */
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .resource-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        
+        .resource-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-color: #ccc;
+        }
+        
+        .resource-card.selected {
+            border-color: #28a745;
+        }
+        
+        .resource-card.expanded {
+            grid-column: span 2;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Compact Card View */
+        .resource-card-compact {
+            padding: 12px 16px;
+        }
+        
+        .compact-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .compact-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0;
+            color: #333;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .status-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            margin-left: 8px;
+        }
+        
+        .status-badge.status-available {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status-badge.status-selected {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .compact-meta {
+            display: flex;
+            gap: 8px;
+            font-size: 11px;
+        }
+        
+        .compact-type,
+        .compact-ecosystem {
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #f5f5f5;
+            color: #666;
+            text-transform: capitalize;
+        }
+        
+        .compact-ecosystem {
+            background: #007bff;
+            color: white;
+        }
+        
+        /* Expanded Card View */
+        .resource-card-expanded {
+            animation: expandCard 0.3s ease-out;
+        }
+        
+        @keyframes expandCard {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .resource-thumbnail-container {
+            width: 100%;
+            padding-top: 56.25%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+        }
+        
+        .resource-thumbnail-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+        }
+        
+        .resource-card-body {
+            padding: 16px;
+        }
+        
+        .resource-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        
+        .resource-tags {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        
+        .tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .tag-ecosystem {
+            background: #007bff;
+            color: white;
+        }
+        
+        .tag-type {
+            background: #e0e0e0;
+            color: #555;
+        }
+        
+        .resource-description {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.4;
+            margin-bottom: 12px;
+        }
+        
+        .resource-card-footer {
+            padding: 12px 16px;
+            background: #f9f9f9;
+            text-align: center;
+        }
+        
+        .btn-select {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-select:hover {
+            background: #0056b3;
+        }
+        
+        .resource-card.selected .btn-select {
+            background: #28a745;
+        }
+        
+        @media (max-width: 768px) {
+            .resource-card.expanded {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>📦 Resource Manager - Compact Cards</h1>
+            <p>Tap any card to expand and see full details</p>
+        </div>
+        
+        <div class="demo-content">
+            <h2 class="section-title">1. Compact Cards (Default View)</h2>
+            <p style="margin-bottom: 20px; color: #666;">
+                Cards show minimal information: name, type, and status. Click to expand.
+            </p>
+            
+            <div class="resource-grid">
+                <!-- Compact Card 1 -->
+                <div class="resource-card" onclick="toggleCard(this)">
+                    <div class="resource-card-compact">
+                        <div class="compact-header">
+                            <h3 class="compact-title">SDXL Anime Style</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">lora</span>
+                            <span class="compact-ecosystem">sdxl</span>
+                        </div>
+                    </div>
+                    <div class="resource-card-expanded" style="display: none;">
+                        <div class="resource-thumbnail-container">
+                            <div class="resource-thumbnail-icon">🎨</div>
+                        </div>
+                        <div class="resource-card-body">
+                            <h3 class="resource-title">SDXL Anime Style</h3>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">SDXL</span>
+                                <span class="tag tag-type">LoRA</span>
+                            </div>
+                            <p class="resource-description">
+                                High-quality anime style LoRA for SDXL base model. Produces clean, professional anime-style images.
+                            </p>
+                        </div>
+                        <div class="resource-card-footer">
+                            <button class="btn-select" onclick="selectCard(event, this)">☐ Select</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Compact Card 2 -->
+                <div class="resource-card selected" onclick="toggleCard(this)">
+                    <div class="resource-card-compact">
+                        <div class="compact-header">
+                            <h3 class="compact-title">WAN 2.2 I2V</h3>
+                            <span class="status-badge status-selected">Selected</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">workflow</span>
+                            <span class="compact-ecosystem">wan</span>
+                        </div>
+                    </div>
+                    <div class="resource-card-expanded" style="display: none;">
+                        <div class="resource-thumbnail-container" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            <div class="resource-thumbnail-icon">📝</div>
+                        </div>
+                        <div class="resource-card-body">
+                            <h3 class="resource-title">WAN 2.2 I2V</h3>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">WAN</span>
+                                <span class="tag tag-type">Workflow</span>
+                            </div>
+                            <p class="resource-description">
+                                Image-to-Video workflow for Wan 2.2 model. High-quality video generation from static images.
+                            </p>
+                        </div>
+                        <div class="resource-card-footer">
+                            <button class="btn-select" onclick="selectCard(event, this)">☑ Selected</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Compact Card 3 -->
+                <div class="resource-card" onclick="toggleCard(this)">
+                    <div class="resource-card-compact">
+                        <div class="compact-header">
+                            <h3 class="compact-title">RealESRGAN x4plus</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">upscaler</span>
+                            <span class="compact-ecosystem">realesrgan</span>
+                        </div>
+                    </div>
+                    <div class="resource-card-expanded" style="display: none;">
+                        <div class="resource-thumbnail-container" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                            <div class="resource-thumbnail-icon">⬆️</div>
+                        </div>
+                        <div class="resource-card-body">
+                            <h3 class="resource-title">RealESRGAN x4plus</h3>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">RealESRGAN</span>
+                                <span class="tag tag-type">Upscaler</span>
+                            </div>
+                            <p class="resource-description">
+                                High-quality 4x upscaling model for general image enhancement. Works well with both anime and real-world images.
+                            </p>
+                        </div>
+                        <div class="resource-card-footer">
+                            <button class="btn-select" onclick="selectCard(event, this)">☐ Select</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Compact Card 4 -->
+                <div class="resource-card" onclick="toggleCard(this)">
+                    <div class="resource-card-compact">
+                        <div class="compact-header">
+                            <h3 class="compact-title">FLUX Realism LoRA</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">lora</span>
+                            <span class="compact-ecosystem">flux</span>
+                        </div>
+                    </div>
+                    <div class="resource-card-expanded" style="display: none;">
+                        <div class="resource-thumbnail-container" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                            <div class="resource-thumbnail-icon">🎨</div>
+                        </div>
+                        <div class="resource-card-body">
+                            <h3 class="resource-title">FLUX Realism LoRA</h3>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">FLUX</span>
+                                <span class="tag tag-type">LoRA</span>
+                            </div>
+                            <p class="resource-description">
+                                Enhances realism in FLUX-generated images. Adds photorealistic details and improves lighting.
+                            </p>
+                        </div>
+                        <div class="resource-card-footer">
+                            <button class="btn-select" onclick="selectCard(event, this)">☐ Select</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Compact Card 5 -->
+                <div class="resource-card" onclick="toggleCard(this)">
+                    <div class="resource-card-compact">
+                        <div class="compact-header">
+                            <h3 class="compact-title">SDXL Base 1.0</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">checkpoint</span>
+                            <span class="compact-ecosystem">sdxl</span>
+                        </div>
+                    </div>
+                    <div class="resource-card-expanded" style="display: none;">
+                        <div class="resource-thumbnail-container">
+                            <div class="resource-thumbnail-icon">🧠</div>
+                        </div>
+                        <div class="resource-card-body">
+                            <h3 class="resource-title">SDXL Base 1.0</h3>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">SDXL</span>
+                                <span class="tag tag-type">Checkpoint</span>
+                            </div>
+                            <p class="resource-description">
+                                Official SDXL base model from Stability AI. 1024x1024 native resolution with improved composition.
+                            </p>
+                        </div>
+                        <div class="resource-card-footer">
+                            <button class="btn-select" onclick="selectCard(event, this)">☐ Select</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Compact Card 6 -->
+                <div class="resource-card" onclick="toggleCard(this)">
+                    <div class="resource-card-compact">
+                        <div class="compact-header">
+                            <h3 class="compact-title">SDXL VAE</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">vae</span>
+                            <span class="compact-ecosystem">sdxl</span>
+                        </div>
+                    </div>
+                    <div class="resource-card-expanded" style="display: none;">
+                        <div class="resource-thumbnail-container">
+                            <div class="resource-thumbnail-icon">🔍</div>
+                        </div>
+                        <div class="resource-card-body">
+                            <h3 class="resource-title">SDXL VAE</h3>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">SDXL</span>
+                                <span class="tag tag-type">VAE</span>
+                            </div>
+                            <p class="resource-description">
+                                Official VAE for Stable Diffusion XL. Essential for high-quality image generation with SDXL models.
+                            </p>
+                        </div>
+                        <div class="resource-card-footer">
+                            <button class="btn-select" onclick="selectCard(event, this)">☐ Select</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 30px 0; border-radius: 4px;">
+                <strong>💡 Interaction:</strong> Click any card to expand it and see full details. The most recently clicked card will expand while others collapse automatically.
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentExpandedCard = null;
+        
+        function toggleCard(card) {
+            const compact = card.querySelector('.resource-card-compact');
+            const expanded = card.querySelector('.resource-card-expanded');
+            
+            // Collapse previously expanded card
+            if (currentExpandedCard && currentExpandedCard !== card) {
+                const prevCompact = currentExpandedCard.querySelector('.resource-card-compact');
+                const prevExpanded = currentExpandedCard.querySelector('.resource-card-expanded');
+                prevCompact.style.display = 'block';
+                prevExpanded.style.display = 'none';
+                currentExpandedCard.classList.remove('expanded');
+            }
+            
+            // Toggle current card
+            if (card.classList.contains('expanded')) {
+                compact.style.display = 'block';
+                expanded.style.display = 'none';
+                card.classList.remove('expanded');
+                currentExpandedCard = null;
+            } else {
+                compact.style.display = 'none';
+                expanded.style.display = 'block';
+                card.classList.add('expanded');
+                currentExpandedCard = card;
+            }
+        }
+        
+        function selectCard(event, button) {
+            event.stopPropagation();
+            const card = button.closest('.resource-card');
+            const compactBadge = card.querySelector('.status-badge');
+            
+            if (card.classList.contains('selected')) {
+                card.classList.remove('selected');
+                button.innerHTML = '☐ Select';
+                button.style.background = '#007bff';
+                compactBadge.className = 'status-badge status-available';
+                compactBadge.textContent = 'Available';
+            } else {
+                card.classList.add('selected');
+                button.innerHTML = '☑ Selected';
+                button.style.background = '#28a745';
+                compactBadge.className = 'status-badge status-selected';
+                compactBadge.textContent = 'Selected';
+            }
+        }
+    </script>
+</body>
+</html>

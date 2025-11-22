@@ -19,6 +19,11 @@ function showTab(tabName) {
     // Add active class to clicked tab button
     const clickedButton = event.target;
     clickedButton.classList.add('active');
+    
+    // Initialize resource browser when resources tab is shown
+    if (tabName === 'resources' && !window.resourceBrowserInitialized) {
+        initResourceBrowser();
+    }
 }
 
 // Initialize application when DOM is loaded
@@ -34,6 +39,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup result panel click handler for viewing full reports
     attachResultClickHandler();
 });
+
+// Initialize resource browser
+async function initResourceBrowser() {
+    try {
+        const { ResourceBrowser } = await import('./resources/resource-browser.js');
+        const browser = new ResourceBrowser('resource-manager-container');
+        await browser.initialize();
+        window.resourceBrowserInitialized = true;
+    } catch (error) {
+        console.error('Failed to initialize resource browser:', error);
+        document.getElementById('resource-manager-container').innerHTML = 
+            '<div class="error">Failed to load Resource Manager</div>';
+    }
+}
 
 // Attach click handler to result panel for viewing full sync reports
 function attachResultClickHandler() {

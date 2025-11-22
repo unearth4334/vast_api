@@ -10,6 +10,7 @@ An easy-to-use tool for syncing media from local Docker containers and VastAI cl
 - 🔥 **Sync Forge**: Sync from Stable Diffusion WebUI Forge (10.0.78.108:2222)
 - 🖼️ **Sync ComfyUI**: Sync from ComfyUI (10.0.78.108:2223)  
 - ☁️ **Sync VastAI**: Auto-discover running VastAI instance and sync
+- 📦 **Resource Manager**: Browse and install workflows, models, and assets to VastAI instances
 - 🐳 **Docker Ready**: Containerized for easy deployment on QNAP NAS
 - 🌐 **Web API**: REST endpoints for web interface
 - ⚡ **Fast Sync**: Manifest-based change detection (v2)
@@ -63,6 +64,18 @@ An easy-to-use tool for syncing media from local Docker containers and VastAI cl
 - `POST /sync/forge` - Sync from Forge (10.0.78.108:2222)
 - `POST /sync/comfy` - Sync from ComfyUI (10.0.78.108:2223)
 - `POST /sync/vastai` - Auto-discover VastAI instance and sync
+
+### Resource Management
+
+- `GET /resources/list` - List available resources with optional filtering
+  - Query params: `type`, `ecosystem`, `tags`, `search`
+- `GET /resources/get/<path>` - Get details of a specific resource
+- `POST /resources/install` - Install resources to remote instance
+  - Body: `{ "ssh_connection": "root@host:port", "resources": [...], "ui_home": "/workspace/ComfyUI" }`
+- `GET /resources/ecosystems` - Get list of available ecosystems
+- `GET /resources/types` - Get list of available resource types
+- `GET /resources/tags` - Get list of available tags
+- `GET /resources/search?q=<query>` - Search resources by query string
 
 ### Status
 
@@ -155,6 +168,82 @@ volumes:
 - SSH files are stored locally in the project's `.ssh/` directory (run `./setup_ssh.sh` to create them)
 - Adjust `/share/sd/SecretFolder` to match your QNAP media share path
 - Container runs as `PUID=0` and `PGID=0` for media folder access
+
+## Resource Manager
+
+The Resource Manager provides a centralized system for browsing, filtering, and installing workflows, models, and other assets to VastAI instances.
+
+### Features
+
+- 📦 **Resource Library**: Curated collection of workflows, models, LoRAs, upscalers, and more
+- 🔍 **Smart Filtering**: Filter by ecosystem (FLUX, SDXL, WAN, etc.), type, and tags
+- 🔎 **Search**: Full-text search across resource descriptions
+- ⚡ **Quick Install**: One-click installation to remote instances via SSH
+- 📊 **Dependency Tracking**: Automatic dependency resolution (coming soon)
+- 🖼️ **Preview Images**: Visual preview of resources
+
+### Using the Resource Manager
+
+1. **Access the Web UI**: Navigate to `http://<your-nas-ip>:5000` in your browser
+2. **Go to Resource Manager Tab**: Click the "📦 Resource Manager" tab
+3. **Browse Resources**: View available resources in the grid layout
+4. **Filter Resources**: Use dropdowns to filter by ecosystem or type
+5. **Search**: Use the search box to find specific resources
+6. **Select Resources**: Click "Select" on resources you want to install
+7. **Install**: Enter your SSH connection string and click "Install Selected"
+
+### Resource Types
+
+- **workflow**: ComfyUI workflow JSON files
+- **checkpoint**: Base models and checkpoints (SDXL, FLUX, etc.)
+- **lora**: LoRA (Low-Rank Adaptation) models for style transfer
+- **vae**: VAE encoders for better image quality
+- **upscaler**: Upscaling models (RealESRGAN, etc.)
+- **controlnet**: ControlNet models for guided generation
+
+### Supported Ecosystems
+
+- **wan**: WAN Video models for video generation
+- **flux**: FLUX models for high-quality image generation
+- **sdxl**: Stable Diffusion XL models
+- **sd15**: Stable Diffusion 1.5 models
+- **realesrgan**: Real-ESRGAN upscaling models
+- **other**: General-purpose models
+
+### Adding Custom Resources
+
+Resources are defined in markdown files in the `resources/` directory. See [resources/README.md](resources/README.md) for detailed documentation on the format.
+
+Example resource definition:
+
+```markdown
+---
+tags: [workflow, text2img]
+ecosystem: flux
+basemodel: flux-schnell
+type: workflow
+version: v1.0
+---
+
+# My Custom Workflow
+
+Description of the workflow...
+
+### Download
+\`\`\`bash
+wget -P "$UI_HOME/user/default/workflows" \
+  https://example.com/workflow.json
+\`\`\`
+```
+
+### Current Resource Library
+
+The library includes:
+- 3 workflows (WAN, FLUX, SD 1.5)
+- 3 LoRAs (WAN, FLUX, SDXL)
+- 2 upscalers (RealESRGAN)
+- 1 checkpoint (SDXL base)
+- 1 VAE (SDXL)
 
 ## Troubleshooting
 

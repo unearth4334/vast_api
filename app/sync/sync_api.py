@@ -9,6 +9,7 @@ import subprocess
 import logging
 import time
 import uuid
+import re
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -66,6 +67,7 @@ CORS(
         r"/status": {"origins": ALLOWED_ORIGINS},
         r"/test/*": {"origins": ALLOWED_ORIGINS},
         r"/logs/*": {"origins": ALLOWED_ORIGINS},
+        r"/resources/*": {"origins": ALLOWED_ORIGINS},
         r"/": {"origins": ALLOWED_ORIGINS},
     },
     supports_credentials=False,
@@ -1240,7 +1242,6 @@ def ssh_install_custom_nodes():
             
             # Parse progress: [X/Y] Processing custom node: NodeName
             if 'Processing custom node:' in line:
-                import re
                 match = re.search(r'\[(\d+)/(\d+)\]\s+Processing custom node:\s+(.+)', line)
                 if match:
                     processed_nodes = int(match.group(1))
@@ -1302,6 +1303,183 @@ def ssh_install_custom_nodes():
         return jsonify({
             'success': False,
             'message': f'Custom nodes installation error: {str(e)}'
+        })
+
+
+@app.route('/ssh/verify-dependencies', methods=['POST', 'OPTIONS'])
+def ssh_verify_dependencies():
+    """Verify and install missing Python dependencies for custom nodes"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        ui_home = data.get('ui_home', '/workspace/ComfyUI')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Verifying dependencies on {ssh_host}:{ssh_port}")
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Check ComfyUI logs for import failures
+        check_log_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'tail -500 /var/log/portal/comfyui.log 2>/dev/null | grep -E "ModuleNotFoundError|ImportError|IMPORT FAILED" || echo ""'
+        ]
+        
+        result = subprocess.run(
+            check_log_cmd,
+            timeout=30,
+            capture_output=True,
+            text=True
+        )
+        
+        import_errors = []
+        missing_modules = set()
+        failed_nodes = set()
+        
+        if result.returncode == 0 and result.stdout.strip():
+            # Parse errors to find missing modules
+            for line in result.stdout.split('\n'):
+                if 'ModuleNotFoundError' in line or 'No module named' in line:
+                    match = re.search(r"No module named ['\"]([^'\"]+)['\"]", line)
+                    if match:
+                        missing_modules.add(match.group(1))
+                    import_errors.append(line.strip())
+                elif 'IMPORT FAILED' in line:
+                    match = re.search(r'IMPORT FAILED.*?([^/]+)$', line)
+                    if match:
+                        failed_nodes.add(match.group(1).strip())
+                # Check for custom error messages like "Can't import color-matcher"
+                elif "Can't import" in line or "did you install requirements" in line:
+                    match = re.search(r"Can't import ([a-zA-Z0-9_-]+)", line)
+                    if match:
+                        missing_modules.add(match.group(1))
+                    import_errors.append(line.strip())
+        
+        if not missing_modules:
+            logger.info("No missing dependencies found")
+            return jsonify({
+                'success': True,
+                'message': 'All dependencies are satisfied',
+                'missing_modules': [],
+                'failed_nodes': list(failed_nodes),
+                'installed': []
+            })
+        
+        logger.info(f"Found {len(missing_modules)} missing modules: {missing_modules}")
+        
+        # Map of module import names to pip package names
+        module_to_package = {
+            'colour_matcher': 'color-matcher',
+            'color_matcher': 'color-matcher',
+        }
+        
+        # Try to install missing modules
+        installed_modules = []
+        failed_installs = []
+        
+        for module in missing_modules:
+            # Convert module name to package name if needed
+            package_name = module_to_package.get(module, module)
+            logger.info(f"Installing missing module: {module} (package: {package_name})")
+            
+            install_cmd = [
+                'ssh',
+                '-p', str(ssh_port),
+                '-i', ssh_key,
+                '-o', 'ConnectTimeout=10',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
+                f'root@{ssh_host}',
+                f'source /venv/main/bin/activate && pip install {package_name}'
+            ]
+            
+            install_result = subprocess.run(
+                install_cmd,
+                timeout=120,
+                capture_output=True,
+                text=True
+            )
+            
+            if install_result.returncode == 0:
+                installed_modules.append(package_name)
+                logger.info(f"Successfully installed {package_name}")
+            else:
+                failed_installs.append(package_name)
+                logger.error(f"Failed to install {package_name}: {install_result.stderr}")
+        
+        # Restart ComfyUI to load the new dependencies
+        if installed_modules:
+            logger.info("Restarting ComfyUI to load new dependencies")
+            restart_cmd = [
+                'ssh',
+                '-p', str(ssh_port),
+                '-i', ssh_key,
+                '-o', 'ConnectTimeout=10',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
+                f'root@{ssh_host}',
+                'supervisorctl restart comfyui'
+            ]
+            
+            subprocess.run(
+                restart_cmd,
+                timeout=30,
+                capture_output=True,
+                text=True
+            )
+            
+            # Wait for ComfyUI to start
+            import time
+            time.sleep(10)
+        
+        success = len(failed_installs) == 0
+        message = f"Installed {len(installed_modules)} missing dependencies" if success else f"Installed {len(installed_modules)}, failed {len(failed_installs)}"
+        
+        return jsonify({
+            'success': success,
+            'message': message,
+            'missing_modules': list(missing_modules),
+            'installed': installed_modules,
+            'failed': failed_installs,
+            'failed_nodes': list(failed_nodes)
+        })
+        
+    except subprocess.TimeoutExpired:
+        logger.error("Dependency verification timed out")
+        return jsonify({
+            'success': False,
+            'message': 'Dependency verification timed out'
+        })
+    except Exception as e:
+        logger.error(f"Dependency verification error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Dependency verification error: {str(e)}'
         })
 
 
@@ -3374,6 +3552,272 @@ try:
     logger.info("Registered Sync API v2")
 except Exception as e:
     logger.warning(f"Failed to register Sync API v2: {e}")
+
+# --- Resource Management Routes ---
+
+# Initialize resource management
+resources_path = '/app/resources'
+resource_manager = None
+resource_installer = None
+
+try:
+    from ..resources import ResourceManager, ResourceInstaller
+    resource_manager = ResourceManager(resources_path)
+    resource_installer = ResourceInstaller()
+    logger.info("Resource management initialized")
+except Exception as e:
+    logger.warning(f"Failed to initialize resource management: {e}")
+
+@app.route('/resources/list', methods=['GET', 'OPTIONS'])
+def resources_list():
+    """List available resources with optional filtering"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    resource_type = request.args.get('type')
+    ecosystem = request.args.get('ecosystem')
+    tags_str = request.args.get('tags', '')
+    tags = [t.strip() for t in tags_str.split(',') if t.strip()] if tags_str else None
+    search = request.args.get('search')
+    
+    try:
+        resources = resource_manager.list_resources(
+            resource_type=resource_type,
+            ecosystem=ecosystem,
+            tags=tags,
+            search=search
+        )
+        
+        return jsonify({
+            'success': True,
+            'count': len(resources),
+            'resources': resources
+        })
+    except Exception as e:
+        logger.error(f"Error listing resources: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/get/<path:resource_path>', methods=['GET', 'OPTIONS'])
+def resources_get(resource_path):
+    """Get details of a specific resource"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        resource = resource_manager.get_resource(resource_path)
+        
+        if not resource:
+            return jsonify({
+                'success': False,
+                'message': f'Resource not found: {resource_path}'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'resource': resource
+        })
+    except Exception as e:
+        logger.error(f"Error getting resource: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/install', methods=['POST', 'OPTIONS'])
+def resources_install():
+    """Install resources to remote instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager or not resource_installer:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        data = request.get_json()
+        ssh_connection = data.get('ssh_connection')
+        resource_paths = data.get('resources', [])
+        ui_home = data.get('ui_home', '/workspace/ComfyUI')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            }), 400
+        
+        if not resource_paths:
+            return jsonify({
+                'success': False,
+                'message': 'At least one resource is required'
+            }), 400
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': str(e)
+            }), 400
+        
+        # Parse all requested resources
+        resources = []
+        for path in resource_paths:
+            resource = resource_manager.get_resource(path)
+            if not resource:
+                return jsonify({
+                    'success': False,
+                    'message': f'Resource not found: {path}'
+                }), 404
+            resources.append(resource)
+        
+        # Install
+        logger.info(f"Installing {len(resources)} resources to {ssh_host}:{ssh_port}")
+        result = resource_installer.install_multiple(
+            ssh_host,
+            ssh_port,
+            ui_home,
+            resources
+        )
+        
+        return jsonify({
+            'success': result['success'],
+            'installed': result['installed'],
+            'total': result['total'],
+            'details': result['results']
+        })
+        
+    except Exception as e:
+        logger.error(f"Error installing resources: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/ecosystems', methods=['GET', 'OPTIONS'])
+def resources_ecosystems():
+    """Get list of all available ecosystems"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        ecosystems = resource_manager.get_ecosystems()
+        return jsonify({
+            'success': True,
+            'ecosystems': ecosystems
+        })
+    except Exception as e:
+        logger.error(f"Error getting ecosystems: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/types', methods=['GET', 'OPTIONS'])
+def resources_types():
+    """Get list of all available resource types"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        types = resource_manager.get_types()
+        return jsonify({
+            'success': True,
+            'types': types
+        })
+    except Exception as e:
+        logger.error(f"Error getting types: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/tags', methods=['GET', 'OPTIONS'])
+def resources_tags():
+    """Get list of all available tags"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    try:
+        tags = resource_manager.get_tags()
+        return jsonify({
+            'success': True,
+            'tags': tags
+        })
+    except Exception as e:
+        logger.error(f"Error getting tags: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/resources/search', methods=['GET', 'OPTIONS'])
+def resources_search():
+    """Search resources by query string"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    if not resource_manager:
+        return jsonify({
+            'success': False,
+            'message': 'Resource management not available'
+        }), 503
+    
+    query = request.args.get('q', '')
+    
+    if not query:
+        return jsonify({
+            'success': False,
+            'message': 'Search query is required'
+        }), 400
+    
+    try:
+        resources = resource_manager.search_resources(query)
+        return jsonify({
+            'success': True,
+            'count': len(resources),
+            'resources': resources
+        })
+    except Exception as e:
+        logger.error(f"Error searching resources: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
 
 
 if __name__ == '__main__':

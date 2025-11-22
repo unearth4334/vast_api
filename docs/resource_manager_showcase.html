@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Manager UI Showcase</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 40px;
+        }
+        .feature {
+            background: white;
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .feature h3 {
+            color: #007bff;
+            margin-top: 0;
+        }
+        .feature ul {
+            line-height: 1.8;
+        }
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .screenshot {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .screenshot img {
+            width: 100%;
+            display: block;
+        }
+        .screenshot-caption {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Resource Manager UI Showcase</h1>
+    
+    <div class="note">
+        <strong>Note:</strong> This is a comprehensive showcase of the Resource Manager functionality.
+        To experience it live, start the application and navigate to the "📦 Resource Manager" tab.
+    </div>
+    
+    <h2>Overview</h2>
+    
+    <div class="feature">
+        <p>The Resource Manager provides an intuitive interface for browsing and installing ComfyUI resources 
+        to VastAI instances. It features a modern, responsive design with powerful filtering and search capabilities.</p>
+    </div>
+    
+    <h2>Main Interface</h2>
+    
+    <div class="screenshot">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 400px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">
+            📦 Resource Manager Tab
+        </div>
+        <div class="screenshot-caption">
+            <strong>Main Interface:</strong> Resource Manager tab showing the complete browsing experience with filters, grid view, and selection controls.
+        </div>
+    </div>
+    
+    <h2>Key Features</h2>
+    
+    <div class="feature">
+        <h3>1. 📦 Resource Library</h3>
+        <ul>
+            <li><strong>Grid Layout:</strong> Visual cards displaying 10+ resources</li>
+            <li><strong>Preview Images:</strong> 16:9 thumbnails for each resource</li>
+            <li><strong>Metadata Display:</strong> Tags, ecosystem, type, file size</li>
+            <li><strong>Hover Effects:</strong> Cards elevate on hover for better UX</li>
+        </ul>
+    </div>
+    
+    <div class="screenshot">
+        <div style="background: #f8f9fa; padding: 40px; text-align: center;">
+            <div style="display: inline-grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 900px;">
+                <div style="background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px;">
+                    <div style="background: #6c757d; height: 120px; border-radius: 4px; margin-bottom: 10px;"></div>
+                    <div style="font-weight: bold; margin: 10px 0;">WAN 2.2 I2V</div>
+                    <div style="font-size: 12px; color: #666;">workflow | wan</div>
+                </div>
+                <div style="background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px;">
+                    <div style="background: #6c757d; height: 120px; border-radius: 4px; margin-bottom: 10px;"></div>
+                    <div style="font-weight: bold; margin: 10px 0;">FLUX Realism LoRA</div>
+                    <div style="font-size: 12px; color: #666;">lora | flux</div>
+                </div>
+                <div style="background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px;">
+                    <div style="background: #6c757d; height: 120px; border-radius: 4px; margin-bottom: 10px;"></div>
+                    <div style="font-weight: bold; margin: 10px 0;">SDXL Base 1.0</div>
+                    <div style="font-size: 12px; color: #666;">checkpoint | sdxl</div>
+                </div>
+            </div>
+        </div>
+        <div class="screenshot-caption">
+            <strong>Resource Grid:</strong> Three-column responsive layout showing resource cards with previews and metadata.
+        </div>
+    </div>
+    
+    <div class="feature">
+        <h3>2. 🔍 Smart Filtering System</h3>
+        <ul>
+            <li><strong>Ecosystem Filter:</strong> FLUX, SDXL, WAN, SD 1.5, RealESRGAN</li>
+            <li><strong>Type Filter:</strong> Workflows, LoRAs, Checkpoints, VAEs, Upscalers</li>
+            <li><strong>Search Box:</strong> Real-time full-text search</li>
+            <li><strong>Clear Filters:</strong> One-click reset button</li>
+        </ul>
+    </div>
+    
+    <div class="screenshot">
+        <div style="background: #f5f5f5; padding: 20px;">
+            <div style="display: flex; gap: 15px; background: white; padding: 20px; border-radius: 8px;">
+                <div style="flex: 1;">
+                    <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px;">Ecosystem:</div>
+                    <select style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option>SDXL</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px;">Type:</div>
+                    <select style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option>All Types</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px;">Search:</div>
+                    <input type="text" placeholder="Search resources..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="padding-top: 22px;">
+                    <button style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">Clear Filters</button>
+                </div>
+            </div>
+        </div>
+        <div class="screenshot-caption">
+            <strong>Filter Panel:</strong> Dropdown filters for ecosystem and type, plus a search box with debouncing for smooth filtering.
+        </div>
+    </div>
+    
+    <div class="feature">
+        <h3>3. ⚡ Batch Installation</h3>
+        <ul>
+            <li><strong>Multi-Select:</strong> Select multiple resources at once</li>
+            <li><strong>Selection Counter:</strong> Shows count and total size</li>
+            <li><strong>SSH Input:</strong> Connection string field</li>
+            <li><strong>Install Button:</strong> One-click deployment</li>
+        </ul>
+    </div>
+    
+    <div class="screenshot">
+        <div style="background: #f5f5f5; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 20px; border-radius: 8px;">
+                <div>
+                    <strong>2 resources selected (650 MB)</strong>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button style="padding: 10px 20px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">Clear Selection</button>
+                    <button style="padding: 10px 20px; border: none; border-radius: 4px; background: #007bff; color: white; cursor: pointer;">Install Selected</button>
+                </div>
+            </div>
+        </div>
+        <div class="screenshot-caption">
+            <strong>Selection Footer:</strong> Shows selected count with size and provides action buttons.
+        </div>
+    </div>
+    
+    <h2>Available Resources</h2>
+    
+    <div class="feature">
+        <h3>📝 Workflows (3)</h3>
+        <ul>
+            <li><strong>WAN 2.2 I2V</strong> - Image-to-Video workflow for WAN 2.2 model</li>
+            <li><strong>FLUX Schnell T2I</strong> - Fast text-to-image generation with FLUX</li>
+            <li><strong>SD 1.5 Img2Img</strong> - Classic image-to-image workflow</li>
+        </ul>
+        
+        <h3>🎨 LoRAs (3)</h3>
+        <ul>
+            <li><strong>WAN FusionX</strong> - Style LoRA for WAN 2.1 video generation</li>
+            <li><strong>FLUX Realism</strong> - Photorealistic enhancement for FLUX</li>
+            <li><strong>SDXL Anime</strong> - Anime style transformation for SDXL</li>
+        </ul>
+        
+        <h3>🔍 Upscalers (2)</h3>
+        <ul>
+            <li><strong>RealESRGAN x4plus</strong> - General-purpose 4x upscaling</li>
+            <li><strong>RealESRGAN Anime 6B</strong> - Anime-optimized upscaling</li>
+        </ul>
+        
+        <h3>🧠 Models (2)</h3>
+        <ul>
+            <li><strong>SDXL Base 1.0</strong> - Official Stable Diffusion XL checkpoint</li>
+            <li><strong>SDXL VAE</strong> - High-quality VAE encoder for SDXL</li>
+        </ul>
+    </div>
+    
+    <h2>Technical Features</h2>
+    
+    <div class="feature">
+        <h3>Frontend Architecture</h3>
+        <ul>
+            <li><strong>Modular Design:</strong> Separate components for browser and cards</li>
+            <li><strong>ES6 Modules:</strong> Modern JavaScript with imports</li>
+            <li><strong>Responsive Grid:</strong> Auto-adjusts to screen size</li>
+            <li><strong>Debounced Search:</strong> Optimized search with 300ms delay</li>
+            <li><strong>State Management:</strong> Client-side selection tracking</li>
+        </ul>
+        
+        <h3>Backend Integration</h3>
+        <ul>
+            <li><strong>RESTful API:</strong> 8 endpoints for resource operations</li>
+            <li><strong>YAML Parsing:</strong> Markdown frontmatter extraction</li>
+            <li><strong>SSH Deployment:</strong> Secure key-based installation</li>
+            <li><strong>Error Handling:</strong> Comprehensive validation</li>
+        </ul>
+    </div>
+    
+    <h2>Quick Start</h2>
+    
+    <div class="feature">
+        <ol>
+            <li>Start the application:
+                <pre><code>docker-compose up -d</code></pre>
+            </li>
+            <li>Open browser to <code>http://localhost:5000</code></li>
+            <li>Click the "📦 Resource Manager" tab</li>
+            <li>Browse resources using filters or search</li>
+            <li>Select resources by clicking "Select" button</li>
+            <li>Enter SSH connection (e.g., <code>root@host:port</code>)</li>
+            <li>Click "Install Selected" to deploy</li>
+        </ol>
+    </div>
+    
+    <h2>API Examples</h2>
+    
+    <div class="feature">
+        <h3>List Resources</h3>
+        <pre><code>GET /resources/list
+GET /resources/list?ecosystem=sdxl
+GET /resources/list?type=workflows
+GET /resources/list?search=upscaler</code></pre>
+        
+        <h3>Get Resource Details</h3>
+        <pre><code>GET /resources/get/workflows/wan22_i2v.md</code></pre>
+        
+        <h3>Install Resources</h3>
+        <pre><code>POST /resources/install
+{
+  "ssh_connection": "root@host:port",
+  "resources": ["workflows/flux_schnell_t2i.md"],
+  "ui_home": "/workspace/ComfyUI"
+}</code></pre>
+        
+        <h3>Get Metadata</h3>
+        <pre><code>GET /resources/ecosystems
+GET /resources/types
+GET /resources/tags</code></pre>
+    </div>
+    
+    <hr style="margin: 40px 0; border: none; border-top: 1px solid #ddd;">
+    
+    <p style="text-align: center; color: #888;">
+        Resource Manager v1.0 | Comprehensive Test Suite Available
+    </p>
+</body>
+</html>

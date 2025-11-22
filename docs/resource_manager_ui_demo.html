@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Manager UI Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .demo-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .demo-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .demo-header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .demo-content {
+            padding: 30px;
+        }
+        
+        /* Resource Manager Styles */
+        .resource-header {
+            margin-bottom: 30px;
+        }
+        
+        .resource-header h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .resource-header p {
+            color: #666;
+        }
+        
+        .resource-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-group {
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .filter-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .btn-clear {
+            align-self: flex-end;
+            padding: 8px 16px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .resource-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+        
+        .resource-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .resource-card.selected {
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+        }
+        
+        .resource-thumbnail {
+            width: 100%;
+            padding-top: 56.25%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+        }
+        
+        .resource-thumbnail.workflow {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .resource-thumbnail.lora {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .resource-thumbnail.upscaler {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .resource-thumbnail-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+        }
+        
+        .resource-body {
+            padding: 16px;
+        }
+        
+        .resource-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .resource-tags {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .tag-ecosystem {
+            background: #007bff;
+            color: white;
+        }
+        
+        .tag-type {
+            background: #e0e0e0;
+            color: #555;
+        }
+        
+        .resource-description {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+        
+        .resource-footer {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #f9f9f9;
+        }
+        
+        .btn-view, .btn-select {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .btn-view {
+            background: transparent;
+            color: #007bff;
+            border: 1px solid #007bff;
+        }
+        
+        .btn-select {
+            background: #007bff;
+            color: white;
+        }
+        
+        .resource-card.selected .btn-select {
+            background: #28a745;
+        }
+        
+        .selection-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .selection-info {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-secondary, .btn-primary {
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .demo-section {
+            margin-bottom: 40px;
+            padding-bottom: 40px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .demo-section:last-child {
+            border-bottom: none;
+        }
+        
+        .demo-section h3 {
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>📦 Resource Manager UI Demo</h1>
+            <p>Interactive demonstration of the Resource Manager interface</p>
+        </div>
+        
+        <div class="demo-content">
+            <!-- Section 1: Main Interface -->
+            <div class="demo-section">
+                <h3>1. Main Interface</h3>
+                
+                <div class="resource-header">
+                    <h2>Resource Manager</h2>
+                    <p>Browse and install workflows, models, and other assets</p>
+                </div>
+                
+                <div class="resource-filters">
+                    <div class="filter-group">
+                        <label>Ecosystem:</label>
+                        <select>
+                            <option>All Ecosystems</option>
+                            <option>FLUX</option>
+                            <option selected>SDXL</option>
+                            <option>WAN</option>
+                            <option>SD 1.5</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label>Type:</label>
+                        <select>
+                            <option selected>All Types</option>
+                            <option>Workflows</option>
+                            <option>LoRAs</option>
+                            <option>Checkpoints</option>
+                            <option>Upscalers</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label>Search:</label>
+                        <input type="text" placeholder="Search resources...">
+                    </div>
+                    
+                    <button class="btn-clear">Clear Filters</button>
+                </div>
+            </div>
+            
+            <!-- Section 2: Resource Grid -->
+            <div class="demo-section">
+                <h3>2. Resource Grid (SDXL Filtered)</h3>
+                
+                <div class="resource-grid">
+                    <!-- Card 1 -->
+                    <div class="resource-card selected">
+                        <div class="resource-thumbnail lora">
+                            <div class="resource-thumbnail-icon">🎨</div>
+                        </div>
+                        <div class="resource-body">
+                            <div class="resource-title">SDXL Anime Style</div>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">SDXL</span>
+                                <span class="tag tag-type">LoRA</span>
+                            </div>
+                            <div class="resource-description">
+                                High-quality anime style LoRA for SDXL base model...
+                            </div>
+                        </div>
+                        <div class="resource-footer">
+                            <button class="btn-view">View Details</button>
+                            <button class="btn-select">☑ Selected</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Card 2 -->
+                    <div class="resource-card">
+                        <div class="resource-thumbnail checkpoint">
+                            <div class="resource-thumbnail-icon">🧠</div>
+                        </div>
+                        <div class="resource-body">
+                            <div class="resource-title">SDXL Base 1.0</div>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">SDXL</span>
+                                <span class="tag tag-type">Checkpoint</span>
+                            </div>
+                            <div class="resource-description">
+                                Official SDXL base model from Stability AI. 1024x1024 native...
+                            </div>
+                        </div>
+                        <div class="resource-footer">
+                            <button class="btn-view">View Details</button>
+                            <button class="btn-select">☐ Select</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Card 3 -->
+                    <div class="resource-card selected">
+                        <div class="resource-thumbnail">
+                            <div class="resource-thumbnail-icon">🔍</div>
+                        </div>
+                        <div class="resource-body">
+                            <div class="resource-title">SDXL VAE</div>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">SDXL</span>
+                                <span class="tag tag-type">VAE</span>
+                            </div>
+                            <div class="resource-description">
+                                Official VAE for Stable Diffusion XL. Essential for high-quality...
+                            </div>
+                        </div>
+                        <div class="resource-footer">
+                            <button class="btn-view">View Details</button>
+                            <button class="btn-select">☑ Selected</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section 3: Selection Footer -->
+            <div class="demo-section">
+                <h3>3. Selection Footer</h3>
+                
+                <div class="selection-footer">
+                    <div class="selection-info">
+                        2 resources selected (480 MB)
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn-secondary">Clear Selection</button>
+                        <button class="btn-primary">Install Selected</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section 4: All Resources View -->
+            <div class="demo-section">
+                <h3>4. Complete Resource Library</h3>
+                
+                <div class="resource-grid">
+                    <!-- Workflow -->
+                    <div class="resource-card">
+                        <div class="resource-thumbnail workflow">
+                            <div class="resource-thumbnail-icon">📝</div>
+                        </div>
+                        <div class="resource-body">
+                            <div class="resource-title">WAN 2.2 I2V</div>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">WAN</span>
+                                <span class="tag tag-type">Workflow</span>
+                            </div>
+                            <div class="resource-description">
+                                Image-to-Video workflow for Wan 2.2 model...
+                            </div>
+                        </div>
+                        <div class="resource-footer">
+                            <button class="btn-view">View Details</button>
+                            <button class="btn-select">☐ Select</button>
+                        </div>
+                    </div>
+                    
+                    <!-- LoRA -->
+                    <div class="resource-card">
+                        <div class="resource-thumbnail lora">
+                            <div class="resource-thumbnail-icon">🎨</div>
+                        </div>
+                        <div class="resource-body">
+                            <div class="resource-title">FLUX Realism</div>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">FLUX</span>
+                                <span class="tag tag-type">LoRA</span>
+                            </div>
+                            <div class="resource-description">
+                                Enhances realism in FLUX-generated images...
+                            </div>
+                        </div>
+                        <div class="resource-footer">
+                            <button class="btn-view">View Details</button>
+                            <button class="btn-select">☐ Select</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Upscaler -->
+                    <div class="resource-card">
+                        <div class="resource-thumbnail upscaler">
+                            <div class="resource-thumbnail-icon">⬆️</div>
+                        </div>
+                        <div class="resource-body">
+                            <div class="resource-title">RealESRGAN x4plus</div>
+                            <div class="resource-tags">
+                                <span class="tag tag-ecosystem">RealESRGAN</span>
+                                <span class="tag tag-type">Upscaler</span>
+                            </div>
+                            <div class="resource-description">
+                                High-quality 4x upscaling model for general images...
+                            </div>
+                        </div>
+                        <div class="resource-footer">
+                            <button class="btn-view">View Details</button>
+                            <button class="btn-select">☐ Select</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Add interactivity
+        document.querySelectorAll('.btn-select').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                const card = this.closest('.resource-card');
+                card.classList.toggle('selected');
+                if (card.classList.contains('selected')) {
+                    this.textContent = '☑ Selected';
+                    this.style.background = '#28a745';
+                } else {
+                    this.textContent = '☐ Select';
+                    this.style.background = '#007bff';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

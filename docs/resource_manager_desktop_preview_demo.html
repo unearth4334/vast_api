@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Manager - Desktop Preview Pane Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .demo-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .demo-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .demo-content {
+            padding: 30px;
+        }
+        
+        .section-title {
+            color: #007bff;
+            margin: 30px 0 20px 0;
+            font-size: 20px;
+        }
+        
+        /* Resource Content - Two-column layout */
+        .resource-content {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        /* Resource Grid */
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            flex: 1;
+        }
+        
+        .resource-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .resource-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-color: #ccc;
+        }
+        
+        .resource-card.active {
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+        }
+        
+        .compact-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .compact-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            flex: 1;
+        }
+        
+        .status-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+        
+        .status-badge.status-available {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status-badge.status-selected {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .compact-meta {
+            display: flex;
+            gap: 8px;
+            font-size: 11px;
+        }
+        
+        .compact-type,
+        .compact-ecosystem {
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #f5f5f5;
+            color: #666;
+            text-transform: capitalize;
+        }
+        
+        .compact-ecosystem {
+            background: #007bff;
+            color: white;
+        }
+        
+        /* Preview Pane */
+        .resource-preview-pane {
+            width: 400px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .preview-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            font-size: 20px;
+        }
+        
+        .preview-header {
+            position: relative;
+        }
+        
+        .preview-thumbnail {
+            width: 100%;
+            padding-top: 75%; /* 4:3 aspect ratio */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+        }
+        
+        .preview-thumbnail-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 64px;
+        }
+        
+        .preview-body {
+            padding: 20px;
+        }
+        
+        .preview-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 12px 0;
+            color: #333;
+        }
+        
+        .preview-tags {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .tag-ecosystem {
+            background: #007bff;
+            color: white;
+        }
+        
+        .tag-type {
+            background: #e0e0e0;
+            color: #555;
+        }
+        
+        .preview-description {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        
+        .preview-meta {
+            font-size: 13px;
+            color: #888;
+            margin: 8px 0;
+        }
+        
+        .preview-footer {
+            padding: 16px 20px;
+            background: #f9f9f9;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .btn-select-preview {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-select-preview:hover {
+            background: #0056b3;
+        }
+        
+        .info-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        /* Mobile styles */
+        @media (max-width: 768px) {
+            .resource-content {
+                flex-direction: column;
+            }
+            
+            .resource-preview-pane {
+                display: none !important;
+            }
+            
+            .info-box {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>📦 Resource Manager - Desktop Preview Pane</h1>
+            <p>Desktop: Preview pane on the right | Mobile: 4:3 aspect ratio inline expansion</p>
+        </div>
+        
+        <div class="demo-content">
+            <h2 class="section-title">Desktop Layout (> 768px width)</h2>
+            <p style="margin-bottom: 20px; color: #666;">
+                Click any card to see the preview pane on the right with a 4:3 aspect ratio thumbnail.
+            </p>
+            
+            <div class="resource-content">
+                <!-- Resource Grid -->
+                <div class="resource-grid">
+                    <!-- Card 1 -->
+                    <div class="resource-card" onclick="showPreview(1, this)">
+                        <div class="compact-header">
+                            <h3 class="compact-title">SDXL Anime Style</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">lora</span>
+                            <span class="compact-ecosystem">sdxl</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Card 2 -->
+                    <div class="resource-card" onclick="showPreview(2, this)">
+                        <div class="compact-header">
+                            <h3 class="compact-title">WAN 2.2 I2V</h3>
+                            <span class="status-badge status-selected">Selected</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">workflow</span>
+                            <span class="compact-ecosystem">wan</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Card 3 -->
+                    <div class="resource-card" onclick="showPreview(3, this)">
+                        <div class="compact-header">
+                            <h3 class="compact-title">RealESRGAN x4plus</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">upscaler</span>
+                            <span class="compact-ecosystem">realesrgan</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Card 4 -->
+                    <div class="resource-card" onclick="showPreview(4, this)">
+                        <div class="compact-header">
+                            <h3 class="compact-title">FLUX Realism LoRA</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">lora</span>
+                            <span class="compact-ecosystem">flux</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Card 5 -->
+                    <div class="resource-card" onclick="showPreview(5, this)">
+                        <div class="compact-header">
+                            <h3 class="compact-title">SDXL Base 1.0</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">checkpoint</span>
+                            <span class="compact-ecosystem">sdxl</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Card 6 -->
+                    <div class="resource-card" onclick="showPreview(6, this)">
+                        <div class="compact-header">
+                            <h3 class="compact-title">SDXL VAE</h3>
+                            <span class="status-badge status-available">Available</span>
+                        </div>
+                        <div class="compact-meta">
+                            <span class="compact-type">vae</span>
+                            <span class="compact-ecosystem">sdxl</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preview Pane -->
+                <div id="preview-pane" class="resource-preview-pane" style="display: none;">
+                    <div class="preview-header">
+                        <div class="preview-close" onclick="closePreview()">✕</div>
+                        <div class="preview-thumbnail" id="preview-thumbnail">
+                            <div class="preview-thumbnail-icon">🎨</div>
+                        </div>
+                    </div>
+                    <div class="preview-body">
+                        <h3 class="preview-title" id="preview-title">SDXL Anime Style</h3>
+                        <div class="preview-tags">
+                            <span class="tag tag-ecosystem" id="preview-ecosystem">SDXL</span>
+                            <span class="tag tag-type" id="preview-type">LoRA</span>
+                        </div>
+                        <p class="preview-description" id="preview-description">
+                            High-quality anime style LoRA for SDXL base model. Produces clean, professional anime-style images with vibrant colors.
+                        </p>
+                        <div class="preview-meta">📦 Size: 144 MB</div>
+                        <div class="preview-meta">👤 Author: StabilityAI</div>
+                        <div class="preview-meta">🏷 Version: v1.0</div>
+                    </div>
+                    <div class="preview-footer">
+                        <button class="btn-select-preview">☐ Select</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <strong>💡 Desktop Behavior:</strong><br>
+                • Click any card to show preview in the right pane<br>
+                • Preview pane has 4:3 aspect ratio thumbnail<br>
+                • Preview pane is sticky and scrolls independently<br>
+                • Close button (✕) in top-right corner
+            </div>
+            
+            <div class="info-box" style="background: #e7f3ff; border-color: #2196f3;">
+                <strong>📱 Mobile Behavior (&lt; 768px):</strong><br>
+                • Preview pane is hidden<br>
+                • Cards expand inline with 4:3 aspect ratio<br>
+                • Cards displayed in single column<br>
+                • Tap card to expand, tap again to collapse
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const previews = {
+            1: {
+                title: 'SDXL Anime Style',
+                ecosystem: 'SDXL',
+                type: 'LoRA',
+                icon: '🎨',
+                gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                description: 'High-quality anime style LoRA for SDXL base model. Produces clean, professional anime-style images with vibrant colors.',
+                meta: ['📦 Size: 144 MB', '👤 Author: StabilityAI', '🏷 Version: v1.0']
+            },
+            2: {
+                title: 'WAN 2.2 I2V',
+                ecosystem: 'WAN',
+                type: 'Workflow',
+                icon: '📝',
+                gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                description: 'Image-to-Video workflow for Wan 2.2 model. High-quality video generation from static images with smooth motion.',
+                meta: ['📦 Size: 2.1 GB', '👤 Author: UmeAiRT', '🏷 Version: v1.2', '⚠ 2 dependencies']
+            },
+            3: {
+                title: 'RealESRGAN x4plus',
+                ecosystem: 'RealESRGAN',
+                type: 'Upscaler',
+                icon: '⬆️',
+                gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                description: 'High-quality 4x upscaling model for general image enhancement. Works well with both anime and real-world images.',
+                meta: ['📦 Size: 64 MB', '🏷 Version: x4plus']
+            },
+            4: {
+                title: 'FLUX Realism LoRA',
+                ecosystem: 'FLUX',
+                type: 'LoRA',
+                icon: '🎨',
+                gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                description: 'Enhances realism in FLUX-generated images. Adds photorealistic details, improves lighting, and refines textures.',
+                meta: ['📦 Size: 180 MB', '👤 Author: FluxLabs', '🏷 Version: v2.1']
+            },
+            5: {
+                title: 'SDXL Base 1.0',
+                ecosystem: 'SDXL',
+                type: 'Checkpoint',
+                icon: '🧠',
+                gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                description: 'Official SDXL base model from Stability AI. 1024x1024 native resolution with improved composition and detail.',
+                meta: ['📦 Size: 6.9 GB', '👤 Author: Stability AI', '🏷 Version: 1.0']
+            },
+            6: {
+                title: 'SDXL VAE',
+                ecosystem: 'SDXL',
+                type: 'VAE',
+                icon: '🔍',
+                gradient: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+                description: 'Official VAE for Stable Diffusion XL. Essential for high-quality image generation with SDXL models.',
+                meta: ['📦 Size: 334 MB', '👤 Author: Stability AI', '🏷 Version: 1.0']
+            }
+        };
+        
+        function showPreview(id, cardElement) {
+            // Remove active class from all cards
+            document.querySelectorAll('.resource-card').forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked card
+            cardElement.classList.add('active');
+            
+            const preview = previews[id];
+            const pane = document.getElementById('preview-pane');
+            const thumbnail = document.getElementById('preview-thumbnail');
+            
+            // Update preview content
+            document.getElementById('preview-title').textContent = preview.title;
+            document.getElementById('preview-ecosystem').textContent = preview.ecosystem;
+            document.getElementById('preview-type').textContent = preview.type;
+            document.getElementById('preview-description').textContent = preview.description;
+            
+            thumbnail.style.background = preview.gradient;
+            thumbnail.innerHTML = `<div class="preview-thumbnail-icon">${preview.icon}</div>`;
+            
+            // Update meta
+            const metaHTML = preview.meta.map(m => `<div class="preview-meta">${m}</div>`).join('');
+            document.querySelector('.preview-body').innerHTML = `
+                <h3 class="preview-title">${preview.title}</h3>
+                <div class="preview-tags">
+                    <span class="tag tag-ecosystem">${preview.ecosystem}</span>
+                    <span class="tag tag-type">${preview.type}</span>
+                </div>
+                <p class="preview-description">${preview.description}</p>
+                ${metaHTML}
+            `;
+            
+            // Show preview pane
+            pane.style.display = 'block';
+        }
+        
+        function closePreview() {
+            document.getElementById('preview-pane').style.display = 'none';
+            document.querySelectorAll('.resource-card').forEach(c => c.classList.remove('active'));
+        }
+    </script>
+</body>
+</html>
