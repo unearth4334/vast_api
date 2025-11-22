@@ -19,6 +19,7 @@ function createTransitionIndicator() {
   return `
     <div class="spinner"></div>
     <div class="checkmark">✓</div>
+    <div class="failed-icon">✗</div>
     <div class="down-arrow">↓</div>
   `;
 }

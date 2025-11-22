@@ -1079,8 +1079,25 @@ body {
 }
 
 .workflow-arrow.loading .down-arrow,
-.workflow-arrow.completed .down-arrow {
+.workflow-arrow.completed .down-arrow,
+.workflow-arrow.failed .down-arrow {
     display: none;
+}
+
+/* Failed state - show X icon */
+.workflow-arrow .failed-icon {
+    width: 40px;
+    height: 40px;
+    color: var(--text-error);
+    font-size: 32px;
+    font-weight: bold;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.workflow-arrow.failed .failed-icon {
+    display: flex;
 }
 
 /* Spin animation for spinner */
@@ -1093,7 +1110,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
     .workflow-arrow.loading .spinner {
         /* Show a pulsing opacity instead for reduced motion */
-        animation: pulse-opacity 2s ease-in-out infinite;
+        animation: pulse-opacity 2s ease-in-out infinite !important;
     }
     
     @keyframes pulse-opacity {
