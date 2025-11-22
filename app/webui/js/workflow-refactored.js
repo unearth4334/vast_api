@@ -413,7 +413,11 @@ async function updateWorkflowVisualization() {
         showSetupResult('✅ Workflow completed successfully!', 'success');
       } else if (state.status === 'failed') {
         const failedStep = state.steps[state.current_step];
-        showSetupResult(`❌ Workflow failed at: ${failedStep?.label || 'unknown step'}`, 'error');
+        const stepLabel = failedStep?.label || 'unknown step';
+        const errorMsg = state.error_message || failedStep?.error || 'Unknown error';
+        
+        // Show detailed error message
+        showSetupResult(`❌ Workflow failed at: ${stepLabel}\n${errorMsg}`, 'error');
       } else if (state.status === 'cancelled') {
         showSetupResult('⏸️ Workflow cancelled', 'error');
       }

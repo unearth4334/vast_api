@@ -146,7 +146,7 @@ class WorkflowExecutor:
                 state_manager.save_state(state)
                 
                 # Execute the step
-                success = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index)
+                success, error_message = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index)
                 
                 # Update state - step completed or failed
                 if success:
@@ -154,8 +154,10 @@ class WorkflowExecutor:
                     logger.info(f"Step {step_index + 1} completed: {step['action']}")
                 else:
                     state['steps'][step_index]['status'] = 'failed'
+                    state['steps'][step_index]['error'] = error_message
                     state['status'] = 'failed'
-                    logger.error(f"Step {step_index + 1} failed: {step['action']}")
+                    state['error_message'] = f"Step {step_index + 1} ({step['action']}) failed: {error_message}"
+                    logger.error(f"Step {step_index + 1} failed: {step['action']} - {error_message}")
                     state_manager.save_state(state)
                     return
                 
@@ -182,7 +184,7 @@ class WorkflowExecutor:
                 if workflow_id in self.stop_flags:
                     del self.stop_flags[workflow_id]
     
-    def _execute_step(self, step: Dict[str, Any], ssh_connection: str, state_manager, workflow_id: str, step_index: int) -> bool:
+    def _execute_step(self, step: Dict[str, Any], ssh_connection: str, state_manager, workflow_id: str, step_index: int) -> tuple:
         """
         Execute a single workflow step by calling actual SSH API endpoints.
         
@@ -194,7 +196,7 @@ class WorkflowExecutor:
             step_index: Index of current step
             
         Returns:
-            True if step succeeded, False otherwise
+            Tuple of (success: bool, error_message: str or None)
         """
         action = step.get('action')
         
@@ -226,11 +228,12 @@ class WorkflowExecutor:
                 return self._execute_reboot_instance(instance_id)
             else:
                 logger.warning(f"Unknown action: {action}")
-                return False
+                return False, f"Unknown action: {action}"
                 
         except Exception as e:
-            logger.error(f"Error executing step {action}: {e}", exc_info=True)
-            return False
+            error_msg = str(e)
+            logger.error(f"Error executing step {action}: {error_msg}", exc_info=True)
+            return False, f"Exception: {error_msg}"
     
     def _parse_ssh_connection(self, ssh_connection: str) -> tuple:
         """Parse SSH connection string to extract host and port."""
@@ -248,7 +251,7 @@ class WorkflowExecutor:
             logger.error(f"Error parsing SSH connection: {e}")
             return None, None
     
-    def _execute_test_ssh(self, ssh_connection: str) -> bool:
+    def _execute_test_ssh(self, ssh_connection: str) -> tuple:
         """Test SSH connection by calling /ssh/test API endpoint."""
         logger.info("Testing SSH connection...")
         
@@ -262,16 +265,23 @@ class WorkflowExecutor:
             result = response.json()
             if result.get('success'):
                 logger.info("SSH connection test successful")
-                return True
+                return True, None
             else:
-                logger.error(f"SSH test failed: {result.get('message')}")
-                return False
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"SSH test failed: {error_msg}")
+                
+                # Check if it's a host key verification issue
+                if result.get('host_verification_needed'):
+                    error_msg = "Host key verification required. Please verify the SSH host key first using the 'Verify Host Key' button."
+                
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"SSH test failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"SSH test failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
-    def _execute_set_ui_home(self, ssh_connection: str, ui_home: str = '/workspace/ComfyUI') -> bool:
+    def _execute_set_ui_home(self, ssh_connection: str, ui_home: str = '/workspace/ComfyUI') -> tuple:
         """Set UI_HOME environment variable by calling /ssh/set-ui-home API endpoint."""
         logger.info(f"Setting UI_HOME to {ui_home}...")
         
@@ -288,16 +298,18 @@ class WorkflowExecutor:
             result = response.json()
             if result.get('success'):
                 logger.info("UI_HOME set successfully")
-                return True
+                return True, None
             else:
-                logger.error(f"Set UI_HOME failed: {result.get('message')}")
-                return False
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Set UI_HOME failed: {error_msg}")
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"Set UI_HOME failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Set UI_HOME failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
-    def _execute_get_ui_home(self, ssh_connection: str) -> bool:
+    def _execute_get_ui_home(self, ssh_connection: str) -> tuple:
         """Get UI_HOME environment variable by calling /ssh/get-ui-home API endpoint."""
         logger.info("Getting UI_HOME...")
         
@@ -312,16 +324,18 @@ class WorkflowExecutor:
             if result.get('success'):
                 ui_home = result.get('ui_home', 'Not set')
                 logger.info(f"UI_HOME: {ui_home}")
-                return True
+                return True, None
             else:
-                logger.error(f"Get UI_HOME failed: {result.get('message')}")
-                return False
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Get UI_HOME failed: {error_msg}")
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"Get UI_HOME failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Get UI_HOME failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
-    def _execute_setup_civitdl(self, ssh_connection: str) -> bool:
+    def _execute_setup_civitdl(self, ssh_connection: str) -> tuple:
         """Setup CivitDL by calling /ssh/setup-civitdl API endpoint."""
         logger.info("Setting up CivitDL...")
         
@@ -335,16 +349,18 @@ class WorkflowExecutor:
             result = response.json()
             if result.get('success'):
                 logger.info("CivitDL setup successful")
-                return True
+                return True, None
             else:
-                logger.error(f"CivitDL setup failed: {result.get('message')}")
-                return False
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"CivitDL setup failed: {error_msg}")
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"CivitDL setup failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"CivitDL setup failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
-    def _execute_test_civitdl(self, ssh_connection: str) -> bool:
+    def _execute_test_civitdl(self, ssh_connection: str) -> tuple:
         """Test CivitDL installation by calling /ssh/test-civitdl API endpoint."""
         logger.info("Testing CivitDL...")
         
@@ -358,17 +374,21 @@ class WorkflowExecutor:
             result = response.json()
             if result.get('success'):
                 logger.info("CivitDL test successful")
-                return True
+                return True, None
             else:
-                logger.warning(f"CivitDL test failed: {result.get('message')}")
+                error_msg = result.get('message', 'Unknown error')
+                logger.warning(f"CivitDL test failed: {error_msg}")
                 # Consider partial success acceptable
-                return result.get('has_warning', False) == False
+                if result.get('has_warning', False):
+                    return True, None  # Warning but not failure
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"CivitDL test failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"CivitDL test failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
-    def _execute_sync_instance(self, ssh_connection: str) -> bool:
+    def _execute_sync_instance(self, ssh_connection: str) -> tuple:
         """Sync instance media by calling /sync/vastai-connection API endpoint."""
         logger.info("Syncing instance...")
         
@@ -385,26 +405,28 @@ class WorkflowExecutor:
             result = response.json()
             if result.get('success'):
                 logger.info("Instance sync successful")
-                return True
+                return True, None
             else:
-                logger.error(f"Instance sync failed: {result.get('message')}")
-                return False
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Instance sync failed: {error_msg}")
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"Instance sync failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Instance sync failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
-    def _execute_setup_python_venv(self, ssh_connection: str) -> bool:
+    def _execute_setup_python_venv(self, ssh_connection: str) -> tuple:
         """Setup Python virtual environment (placeholder - may not be needed)."""
         logger.info("Setting up Python venv...")
         # Most VastAI templates already have venv configured
         # This is a placeholder for future use
         time.sleep(1)
         logger.info("Python venv already configured")
-        return True
+        return True, None
     
     def _execute_install_custom_nodes(self, ssh_connection: str, ui_home: str, 
-                                     state_manager, workflow_id: str, step_index: int) -> bool:
+                                     state_manager, workflow_id: str, step_index: int) -> tuple:
         """
         Install custom nodes by calling /ssh/install-custom-nodes API endpoint.
         Polls progress and updates state during installation.
@@ -442,16 +464,18 @@ class WorkflowExecutor:
                     }
                     state_manager.save_state(state)
                 
-                return True
+                return True, None
             else:
-                logger.error(f"Custom nodes installation failed: {result.get('message')}")
-                return False
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Custom nodes installation failed: {error_msg}")
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"Custom nodes installation failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Custom nodes installation failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
-    def _execute_verify_dependencies(self, ssh_connection: str, ui_home: str) -> bool:
+    def _execute_verify_dependencies(self, ssh_connection: str, ui_home: str) -> tuple:
         """Verify dependencies by calling /ssh/verify-dependencies API endpoint."""
         logger.info("Verifying dependencies...")
         
@@ -472,22 +496,25 @@ class WorkflowExecutor:
                     logger.info(f"Installed {len(installed)} missing dependencies: {', '.join(installed)}")
                 else:
                     logger.info("All dependencies verified")
-                return True
+                return True, None
             else:
-                logger.error(f"Dependency verification failed: {result.get('message')}")
-                return False
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Dependency verification failed: {error_msg}")
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"Dependency verification failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Dependency verification failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
-    def _execute_reboot_instance(self, instance_id: Optional[int]) -> bool:
+    def _execute_reboot_instance(self, instance_id: Optional[int]) -> tuple:
         """Reboot instance by calling /ssh/reboot-instance API endpoint."""
         logger.info(f"Rebooting instance {instance_id}...")
         
         if not instance_id:
-            logger.error("Instance ID required for reboot")
-            return False
+            error_msg = "Instance ID required for reboot"
+            logger.error(error_msg)
+            return False, error_msg
         
         try:
             response = requests.post(
@@ -502,14 +529,16 @@ class WorkflowExecutor:
                 # Wait for instance to come back up
                 logger.info("Waiting 30 seconds for instance to restart...")
                 time.sleep(30)
-                return True
+                return True, None
             else:
-                logger.error(f"Instance reboot failed: {result.get('message')}")
-                return False
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Instance reboot failed: {error_msg}")
+                return False, error_msg
                 
         except Exception as e:
-            logger.error(f"Instance reboot failed: {e}")
-            return False
+            error_msg = str(e)
+            logger.error(f"Instance reboot failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
 
 
 def get_workflow_executor() -> WorkflowExecutor:
