@@ -1035,31 +1035,89 @@ body {
     visibility: hidden;
 }
 
-/* SVG arrow container */
-.workflow-arrow svg {
-    width: 50px;
-    height: 60px;
+/* Spinner icon for loading state */
+.workflow-arrow .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--background-modifier-border);
+    border-top-color: var(--interactive-accent);
+    border-radius: 50%;
+    display: none;
+}
+
+/* Show spinner when loading */
+.workflow-arrow.loading .spinner {
     display: block;
+    animation: spin 1s linear infinite;
 }
 
-/* Default state - full color arrow */
-.workflow-arrow svg .arrow-body {
-    fill: var(--interactive-accent);
+/* Checkmark icon for completed state */
+.workflow-arrow .checkmark {
+    width: 40px;
+    height: 40px;
+    color: var(--text-success);
+    font-size: 32px;
+    font-weight: bold;
+    display: none;
+    align-items: center;
+    justify-content: center;
 }
 
-/* Grey state when workflow starts */
-.workflow-arrow.loading svg .arrow-body {
-    fill: #4a4a4a;
+.workflow-arrow.completed .checkmark {
+    display: flex;
 }
 
-/* Filled state - shows progress */
-.workflow-arrow.loading svg .arrow-fill {
-    fill: var(--interactive-accent);
+/* Down arrow icon for pending state */
+.workflow-arrow .down-arrow {
+    width: 40px;
+    height: 40px;
+    color: var(--text-muted);
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* Completed state - full color */
-.workflow-arrow.completed svg .arrow-body {
-    fill: var(--interactive-accent);
+.workflow-arrow.loading .down-arrow,
+.workflow-arrow.completed .down-arrow,
+.workflow-arrow.failed .down-arrow {
+    display: none;
+}
+
+/* Failed state - show X icon */
+.workflow-arrow .failed-icon {
+    width: 40px;
+    height: 40px;
+    color: var(--text-error);
+    font-size: 32px;
+    font-weight: bold;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.workflow-arrow.failed .failed-icon {
+    display: flex;
+}
+
+/* Spin animation for spinner */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Pulse opacity animation for reduced motion */
+@keyframes pulse-opacity {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Accessibility: Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .workflow-arrow.loading .spinner {
+        /* Show a pulsing opacity instead for reduced motion */
+        animation: pulse-opacity 2s ease-in-out infinite;
+    }
 }
 
 /* Progress visualization for workflow steps */
