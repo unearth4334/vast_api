@@ -3820,6 +3820,347 @@ def resources_search():
         }), 500
 
 
+# ============================================================================
+# ComfyUI Workflow Execution API Endpoints
+# ============================================================================
+
+@app.route('/comfyui/workflow/execute', methods=['POST', 'OPTIONS'])
+def execute_comfyui_workflow():
+    """
+    Execute a ComfyUI workflow on remote instance.
+    
+    Request Body:
+    {
+        "ssh_connection": "ssh -p 40738 root@198.53.64.194",
+        "workflow_file": "/path/to/workflow.json",
+        "workflow_name": "Image Enhancement",  # Optional
+        "input_images": ["/path/to/image1.png"],  # Optional
+        "output_dir": "/tmp/outputs",  # Optional
+        "comfyui_port": 18188,  # Optional
+        "comfyui_input_dir": "/workspace/ComfyUI/input",  # Optional
+        "comfyui_output_dir": "/workspace/ComfyUI/output"  # Optional
+    }
+    
+    Response:
+    {
+        "success": true,
+        "workflow_id": "comfyui_workflow_123",
+        "message": "Workflow execution started"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'Request body is required'
+            }), 400
+        
+        ssh_connection = data.get('ssh_connection')
+        workflow_file = data.get('workflow_file')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'ssh_connection is required'
+            }), 400
+        
+        if not workflow_file:
+            return jsonify({
+                'success': False,
+                'message': 'workflow_file is required'
+            }), 400
+        
+        # Optional parameters
+        workflow_name = data.get('workflow_name')
+        input_images = data.get('input_images', [])
+        output_dir = data.get('output_dir', '/tmp/comfyui_outputs')
+        comfyui_port = data.get('comfyui_port', 18188)
+        comfyui_input_dir = data.get('comfyui_input_dir', '/workspace/ComfyUI/input')
+        comfyui_output_dir = data.get('comfyui_output_dir', '/workspace/ComfyUI/output')
+        
+        # Import executor
+        from .comfyui_workflow_executor import get_executor
+        executor = get_executor()
+        
+        # Execute workflow
+        success, workflow_id, message = executor.execute_workflow(
+            ssh_connection=ssh_connection,
+            workflow_file=workflow_file,
+            workflow_name=workflow_name,
+            input_images=input_images,
+            output_dir=output_dir,
+            comfyui_port=comfyui_port,
+            comfyui_input_dir=comfyui_input_dir,
+            comfyui_output_dir=comfyui_output_dir
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'workflow_id': workflow_id,
+                'message': message
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+    
+    except Exception as e:
+        logger.exception("Error executing ComfyUI workflow")
+        return jsonify({
+            'success': False,
+            'message': f'Error executing workflow: {str(e)}'
+        }), 500
+
+
+@app.route('/comfyui/workflow/<workflow_id>/progress', methods=['GET', 'OPTIONS'])
+def get_comfyui_workflow_progress(workflow_id):
+    """
+    Get real-time progress of ComfyUI workflow.
+    
+    Response:
+    {
+        "success": true,
+        "progress": {
+            "workflow_id": "comfyui_workflow_123",
+            "workflow_name": "Image Enhancement",
+            "status": "executing",
+            "prompt_id": "abc-def-123",
+            "queue_position": null,
+            "current_node": "KSampler",
+            "total_nodes": 15,
+            "completed_nodes": 8,
+            "progress_percent": 53.3,
+            "nodes": [...],
+            "outputs": [],
+            "queue_time": "2024-11-21T10:30:00Z",
+            "start_time": "2024-11-21T10:30:15Z",
+            "end_time": null,
+            "last_update": "2024-11-21T10:32:45Z",
+            "error_message": null,
+            "failed_node": null
+        }
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        from .comfyui_workflow_executor import get_executor
+        from dataclasses import asdict
+        
+        executor = get_executor()
+        state = executor.get_workflow_state(workflow_id)
+        
+        if not state:
+            return jsonify({
+                'success': False,
+                'message': f'Workflow not found: {workflow_id}'
+            }), 404
+        
+        # Convert state to dict
+        state_dict = asdict(state)
+        
+        # Convert datetime objects to ISO format strings
+        for key in ['queue_time', 'start_time', 'end_time', 'last_update']:
+            if state_dict.get(key):
+                state_dict[key] = state_dict[key].isoformat()
+        
+        return jsonify({
+            'success': True,
+            'progress': state_dict
+        })
+    
+    except Exception as e:
+        logger.exception(f"Error getting workflow progress for {workflow_id}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting progress: {str(e)}'
+        }), 500
+
+
+@app.route('/comfyui/workflow/<workflow_id>/cancel', methods=['POST', 'OPTIONS'])
+def cancel_comfyui_workflow(workflow_id):
+    """
+    Cancel a running ComfyUI workflow.
+    
+    Response:
+    {
+        "success": true,
+        "message": "Workflow cancellation initiated"
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        from .comfyui_workflow_executor import get_executor
+        
+        executor = get_executor()
+        success = executor.cancel_workflow(workflow_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Workflow cancellation initiated'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Workflow not found or already completed: {workflow_id}'
+            }), 404
+    
+    except Exception as e:
+        logger.exception(f"Error cancelling workflow {workflow_id}")
+        return jsonify({
+            'success': False,
+            'message': f'Error cancelling workflow: {str(e)}'
+        }), 500
+
+
+@app.route('/comfyui/workflow/<workflow_id>/outputs', methods=['GET', 'OPTIONS'])
+def get_comfyui_workflow_outputs(workflow_id):
+    """
+    Get list of generated outputs for a workflow.
+    
+    Response:
+    {
+        "success": true,
+        "outputs": [
+            {
+                "filename": "ComfyUI_00001_.png",
+                "file_type": "image",
+                "remote_path": "/workspace/ComfyUI/output/ComfyUI_00001_.png",
+                "local_path": "/tmp/outputs/ComfyUI_00001_.png",
+                "downloaded": true
+            }
+        ]
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        from .comfyui_workflow_executor import get_executor
+        from dataclasses import asdict
+        
+        executor = get_executor()
+        state = executor.get_workflow_state(workflow_id)
+        
+        if not state:
+            return jsonify({
+                'success': False,
+                'message': f'Workflow not found: {workflow_id}'
+            }), 404
+        
+        # Convert outputs to dicts
+        outputs = [asdict(output) for output in state.outputs]
+        
+        return jsonify({
+            'success': True,
+            'outputs': outputs
+        })
+    
+    except Exception as e:
+        logger.exception(f"Error getting workflow outputs for {workflow_id}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting outputs: {str(e)}'
+        }), 500
+
+
+@app.route('/comfyui/workflow/state', methods=['GET', 'OPTIONS'])
+def get_comfyui_workflow_state():
+    """
+    Load persisted workflow state from disk (for page refresh restoration).
+    
+    Response:
+    {
+        "success": true,
+        "state": {
+            "workflow_id": "comfyui_workflow_123",
+            "status": "executing",
+            ...
+        }
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        from .comfyui_workflow_executor import get_executor
+        from dataclasses import asdict
+        
+        executor = get_executor()
+        state = executor.load_state()
+        
+        if not state:
+            return jsonify({
+                'success': True,
+                'state': None
+            })
+        
+        # Convert state to dict
+        state_dict = asdict(state)
+        
+        # Convert datetime objects to ISO format strings
+        for key in ['queue_time', 'start_time', 'end_time', 'last_update']:
+            if state_dict.get(key):
+                state_dict[key] = state_dict[key].isoformat()
+        
+        return jsonify({
+            'success': True,
+            'state': state_dict
+        })
+    
+    except Exception as e:
+        logger.exception("Error loading workflow state")
+        return jsonify({
+            'success': False,
+            'message': f'Error loading state: {str(e)}'
+        }), 500
+
+
+@app.route('/comfyui/workflow/<workflow_id>/active', methods=['GET', 'OPTIONS'])
+def check_comfyui_workflow_active(workflow_id):
+    """
+    Check if a workflow is currently executing.
+    
+    Response:
+    {
+        "success": true,
+        "active": true
+    }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        from .comfyui_workflow_executor import get_executor
+        
+        executor = get_executor()
+        active = executor.is_workflow_active(workflow_id)
+        
+        return jsonify({
+            'success': True,
+            'active': active
+        })
+    
+    except Exception as e:
+        logger.exception(f"Error checking workflow active status for {workflow_id}")
+        return jsonify({
+            'success': False,
+            'message': f'Error checking active status: {str(e)}'
+        }), 500
+
+
 if __name__ == '__main__':
     # Initialize log directories
     try:
