@@ -492,10 +492,9 @@ function renderWorkflowState(state) {
       stepElement.classList.add(stepStatus.replace('_', '-'));
     }
     
-    // Update step progress if available
-    if (stepData.progress) {
-      // TODO: Show progress details (e.g., for custom nodes installation)
-      console.log(`Step ${index} progress:`, stepData.progress);
+    // Render tasklist if step is in-progress or finished
+    if (stepStatus && (stepStatus === 'in_progress' || stepStatus === 'completed' || stepStatus === 'failed')) {
+      renderTasklist(stepElement, stepData);
     }
   });
   
@@ -535,6 +534,86 @@ function renderWorkflowState(state) {
     const blockReason = state.block_info?.block_reason || 'unknown';
     showSetupResult(`⚠️ Workflow paused: ${blockReason.replace(/_/g, ' ')}`, 'warning');
   }
+}
+
+/**
+ * Render tasklist for a workflow step
+ * @param {HTMLElement} stepElement - The workflow step element
+ * @param {object} stepData - Step data from workflow state
+ */
+function renderTasklist(stepElement, stepData) {
+  const tasks = stepData.tasks || [];
+  const completionNote = stepData.completion_note || '';
+  
+  // Check if tasklist already exists
+  let tasklistElement = stepElement.querySelector('.tasklist');
+  
+  if (tasks.length === 0 && !completionNote) {
+    // No tasks or note, remove tasklist if it exists
+    if (tasklistElement) {
+      tasklistElement.remove();
+    }
+    return;
+  }
+  
+  if (!tasklistElement) {
+    // Create new tasklist element
+    tasklistElement = document.createElement('div');
+    tasklistElement.className = 'tasklist';
+    stepElement.appendChild(tasklistElement);
+  }
+  
+  // Build tasklist HTML
+  let tasklistHTML = '<ul class="task-list">';
+  
+  tasks.forEach(task => {
+    const taskName = task.name;
+    const taskStatus = task.status || 'pending';
+    const taskNote = task.note || '';
+    
+    // Check if it's a countdown status
+    if (taskStatus.startsWith('countdown:')) {
+      const seconds = taskStatus.split(':')[1];
+      tasklistHTML += `<li class="task-item">
+        <span class="task-name">${escapeHtml(taskName)}</span>
+        <span class="task-status countdown">${seconds}s</span>
+      </li>`;
+    } else {
+      // Check if it's a success with count (e.g., "success (3/5)")
+      let statusDisplay = taskStatus;
+      let statusClass = taskStatus;
+      
+      if (taskStatus.startsWith('success (')) {
+        statusDisplay = taskStatus;
+        statusClass = 'success';
+      }
+      
+      tasklistHTML += `<li class="task-item">
+        <span class="task-name">${escapeHtml(taskName)}</span>
+        <span class="task-status ${statusClass}">${escapeHtml(statusDisplay)}</span>
+      </li>`;
+    }
+  });
+  
+  tasklistHTML += '</ul>';
+  
+  // Add completion note if present
+  if (completionNote) {
+    tasklistHTML += `<div class="completion-note">${escapeHtml(completionNote)}</div>`;
+  }
+  
+  tasklistElement.innerHTML = tasklistHTML;
+}
+
+/**
+ * Escape HTML to prevent XSS
+ * @param {string} text - Text to escape
+ * @returns {string} - Escaped text
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 /**

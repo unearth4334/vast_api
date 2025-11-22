@@ -246,30 +246,21 @@ class WorkflowExecutor:
             # Map action to execution logic
             if action == 'test_ssh':
                 return self._execute_test_ssh(ssh_connection)
-            elif action == 'set_ui_home':
-                ui_home = step.get('ui_home', '/workspace/ComfyUI')
-                return self._execute_set_ui_home(ssh_connection, ui_home)
-            elif action == 'get_ui_home':
-                return self._execute_get_ui_home(ssh_connection)
             elif action == 'setup_civitdl':
-                return self._execute_setup_civitdl(ssh_connection)
-            elif action == 'test_civitdl':
-                return self._execute_test_civitdl(ssh_connection)
+                # Consolidated: Setup and Test CivitDL
+                return self._execute_setup_civitdl_consolidated(ssh_connection, state_manager, workflow_id, step_index)
+            elif action == 'set_ui_home':
+                # Consolidated: Set and Read UI_HOME
+                ui_home = step.get('ui_home', '/workspace/ComfyUI')
+                return self._execute_set_ui_home_consolidated(ssh_connection, ui_home, state_manager, workflow_id, step_index)
             elif action == 'sync_instance':
                 return self._execute_sync_instance(ssh_connection)
-            elif action == 'setup_python_venv':
-                return self._execute_setup_python_venv(ssh_connection)
-            elif action == 'clone_auto_installer':
-                return self._execute_clone_auto_installer(ssh_connection)
             elif action == 'install_custom_nodes':
                 ui_home = step.get('ui_home', '/workspace/ComfyUI')
                 return self._execute_install_custom_nodes(ssh_connection, ui_home, state_manager, workflow_id, step_index)
-            elif action == 'verify_dependencies':
-                ui_home = step.get('ui_home', '/workspace/ComfyUI')
-                return self._execute_verify_dependencies(ssh_connection, ui_home)
             elif action == 'reboot_instance':
                 instance_id = step.get('instance_id')
-                return self._execute_reboot_instance(instance_id)
+                return self._execute_reboot_instance_with_tasks(instance_id, state_manager, workflow_id, step_index)
             else:
                 logger.warning(f"Unknown action: {action}")
                 return False, f"Unknown action: {action}"
@@ -278,6 +269,62 @@ class WorkflowExecutor:
             error_msg = str(e)
             logger.error(f"Error executing step {action}: {error_msg}", exc_info=True)
             return False, f"Exception: {error_msg}"
+    
+    def _update_task_status(self, state_manager, workflow_id: str, step_index: int, task_name: str, status: str, note: str = None):
+        """
+        Update the status of a specific task within a workflow step.
+        
+        Args:
+            state_manager: WorkflowStateManager instance
+            workflow_id: ID of the workflow
+            step_index: Index of the step
+            task_name: Name of the task
+            status: Status of the task (pending, running, success, failed)
+            note: Optional completion note
+        """
+        state = state_manager.load_state()
+        if not state or step_index >= len(state.get('steps', [])):
+            return
+        
+        # Initialize tasks list if not present
+        if 'tasks' not in state['steps'][step_index]:
+            state['steps'][step_index]['tasks'] = []
+        
+        # Find or create task entry
+        tasks = state['steps'][step_index]['tasks']
+        task_entry = None
+        for task in tasks:
+            if task['name'] == task_name:
+                task_entry = task
+                break
+        
+        if not task_entry:
+            task_entry = {'name': task_name, 'status': status}
+            tasks.append(task_entry)
+        else:
+            task_entry['status'] = status
+        
+        if note:
+            task_entry['note'] = note
+        
+        state_manager.save_state(state)
+    
+    def _set_completion_note(self, state_manager, workflow_id: str, step_index: int, note: str):
+        """
+        Set a completion note for a workflow step.
+        
+        Args:
+            state_manager: WorkflowStateManager instance
+            workflow_id: ID of the workflow
+            step_index: Index of the step
+            note: Completion note text
+        """
+        state = state_manager.load_state()
+        if not state or step_index >= len(state.get('steps', [])):
+            return
+        
+        state['steps'][step_index]['completion_note'] = note
+        state_manager.save_state(state)
     
     def _parse_ssh_connection(self, ssh_connection: str) -> tuple:
         """Parse SSH connection string to extract host and port."""
@@ -360,6 +407,71 @@ class WorkflowExecutor:
             logger.error(f"Set UI_HOME failed: {error_msg}")
             return False, f"Connection error: {error_msg}"
     
+    def _execute_set_ui_home_consolidated(self, ssh_connection: str, ui_home: str, state_manager, workflow_id: str, step_index: int) -> tuple:
+        """
+        Consolidated UI_HOME setup: Set and Read.
+        This replaces separate set_ui_home and get_ui_home actions.
+        """
+        logger.info(f"Starting consolidated UI_HOME setup (set + read): {ui_home}")
+        
+        # Task 1: Install (Set)
+        self._update_task_status(state_manager, workflow_id, step_index, 'install', 'running')
+        
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/set-ui-home",
+                json={
+                    'ssh_connection': ssh_connection,
+                    'ui_home': ui_home
+                },
+                timeout=30
+            )
+            
+            result = response.json()
+            if not result.get('success'):
+                error_msg = result.get('message', 'Unknown error')
+                self._update_task_status(state_manager, workflow_id, step_index, 'install', 'failed')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Failed to set UI_HOME: {error_msg}")
+                return False, error_msg
+            
+            self._update_task_status(state_manager, workflow_id, step_index, 'install', 'success')
+            logger.info("UI_HOME set successfully")
+            
+        except Exception as e:
+            error_msg = str(e)
+            self._update_task_status(state_manager, workflow_id, step_index, 'install', 'failed')
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Error setting UI_HOME: {error_msg}")
+            return False, error_msg
+        
+        # Task 2: Test (Read)
+        self._update_task_status(state_manager, workflow_id, step_index, 'test', 'running')
+        
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/get-ui-home",
+                json={'ssh_connection': ssh_connection},
+                timeout=30
+            )
+            
+            result = response.json()
+            if result.get('success'):
+                retrieved_ui_home = result.get('ui_home', 'Not set')
+                self._update_task_status(state_manager, workflow_id, step_index, 'test', 'success')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"UI_HOME verified: {retrieved_ui_home}")
+                logger.info(f"UI_HOME verified: {retrieved_ui_home}")
+                return True, None
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                self._update_task_status(state_manager, workflow_id, step_index, 'test', 'failed')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Failed to verify UI_HOME: {error_msg}")
+                return False, error_msg
+                
+        except Exception as e:
+            error_msg = str(e)
+            self._update_task_status(state_manager, workflow_id, step_index, 'test', 'failed')
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Error verifying UI_HOME: {error_msg}")
+            return False, error_msg
+    
     def _execute_get_ui_home(self, ssh_connection: str) -> tuple:
         """Get UI_HOME environment variable by calling /ssh/get-ui-home API endpoint."""
         logger.info("Getting UI_HOME...")
@@ -410,6 +522,73 @@ class WorkflowExecutor:
             error_msg = str(e)
             logger.error(f"CivitDL setup failed: {error_msg}")
             return False, f"Connection error: {error_msg}"
+    
+    def _execute_setup_civitdl_consolidated(self, ssh_connection: str, state_manager, workflow_id: str, step_index: int) -> tuple:
+        """
+        Consolidated CivitDL setup: Install and Test.
+        This replaces separate setup_civitdl and test_civitdl actions.
+        """
+        logger.info("Starting consolidated CivitDL setup (install + test)...")
+        
+        # Task 1: Install
+        self._update_task_status(state_manager, workflow_id, step_index, 'install', 'running')
+        
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/setup-civitdl",
+                json={'ssh_connection': ssh_connection},
+                timeout=180
+            )
+            
+            result = response.json()
+            if not result.get('success'):
+                error_msg = result.get('message', 'Unknown error')
+                self._update_task_status(state_manager, workflow_id, step_index, 'install', 'failed')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Installation failed: {error_msg}")
+                return False, error_msg
+            
+            self._update_task_status(state_manager, workflow_id, step_index, 'install', 'success')
+            logger.info("CivitDL installation successful")
+            
+        except Exception as e:
+            error_msg = str(e)
+            self._update_task_status(state_manager, workflow_id, step_index, 'install', 'failed')
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Installation error: {error_msg}")
+            return False, error_msg
+        
+        # Task 2: Test
+        self._update_task_status(state_manager, workflow_id, step_index, 'test', 'running')
+        
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/test-civitdl",
+                json={'ssh_connection': ssh_connection},
+                timeout=60
+            )
+            
+            result = response.json()
+            if result.get('success'):
+                self._update_task_status(state_manager, workflow_id, step_index, 'test', 'success')
+                self._set_completion_note(state_manager, workflow_id, step_index, "CivitDL installed and tested successfully")
+                logger.info("CivitDL test successful")
+                return True, None
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                # Test failure might be acceptable with warning
+                if result.get('has_warning', False):
+                    self._update_task_status(state_manager, workflow_id, step_index, 'test', 'success')
+                    self._set_completion_note(state_manager, workflow_id, step_index, f"CivitDL installed successfully (test warning: {error_msg})")
+                    return True, None
+                else:
+                    self._update_task_status(state_manager, workflow_id, step_index, 'test', 'failed')
+                    self._set_completion_note(state_manager, workflow_id, step_index, f"Test failed: {error_msg}")
+                    return False, error_msg
+                    
+        except Exception as e:
+            error_msg = str(e)
+            self._update_task_status(state_manager, workflow_id, step_index, 'test', 'failed')
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Test error: {error_msg}")
+            return False, error_msg
     
     def _execute_test_civitdl(self, ssh_connection: str) -> tuple:
         """Test CivitDL installation by calling /ssh/test-civitdl API endpoint."""
@@ -507,13 +686,43 @@ class WorkflowExecutor:
     def _execute_install_custom_nodes(self, ssh_connection: str, ui_home: str, 
                                      state_manager, workflow_id: str, step_index: int) -> tuple:
         """
-        Install custom nodes by calling /ssh/install-custom-nodes API endpoint.
-        Polls progress and updates state during installation.
+        Install custom nodes with rolling tasklist display.
+        Includes: Clone Auto-installer, custom nodes (with rolling 5-line display), and verify dependencies.
         """
-        logger.info("Installing custom nodes...")
+        logger.info("Starting custom nodes installation workflow...")
+        
+        # Task 1: Clone Auto-installer
+        self._update_task_status(state_manager, workflow_id, step_index, 'Clone Auto-installer', 'running')
         
         try:
-            # Start the installation (this returns immediately)
+            response = requests.post(
+                f"{API_BASE_URL}/templates/comfyui/execute-step",
+                json={
+                    'ssh_connection': ssh_connection,
+                    'step_name': 'Clone ComfyUI Auto Installer'
+                },
+                timeout=300
+            )
+            
+            result = response.json()
+            if not result.get('success'):
+                error_msg = result.get('message', 'Unknown error')
+                self._update_task_status(state_manager, workflow_id, step_index, 'Clone Auto-installer', 'failed')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Failed to clone auto-installer: {error_msg}")
+                return False, error_msg
+            
+            self._update_task_status(state_manager, workflow_id, step_index, 'Clone Auto-installer', 'success')
+            logger.info("Auto-installer cloned successfully")
+            
+        except Exception as e:
+            error_msg = str(e)
+            self._update_task_status(state_manager, workflow_id, step_index, 'Clone Auto-installer', 'failed')
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Error cloning auto-installer: {error_msg}")
+            return False, error_msg
+        
+        # Task 2: Install Custom Nodes (with rolling display)
+        try:
+            # Start the installation
             response = requests.post(
                 f"{API_BASE_URL}/ssh/install-custom-nodes",
                 json={
@@ -524,35 +733,99 @@ class WorkflowExecutor:
             )
             
             result = response.json()
+            if not result.get('success'):
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Custom nodes installation failed: {error_msg}")
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Custom nodes installation failed: {error_msg}")
+                return False, error_msg
+            
+            # Installation completed - update tasklist with rolling display logic
+            total_nodes = result.get('total_nodes', 0)
+            successful_nodes = result.get('successful_clones', 0)
+            failed_nodes = result.get('failed_clones', 0)
+            node_list = result.get('nodes', [])
+            
+            logger.info(f"Custom nodes installation completed: {successful_nodes}/{total_nodes} successful, {failed_nodes} failed")
+            
+            # Update state with rolling display for nodes
+            state = state_manager.load_state()
+            if state:
+                tasks = state['steps'][step_index].get('tasks', [])
+                
+                # Keep Clone Auto-installer task
+                # Add node tasks with rolling display
+                MAX_VISIBLE = 5
+                
+                if total_nodes > MAX_VISIBLE - 1:  # -1 for Clone Auto-installer
+                    # Show first 3 nodes, then "# others"
+                    for i, node in enumerate(node_list[:3]):
+                        task_name = node.get('name', f'Node {i+1}')
+                        status = 'success' if node.get('success') else 'failed'
+                        self._update_task_status(state_manager, workflow_id, step_index, task_name, status)
+                    
+                    # Add "# others" summary
+                    remaining = total_nodes - 3
+                    others_status = f"success ({successful_nodes - 3}/{remaining})" if successful_nodes > 3 else "pending"
+                    self._update_task_status(state_manager, workflow_id, step_index, f"{remaining} others", others_status)
+                else:
+                    # Show all nodes
+                    for node in node_list:
+                        task_name = node.get('name', 'Unknown Node')
+                        status = 'success' if node.get('success') else 'failed'
+                        self._update_task_status(state_manager, workflow_id, step_index, task_name, status)
+                
+                state_manager.save_state(state)
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Custom nodes installation failed: {error_msg}")
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Installation error: {error_msg}")
+            return False, error_msg
+        
+        # Task 3: Verify Dependencies (with rolling display)
+        self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'running')
+        
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/verify-dependencies",
+                json={
+                    'ssh_connection': ssh_connection,
+                    'ui_home': ui_home
+                },
+                timeout=300
+            )
+            
+            result = response.json()
             if result.get('success'):
-                # Installation completed successfully
-                total = result.get('total_nodes', 0)
-                successful = result.get('successful_clones', 0)
-                failed = result.get('failed_clones', 0)
+                installed_deps = result.get('installed', [])
+                if installed_deps:
+                    logger.info(f"Installed {len(installed_deps)} missing dependencies")
+                    
+                    # Add dependencies as sub-tasks with rolling display
+                    MAX_DEP_VISIBLE = 5
+                    if len(installed_deps) > MAX_DEP_VISIBLE:
+                        for dep in installed_deps[:4]:
+                            self._update_task_status(state_manager, workflow_id, step_index, f"  {dep}", 'success')
+                        remaining_deps = len(installed_deps) - 4
+                        self._update_task_status(state_manager, workflow_id, step_index, f"  {remaining_deps} others", f"success ({remaining_deps}/{remaining_deps})")
+                    else:
+                        for dep in installed_deps:
+                            self._update_task_status(state_manager, workflow_id, step_index, f"  {dep}", 'success')
                 
-                logger.info(f"Custom nodes installation completed: {successful}/{total} successful, {failed} failed")
-                
-                # Update step progress
-                state = state_manager.load_state()
-                if state:
-                    state['steps'][step_index]['progress'] = {
-                        'total': total,
-                        'processed': total,
-                        'successful': successful,
-                        'failed': failed
-                    }
-                    state_manager.save_state(state)
-                
+                self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'success')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Custom nodes installation completed: {successful_nodes}/{total_nodes} nodes, {len(installed_deps)} dependencies installed")
                 return True, None
             else:
                 error_msg = result.get('message', 'Unknown error')
-                logger.error(f"Custom nodes installation failed: {error_msg}")
+                self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'failed')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Dependency verification failed: {error_msg}")
                 return False, error_msg
                 
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"Custom nodes installation failed: {error_msg}")
-            return False, f"Connection error: {error_msg}"
+            self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'failed')
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Dependency verification error: {error_msg}")
+            return False, error_msg
     
     def _execute_verify_dependencies(self, ssh_connection: str, ui_home: str) -> tuple:
         """Verify dependencies by calling /ssh/verify-dependencies API endpoint."""
@@ -618,6 +891,108 @@ class WorkflowExecutor:
             error_msg = str(e)
             logger.error(f"Instance reboot failed: {error_msg}")
             return False, f"Connection error: {error_msg}"
+    
+    def _execute_reboot_instance_with_tasks(self, instance_id: Optional[int], state_manager, workflow_id: str, step_index: int) -> tuple:
+        """
+        Reboot instance with detailed task tracking.
+        Tasks: Initiating, Waiting (with countdown), Checking (with retry).
+        """
+        logger.info(f"Starting reboot workflow for instance {instance_id}...")
+        
+        if not instance_id:
+            error_msg = "Instance ID required for reboot"
+            logger.error(error_msg)
+            self._set_completion_note(state_manager, workflow_id, step_index, error_msg)
+            return False, error_msg
+        
+        # Task 1: Initiating
+        self._update_task_status(state_manager, workflow_id, step_index, 'Initiating', 'running')
+        
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/reboot-instance",
+                json={'instance_id': instance_id},
+                timeout=30
+            )
+            
+            result = response.json()
+            if not result.get('success'):
+                error_msg = result.get('message', 'Unknown error')
+                self._update_task_status(state_manager, workflow_id, step_index, 'Initiating', 'failed')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Failed to initiate reboot: {error_msg}")
+                return False, error_msg
+            
+            self._update_task_status(state_manager, workflow_id, step_index, 'Initiating', 'success')
+            logger.info("Instance reboot initiated")
+            
+        except Exception as e:
+            error_msg = str(e)
+            self._update_task_status(state_manager, workflow_id, step_index, 'Initiating', 'failed')
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Reboot initiation error: {error_msg}")
+            return False, error_msg
+        
+        # Task 2: Waiting (with countdown)
+        WAIT_DURATION = 30  # seconds
+        for remaining in range(WAIT_DURATION, 0, -1):
+            self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', f'countdown:{remaining}')
+            time.sleep(1)
+        
+        self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', 'success')
+        logger.info("Wait period completed")
+        
+        # Task 3: Checking (with retry)
+        MAX_RETRIES = 3
+        for attempt in range(1, MAX_RETRIES + 1):
+            self._update_task_status(state_manager, workflow_id, step_index, 'Checking', 'running')
+            logger.info(f"Checking instance status (attempt {attempt}/{MAX_RETRIES})...")
+            
+            try:
+                # Check if instance is back online
+                check_response = requests.get(
+                    f"{API_BASE_URL}/vastai/instances",
+                    timeout=30
+                )
+                
+                check_result = check_response.json()
+                if check_result.get('success'):
+                    instances = check_result.get('instances', [])
+                    target_instance = next((inst for inst in instances if inst.get('id') == instance_id), None)
+                    
+                    if target_instance and target_instance.get('actual_status') == 'running':
+                        self._update_task_status(state_manager, workflow_id, step_index, 'Checking', 'success')
+                        self._set_completion_note(state_manager, workflow_id, step_index, "Instance rebooted and verified successfully")
+                        logger.info("Instance is back online")
+                        return True, None
+                
+                # Check failed, retry if attempts remain
+                if attempt < MAX_RETRIES:
+                    logger.warning(f"Instance not ready, waiting 30 seconds before retry...")
+                    for remaining in range(30, 0, -1):
+                        self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', f'countdown:{remaining}')
+                        time.sleep(1)
+                    self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', 'success')
+                else:
+                    # Max retries reached
+                    self._update_task_status(state_manager, workflow_id, step_index, 'Checking', 'failed')
+                    error_msg = f"Instance did not come back online after {MAX_RETRIES} attempts"
+                    self._set_completion_note(state_manager, workflow_id, step_index, error_msg)
+                    return False, error_msg
+                    
+            except Exception as e:
+                error_msg = str(e)
+                if attempt < MAX_RETRIES:
+                    logger.warning(f"Check failed with error: {error_msg}, retrying...")
+                    for remaining in range(30, 0, -1):
+                        self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', f'countdown:{remaining}')
+                        time.sleep(1)
+                    self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', 'success')
+                else:
+                    self._update_task_status(state_manager, workflow_id, step_index, 'Checking', 'failed')
+                    self._set_completion_note(state_manager, workflow_id, step_index, f"Check error: {error_msg}")
+                    return False, error_msg
+        
+        # Should not reach here
+        return False, "Unexpected error in reboot workflow"
 
 
 def get_workflow_executor() -> WorkflowExecutor:
