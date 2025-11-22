@@ -195,61 +195,56 @@ async function restoreWorkflowState() {
   const stepElements = workflowStepsContainer.querySelectorAll('.workflow-step');
   const steps = state.steps || [];
   
-  steps.forEach((stepState, index) => {
-    if (index < stepElements.length) {
-      const stepElement = stepElements[index];
-      const arrow = stepElement.nextElementSibling;
-      
-      // Apply step status classes
-      if (stepState.status === 'completed') {
-        stepElement.classList.add('completed');
-        if (arrow && arrow.classList.contains('workflow-arrow')) {
-          arrow.classList.remove('loading');
-          arrow.classList.add('completed');
-          updateArrowProgress(arrow, 1.0);
-        }
-      } else if (stepState.status === 'in_progress') {
-        stepElement.classList.add('in-progress');
-        if (arrow && arrow.classList.contains('workflow-arrow')) {
-          arrow.classList.add('loading');
-        }
-      } else if (stepState.status === 'failed') {
-        stepElement.classList.add('failed');
-      }
-    }
-  });
+  // Update UI with current state
+  updateWorkflowUI(state);
   
   // Update UI to show workflow status
   if (state.status === 'running') {
     // Count completed steps
     const completedSteps = steps.filter(s => s.status === 'completed').length;
     const totalSteps = steps.length;
-    const currentStepIndex = state.current_step;
     
-    // Build detailed message
-    let message = `⚠️ Workflow was interrupted (page refresh/navigation). Progress: ${completedSteps}/${totalSteps} steps completed.`;
-    
-    if (completedSteps > 0) {
-      message += ` The workflow stopped and is NOT running. Click "Run Workflow" to restart from the beginning.`;
-    } else {
-      message += ` Click "Run Workflow" to start.`;
+    // Resume polling for progress
+    workflowRunning = true;
+    const runButton = document.getElementById('run-workflow-btn');
+    if (runButton) {
+      runButton.textContent = '⏸️ Cancel Workflow';
+      runButton.classList.add('cancel');
     }
     
-    showSetupResult(message, 'warning');
+    // Disable buttons during execution
+    const allSteps = workflowStepsContainer.querySelectorAll('.workflow-step');
+    allSteps.forEach(step => {
+      const stepButton = step.querySelector('.step-button');
+      const toggleButton = step.querySelector('.step-toggle');
+      if (stepButton) stepButton.disabled = true;
+      if (toggleButton) toggleButton.disabled = true;
+    });
     
-    // Also clear the workflow state since it's not actually running anymore
-    // This prevents confusion on subsequent refreshes
-    setTimeout(() => {
-      clearWorkflowState();
-    }, 5000); // Clear after 5 seconds to give user time to see the message
+    showSetupResult(`🔄 Workflow resumed. Progress: ${completedSteps}/${totalSteps} steps completed. Workflow continues to run on server.`, 'info');
+    
+    // Start polling for progress
+    console.log('Starting to poll for workflow progress...');
+    pollWorkflowProgress();
     
   } else if (state.status === 'completed') {
     const totalSteps = steps.length;
     showSetupResult(`✅ Previous workflow completed successfully! All ${totalSteps} steps finished.`, 'success');
+    
+    // Clear state after showing for a moment
+    setTimeout(() => {
+      clearWorkflowState();
+    }, 5000);
+    
   } else if (state.status === 'failed') {
     const completedSteps = steps.filter(s => s.status === 'completed').length;
     const totalSteps = steps.length;
     showSetupResult(`❌ Previous workflow failed at step ${completedSteps + 1} of ${totalSteps}.`, 'error');
+    
+    // Clear state after showing for a moment
+    setTimeout(() => {
+      clearWorkflowState();
+    }, 5000);
   }
 }
 
@@ -306,13 +301,24 @@ function toggleStep(toggleButton) {
 }
 
 /**
- * Run the complete workflow
+ * Run the complete workflow (server-side execution with polling)
  */
 async function runWorkflow() {
   if (workflowRunning) {
     // Cancel workflow
     console.log('🛑 Cancelling workflow...');
     workflowCancelled = true;
+    
+    // Stop server-side workflow
+    if (currentWorkflowId) {
+      try {
+        await fetch(`/workflow/stop/${currentWorkflowId}`, {
+          method: 'POST'
+        });
+      } catch (error) {
+        console.error('Error stopping workflow:', error);
+      }
+    }
     return;
   }
   
@@ -344,23 +350,13 @@ async function runWorkflow() {
   // Generate workflow ID
   currentWorkflowId = `workflow_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
-  // Build initial workflow state
-  const workflowState = {
-    workflow_id: currentWorkflowId,
-    status: 'running',
-    current_step: 0,
-    steps: Array.from(stepElements).map((el, idx) => ({
-      action: el.dataset.action,
-      label: el.querySelector('.step-button')?.textContent.trim() || '',
-      status: 'pending',
-      index: idx
-    })),
-    start_time: new Date().toISOString(),
-    ssh_connection: sshConnectionString
-  };
-  
-  // Save initial state to server
-  await saveWorkflowState(workflowState);
+  // Build workflow configuration
+  const steps = Array.from(stepElements).map((el, idx) => ({
+    action: el.dataset.action,
+    label: el.querySelector('.step-button')?.textContent.trim() || '',
+    status: 'pending',
+    index: idx
+  }));
   
   // Set all arrows to grey/loading state with 0% progress
   const allArrows = workflowStepsContainer.querySelectorAll('.workflow-arrow');
@@ -386,115 +382,31 @@ async function runWorkflow() {
   });
   
   try {
-    // Execute each enabled step in sequence
-    for (let i = 0; i < stepElements.length; i++) {
-      if (workflowCancelled) {
-        showSetupResult('Workflow cancelled by user.', 'error');
-        break;
-      }
-      
-      const stepElement = stepElements[i];
-      const action = stepElement.dataset.action;
-      const stepButton = stepElement.querySelector('.step-button');
-      
-      console.log(`📍 Executing step ${i + 1}/${stepElements.length}: ${action}`);
-      
-      // Update workflow state - step starting
-      workflowState.current_step = i;
-      workflowState.steps[i].status = 'in_progress';
-      await saveWorkflowState(workflowState);
-      
-      // Mark step as in-progress
-      stepElement.classList.add('in-progress');
-      showSetupResult(`Executing: ${stepButton.textContent.trim()}...`, 'info');
-      
-      // Execute the step
-      const success = await executeWorkflowStep(stepElement);
-      
-      // Remove in-progress state
-      stepElement.classList.remove('in-progress');
-      
-      if (success) {
-        // Mark step as completed
-        stepElement.classList.add('completed');
-        console.log(`✅ Step ${i + 1} completed: ${action}`);
-        
-        // Update workflow state - step completed
-        workflowState.steps[i].status = 'completed';
-        await saveWorkflowState(workflowState);
-        
-        // Animate arrow with 11-step loading bar if not the last step
-        if (i < stepElements.length - 1 && !workflowCancelled) {
-          const nextArrow = stepElement.nextElementSibling;
-          if (nextArrow && nextArrow.classList.contains('workflow-arrow')) {
-            console.log(`🎬 Starting arrow loading animation (11 steps)`);
-            
-            // Animate arrow filling over the delay period with 11 discrete steps
-            const steps = 11; // 0%, 10%, 20%, ..., 100%
-            const stepDuration = workflowConfig.stepDelay / (steps - 1);
-            
-            for (let step = 0; step < steps; step++) {
-              if (workflowCancelled) break;
-              
-              const progress = step / (steps - 1); // 0.0 to 1.0
-              updateArrowProgress(nextArrow, progress);
-              
-              // Wait for next step (except on the last step)
-              if (step < steps - 1) {
-                await sleep(stepDuration);
-              }
-            }
-            
-            // Mark arrow as completed (full color)
-            nextArrow.classList.remove('loading');
-            nextArrow.classList.add('completed');
-          }
-        }
-      } else {
-        // Mark step as failed
-        stepElement.classList.add('failed');
-        console.log(`❌ Step ${i + 1} failed: ${action}`);
-        
-        // Update workflow state - step failed
-        workflowState.status = 'failed';
-        workflowState.steps[i].status = 'failed';
-        await saveWorkflowState(workflowState);
-        
-        showSetupResult(`Workflow failed at step: ${stepButton.textContent.trim()}`, 'error');
-        break; // Stop workflow on failure
-      }
-      
-      // Note: Arrow animation now happens inline above, no separate wait needed
-      // The arrow fills during the delay, so we don't need additional waiting
+    // Start workflow execution on server
+    const response = await fetch('/workflow/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workflow_id: currentWorkflowId,
+        steps: steps,
+        ssh_connection: sshConnectionString,
+        step_delay: Math.floor(workflowConfig.stepDelay / 1000) // Convert to seconds
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to start workflow on server');
     }
     
-    if (!workflowCancelled) {
-      showSetupResult('✅ Workflow completed successfully!', 'success');
-      
-      // Update workflow state - completed
-      workflowState.status = 'completed';
-      await saveWorkflowState(workflowState);
-    } else {
-      // Update workflow state - cancelled
-      workflowState.status = 'cancelled';
-      await saveWorkflowState(workflowState);
-    }
+    console.log('✅ Workflow started on server, polling for progress...');
+    showSetupResult('🚀 Workflow started on server. Progress will update automatically.', 'info');
+    
+    // Poll for workflow progress
+    await pollWorkflowProgress();
+    
   } catch (error) {
     console.error('❌ Workflow error:', error);
     showSetupResult(`Workflow error: ${error.message}`, 'error');
-    
-    // Update workflow state - error
-    if (workflowState) {
-      workflowState.status = 'failed';
-      await saveWorkflowState(workflowState);
-    }
-  } finally {
-    // Clear workflow state from server after a delay
-    // This allows the user to see the final state if they refresh immediately
-    // The delay is configurable via STATE_CLEANUP_DELAY_MS constant
-    setTimeout(async () => {
-      await clearWorkflowState();
-    }, 30000); // 30 seconds delay
     
     // Reset UI state
     workflowRunning = false;
@@ -512,6 +424,126 @@ async function runWorkflow() {
       step.style.opacity = '';
     });
   }
+}
+
+/**
+ * Poll for workflow progress from server
+ */
+async function pollWorkflowProgress() {
+  const workflowStepsContainer = document.getElementById('workflow-steps');
+  const runButton = document.getElementById('run-workflow-btn');
+  const allSteps = workflowStepsContainer.querySelectorAll('.workflow-step');
+  
+  let previousState = null;
+  
+  while (workflowRunning && !workflowCancelled) {
+    try {
+      // Get current workflow state
+      const state = await loadWorkflowState();
+      
+      if (!state) {
+        console.warn('No workflow state found');
+        break;
+      }
+      
+      // Check if state has changed
+      const stateChanged = !previousState || 
+                          JSON.stringify(state.steps) !== JSON.stringify(previousState.steps);
+      
+      if (stateChanged) {
+        console.log('📊 Workflow state updated:', state);
+        updateWorkflowUI(state);
+        previousState = state;
+      }
+      
+      // Check if workflow is complete
+      if (state.status === 'completed') {
+        console.log('✅ Workflow completed successfully');
+        showSetupResult('✅ Workflow completed successfully!', 'success');
+        workflowRunning = false;
+        break;
+      } else if (state.status === 'failed') {
+        console.log('❌ Workflow failed');
+        const failedStep = state.steps.findIndex(s => s.status === 'failed');
+        showSetupResult(`❌ Workflow failed at step ${failedStep + 1}`, 'error');
+        workflowRunning = false;
+        break;
+      } else if (state.status === 'cancelled') {
+        console.log('🛑 Workflow was cancelled');
+        showSetupResult('Workflow cancelled.', 'warning');
+        workflowRunning = false;
+        break;
+      }
+      
+      // Wait before next poll
+      await sleep(1000); // Poll every 1 second
+      
+    } catch (error) {
+      console.error('Error polling workflow progress:', error);
+      await sleep(2000); // Wait longer on error
+    }
+  }
+  
+  // Reset UI state
+  workflowRunning = false;
+  workflowCancelled = false;
+  currentWorkflowId = null;
+  runButton.textContent = '▶️ Run Workflow';
+  runButton.classList.remove('cancel');
+  
+  // Re-enable buttons and toggles
+  allSteps.forEach(step => {
+    const stepButton = step.querySelector('.step-button');
+    const toggleButton = step.querySelector('.step-toggle');
+    if (stepButton) stepButton.disabled = false;
+    if (toggleButton) toggleButton.disabled = false;
+    step.style.opacity = '';
+  });
+  
+  // Clear workflow state after delay
+  setTimeout(async () => {
+    await clearWorkflowState();
+  }, 30000); // 30 seconds delay
+}
+
+/**
+ * Update workflow UI based on server state
+ */
+function updateWorkflowUI(state) {
+  const workflowStepsContainer = document.getElementById('workflow-steps');
+  const stepElements = workflowStepsContainer.querySelectorAll('.workflow-step');
+  const steps = state.steps || [];
+  
+  steps.forEach((stepState, index) => {
+    if (index < stepElements.length) {
+      const stepElement = stepElements[index];
+      const arrow = stepElement.nextElementSibling;
+      
+      // Remove all status classes first
+      stepElement.classList.remove('in-progress', 'completed', 'failed');
+      
+      // Apply step status classes
+      if (stepState.status === 'completed') {
+        stepElement.classList.add('completed');
+        if (arrow && arrow.classList.contains('workflow-arrow')) {
+          arrow.classList.remove('loading');
+          arrow.classList.add('completed');
+          updateArrowProgress(arrow, 1.0);
+        }
+      } else if (stepState.status === 'in_progress') {
+        stepElement.classList.add('in-progress');
+        if (arrow && arrow.classList.contains('workflow-arrow')) {
+          arrow.classList.add('loading');
+        }
+        
+        // Update status message
+        const label = stepState.label || stepState.action;
+        showSetupResult(`Executing: ${label}...`, 'info');
+      } else if (stepState.status === 'failed') {
+        stepElement.classList.add('failed');
+      }
+    }
+  });
 }
 
 /**
