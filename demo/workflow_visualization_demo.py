@@ -25,7 +25,7 @@ state_in_progress = {
         {"action": "test_ssh", "label": "Test SSH Connection", "status": "completed", "index": 0},
         {"action": "set_ui_home", "label": "Set UI Home Directory", "status": "completed", "index": 1},
         {"action": "setup_civitdl", "label": "Setup CivitDL", "status": "completed", "index": 2},
-        {"action": "sync_instance", "label": "Sync Instance Files", "status": "in_progress", "index": 3},
+        {"action": "clone_installer", "label": "Clone Auto-Installer", "status": "in_progress", "index": 3},
         {"action": "install_nodes", "label": "Install Custom Nodes", "status": "pending", "index": 4}
     ],
     "start_time": "2024-11-22T04:00:00Z",
@@ -42,7 +42,7 @@ state_completed = {
         {"action": "test_ssh", "label": "Test SSH Connection", "status": "completed", "index": 0},
         {"action": "set_ui_home", "label": "Set UI Home Directory", "status": "completed", "index": 1},
         {"action": "setup_civitdl", "label": "Setup CivitDL", "status": "completed", "index": 2},
-        {"action": "sync_instance", "label": "Sync Instance Files", "status": "completed", "index": 3},
+        {"action": "clone_installer", "label": "Clone Auto-Installer", "status": "completed", "index": 3},
         {"action": "install_nodes", "label": "Install Custom Nodes", "status": "completed", "index": 4}
     ],
     "start_time": "2024-11-22T03:45:00Z",
@@ -59,7 +59,7 @@ state_failed = {
         {"action": "test_ssh", "label": "Test SSH Connection", "status": "completed", "index": 0},
         {"action": "set_ui_home", "label": "Set UI Home Directory", "status": "completed", "index": 1},
         {"action": "setup_civitdl", "label": "Setup CivitDL", "status": "failed", "index": 2},
-        {"action": "sync_instance", "label": "Sync Instance Files", "status": "pending", "index": 3},
+        {"action": "clone_installer", "label": "Clone Auto-Installer", "status": "pending", "index": 3},
         {"action": "install_nodes", "label": "Install Custom Nodes", "status": "pending", "index": 4}
     ],
     "start_time": "2024-11-22T03:30:00Z",
