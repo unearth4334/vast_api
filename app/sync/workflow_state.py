@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 # Default state file location
 DEFAULT_STATE_FILE = "/tmp/workflow_state.json"
 
+# Configuration for state cleanup delay (in milliseconds)
+STATE_CLEANUP_DELAY_MS = 30000  # 30 seconds - allows user to see final state on refresh
+
 
 class WorkflowStateManager:
     """Manages persistent workflow state for UI restoration."""
@@ -187,7 +190,7 @@ class WorkflowStateManager:
             'status': state.get('status'),
             'current_step': current_step,
             'total_steps': total_steps,
-            'progress_percent': (current_step / total_steps * 100) if total_steps > 0 else 0,
+            'progress_percent': ((current_step + 1) / total_steps * 100) if total_steps > 0 else 0,
             'start_time': state.get('start_time'),
             'last_update': state.get('last_update')
         }

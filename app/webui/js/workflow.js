@@ -318,7 +318,7 @@ async function runWorkflow() {
   runButton.classList.add('cancel');
   
   // Generate workflow ID
-  currentWorkflowId = `workflow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  currentWorkflowId = `workflow_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   
   // Build initial workflow state
   const workflowState = {
@@ -465,11 +465,12 @@ async function runWorkflow() {
       await saveWorkflowState(workflowState);
     }
   } finally {
-    // Clear workflow state from server after a short delay
+    // Clear workflow state from server after a delay
     // This allows the user to see the final state if they refresh immediately
+    // The delay is configurable via STATE_CLEANUP_DELAY_MS constant
     setTimeout(async () => {
       await clearWorkflowState();
-    }, 30000); // Clear after 30 seconds
+    }, 30000); // 30 seconds delay
     
     // Reset UI state
     workflowRunning = false;

@@ -174,7 +174,7 @@ class TestWorkflowStateAPI:
         assert data['summary']['workflow_id'] == 'test_summary_123'
         assert data['summary']['current_step'] == 2
         assert data['summary']['total_steps'] == 4
-        assert data['summary']['progress_percent'] == 50.0
+        assert data['summary']['progress_percent'] == 75.0  # 3 out of 4 steps (current_step=2 means 0,1,2 completed)
     
     def test_post_workflow_state_no_data(self):
         """Test POST /workflow/state with no data returns error"""

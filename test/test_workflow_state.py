@@ -29,8 +29,8 @@ class TestWorkflowStateManager:
     def teardown_method(self):
         """Cleanup test fixtures"""
         # Remove temporary state file
-        if os.path.exists(self.state_file):
-            os.remove(self.state_file)
+        from pathlib import Path
+        Path(self.state_file).unlink(missing_ok=True)
     
     def test_save_and_load_state(self):
         """Test saving and loading workflow state"""
@@ -190,7 +190,7 @@ class TestWorkflowStateManager:
         assert summary['status'] == 'running'
         assert summary['current_step'] == 2
         assert summary['total_steps'] == 5
-        assert summary['progress_percent'] == 40.0  # 2 out of 5 steps
+        assert summary['progress_percent'] == 60.0  # 3 out of 5 steps (current_step=2 means step 0,1,2 completed)
         assert 'start_time' in summary
         assert 'last_update' in summary
     
