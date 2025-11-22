@@ -163,8 +163,8 @@ class WorkflowExecutor:
                         # Wait for workflow to be resumed (polling for state change)
                         while not stop_flag.is_set():
                             time.sleep(1)
-                            current_state = state_manager.get_state()
-                            if current_state.get('status') != 'blocked':
+                            current_state = state_manager.load_state()
+                            if current_state and current_state.get('status') != 'blocked':
                                 # State changed - reload and continue
                                 state = current_state
                                 if state.get('status') == 'running':
