@@ -3820,6 +3820,226 @@ def resources_search():
         }), 500
 
 
+# --- Workflow Execution Routes ---
+
+@app.route('/workflow/start', methods=['POST', 'OPTIONS'])
+def workflow_start():
+    """Start a workflow execution in the background"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .workflow_executor import get_workflow_executor
+        
+        data = request.get_json() if request.is_json else {}
+        workflow_id = data.get('workflow_id') or str(uuid.uuid4())
+        steps = data.get('steps', [])
+        ssh_connection = data.get('ssh_connection')
+        step_delay = data.get('step_delay', 5)
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        if not steps:
+            return jsonify({
+                'success': False,
+                'message': 'Workflow steps are required'
+            })
+        
+        logger.info(f"Starting workflow {workflow_id} with {len(steps)} steps")
+        
+        # Get executor and start workflow
+        executor = get_workflow_executor()
+        success = executor.start_workflow(workflow_id, steps, ssh_connection, step_delay)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Workflow started successfully',
+                'workflow_id': workflow_id
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Workflow is already running'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error starting workflow: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error starting workflow: {str(e)}'
+        })
+
+
+@app.route('/workflow/stop', methods=['POST', 'OPTIONS'])
+def workflow_stop():
+    """Stop a running workflow"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .workflow_executor import get_workflow_executor
+        
+        data = request.get_json() if request.is_json else {}
+        workflow_id = data.get('workflow_id')
+        
+        if not workflow_id:
+            return jsonify({
+                'success': False,
+                'message': 'Workflow ID is required'
+            })
+        
+        logger.info(f"Stopping workflow {workflow_id}")
+        
+        # Get executor and stop workflow
+        executor = get_workflow_executor()
+        success = executor.stop_workflow(workflow_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Workflow stop requested'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Workflow not found or already stopped'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error stopping workflow: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error stopping workflow: {str(e)}'
+        })
+
+
+@app.route('/workflow/state', methods=['GET', 'OPTIONS'])
+def workflow_state():
+    """Get the full state of a workflow or the current workflow"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .workflow_state import get_workflow_state_manager
+        
+        workflow_id = request.args.get('workflow_id')
+        
+        # Get state manager
+        state_manager = get_workflow_state_manager()
+        state = state_manager.load_state()
+        
+        if not state:
+            return jsonify({
+                'success': False,
+                'message': 'No workflow state found'
+            })
+        
+        # If workflow_id specified, check if it matches
+        if workflow_id and state.get('workflow_id') != workflow_id:
+            return jsonify({
+                'success': False,
+                'message': f'Workflow {workflow_id} not found'
+            })
+        
+        return jsonify({
+            'success': True,
+            'state': state
+        })
+            
+    except Exception as e:
+        logger.error(f"Error getting workflow state: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting workflow state: {str(e)}'
+        })
+
+
+@app.route('/workflow/state/summary', methods=['GET', 'OPTIONS'])
+def workflow_state_summary():
+    """Get a summary of the workflow state (lighter weight than full state)"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .workflow_state import get_workflow_state_manager
+        from .workflow_executor import get_workflow_executor
+        
+        workflow_id = request.args.get('workflow_id')
+        
+        # Get state manager and executor
+        state_manager = get_workflow_state_manager()
+        executor = get_workflow_executor()
+        
+        state = state_manager.load_state()
+        
+        if not state:
+            return jsonify({
+                'success': True,
+                'has_workflow': False,
+                'summary': None
+            })
+        
+        # If workflow_id specified, check if it matches
+        if workflow_id and state.get('workflow_id') != workflow_id:
+            return jsonify({
+                'success': True,
+                'has_workflow': False,
+                'summary': None
+            })
+        
+        # Get summary information
+        summary = state_manager.get_state_summary()
+        
+        # Add running status
+        is_running = executor.is_workflow_running(state.get('workflow_id'))
+        summary['is_running'] = is_running
+        
+        return jsonify({
+            'success': True,
+            'has_workflow': True,
+            'summary': summary
+        })
+            
+    except Exception as e:
+        logger.error(f"Error getting workflow summary: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting workflow summary: {str(e)}'
+        })
+
+
+@app.route('/workflow/clear', methods=['POST', 'OPTIONS'])
+def workflow_clear():
+    """Clear the workflow state"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        from .workflow_state import get_workflow_state_manager
+        
+        state_manager = get_workflow_state_manager()
+        state_manager.clear_state()
+        
+        logger.info("Workflow state cleared")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Workflow state cleared'
+        })
+            
+    except Exception as e:
+        logger.error(f"Error clearing workflow state: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error clearing workflow state: {str(e)}'
+        })
+
+
 if __name__ == '__main__':
     # Initialize log directories
     try:
