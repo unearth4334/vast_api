@@ -1110,7 +1110,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
     .workflow-arrow.loading .spinner {
         /* Show a pulsing opacity instead for reduced motion */
-        animation: pulse-opacity 2s ease-in-out infinite !important;
+        animation: pulse-opacity 2s ease-in-out infinite;
     }
     
     @keyframes pulse-opacity {
