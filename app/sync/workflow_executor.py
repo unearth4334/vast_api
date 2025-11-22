@@ -765,7 +765,8 @@ class WorkflowExecutor:
                     
                     # Add "# others" summary
                     remaining = total_nodes - 3
-                    others_status = f"success ({successful_nodes - 3}/{remaining})" if successful_nodes > 3 else "pending"
+                    successful_remaining = max(0, successful_nodes - 3)
+                    others_status = f"success ({successful_remaining}/{remaining})" if successful_remaining > 0 else "pending"
                     self._update_task_status(state_manager, workflow_id, step_index, f"{remaining} others", others_status)
                 else:
                     # Show all nodes
@@ -892,6 +893,23 @@ class WorkflowExecutor:
             logger.error(f"Instance reboot failed: {error_msg}")
             return False, f"Connection error: {error_msg}"
     
+    def _countdown_wait(self, state_manager, workflow_id: str, step_index: int, duration: int, task_name: str = 'Waiting'):
+        """
+        Helper method to perform countdown wait with status updates.
+        
+        Args:
+            state_manager: WorkflowStateManager instance
+            workflow_id: ID of the workflow
+            step_index: Index of the step
+            duration: Duration in seconds
+            task_name: Name of the task (default: 'Waiting')
+        """
+        for remaining in range(duration, 0, -1):
+            self._update_task_status(state_manager, workflow_id, step_index, task_name, f'countdown:{remaining}')
+            time.sleep(1)
+        
+        self._update_task_status(state_manager, workflow_id, step_index, task_name, 'success')
+    
     def _execute_reboot_instance_with_tasks(self, instance_id: Optional[int], state_manager, workflow_id: str, step_index: int) -> tuple:
         """
         Reboot instance with detailed task tracking.
@@ -933,11 +951,7 @@ class WorkflowExecutor:
         
         # Task 2: Waiting (with countdown)
         WAIT_DURATION = 30  # seconds
-        for remaining in range(WAIT_DURATION, 0, -1):
-            self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', f'countdown:{remaining}')
-            time.sleep(1)
-        
-        self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', 'success')
+        self._countdown_wait(state_manager, workflow_id, step_index, WAIT_DURATION)
         logger.info("Wait period completed")
         
         # Task 3: Checking (with retry)
@@ -967,10 +981,7 @@ class WorkflowExecutor:
                 # Check failed, retry if attempts remain
                 if attempt < MAX_RETRIES:
                     logger.warning(f"Instance not ready, waiting 30 seconds before retry...")
-                    for remaining in range(30, 0, -1):
-                        self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', f'countdown:{remaining}')
-                        time.sleep(1)
-                    self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', 'success')
+                    self._countdown_wait(state_manager, workflow_id, step_index, 30)
                 else:
                     # Max retries reached
                     self._update_task_status(state_manager, workflow_id, step_index, 'Checking', 'failed')
@@ -982,10 +993,7 @@ class WorkflowExecutor:
                 error_msg = str(e)
                 if attempt < MAX_RETRIES:
                     logger.warning(f"Check failed with error: {error_msg}, retrying...")
-                    for remaining in range(30, 0, -1):
-                        self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', f'countdown:{remaining}')
-                        time.sleep(1)
-                    self._update_task_status(state_manager, workflow_id, step_index, 'Waiting', 'success')
+                    self._countdown_wait(state_manager, workflow_id, step_index, 30)
                 else:
                     self._update_task_status(state_manager, workflow_id, step_index, 'Checking', 'failed')
                     self._set_completion_note(state_manager, workflow_id, step_index, f"Check error: {error_msg}")

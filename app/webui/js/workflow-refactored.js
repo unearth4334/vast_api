@@ -573,11 +573,21 @@ function renderTasklist(stepElement, stepData) {
     
     // Check if it's a countdown status
     if (taskStatus.startsWith('countdown:')) {
-      const seconds = taskStatus.split(':')[1];
-      tasklistHTML += `<li class="task-item">
-        <span class="task-name">${escapeHtml(taskName)}</span>
-        <span class="task-status countdown">${seconds}s</span>
-      </li>`;
+      const secondsStr = taskStatus.split(':')[1];
+      // Validate that seconds is a valid number to prevent XSS
+      const seconds = parseInt(secondsStr, 10);
+      if (!isNaN(seconds) && seconds >= 0) {
+        tasklistHTML += `<li class="task-item">
+          <span class="task-name">${escapeHtml(taskName)}</span>
+          <span class="task-status countdown">${seconds}s</span>
+        </li>`;
+      } else {
+        // Invalid countdown value, show as pending
+        tasklistHTML += `<li class="task-item">
+          <span class="task-name">${escapeHtml(taskName)}</span>
+          <span class="task-status pending">pending</span>
+        </li>`;
+      }
     } else {
       // Check if it's a success with count (e.g., "success (3/5)")
       let statusDisplay = taskStatus;
