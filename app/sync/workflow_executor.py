@@ -457,7 +457,7 @@ class WorkflowExecutor:
             if result.get('success'):
                 retrieved_ui_home = result.get('ui_home', 'Not set')
                 self._update_task_status(state_manager, workflow_id, step_index, 'test', 'success')
-                self._set_completion_note(state_manager, workflow_id, step_index, f"UI_HOME verified: {retrieved_ui_home}")
+                self._set_completion_note(state_manager, workflow_id, step_index, f"UI_HOME successfully set and verified. Current value: {retrieved_ui_home}")
                 logger.info(f"UI_HOME verified: {retrieved_ui_home}")
                 return True, None
             else:
