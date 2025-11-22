@@ -1788,3 +1788,100 @@ body {
     font-size: 0.9em;
     line-height: 1.5;
 }
+
+/* =========================
+   COMFYUI WORKFLOW STYLES
+   ========================= */
+
+/* ComfyUI textarea for input images */
+#comfyuiInputImages {
+    min-height: 100px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+    font-size: 0.9em;
+    resize: vertical;
+}
+
+/* ComfyUI outputs section */
+#comfyui-outputs-section {
+    margin-top: var(--size-4-6);
+    padding: var(--size-4-4);
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+}
+
+#comfyui-outputs-section h3 {
+    margin-top: 0;
+    margin-bottom: var(--size-4-4);
+    color: var(--text-normal);
+    font-size: var(--font-ui-large);
+}
+
+#comfyui-outputs-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-3);
+}
+
+.output-item {
+    padding: var(--size-4-3);
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    transition: all 0.2s ease;
+}
+
+.output-item:hover {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.output-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+}
+
+.output-filename {
+    font-weight: 600;
+    color: var(--text-normal);
+    font-size: var(--font-ui-medium);
+}
+
+.output-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-4-3);
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
+.output-details span {
+    padding: var(--size-2-1) var(--size-4-2);
+    background: var(--background-modifier-hover);
+    border-radius: var(--radius-s);
+}
+
+/* Cancel button styling */
+#cancel-comfyui-workflow-btn {
+    background: var(--background-modifier-error);
+    border-color: var(--text-error);
+    color: var(--text-error);
+}
+
+#cancel-comfyui-workflow-btn:hover {
+    background: var(--text-error);
+    color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .output-details {
+        flex-direction: column;
+        gap: var(--size-2-1);
+    }
+    
+    #comfyuiInputImages {
+        min-height: 80px;
+    }
+}
