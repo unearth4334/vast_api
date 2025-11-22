@@ -639,6 +639,12 @@ function resetWorkflowVisualization() {
   // Reset all steps
   stepElements.forEach(step => {
     step.classList.remove('in-progress', 'completed', 'failed', 'blocked');
+    
+    // Remove tasklists from previous workflow run
+    const tasklist = step.querySelector('.tasklist');
+    if (tasklist) {
+      tasklist.remove();
+    }
   });
   
   // Reset all arrows to pending state
