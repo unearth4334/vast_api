@@ -60,10 +60,16 @@ deploy_via_git() {
     log_info "Deploying via git to QNAP at ${MOUNTED_PATH}"
     log_info "Target branch: ${branch}"
     
-    # Check for unpushed commits in the current repository
+    # Save the original directory
+    local original_dir=$(pwd)
+    
+    # Check for unpushed commits in the current repository (before changing directories)
     if git status >/dev/null 2>&1; then
         # Get the current branch in the working directory
         local current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        
+        # Get the origin URL before we change directories
+        local origin_url=$(git config --get remote.origin.url 2>/dev/null || echo "")
         
         # Only check for unpushed commits if we're on the same branch we're deploying
         if [[ "$current_branch" == "$branch" ]]; then
@@ -84,6 +90,13 @@ deploy_via_git() {
                 fi
             fi
         fi
+    else
+        # Not in a git repository, try to get origin URL from mounted path if it exists
+        if [[ -d "${MOUNTED_PATH}/.git" ]]; then
+            origin_url=$(git -C "${MOUNTED_PATH}" config --get remote.origin.url 2>/dev/null || echo "")
+        else
+            origin_url=""
+        fi
     fi
     
     # Check if mounted directory exists
@@ -99,10 +112,9 @@ deploy_via_git() {
     if [[ ! -d "${MOUNTED_PATH}/.git" ]]; then
         log_info "Initializing git repository at ${MOUNTED_PATH}"
         
-        # Get the current repository's origin URL
-        local origin_url=$(git config --get remote.origin.url)
+        # Use origin URL from working directory if available
         if [[ -z "$origin_url" ]]; then
-            log_error "No origin URL found in current repository"
+            log_error "No origin URL found. Please run this script from within a git repository."
             exit 1
         fi
         
@@ -199,7 +211,7 @@ deploy_via_git() {
     fi
     
     # Return to original directory
-    cd - > /dev/null
+    cd "$original_dir" > /dev/null
 }
 
 # Function to start containers
