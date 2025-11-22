@@ -259,6 +259,8 @@ class WorkflowExecutor:
                 return self._execute_sync_instance(ssh_connection)
             elif action == 'setup_python_venv':
                 return self._execute_setup_python_venv(ssh_connection)
+            elif action == 'clone_auto_installer':
+                return self._execute_clone_auto_installer(ssh_connection)
             elif action == 'install_custom_nodes':
                 ui_home = step.get('ui_home', '/workspace/ComfyUI')
                 return self._execute_install_custom_nodes(ssh_connection, ui_home, state_manager, workflow_id, step_index)
@@ -473,6 +475,34 @@ class WorkflowExecutor:
         time.sleep(1)
         logger.info("Python venv already configured")
         return True, None
+    
+    def _execute_clone_auto_installer(self, ssh_connection: str) -> tuple:
+        """Clone Auto Installer repository by calling template execute-step API."""
+        logger.info("Cloning Auto Installer repository...")
+        
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/templates/comfyui/execute-step",
+                json={
+                    'ssh_connection': ssh_connection,
+                    'step_name': 'Clone ComfyUI Auto Installer'
+                },
+                timeout=300  # 5 minutes
+            )
+            
+            result = response.json()
+            if result.get('success'):
+                logger.info("Auto Installer repository cloned successfully")
+                return True, None
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Auto Installer clone failed: {error_msg}")
+                return False, error_msg
+                
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Auto Installer clone failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
     def _execute_install_custom_nodes(self, ssh_connection: str, ui_home: str, 
                                      state_manager, workflow_id: str, step_index: int) -> tuple:
