@@ -12,87 +12,15 @@ let workflowConfig = {
 };
 
 /**
- * Create an SVG downward arrow with vertical fill progress
- * The arrow is revealed from the top down as `progress` goes from 0 → 1.
- *
- * @param {number} progress - Progress from 0 to 1 (0% to 100%)
- * @returns {string} - SVG markup
+ * Create transition indicator HTML with spinner and icons
+ * @returns {string} - HTML markup for transition indicator
  */
-function createArrowSVG(progress = 0) {
-  // Clamp progress to [0, 1]
-  const clamped = Math.max(0, Math.min(1, progress));
-
-  const width = 50;
-  const height = 60;
-
-  // Arrow geometry
-  const shaftWidth = 14;
-  const shaftHeight = 32;      // straight vertical part
-  const headWidth = 32;
-  const headHeight = height - shaftHeight; // remaining height for the head
-
-  const centerX = width / 2;
-
-  const shaftLeft   = centerX - shaftWidth / 2;
-  const shaftRight  = centerX + shaftWidth / 2;
-  const shaftTopY   = 0;
-  const shaftBotY   = shaftHeight;
-
-  const headBaseY   = shaftBotY;      // where the head starts
-  const headTipY    = height;         // bottom point
-  const headLeftX   = centerX - headWidth / 2;
-  const headRightX  = centerX + headWidth / 2;
-
-  // Single path for a clean, bold downward arrow
-  const arrowPath = [
-    // Shaft top edge
-    `M ${shaftLeft} ${shaftTopY}`,
-    `L ${shaftRight} ${shaftTopY}`,
-    // Shaft sides down
-    `L ${shaftRight} ${headBaseY}`,
-    // Head right edge
-    `L ${headRightX} ${headBaseY}`,
-    // Tip
-    `L ${centerX} ${headTipY}`,
-    // Head left edge
-    `L ${headLeftX} ${headBaseY}`,
-    // Back up left side of shaft
-    `L ${shaftLeft} ${headBaseY}`,
-    'Z'
-  ].join(' ');
-
-  const filledHeight = clamped * height;
-
-  // Unique clipPath ID
-  const clipId = `arrow-clip-${Math.random().toString(36).slice(2)}`;
-
+function createTransitionIndicator() {
   return `
-<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <!-- Arrow outline -->
-  <path class="arrow-body" d="${arrowPath}" />
-
-  <defs>
-    <!-- Rect that grows from the top downward -->
-    <clipPath id="${clipId}">
-      <rect x="0" y="0" width="${width}" height="${filledHeight}" />
-    </clipPath>
-  </defs>
-
-  <!-- Filled portion of the arrow, revealed from top down -->
-  <g clip-path="url(#${clipId})">
-    <path class="arrow-fill" d="${arrowPath}" />
-  </g>
-</svg>
+    <div class="spinner"></div>
+    <div class="checkmark">✓</div>
+    <div class="down-arrow">↓</div>
   `;
-}
-
-/**
- * Update arrow SVG with new progress
- * @param {HTMLElement} arrowElement - The arrow element
- * @param {number} progress - Progress from 0 to 1
- */
-function updateArrowProgress(arrowElement, progress) {
-  arrowElement.innerHTML = createArrowSVG(progress);
 }
 
 /**
@@ -582,22 +510,17 @@ function renderWorkflowState(state) {
     
     // Determine arrow status based on surrounding steps
     if (prevStepData.status === 'completed' && nextStepData.status === 'in_progress') {
-      // Previous step done, next step in progress - show loading animation
+      // Previous step done, next step in progress - show loading spinner
       arrow.classList.add('loading');
-      // Animate arrow fill (simplified version - full implementation would track time)
-      updateArrowProgress(arrow, 0.5);
     } else if (prevStepData.status === 'completed' && nextStepData.status === 'completed') {
-      // Both steps done - show completed
+      // Both steps done - show completed checkmark
       arrow.classList.add('completed');
-      updateArrowProgress(arrow, 1.0);
     } else if (prevStepData.status === 'failed') {
       // Previous step failed
       arrow.classList.add('failed');
-      updateArrowProgress(arrow, 0);
     } else {
-      // Pending
+      // Pending - show down arrow
       arrow.classList.add('pending');
-      updateArrowProgress(arrow, 0);
     }
   });
   
@@ -628,11 +551,10 @@ function resetWorkflowVisualization() {
     step.classList.remove('in-progress', 'completed', 'failed', 'blocked');
   });
   
-  // Reset all arrows
+  // Reset all arrows to pending state
   arrowElements.forEach(arrow => {
     arrow.classList.remove('loading', 'completed', 'failed');
     arrow.classList.add('pending');
-    updateArrowProgress(arrow, 0);
   });
 }
 
@@ -690,11 +612,11 @@ function updateWorkflowSteps(template) {
     // Add step to container
     container.appendChild(stepDiv);
     
-    // Add arrow between steps (except after the last one)
+    // Add transition indicator between steps (except after the last one)
     if (index < buttons.length - 1) {
       const arrow = document.createElement('div');
       arrow.className = 'workflow-arrow pending';
-      arrow.innerHTML = createArrowSVG(0); // Start with empty arrow
+      arrow.innerHTML = createTransitionIndicator();
       container.appendChild(arrow);
     }
     
@@ -751,7 +673,7 @@ function resetWorkflowSteps() {
     if (index < defaultSteps.length - 1) {
       const arrow = document.createElement('div');
       arrow.className = 'workflow-arrow pending';
-      arrow.innerHTML = createArrowSVG(0);
+      arrow.innerHTML = createTransitionIndicator();
       container.appendChild(arrow);
     }
   });
