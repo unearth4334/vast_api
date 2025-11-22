@@ -3862,7 +3862,7 @@ def get_workflow_state():
 def update_workflow_state():
     """Update workflow state"""
     try:
-        data = request.get_json() if request.is_json else {}
+        data = request.get_json(force=True, silent=True) if request.data else None
         
         if not data:
             return jsonify({
