@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Setup result panel click handler for viewing full reports
     attachResultClickHandler();
+    
+    // Initialize workflow system (will check for and restore active workflow state)
+    initWorkflow();
 });
 
 // Initialize resource browser

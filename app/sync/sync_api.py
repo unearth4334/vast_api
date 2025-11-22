@@ -24,6 +24,7 @@ try:
     from ..webui.templates import get_index_template
     from ..webui.template_manager import template_manager
     from .ssh_test import SSHTester
+    from .workflow_state import get_workflow_state_manager
 except ImportError:
     # Handle imports for both module and direct execution
     import sys
@@ -3817,6 +3818,131 @@ def resources_search():
         return jsonify({
             'success': False,
             'message': str(e)
+        }), 500
+
+
+# ==============================
+# Workflow State Management
+# ==============================
+
+@app.route('/workflow/state', methods=['GET', 'OPTIONS'])
+def get_workflow_state():
+    """Get current workflow state"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        state_manager = get_workflow_state_manager()
+        state = state_manager.load_state()
+        
+        if state is None:
+            return jsonify({
+                'success': True,
+                'active': False,
+                'state': None
+            })
+        
+        return jsonify({
+            'success': True,
+            'active': state.get('status') == 'running',
+            'state': state
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting workflow state: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'active': False,
+            'state': None
+        }), 500
+
+
+@app.route('/workflow/state', methods=['POST'])
+def update_workflow_state():
+    """Update workflow state"""
+    try:
+        data = request.get_json() if request.is_json else {}
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'State data is required'
+            }), 400
+        
+        state_manager = get_workflow_state_manager()
+        success = state_manager.save_state(data)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Workflow state saved'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to save workflow state'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error updating workflow state: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/workflow/state', methods=['DELETE'])
+def clear_workflow_state():
+    """Clear workflow state"""
+    try:
+        state_manager = get_workflow_state_manager()
+        success = state_manager.clear_state()
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Workflow state cleared'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to clear workflow state'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error clearing workflow state: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/workflow/state/summary', methods=['GET', 'OPTIONS'])
+def get_workflow_state_summary():
+    """Get workflow state summary"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        state_manager = get_workflow_state_manager()
+        summary = state_manager.get_state_summary()
+        
+        return jsonify({
+            'success': True,
+            'summary': summary
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting workflow state summary: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'summary': {
+                'active': False,
+                'workflow_id': None,
+                'status': None
+            }
         }), 500
 
 
