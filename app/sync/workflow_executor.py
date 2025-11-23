@@ -897,29 +897,6 @@ class WorkflowExecutor:
             self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'failed')
             self._set_completion_note(state_manager, workflow_id, step_index, f"Dependency verification error: {error_msg}")
             return False, error_msg
-                    if len(installed_deps) > MAX_DEP_VISIBLE:
-                        for dep in installed_deps[:4]:
-                            self._update_task_status(state_manager, workflow_id, step_index, f"  {dep}", 'success')
-                        remaining_deps = len(installed_deps) - 4
-                        self._update_task_status(state_manager, workflow_id, step_index, f"  {remaining_deps} others", f"success ({remaining_deps}/{remaining_deps})")
-                    else:
-                        for dep in installed_deps:
-                            self._update_task_status(state_manager, workflow_id, step_index, f"  {dep}", 'success')
-                
-                self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'success')
-                self._set_completion_note(state_manager, workflow_id, step_index, f"Custom nodes installation completed: {successful_nodes}/{total_nodes} nodes, {len(installed_deps)} dependencies installed")
-                return True, None
-            else:
-                error_msg = result.get('message', 'Unknown error')
-                self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'failed')
-                self._set_completion_note(state_manager, workflow_id, step_index, f"Dependency verification failed: {error_msg}")
-                return False, error_msg
-                
-        except Exception as e:
-            error_msg = str(e)
-            self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'failed')
-            self._set_completion_note(state_manager, workflow_id, step_index, f"Dependency verification error: {error_msg}")
-            return False, error_msg
     
     def _execute_verify_dependencies(self, ssh_connection: str, ui_home: str) -> tuple:
         """Verify dependencies by calling /ssh/verify-dependencies API endpoint."""
