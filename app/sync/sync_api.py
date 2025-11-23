@@ -1246,7 +1246,7 @@ def ssh_install_custom_nodes():
         ]
         subprocess.run(clear_progress_cmd, timeout=10, capture_output=True)
         
-        # Run the custom nodes installer
+        # Run the custom nodes installer with VastAI's Python venv
         install_cmd = [
             'ssh',
             '-p', str(ssh_port),
@@ -1256,7 +1256,7 @@ def ssh_install_custom_nodes():
             '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
             '-o', 'IdentitiesOnly=yes',
             f'root@{ssh_host}',
-            f'source /etc/environment 2>/dev/null; cd /workspace/ComfyUI-Auto_installer/scripts && ./install-custom-nodes.sh {ui_home} 2>&1'
+            f'source /etc/environment 2>/dev/null; cd /workspace/ComfyUI-Auto_installer/scripts && ./install-custom-nodes.sh {ui_home} --venv-path /venv/main/bin/python 2>&1'
         ]
         
         # Use Popen for real-time output streaming (important for long-running process)
