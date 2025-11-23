@@ -834,70 +834,79 @@ class WorkflowExecutor:
                                     logger.warning("Clone Auto-installer task not found in existing tasks, adding as completed")
                                     tasks_to_show.append({'name': 'Clone Auto-installer', 'status': 'success'})
                                 
+                                # Add "Configure venv path" task
+                                if current_node == 'Configure venv path':
+                                    tasks_to_show.append({'name': 'Configure venv path', 'status': node_status})
+                                elif current_node and current_node != 'Initializing' and current_node != 'Cloning Auto-installer':
+                                    # If we're past venv config, show it as success
+                                    tasks_to_show.append({'name': 'Configure venv path', 'status': 'success'})
+                                
                                 # Determine how many nodes to show and which ones
-                                if total_nodes_count > MAX_VISIBLE_NODES:
-                                    # We have more than 4 nodes total, use rolling window
-                                    
-                                    if processed <= MAX_VISIBLE_NODES:
-                                        # Still in first 4 nodes - show them + pending "# others"
+                                # Only show node tasks if we're past initialization
+                                if current_node and current_node not in ['Initializing', 'Cloning Auto-installer', 'Configure venv path']:
+                                    if total_nodes_count > MAX_VISIBLE_NODES:
+                                        # We have more than 4 nodes total, use rolling window
+                                        
+                                        if processed <= MAX_VISIBLE_NODES:
+                                            # Still in first 4 nodes - show them + pending "# others"
+                                            for node in nodes_seen:
+                                                status = node_statuses.get(node, 'success')
+                                                node_task = {'name': node, 'status': status}
+                                                
+                                                # Add sub-task for requirements if this node has them
+                                                if node == current_node and has_requirements and requirements_status:
+                                                    node_task['subtasks'] = [{
+                                                        'name': 'Install dependencies',
+                                                        'status': requirements_status
+                                                    }]
+                                                
+                                                tasks_to_show.append(node_task)
+                                            
+                                            # Add "# others" for remaining nodes
+                                            remaining = total_nodes_count - processed
+                                            if remaining > 0:
+                                                tasks_to_show.append({
+                                                    'name': f'{remaining} others',
+                                                    'status': 'pending'
+                                                })
+                                        else:
+                                            # Past 4th node - show completed "# others" at top and current nodes at bottom
+                                            completed_others_count = processed - MAX_VISIBLE_NODES
+                                            successful_others = successful_count - len([n for n in nodes_seen[:processed-MAX_VISIBLE_NODES] if node_statuses.get(n) == 'success'])
+                                            
+                                            tasks_to_show.append({
+                                                'name': f'{completed_others_count} others',
+                                                'status': f'success ({successful_others}/{completed_others_count})'
+                                            })
+                                            
+                                            # Show last 4 nodes (current window)
+                                            visible_nodes = nodes_seen[-MAX_VISIBLE_NODES:]
+                                            for node in visible_nodes:
+                                                status = node_statuses.get(node, 'success')
+                                                node_task = {'name': node, 'status': status}
+                                                
+                                                # Add sub-task for requirements if this node has them
+                                                if node == current_node and has_requirements and requirements_status:
+                                                    node_task['subtasks'] = [{
+                                                        'name': 'Install dependencies',
+                                                        'status': requirements_status
+                                                    }]
+                                                
+                                                tasks_to_show.append(node_task)
+                                            
+                                            # Add pending "# others" if there are more nodes ahead
+                                            remaining = total_nodes_count - processed
+                                            if remaining > 0:
+                                                tasks_to_show.append({
+                                                    'name': f'{remaining} others',
+                                                    'status': 'pending'
+                                                })
+                                    else:
+                                        # 4 or fewer nodes total - show all
                                         for node in nodes_seen:
                                             status = node_statuses.get(node, 'success')
                                             node_task = {'name': node, 'status': status}
                                             
-                                            # Add sub-task for requirements if this node has them
-                                            if node == current_node and has_requirements and requirements_status:
-                                                node_task['subtasks'] = [{
-                                                    'name': 'Install dependencies',
-                                                    'status': requirements_status
-                                                }]
-                                            
-                                            tasks_to_show.append(node_task)
-                                        
-                                        # Add "# others" for remaining nodes
-                                        remaining = total_nodes_count - processed
-                                        if remaining > 0:
-                                            tasks_to_show.append({
-                                                'name': f'{remaining} others',
-                                                'status': 'pending'
-                                            })
-                                    else:
-                                        # Past 4th node - show completed "# others" at top and current nodes at bottom
-                                        completed_others_count = processed - MAX_VISIBLE_NODES
-                                        successful_others = successful_count - len([n for n in nodes_seen[:processed-MAX_VISIBLE_NODES] if node_statuses.get(n) == 'success'])
-                                        
-                                        tasks_to_show.append({
-                                            'name': f'{completed_others_count} others',
-                                            'status': f'success ({successful_others}/{completed_others_count})'
-                                        })
-                                        
-                                        # Show last 4 nodes (current window)
-                                        visible_nodes = nodes_seen[-MAX_VISIBLE_NODES:]
-                                        for node in visible_nodes:
-                                            status = node_statuses.get(node, 'success')
-                                            node_task = {'name': node, 'status': status}
-                                            
-                                            # Add sub-task for requirements if this node has them
-                                            if node == current_node and has_requirements and requirements_status:
-                                                node_task['subtasks'] = [{
-                                                    'name': 'Install dependencies',
-                                                    'status': requirements_status
-                                                }]
-                                            
-                                            tasks_to_show.append(node_task)
-                                        
-                                        # Add pending "# others" if there are more nodes ahead
-                                        remaining = total_nodes_count - processed
-                                        if remaining > 0:
-                                            tasks_to_show.append({
-                                                'name': f'{remaining} others',
-                                                'status': 'pending'
-                                            })
-                                else:
-                                    # 4 or fewer nodes total - show all
-                                    for node in nodes_seen:
-                                        status = node_statuses.get(node, 'success')
-                                        node_task = {'name': node, 'status': status}
-                                        
                                         # Add sub-task for requirements if this node has them
                                         if node == current_node and has_requirements and requirements_status:
                                             node_task['subtasks'] = [{

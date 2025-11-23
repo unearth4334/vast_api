@@ -1292,6 +1292,13 @@ def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str
         else:
             logger.info("ComfyUI-Auto_installer already exists")
         
+        # Update progress to show venv configuration
+        venv_progress = initial_progress.copy()
+        venv_progress['current_node'] = 'Configure venv path'
+        venv_progress['current_status'] = 'running'
+        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, venv_progress)
+        logger.info("Configuring venv path for installation")
+        
         # Run the custom nodes installer
         install_cmd = [
             'ssh',
@@ -1324,6 +1331,12 @@ def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str
         current_node = None
         current_node_has_requirements = False
         output_lines = []
+        
+        # Mark venv config as complete and start node installation
+        venv_complete = initial_progress.copy()
+        venv_complete['current_node'] = 'Configure venv path'
+        venv_complete['current_status'] = 'success'
+        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, venv_complete)
         
         for line in process.stdout:
             output_lines.append(line.rstrip())
