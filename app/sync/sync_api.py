@@ -1190,7 +1190,49 @@ def ssh_install_custom_nodes():
         
         ssh_key = '/root/.ssh/id_ed25519'
         
-        # Clear any existing progress file first
+        # Check if ComfyUI-Auto_installer exists, clone if needed
+        check_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'test -d /workspace/ComfyUI-Auto_installer'
+        ]
+        
+        check_result = subprocess.run(check_cmd, timeout=10, capture_output=True)
+        
+        if check_result.returncode != 0:
+            logger.info("ComfyUI-Auto_installer not found, cloning repository...")
+            clone_cmd = [
+                'ssh',
+                '-p', str(ssh_port),
+                '-i', ssh_key,
+                '-o', 'ConnectTimeout=10',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
+                f'root@{ssh_host}',
+                'cd /workspace && git clone https://github.com/unearth4334/ComfyUI-Auto_installer'
+            ]
+            
+            clone_result = subprocess.run(clone_cmd, timeout=300, capture_output=True, text=True)
+            
+            if clone_result.returncode != 0:
+                logger.error(f"Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}'
+                })
+            
+            logger.info("ComfyUI-Auto_installer cloned successfully")
+        else:
+            logger.info("ComfyUI-Auto_installer already exists")
+        
+        # Clear any existing progress file
         clear_progress_cmd = [
             'ssh',
             '-p', str(ssh_port),
