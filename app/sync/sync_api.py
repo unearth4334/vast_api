@@ -1549,6 +1549,13 @@ def ssh_install_custom_nodes_progress():
                 'success': False,
                 'message': f'Error reading progress: {str(e)}'
             })
+            
+    except Exception as e:
+        logger.error(f"Error in progress endpoint: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error in progress endpoint: {str(e)}'
+        })
 
 
 @app.route('/ssh/verify-dependencies', methods=['POST', 'OPTIONS'])
