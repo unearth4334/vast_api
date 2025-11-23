@@ -148,7 +148,7 @@ class WorkflowExecutor:
                 state_manager.save_state(state)
                 
                 # Execute the step
-                result = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index)
+                result = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index, instance_id)
                 
                 # Check if step returned blocking information (3-element tuple)
                 if isinstance(result, tuple) and len(result) == 3:
@@ -174,7 +174,7 @@ class WorkflowExecutor:
                                     logger.info(f"Workflow resumed, retrying step {step_index + 1}")
                                     state['steps'][step_index]['status'] = 'in_progress'
                                     state_manager.save_state(state)
-                                    success, error_message = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index)
+                                    success, error_message = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index, instance_id)
                                     break
                                 elif state.get('status') == 'cancelled':
                                     logger.info(f"Workflow {workflow_id} cancelled during blocked state")
@@ -228,7 +228,7 @@ class WorkflowExecutor:
                 if workflow_id in self.stop_flags:
                     del self.stop_flags[workflow_id]
     
-    def _execute_step(self, step: Dict[str, Any], ssh_connection: str, state_manager, workflow_id: str, step_index: int) -> tuple:
+    def _execute_step(self, step: Dict[str, Any], ssh_connection: str, state_manager, workflow_id: str, step_index: int, instance_id: int = None) -> tuple:
         """
         Execute a single workflow step by calling actual SSH API endpoints.
         
@@ -238,6 +238,7 @@ class WorkflowExecutor:
             state_manager: WorkflowStateManager for progress updates
             workflow_id: ID of the workflow
             step_index: Index of current step
+            instance_id: Optional instance ID for workflow-level operations
             
         Returns:
             Tuple of (success: bool, error_message: str or None)
