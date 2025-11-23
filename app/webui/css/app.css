@@ -1177,6 +1177,24 @@ body {
     font-weight: 500;
 }
 
+/* Sub-task styling */
+.task-item.sub-task {
+    padding-left: var(--size-4-4);
+    font-size: var(--font-ui-smaller);
+    opacity: 0.9;
+}
+
+.task-item.sub-task .task-name {
+    font-weight: 400;
+    font-size: var(--font-ui-smaller);
+}
+
+.task-item.sub-task .task-name::before {
+    content: '↳ ';
+    color: var(--text-muted);
+    margin-right: var(--size-4-1);
+}
+
 .task-status {
     display: inline-block;
     padding: var(--size-4-1) var(--size-4-2);

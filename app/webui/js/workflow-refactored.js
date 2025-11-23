@@ -570,6 +570,11 @@ function renderTasklist(stepElement, stepData) {
     const taskName = task.name;
     const taskStatus = task.status || 'pending';
     const taskNote = task.note || '';
+    const subTasks = task.subtasks || [];
+    const isSubTask = task.is_subtask || false;
+    
+    // Determine CSS class for sub-tasks
+    const taskItemClass = isSubTask ? 'task-item sub-task' : 'task-item';
     
     // Check if it's a countdown status
     if (taskStatus.startsWith('countdown:')) {
@@ -577,13 +582,13 @@ function renderTasklist(stepElement, stepData) {
       // Validate that seconds is a valid number to prevent XSS
       const seconds = parseInt(secondsStr, 10);
       if (!isNaN(seconds) && seconds >= 0) {
-        tasklistHTML += `<li class="task-item">
+        tasklistHTML += `<li class="${taskItemClass}">
           <span class="task-name">${escapeHtml(taskName)}</span>
           <span class="task-status countdown">${seconds}s</span>
         </li>`;
       } else {
         // Invalid countdown value, show as pending
-        tasklistHTML += `<li class="task-item">
+        tasklistHTML += `<li class="${taskItemClass}">
           <span class="task-name">${escapeHtml(taskName)}</span>
           <span class="task-status pending">pending</span>
         </li>`;
@@ -598,10 +603,30 @@ function renderTasklist(stepElement, stepData) {
         statusClass = 'success';
       }
       
-      tasklistHTML += `<li class="task-item">
+      tasklistHTML += `<li class="${taskItemClass}">
         <span class="task-name">${escapeHtml(taskName)}</span>
         <span class="task-status ${statusClass}">${escapeHtml(statusDisplay)}</span>
       </li>`;
+      
+      // Render sub-tasks if they exist
+      if (subTasks.length > 0) {
+        subTasks.forEach(subTask => {
+          const subTaskName = subTask.name;
+          const subTaskStatus = subTask.status || 'pending';
+          let subStatusDisplay = subTaskStatus;
+          let subStatusClass = subTaskStatus;
+          
+          if (subTaskStatus.startsWith('success (')) {
+            subStatusDisplay = subTaskStatus;
+            subStatusClass = 'success';
+          }
+          
+          tasklistHTML += `<li class="task-item sub-task">
+            <span class="task-name">${escapeHtml(subTaskName)}</span>
+            <span class="task-status ${subStatusClass}">${escapeHtml(subStatusDisplay)}</span>
+          </li>`;
+        });
+      }
     }
   });
   

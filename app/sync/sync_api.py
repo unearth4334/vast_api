@@ -1277,6 +1277,7 @@ def ssh_install_custom_nodes():
         successful_requirements = 0
         failed_requirements = 0
         current_node = None
+        current_node_has_requirements = False
         output_lines = []
         
         # Write progress to remote file for tracking
@@ -1293,6 +1294,7 @@ def ssh_install_custom_nodes():
                     processed_nodes = int(match.group(1))
                     total_nodes = int(match.group(2))
                     current_node = match.group(3).strip()
+                    current_node_has_requirements = False
                     logger.info(f"Processing node {processed_nodes}/{total_nodes}: {current_node}")
                     
                     # Write progress to file
@@ -1303,7 +1305,8 @@ def ssh_install_custom_nodes():
                         'current_node': current_node,
                         'current_status': 'running',
                         'successful': successful_clones,
-                        'failed': failed_clones
+                        'failed': failed_clones,
+                        'has_requirements': False
                     }
                     try:
                         write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
@@ -1311,6 +1314,27 @@ def ssh_install_custom_nodes():
                         stdout.channel.recv_exit_status()
                     except Exception as e:
                         logger.debug(f"Failed to write progress: {e}")
+            
+            # Detect when installing requirements
+            elif 'Installing requirements' in line and current_node:
+                current_node_has_requirements = True
+                progress_data = {
+                    'in_progress': True,
+                    'total_nodes': total_nodes,
+                    'processed': processed_nodes,
+                    'current_node': current_node,
+                    'current_status': 'running',
+                    'successful': successful_clones,
+                    'failed': failed_clones,
+                    'has_requirements': True,
+                    'requirements_status': 'running'
+                }
+                try:
+                    write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                    stdin, stdout, stderr = client.exec_command(write_progress_cmd)
+                    stdout.channel.recv_exit_status()
+                except Exception as e:
+                    logger.debug(f"Failed to write progress: {e}")
             
             # Track successes and failures
             elif 'Successfully cloned' in line:
@@ -1324,7 +1348,9 @@ def ssh_install_custom_nodes():
                         'current_node': current_node,
                         'current_status': 'success',
                         'successful': successful_clones,
-                        'failed': failed_clones
+                        'failed': failed_clones,
+                        'has_requirements': current_node_has_requirements,
+                        'requirements_status': 'pending' if current_node_has_requirements else None
                     }
                     try:
                         write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
@@ -1335,10 +1361,63 @@ def ssh_install_custom_nodes():
                         
             elif 'Failed to clone' in line:
                 failed_clones += 1
+                if current_node:
+                    progress_data = {
+                        'in_progress': True,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'failed',
+                        'successful': successful_clones,
+                        'failed': failed_clones,
+                        'has_requirements': False
+                    }
+                    try:
+                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
+                        stdout.channel.recv_exit_status()
+                    except Exception as e:
+                        logger.debug(f"Failed to write progress: {e}")
             elif 'Successfully installed requirements' in line:
                 successful_requirements += 1
+                if current_node and current_node_has_requirements:
+                    progress_data = {
+                        'in_progress': True,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'success',
+                        'successful': successful_clones,
+                        'failed': failed_clones,
+                        'has_requirements': True,
+                        'requirements_status': 'success'
+                    }
+                    try:
+                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
+                        stdout.channel.recv_exit_status()
+                    except Exception as e:
+                        logger.debug(f"Failed to write progress: {e}")
             elif 'Failed to install requirements' in line:
                 failed_requirements += 1
+                if current_node and current_node_has_requirements:
+                    progress_data = {
+                        'in_progress': True,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'success',  # Node cloned but reqs failed
+                        'successful': successful_clones,
+                        'failed': failed_clones,
+                        'has_requirements': True,
+                        'requirements_status': 'failed'
+                    }
+                    try:
+                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
+                        stdout.channel.recv_exit_status()
+                    except Exception as e:
+                        logger.debug(f"Failed to write progress: {e}")
         
         # Clear progress file when done
         try:

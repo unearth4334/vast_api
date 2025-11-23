@@ -754,11 +754,13 @@ class WorkflowExecutor:
             install_thread.start()
             
             # Poll progress while installation runs
-            nodes_seen = set()
+            nodes_seen = []  # List to maintain order
+            node_statuses = {}  # Track status of each node
             MAX_VISIBLE_NODES = 4  # Show 4 nodes max, 5th line is for "# others"
             total_nodes_count = 0
             successful_count = 0
             failed_count = 0
+            last_update_hash = None
             
             while install_thread.is_alive() or install_result['success'] is not None:
                 try:
@@ -775,51 +777,112 @@ class WorkflowExecutor:
                         if progress.get('in_progress'):
                             total_nodes_count = progress.get('total_nodes', 0)
                             current_node = progress.get('current_node')
-                            node_status = progress.get('current_status')
+                            node_status = progress.get('current_status', 'running')
                             processed = progress.get('processed', 0)
                             successful_count = progress.get('successful', 0)
                             failed_count = progress.get('failed', 0)
+                            has_requirements = progress.get('has_requirements', False)
+                            requirements_status = progress.get('requirements_status')
                             
-                            # Update tasklist with rolling window
+                            # Track this node if we haven't seen it
+                            if current_node and current_node not in nodes_seen:
+                                nodes_seen.append(current_node)
+                            
+                            # Update status for current node
+                            if current_node:
+                                node_statuses[current_node] = node_status
+                            
+                            # Build task list update
                             state = state_manager.load_state()
-                            if state and current_node:
-                                # Track nodes as we see them
-                                if current_node not in nodes_seen:
-                                    nodes_seen.add(current_node)
+                            if state:
+                                # Calculate what to display
+                                tasks_to_show = []
+                                
+                                # Always keep Clone Auto-installer at the top
+                                existing_tasks = state['steps'][step_index].get('tasks', [])
+                                clone_task = next((t for t in existing_tasks if t['name'] == 'Clone Auto-installer'), None)
+                                if clone_task:
+                                    tasks_to_show.append(clone_task)
+                                
+                                # Determine how many nodes to show and which ones
+                                if total_nodes_count > MAX_VISIBLE_NODES:
+                                    # We have more than 4 nodes total, use rolling window
                                     
-                                    # Determine if we need rolling display
-                                    visible_nodes = list(nodes_seen)[-MAX_VISIBLE_NODES:]
-                                    
-                                    # Remove old node tasks and rebuild
-                                    tasks = state['steps'][step_index].get('tasks', [])
-                                    # Keep only Clone Auto-installer
-                                    state['steps'][step_index]['tasks'] = [t for t in tasks if t['name'] == 'Clone Auto-installer']
-                                    
-                                    # Add visible nodes
-                                    for node in visible_nodes:
-                                        node_task_status = 'running' if node == current_node else ('success' if node != current_node else 'pending')
-                                        if node == current_node:
-                                            node_task_status = 'running'
-                                        else:
-                                            # Check if this node was successful (it's behind current)
-                                            node_task_status = 'success'  # Assume success for completed nodes
+                                    if processed <= MAX_VISIBLE_NODES:
+                                        # Still in first 4 nodes - show them + pending "# others"
+                                        for node in nodes_seen:
+                                            status = node_statuses.get(node, 'success')
+                                            node_task = {'name': node, 'status': status}
+                                            
+                                            # Add sub-task for requirements if this node has them
+                                            if node == current_node and has_requirements and requirements_status:
+                                                node_task['subtasks'] = [{
+                                                    'name': 'Install dependencies',
+                                                    'status': requirements_status
+                                                }]
+                                            
+                                            tasks_to_show.append(node_task)
                                         
-                                        self._update_task_status(state_manager, workflow_id, step_index, node, node_task_status)
-                                    
-                                    # Add "# others" if there are more nodes
-                                    if len(nodes_seen) > MAX_VISIBLE_NODES:
-                                        remaining = total_nodes_count - processed if total_nodes_count > 0 else 0
-                                        completed_others = processed - len(visible_nodes)
+                                        # Add "# others" for remaining nodes
+                                        remaining = total_nodes_count - processed
                                         if remaining > 0:
-                                            others_label = f"{remaining} others"
-                                            others_status = f"pending"
-                                            self._update_task_status(state_manager, workflow_id, step_index, others_label, others_status)
-                                        elif completed_others > 0:
-                                            others_label = f"{completed_others} others"
-                                            others_status = f"success ({successful_count - len(visible_nodes)}/{completed_others})"
-                                            self._update_task_status(state_manager, workflow_id, step_index, others_label, others_status)
-                                    
+                                            tasks_to_show.append({
+                                                'name': f'{remaining} others',
+                                                'status': 'pending'
+                                            })
+                                    else:
+                                        # Past 4th node - show completed "# others" at top and current nodes at bottom
+                                        completed_others_count = processed - MAX_VISIBLE_NODES
+                                        successful_others = successful_count - len([n for n in nodes_seen[:processed-MAX_VISIBLE_NODES] if node_statuses.get(n) == 'success'])
+                                        
+                                        tasks_to_show.append({
+                                            'name': f'{completed_others_count} others',
+                                            'status': f'success ({successful_others}/{completed_others_count})'
+                                        })
+                                        
+                                        # Show last 4 nodes (current window)
+                                        visible_nodes = nodes_seen[-MAX_VISIBLE_NODES:]
+                                        for node in visible_nodes:
+                                            status = node_statuses.get(node, 'success')
+                                            node_task = {'name': node, 'status': status}
+                                            
+                                            # Add sub-task for requirements if this node has them
+                                            if node == current_node and has_requirements and requirements_status:
+                                                node_task['subtasks'] = [{
+                                                    'name': 'Install dependencies',
+                                                    'status': requirements_status
+                                                }]
+                                            
+                                            tasks_to_show.append(node_task)
+                                        
+                                        # Add pending "# others" if there are more nodes ahead
+                                        remaining = total_nodes_count - processed
+                                        if remaining > 0:
+                                            tasks_to_show.append({
+                                                'name': f'{remaining} others',
+                                                'status': 'pending'
+                                            })
+                                else:
+                                    # 4 or fewer nodes total - show all
+                                    for node in nodes_seen:
+                                        status = node_statuses.get(node, 'success')
+                                        node_task = {'name': node, 'status': status}
+                                        
+                                        # Add sub-task for requirements if this node has them
+                                        if node == current_node and has_requirements and requirements_status:
+                                            node_task['subtasks'] = [{
+                                                'name': 'Install dependencies',
+                                                'status': requirements_status
+                                            }]
+                                        
+                                        tasks_to_show.append(node_task)
+                                
+                                # Only update if tasks changed
+                                update_hash = str(tasks_to_show)
+                                if update_hash != last_update_hash:
+                                    state['steps'][step_index]['tasks'] = tasks_to_show
                                     state_manager.save_state(state)
+                                    last_update_hash = update_hash
                 
                 except Exception as e:
                     logger.debug(f"Progress poll error: {e}")
@@ -844,15 +907,15 @@ class WorkflowExecutor:
             
             logger.info(f"Custom nodes installation completed: {successful_nodes}/{total_nodes} successful, {failed_nodes} failed")
             
-            # Final tasklist update - show summary
+            # Final tasklist update - add "Verify Dependencies" task
             state = state_manager.load_state()
-            if state and total_nodes > MAX_VISIBLE_NODES:
-                # Update "# others" with final count
-                remaining_successful = max(0, successful_nodes - MAX_VISIBLE_NODES)
-                remaining_total = total_nodes - MAX_VISIBLE_NODES
-                others_label = f"{remaining_total} others"
-                others_status = f"success ({remaining_successful}/{remaining_total})"
-                self._update_task_status(state_manager, workflow_id, step_index, others_label, others_status)
+            if state:
+                tasks = state['steps'][step_index].get('tasks', [])
+                # Ensure Verify Dependencies is added to the list
+                if not any(t['name'] == 'Verify Dependencies' for t in tasks):
+                    tasks.append({'name': 'Verify Dependencies', 'status': 'pending'})
+                    state['steps'][step_index]['tasks'] = tasks
+                    state_manager.save_state(state)
             
         except Exception as e:
             error_msg = str(e)
