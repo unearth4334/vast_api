@@ -18,10 +18,16 @@ fi
 
 COMFY_PATH="$1"
 CUSTOM_VENV_PATH=""
+CUSTOM_PROGRESS_FILE=""
 
 # Check for optional venv-path argument
 if [ $# -ge 3 ] && [ "$2" = "--venv-path" ]; then
     CUSTOM_VENV_PATH="$3"
+fi
+
+# Check for optional progress-file argument
+if [ $# -ge 5 ] && [ "$4" = "--progress-file" ]; then
+    CUSTOM_PROGRESS_FILE="$5"
 fi
 
 # Derive other paths from ComfyUI root and script location
@@ -42,8 +48,17 @@ LOG_FILE="$LOG_PATH/install_custom_nodes_log.txt"
 # Progress log file - overwritten on each run
 PROGRESS_LOG="/tmp/custom_nodes_install.log"
 
+# JSON progress file for real-time progress tracking
+# Use custom progress file if specified, otherwise default
+if [ -n "$CUSTOM_PROGRESS_FILE" ]; then
+    PROGRESS_JSON="$CUSTOM_PROGRESS_FILE"
+else
+    PROGRESS_JSON="/tmp/custom_nodes_progress.json"
+fi
+
 # Clear progress log at start
 > "$PROGRESS_LOG"
+> "$PROGRESS_JSON"
 
 # Load dependencies configuration
 DEPENDENCIES_FILE="$(dirname "$0")/dependencies.json"
@@ -66,6 +81,37 @@ write_progress_log() {
     
     # Format: [TIMESTAMP] EVENT_TYPE|NODE_NAME|STATUS|MESSAGE
     echo "[$timestamp] $event_type|$node_name|$status|$message" >> "$PROGRESS_LOG"
+}
+
+# Write JSON progress file for real-time tracking
+write_json_progress() {
+    local in_progress="$1"
+    local total_nodes="$2"
+    local processed="$3"
+    local current_node="$4"
+    local current_status="$5"
+    local successful="${6:-0}"
+    local failed="${7:-0}"
+    local has_requirements="${8:-false}"
+    local requirements_status="${9:-}"
+    
+    # Escape node name for JSON (replace quotes with escaped quotes)
+    local escaped_node=$(echo "$current_node" | sed 's/"/\\"/g')
+    
+    # Build JSON object
+    cat > "$PROGRESS_JSON" <<EOF
+{
+  "in_progress": $in_progress,
+  "total_nodes": $total_nodes,
+  "processed": $processed,
+  "current_node": "$escaped_node",
+  "current_status": "$current_status",
+  "successful": $successful,
+  "failed": $failed,
+  "has_requirements": $has_requirements$([ -n "$requirements_status" ] && echo ",
+  \"requirements_status\": \"$requirements_status\"" || echo "")
+}
+EOF
 }
 
 # Function to write log messages
@@ -148,6 +194,9 @@ write_log "ComfyUI Custom Nodes Installer" 0
 # Log start event
 write_progress_log "START" "installer" "initializing" "Beginning installation"
 
+# Write initial JSON progress
+write_json_progress true 0 0 "Initializing" "running" 0 0 false
+
 # Check if ComfyUI is installed
 if [ ! -d "$COMFY_PATH" ]; then
     write_log "ComfyUI installation not found at: $COMFY_PATH" 1 "red"
@@ -188,20 +237,29 @@ if [ -f "$CUSTOM_NODES_CSV" ]; then
     # Count total nodes for progress tracking
     TOTAL_NODES=$(tail -n +2 "$CUSTOM_NODES_CSV" | wc -l)
     CURRENT_NODE=0
+    SUCCESSFUL_NODES=0
+    FAILED_NODES=0
     
     write_log "Found $TOTAL_NODES custom nodes to process" 1
     
     # Log total nodes count
     write_progress_log "INFO" "installer" "installing" "Found $TOTAL_NODES nodes to install"
     
+    # Write initial progress with total count
+    write_json_progress true "$TOTAL_NODES" 0 "Starting installation" "running" 0 0 false
+    
     # Skip header line and process each custom node
-    tail -n +2 "$CUSTOM_NODES_CSV" | while IFS=',' read -r name repo_url subfolder requirements_file; do
+    # Use process substitution to avoid subshell and preserve variable updates
+    while IFS=',' read -r name repo_url subfolder requirements_file; do
         if [ -n "$name" ] && [ -n "$repo_url" ]; then
             ((CURRENT_NODE++))
             write_log "[$CURRENT_NODE/$TOTAL_NODES] Processing custom node: $name" 1
             
             # Log node processing start
             write_progress_log "NODE" "$name" "processing" "Node $CURRENT_NODE/$TOTAL_NODES"
+            
+            # Write JSON progress for node being processed
+            write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "running" "$SUCCESSFUL_NODES" "$FAILED_NODES" false
             
             if [ -n "$subfolder" ]; then
                 NODE_PATH="$CUSTOM_NODES_PATH/$subfolder"
@@ -215,41 +273,71 @@ if [ -f "$CUSTOM_NODES_CSV" ]; then
                 
                 if invoke_and_log git clone "$repo_url" "$NODE_PATH"; then
                     write_log "Successfully cloned $name" 2 "green"
+                    ((SUCCESSFUL_NODES++))
                     
                     # Install requirements if specified
                     if [ -n "$requirements_file" ] && [ -f "$NODE_PATH/$requirements_file" ]; then
                         write_log "Installing requirements: $requirements_file" 2
                         write_progress_log "NODE" "$name" "installing_requirements" "Installing dependencies"
                         
+                        # Update JSON progress to show requirements installation
+                        write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "running" "$SUCCESSFUL_NODES" "$FAILED_NODES" true "running"
+                        
                         if invoke_and_log "$VENV_PYTHON" -m pip install -r "$NODE_PATH/$requirements_file"; then
                             write_log "Successfully installed requirements for $name" 2 "green"
                             write_progress_log "NODE" "$name" "success" "Installed successfully"
+                            
+                            # Update JSON progress with requirements success
+                            write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "success" "$SUCCESSFUL_NODES" "$FAILED_NODES" true "success"
                         else
                             write_log "Failed to install requirements for $name" 2 "yellow"
                             write_progress_log "NODE" "$name" "partial" "Cloned, but requirements failed"
+                            
+                            # Update JSON progress with requirements failure
+                            write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "success" "$SUCCESSFUL_NODES" "$FAILED_NODES" true "failed"
                         fi
                     else
                         # No requirements file, mark as success after clone
                         write_progress_log "NODE" "$name" "success" "Installed successfully"
+                        
+                        # Update JSON progress with success
+                        write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "success" "$SUCCESSFUL_NODES" "$FAILED_NODES" false
                     fi
                 else
                     write_log "Failed to clone $name" 2 "red"
                     write_progress_log "NODE" "$name" "failed" "Failed to clone repository"
+                    ((FAILED_NODES++))
+                    
+                    # Update JSON progress with failure
+                    write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "failed" "$SUCCESSFUL_NODES" "$FAILED_NODES" false
                 fi
             else
                 write_log "Custom node $name already exists, skipping" 2 "gray"
                 write_progress_log "NODE" "$name" "success" "Already installed"
+                ((SUCCESSFUL_NODES++))
+                
+                # Update JSON progress for already installed node
+                write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "success" "$SUCCESSFUL_NODES" "$FAILED_NODES" false
             fi
         else
             write_log "Skipping invalid entry: name='$name', repo_url='$repo_url'" 2 "yellow"
             if [ -n "$name" ]; then
                 write_progress_log "NODE" "$name" "failed" "Invalid configuration"
+                ((FAILED_NODES++))
+                ((CURRENT_NODE++))
+                
+                # Update JSON progress for invalid node
+                write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "failed" "$SUCCESSFUL_NODES" "$FAILED_NODES" false
             fi
         fi
-    done
+    done < <(tail -n +2 "$CUSTOM_NODES_CSV")
 else
     write_log "Custom nodes CSV file not found: $CUSTOM_NODES_CSV" 1 "yellow"
     write_log "Please ensure the custom_nodes.csv file exists in the scripts directory." 1 "yellow"
+    
+    # Write error to JSON progress
+    write_json_progress false 0 0 "Error: CSV file not found" "failed" 0 1 false
+    
     read -p "Press Enter to exit..."
     exit 1
 fi
@@ -260,6 +348,9 @@ fi
 
 # Log completion
 write_progress_log "COMPLETE" "installer" "completed" "Installation finished"
+
+# Write final JSON progress
+write_json_progress false "$TOTAL_NODES" "$TOTAL_NODES" "Installation complete" "completed" "$SUCCESSFUL_NODES" "$FAILED_NODES" false
 
 write_log "Custom Nodes Installation Complete!" 0 "green"
 write_log "All custom nodes have been installed to: $CUSTOM_NODES_PATH" 1 "green"
