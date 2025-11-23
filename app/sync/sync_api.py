@@ -11,7 +11,6 @@ import time
 import uuid
 import re
 import json
-import paramiko
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -1500,31 +1499,32 @@ def ssh_install_custom_nodes_progress():
                 'message': f'Invalid SSH connection format: {str(e)}'
             }), 400
         
-        # Extract username from connection string
-        parts = ssh_connection.split('@')
-        username = parts[0] if len(parts) == 2 else 'root'
-        
         # SSH key path
         ssh_key = '/root/.ssh/id_ed25519'
         
-        # Read the progress file from remote instance
+        # Read the progress file from remote instance using subprocess (consistent with other SSH operations)
         progress_file = '/tmp/custom_nodes_progress.json'
         
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
         try:
-            client.connect(
-                hostname=ssh_host,
-                port=ssh_port,
-                username=username,
-                key_filename=ssh_key,
+            # Use subprocess SSH like all other operations in this file
+            cmd = [
+                'ssh',
+                '-i', ssh_key,
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=/dev/null',
+                '-p', str(ssh_port),
+                ssh_connection,
+                f"cat {progress_file} 2>/dev/null || echo '{{}}'"
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
                 timeout=10
             )
             
-            # Read progress file
-            stdin, stdout, stderr = client.exec_command(f"cat {progress_file} 2>/dev/null || echo '{{}}'")
-            progress_json = stdout.read().decode('utf-8').strip()
+            progress_json = result.stdout.strip()
             
             logger.debug(f"Progress file content: {progress_json}")
             
@@ -1542,9 +1542,6 @@ def ssh_install_custom_nodes_progress():
                 'success': True,
                 **progress_data
             })
-            
-        finally:
-            client.close()
             
     except Exception as e:
         logger.error(f"Error reading progress: {str(e)}")
