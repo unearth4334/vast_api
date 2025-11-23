@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration constants
 LOG_BASE = os.environ.get('LOG_BASE', '/app/logs')
-SYNC_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'sync_outputs.sh')
+SYNC_SCRIPT_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'scripts', 'sync_outputs.sh')
 SYNC_LOG_DIR = os.path.join(LOG_BASE, 'sync')
 FORGE_HOST = "10.0.78.108"
 FORGE_PORT = "2222"
