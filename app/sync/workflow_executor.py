@@ -686,7 +686,7 @@ class WorkflowExecutor:
     def _execute_install_custom_nodes(self, ssh_connection: str, ui_home: str, 
                                      state_manager, workflow_id: str, step_index: int) -> tuple:
         """
-        Install custom nodes with rolling tasklist display.
+        Install custom nodes with rolling tasklist display showing real-time progress.
         Includes: Clone Auto-installer, custom nodes (with rolling 5-line display), and verify dependencies.
         """
         logger.info("Starting custom nodes installation workflow...")
@@ -720,62 +720,135 @@ class WorkflowExecutor:
             self._set_completion_note(state_manager, workflow_id, step_index, f"Error cloning auto-installer: {error_msg}")
             return False, error_msg
         
-        # Task 2: Install Custom Nodes (with rolling display)
+        # Task 2: Install Custom Nodes (with real-time progress tracking)
+        logger.info("Starting custom nodes installation with progress tracking...")
+        
         try:
-            # Start the installation
-            response = requests.post(
-                f"{API_BASE_URL}/ssh/install-custom-nodes",
-                json={
-                    'ssh_connection': ssh_connection,
-                    'ui_home': ui_home
-                },
-                timeout=1800  # 30 minutes timeout
-            )
+            # Start the installation in a thread and poll progress
+            import threading
             
-            result = response.json()
-            if not result.get('success'):
-                error_msg = result.get('message', 'Unknown error')
+            install_result = {'success': None, 'error': None, 'data': None}
+            
+            def run_install():
+                try:
+                    response = requests.post(
+                        f"{API_BASE_URL}/ssh/install-custom-nodes",
+                        json={
+                            'ssh_connection': ssh_connection,
+                            'ui_home': ui_home
+                        },
+                        timeout=1800
+                    )
+                    result = response.json()
+                    install_result['success'] = result.get('success')
+                    install_result['data'] = result
+                except Exception as e:
+                    install_result['success'] = False
+                    install_result['error'] = str(e)
+            
+            install_thread = threading.Thread(target=run_install, daemon=True)
+            install_thread.start()
+            
+            # Poll progress while installation runs
+            nodes_seen = set()
+            MAX_VISIBLE_NODES = 4  # Show 4 nodes max, 5th line is for "# others"
+            total_nodes_count = 0
+            successful_count = 0
+            failed_count = 0
+            
+            while install_thread.is_alive() or install_result['success'] is not None:
+                try:
+                    # Read progress from remote instance
+                    progress_response = requests.post(
+                        f"{API_BASE_URL}/ssh/install-custom-nodes/progress",
+                        json={'ssh_connection': ssh_connection},
+                        timeout=10
+                    )
+                    
+                    if progress_response.status_code == 200:
+                        progress = progress_response.json()
+                        
+                        if progress.get('in_progress'):
+                            total_nodes_count = progress.get('total_nodes', 0)
+                            current_node = progress.get('current_node')
+                            node_status = progress.get('current_status')
+                            processed = progress.get('processed', 0)
+                            successful_count = progress.get('successful', 0)
+                            failed_count = progress.get('failed', 0)
+                            
+                            # Update tasklist with rolling window
+                            state = state_manager.load_state()
+                            if state and current_node:
+                                # Track nodes as we see them
+                                if current_node not in nodes_seen:
+                                    nodes_seen.add(current_node)
+                                    
+                                    # Determine if we need rolling display
+                                    visible_nodes = list(nodes_seen)[-MAX_VISIBLE_NODES:]
+                                    
+                                    # Remove old node tasks and rebuild
+                                    tasks = state['steps'][step_index].get('tasks', [])
+                                    # Keep only Clone Auto-installer
+                                    state['steps'][step_index]['tasks'] = [t for t in tasks if t['name'] == 'Clone Auto-installer']
+                                    
+                                    # Add visible nodes
+                                    for node in visible_nodes:
+                                        node_task_status = 'running' if node == current_node else ('success' if node != current_node else 'pending')
+                                        if node == current_node:
+                                            node_task_status = 'running'
+                                        else:
+                                            # Check if this node was successful (it's behind current)
+                                            node_task_status = 'success'  # Assume success for completed nodes
+                                        
+                                        self._update_task_status(state_manager, workflow_id, step_index, node, node_task_status)
+                                    
+                                    # Add "# others" if there are more nodes
+                                    if len(nodes_seen) > MAX_VISIBLE_NODES:
+                                        remaining = total_nodes_count - processed if total_nodes_count > 0 else 0
+                                        completed_others = processed - len(visible_nodes)
+                                        if remaining > 0:
+                                            others_label = f"{remaining} others"
+                                            others_status = f"pending"
+                                            self._update_task_status(state_manager, workflow_id, step_index, others_label, others_status)
+                                        elif completed_others > 0:
+                                            others_label = f"{completed_others} others"
+                                            others_status = f"success ({successful_count - len(visible_nodes)}/{completed_others})"
+                                            self._update_task_status(state_manager, workflow_id, step_index, others_label, others_status)
+                                    
+                                    state_manager.save_state(state)
+                
+                except Exception as e:
+                    logger.debug(f"Progress poll error: {e}")
+                
+                # Break if installation completed
+                if install_result['success'] is not None:
+                    break
+                
+                time.sleep(2)  # Poll every 2 seconds
+            
+            # Installation finished - check result
+            if not install_result['success']:
+                error_msg = install_result.get('error') or install_result.get('data', {}).get('message', 'Unknown error')
                 logger.error(f"Custom nodes installation failed: {error_msg}")
                 self._set_completion_note(state_manager, workflow_id, step_index, f"Custom nodes installation failed: {error_msg}")
                 return False, error_msg
             
-            # Installation completed - update tasklist with rolling display logic
-            total_nodes = result.get('total_nodes', 0)
-            successful_nodes = result.get('successful_clones', 0)
-            failed_nodes = result.get('failed_clones', 0)
-            node_list = result.get('nodes', [])
+            result_data = install_result['data']
+            total_nodes = result_data.get('total_nodes', 0)
+            successful_nodes = result_data.get('successful_clones', 0)
+            failed_nodes = result_data.get('failed_clones', 0)
             
             logger.info(f"Custom nodes installation completed: {successful_nodes}/{total_nodes} successful, {failed_nodes} failed")
             
-            # Update state with rolling display for nodes
+            # Final tasklist update - show summary
             state = state_manager.load_state()
-            if state:
-                tasks = state['steps'][step_index].get('tasks', [])
-                
-                # Keep Clone Auto-installer task
-                # Add node tasks with rolling display
-                MAX_VISIBLE = 5
-                
-                if total_nodes > MAX_VISIBLE - 1:  # -1 for Clone Auto-installer
-                    # Show first 3 nodes, then "# others"
-                    for i, node in enumerate(node_list[:3]):
-                        task_name = node.get('name', f'Node {i+1}')
-                        status = 'success' if node.get('success') else 'failed'
-                        self._update_task_status(state_manager, workflow_id, step_index, task_name, status)
-                    
-                    # Add "# others" summary
-                    remaining = total_nodes - 3
-                    successful_remaining = max(0, successful_nodes - 3)
-                    others_status = f"success ({successful_remaining}/{remaining})" if successful_remaining > 0 else "pending"
-                    self._update_task_status(state_manager, workflow_id, step_index, f"{remaining} others", others_status)
-                else:
-                    # Show all nodes
-                    for node in node_list:
-                        task_name = node.get('name', 'Unknown Node')
-                        status = 'success' if node.get('success') else 'failed'
-                        self._update_task_status(state_manager, workflow_id, step_index, task_name, status)
-                
-                state_manager.save_state(state)
+            if state and total_nodes > MAX_VISIBLE_NODES:
+                # Update "# others" with final count
+                remaining_successful = max(0, successful_nodes - MAX_VISIBLE_NODES)
+                remaining_total = total_nodes - MAX_VISIBLE_NODES
+                others_label = f"{remaining_total} others"
+                others_status = f"success ({remaining_successful}/{remaining_total})"
+                self._update_task_status(state_manager, workflow_id, step_index, others_label, others_status)
             
         except Exception as e:
             error_msg = str(e)
@@ -783,7 +856,7 @@ class WorkflowExecutor:
             self._set_completion_note(state_manager, workflow_id, step_index, f"Installation error: {error_msg}")
             return False, error_msg
         
-        # Task 3: Verify Dependencies (with rolling display)
+        # Task 3: Verify Dependencies
         self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'running')
         
         try:
@@ -802,8 +875,28 @@ class WorkflowExecutor:
                 if installed_deps:
                     logger.info(f"Installed {len(installed_deps)} missing dependencies")
                     
-                    # Add dependencies as sub-tasks with rolling display
-                    MAX_DEP_VISIBLE = 5
+                    # Add dependencies as sub-tasks
+                    for dep in installed_deps[:5]:  # Show up to 5
+                        self._update_task_status(state_manager, workflow_id, step_index, f"  └─ {dep}", 'success')
+                    
+                    if len(installed_deps) > 5:
+                        remaining = len(installed_deps) - 5
+                        self._update_task_status(state_manager, workflow_id, step_index, f"  └─ {remaining} more dependencies", 'success')
+                
+                self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'success')
+                self._set_completion_note(state_manager, workflow_id, step_index, "Custom nodes and dependencies installed successfully")
+                return True, None
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'failed')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Dependency verification failed: {error_msg}")
+                return False, error_msg
+                
+        except Exception as e:
+            error_msg = str(e)
+            self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'failed')
+            self._set_completion_note(state_manager, workflow_id, step_index, f"Dependency verification error: {error_msg}")
+            return False, error_msg
                     if len(installed_deps) > MAX_DEP_VISIBLE:
                         for dep in installed_deps[:4]:
                             self._update_task_status(state_manager, workflow_id, step_index, f"  {dep}", 'success')

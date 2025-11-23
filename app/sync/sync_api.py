@@ -10,6 +10,7 @@ import logging
 import time
 import uuid
 import re
+import json
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -1278,6 +1279,9 @@ def ssh_install_custom_nodes():
         current_node = None
         output_lines = []
         
+        # Write progress to remote file for tracking
+        progress_file = '/tmp/custom_nodes_progress.json'
+        
         for line in process.stdout:
             output_lines.append(line.rstrip())
             logger.debug(f"Install output: {line.rstrip()}")
@@ -1290,16 +1294,59 @@ def ssh_install_custom_nodes():
                     total_nodes = int(match.group(2))
                     current_node = match.group(3).strip()
                     logger.info(f"Processing node {processed_nodes}/{total_nodes}: {current_node}")
+                    
+                    # Write progress to file
+                    progress_data = {
+                        'in_progress': True,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'running',
+                        'successful': successful_clones,
+                        'failed': failed_clones
+                    }
+                    try:
+                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
+                        stdout.channel.recv_exit_status()
+                    except Exception as e:
+                        logger.debug(f"Failed to write progress: {e}")
             
             # Track successes and failures
             elif 'Successfully cloned' in line:
                 successful_clones += 1
+                # Update progress file with success count
+                if current_node:
+                    progress_data = {
+                        'in_progress': True,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'success',
+                        'successful': successful_clones,
+                        'failed': failed_clones
+                    }
+                    try:
+                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
+                        stdout.channel.recv_exit_status()
+                    except Exception as e:
+                        logger.debug(f"Failed to write progress: {e}")
+                        
             elif 'Failed to clone' in line:
                 failed_clones += 1
             elif 'Successfully installed requirements' in line:
                 successful_requirements += 1
             elif 'Failed to install requirements' in line:
                 failed_requirements += 1
+        
+        # Clear progress file when done
+        try:
+            clear_progress_cmd = f"echo '{{\"in_progress\": false}}' > {progress_file}"
+            stdin, stdout, stderr = client.exec_command(clear_progress_cmd)
+            stdout.channel.recv_exit_status()
+        except Exception as e:
+            logger.debug(f"Failed to clear progress: {e}")
         
         # Wait for process to complete
         return_code = process.wait(timeout=1800)  # 30 minute timeout for all nodes
@@ -1345,6 +1392,78 @@ def ssh_install_custom_nodes():
         return jsonify({
             'success': False,
             'message': f'Custom nodes installation error: {str(e)}'
+        })
+
+
+@app.route('/ssh/install-custom-nodes/progress', methods=['POST', 'OPTIONS'])
+def ssh_install_custom_nodes_progress():
+    """Get real-time progress of custom nodes installation"""
+    if request.method == 'OPTIONS':
+        return handle_cors_preflight()
+    
+    try:
+        data = request.get_json()
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'Missing ssh_connection parameter'
+            }), 400
+        
+        # Parse SSH connection
+        parts = ssh_connection.split('@')
+        if len(parts) != 2:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid SSH connection format. Expected: root@host:port'
+            }), 400
+        
+        username = parts[0]
+        host_port = parts[1].split(':')
+        hostname = host_port[0]
+        port = int(host_port[1]) if len(host_port) > 1 else 22
+        
+        # Read the progress file from remote instance
+        progress_file = '/tmp/custom_nodes_progress.json'
+        
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        try:
+            client.connect(
+                hostname=hostname,
+                port=port,
+                username=username,
+                key_filename=SSH_KEY_PATH,
+                timeout=10
+            )
+            
+            # Read progress file
+            stdin, stdout, stderr = client.exec_command(f"cat {progress_file} 2>/dev/null || echo '{{}}'")
+            progress_json = stdout.read().decode('utf-8').strip()
+            
+            if not progress_json or progress_json == '{}':
+                return jsonify({
+                    'success': True,
+                    'in_progress': False,
+                    'message': 'No active installation'
+                })
+            
+            progress_data = json.loads(progress_json)
+            return jsonify({
+                'success': True,
+                **progress_data
+            })
+            
+        finally:
+            client.close()
+            
+    except Exception as e:
+        logger.error(f"Error reading progress: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error reading progress: {str(e)}'
         })
 
 
