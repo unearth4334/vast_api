@@ -1309,9 +1309,18 @@ def ssh_install_custom_nodes():
                         'has_requirements': False
                     }
                     try:
-                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
-                        stdout.channel.recv_exit_status()
+                        write_cmd = [
+                            'ssh',
+                            '-p', str(ssh_port),
+                            '-i', ssh_key,
+                            '-o', 'ConnectTimeout=5',
+                            '-o', 'StrictHostKeyChecking=yes',
+                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                            '-o', 'IdentitiesOnly=yes',
+                            f'root@{ssh_host}',
+                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        ]
+                        subprocess.run(write_cmd, timeout=5, capture_output=True)
                     except Exception as e:
                         logger.debug(f"Failed to write progress: {e}")
             
@@ -1330,9 +1339,18 @@ def ssh_install_custom_nodes():
                     'requirements_status': 'running'
                 }
                 try:
-                    write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                    stdin, stdout, stderr = client.exec_command(write_progress_cmd)
-                    stdout.channel.recv_exit_status()
+                    write_cmd = [
+                        'ssh',
+                        '-p', str(ssh_port),
+                        '-i', ssh_key,
+                        '-o', 'ConnectTimeout=5',
+                        '-o', 'StrictHostKeyChecking=yes',
+                        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                        '-o', 'IdentitiesOnly=yes',
+                        f'root@{ssh_host}',
+                        f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                    ]
+                    subprocess.run(write_cmd, timeout=5, capture_output=True)
                 except Exception as e:
                     logger.debug(f"Failed to write progress: {e}")
             
@@ -1353,9 +1371,18 @@ def ssh_install_custom_nodes():
                         'requirements_status': 'pending' if current_node_has_requirements else None
                     }
                     try:
-                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
-                        stdout.channel.recv_exit_status()
+                        write_cmd = [
+                            'ssh',
+                            '-p', str(ssh_port),
+                            '-i', ssh_key,
+                            '-o', 'ConnectTimeout=5',
+                            '-o', 'StrictHostKeyChecking=yes',
+                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                            '-o', 'IdentitiesOnly=yes',
+                            f'root@{ssh_host}',
+                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        ]
+                        subprocess.run(write_cmd, timeout=5, capture_output=True)
                     except Exception as e:
                         logger.debug(f"Failed to write progress: {e}")
                         
@@ -1373,9 +1400,18 @@ def ssh_install_custom_nodes():
                         'has_requirements': False
                     }
                     try:
-                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
-                        stdout.channel.recv_exit_status()
+                        write_cmd = [
+                            'ssh',
+                            '-p', str(ssh_port),
+                            '-i', ssh_key,
+                            '-o', 'ConnectTimeout=5',
+                            '-o', 'StrictHostKeyChecking=yes',
+                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                            '-o', 'IdentitiesOnly=yes',
+                            f'root@{ssh_host}',
+                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        ]
+                        subprocess.run(write_cmd, timeout=5, capture_output=True)
                     except Exception as e:
                         logger.debug(f"Failed to write progress: {e}")
             elif 'Successfully installed requirements' in line:
@@ -1393,9 +1429,18 @@ def ssh_install_custom_nodes():
                         'requirements_status': 'success'
                     }
                     try:
-                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
-                        stdout.channel.recv_exit_status()
+                        write_cmd = [
+                            'ssh',
+                            '-p', str(ssh_port),
+                            '-i', ssh_key,
+                            '-o', 'ConnectTimeout=5',
+                            '-o', 'StrictHostKeyChecking=yes',
+                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                            '-o', 'IdentitiesOnly=yes',
+                            f'root@{ssh_host}',
+                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        ]
+                        subprocess.run(write_cmd, timeout=5, capture_output=True)
                     except Exception as e:
                         logger.debug(f"Failed to write progress: {e}")
             elif 'Failed to install requirements' in line:
@@ -1413,17 +1458,35 @@ def ssh_install_custom_nodes():
                         'requirements_status': 'failed'
                     }
                     try:
-                        write_progress_cmd = f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        stdin, stdout, stderr = client.exec_command(write_progress_cmd)
-                        stdout.channel.recv_exit_status()
+                        write_cmd = [
+                            'ssh',
+                            '-p', str(ssh_port),
+                            '-i', ssh_key,
+                            '-o', 'ConnectTimeout=5',
+                            '-o', 'StrictHostKeyChecking=yes',
+                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                            '-o', 'IdentitiesOnly=yes',
+                            f'root@{ssh_host}',
+                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
+                        ]
+                        subprocess.run(write_cmd, timeout=5, capture_output=True)
                     except Exception as e:
                         logger.debug(f"Failed to write progress: {e}")
         
         # Clear progress file when done
         try:
-            clear_progress_cmd = f"echo '{{\"in_progress\": false}}' > {progress_file}"
-            stdin, stdout, stderr = client.exec_command(clear_progress_cmd)
-            stdout.channel.recv_exit_status()
+            clear_cmd = [
+                'ssh',
+                '-p', str(ssh_port),
+                '-i', ssh_key,
+                '-o', 'ConnectTimeout=5',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
+                f'root@{ssh_host}',
+                f"echo '{{\"in_progress\": false}}' > {progress_file}"
+            ]
+            subprocess.run(clear_cmd, timeout=5, capture_output=True)
         except Exception as e:
             logger.debug(f"Failed to clear progress: {e}")
         
