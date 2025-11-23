@@ -761,6 +761,9 @@ class WorkflowExecutor:
             successful_count = 0
             failed_count = 0
             last_update_hash = None
+            current_node = None  # Initialize to prevent UnboundLocalError
+            has_requirements = False
+            requirements_status = None
             
             while install_thread.is_alive() or install_result['success'] is None:
                 try:
