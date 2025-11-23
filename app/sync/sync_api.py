@@ -3860,6 +3860,7 @@ def workflow_start():
         steps = data.get('steps', [])
         ssh_connection = data.get('ssh_connection')
         step_delay = data.get('step_delay', 5)
+        instance_id = data.get('instance_id')
         
         if not ssh_connection:
             return jsonify({
@@ -3873,11 +3874,11 @@ def workflow_start():
                 'message': 'Workflow steps are required'
             })
         
-        logger.info(f"Starting workflow {workflow_id} with {len(steps)} steps")
+        logger.info(f"Starting workflow {workflow_id} with {len(steps)} steps, instance_id: {instance_id}")
         
         # Get executor and start workflow
         executor = get_workflow_executor()
-        success = executor.start_workflow(workflow_id, steps, ssh_connection, step_delay)
+        success = executor.start_workflow(workflow_id, steps, ssh_connection, step_delay, instance_id)
         
         if success:
             return jsonify({

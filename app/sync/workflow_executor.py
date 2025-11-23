@@ -30,7 +30,7 @@ class WorkflowExecutor:
         self._lock = threading.Lock()
         logger.info("WorkflowExecutor initialized")
     
-    def start_workflow(self, workflow_id: str, steps: list, ssh_connection: str, step_delay: int = 5) -> bool:
+    def start_workflow(self, workflow_id: str, steps: list, ssh_connection: str, step_delay: int = 5, instance_id: int = None) -> bool:
         """
         Start a workflow execution in the background.
         
@@ -39,6 +39,7 @@ class WorkflowExecutor:
             steps: List of step configurations
             ssh_connection: SSH connection string
             step_delay: Delay between steps in seconds
+            instance_id: Optional instance ID for workflow-level operations
             
         Returns:
             True if workflow started successfully, False otherwise
@@ -56,7 +57,7 @@ class WorkflowExecutor:
             # Create and start thread
             thread = threading.Thread(
                 target=self._execute_workflow,
-                args=(workflow_id, steps, ssh_connection, step_delay, stop_flag),
+                args=(workflow_id, steps, ssh_connection, step_delay, stop_flag, instance_id),
                 daemon=True,
                 name=f"workflow-{workflow_id}"
             )
@@ -101,7 +102,7 @@ class WorkflowExecutor:
                     self.active_workflows[workflow_id].is_alive())
     
     def _execute_workflow(self, workflow_id: str, steps: list, ssh_connection: str, 
-                         step_delay: int, stop_flag: threading.Event):
+                         step_delay: int, stop_flag: threading.Event, instance_id: int = None):
         """
         Execute workflow steps in sequence (runs in background thread).
         
@@ -111,6 +112,7 @@ class WorkflowExecutor:
             ssh_connection: SSH connection string
             step_delay: Delay between steps in seconds
             stop_flag: Event to signal workflow should stop
+            instance_id: Optional instance ID for workflow-level operations
         """
         state_manager = get_workflow_state_manager()
         
@@ -259,8 +261,9 @@ class WorkflowExecutor:
                 ui_home = step.get('ui_home', '/workspace/ComfyUI')
                 return self._execute_install_custom_nodes(ssh_connection, ui_home, state_manager, workflow_id, step_index)
             elif action == 'reboot_instance':
-                instance_id = step.get('instance_id')
-                return self._execute_reboot_instance_with_tasks(instance_id, state_manager, workflow_id, step_index)
+                step_instance_id = step.get('instance_id') or instance_id
+                logger.info(f"Reboot instance action - step instance_id: {step.get('instance_id')}, workflow instance_id: {instance_id}, using: {step_instance_id}")
+                return self._execute_reboot_instance_with_tasks(step_instance_id, state_manager, workflow_id, step_index)
             else:
                 logger.warning(f"Unknown action: {action}")
                 return False, f"Unknown action: {action}"
