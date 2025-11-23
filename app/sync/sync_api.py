@@ -88,6 +88,15 @@ def add_pna_header(resp):
     return resp
 
 
+# Constants for custom nodes installation
+PROGRESS_FILE_TEMPLATE = '/tmp/custom_nodes_progress_{task_id}.json'
+
+
+def _get_progress_file_path(task_id: str) -> str:
+    """Get the progress file path for a given task ID"""
+    return PROGRESS_FILE_TEMPLATE.format(task_id=task_id)
+
+
 def _extract_host_port(ssh_connection):
     """Helper function to extract host and port from SSH connection string"""
     return parse_host_port(ssh_connection)
@@ -1212,7 +1221,7 @@ def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str
         return
     
     ssh_key = '/root/.ssh/id_ed25519'
-    progress_file = f'/tmp/custom_nodes_progress_{task_id}.json'
+    progress_file = _get_progress_file_path(task_id)
     
     logger.info(f"Starting background installation for task {task_id} on {ssh_host}:{ssh_port}")
     
@@ -1583,7 +1592,7 @@ def ssh_install_custom_nodes_progress():
         ssh_key = '/root/.ssh/id_ed25519'
         
         # Read the progress file for this specific task_id
-        progress_file = f'/tmp/custom_nodes_progress_{task_id}.json'
+        progress_file = _get_progress_file_path(task_id)
         
         try:
             # Use subprocess SSH like all other operations in this file

@@ -153,11 +153,14 @@ class BackgroundTaskManager:
                 with self.lock:
                     tasks_to_remove = []
                     for task_id, task in self.tasks.items():
-                        # Remove tasks that completed more than max_task_age seconds ago
+                        # Only clean up tasks that are no longer running
                         if not task['thread'].is_alive():
-                            completed_at = task['status'].get('completed_at', 
-                                                            task['status']['started_at'])
-                            if current_time - completed_at > self._max_task_age:
+                            # Use completed_at if available, otherwise current time for safety
+                            # This ensures long-running tasks aren't cleaned up prematurely
+                            completed_at = task['status'].get('completed_at', current_time)
+                            age = current_time - completed_at
+                            
+                            if age > self._max_task_age:
                                 tasks_to_remove.append(task_id)
                     
                     for task_id in tasks_to_remove:
