@@ -1171,6 +1171,7 @@ def ssh_install_custom_nodes():
     def write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data):
         """Helper to write progress JSON to remote instance"""
         try:
+            logger.debug(f"Writing progress to remote: {progress_data.get('current_node')} - {progress_data.get('processed')}/{progress_data.get('total_nodes')}")
             # Write to local temp file
             import tempfile
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as tmp:
@@ -1189,13 +1190,18 @@ def ssh_install_custom_nodes():
                 tmp_path,
                 f'root@{ssh_host}:{progress_file}'
             ]
-            subprocess.run(scp_cmd, timeout=5, capture_output=True)
+            result = subprocess.run(scp_cmd, timeout=5, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                logger.warning(f"SCP failed: {result.stderr}")
+            else:
+                logger.debug(f"Progress written successfully")
             
             # Clean up local temp file
             import os
             os.unlink(tmp_path)
         except Exception as e:
-            logger.debug(f"Failed to write progress: {e}")
+            logger.error(f"Failed to write progress: {e}", exc_info=True)
     
     try:
         data = request.get_json() if request.is_json else {}
@@ -1516,7 +1522,10 @@ def ssh_install_custom_nodes_progress():
             stdin, stdout, stderr = client.exec_command(f"cat {progress_file} 2>/dev/null || echo '{{}}'")
             progress_json = stdout.read().decode('utf-8').strip()
             
+            logger.debug(f"Progress file content: {progress_json}")
+            
             if not progress_json or progress_json == '{}':
+                logger.debug("No active installation found")
                 return jsonify({
                     'success': True,
                     'in_progress': False,
@@ -1524,6 +1533,7 @@ def ssh_install_custom_nodes_progress():
                 })
             
             progress_data = json.loads(progress_json)
+            logger.info(f"Returning progress: {progress_data.get('current_node')} - {progress_data.get('processed')}/{progress_data.get('total_nodes')}")
             return jsonify({
                 'success': True,
                 **progress_data

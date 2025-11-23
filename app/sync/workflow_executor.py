@@ -790,6 +790,7 @@ class WorkflowExecutor:
                             # Track this node if we haven't seen it
                             if current_node and current_node not in nodes_seen:
                                 nodes_seen.append(current_node)
+                                logger.info(f"New node detected: {current_node}, total seen: {len(nodes_seen)}")
                             
                             # Update status for current node
                             if current_node:
@@ -798,6 +799,7 @@ class WorkflowExecutor:
                             # Build task list update
                             state = state_manager.load_state()
                             if state:
+                                logger.debug(f"Building task list. Nodes seen: {len(nodes_seen)}, Total: {total_nodes_count}")
                                 # Calculate what to display
                                 tasks_to_show = []
                                 
@@ -806,6 +808,10 @@ class WorkflowExecutor:
                                 clone_task = next((t for t in existing_tasks if t['name'] == 'Clone Auto-installer'), None)
                                 if clone_task:
                                     tasks_to_show.append(clone_task)
+                                else:
+                                    # Fallback: if clone task not found, assume it's completed
+                                    logger.warning("Clone Auto-installer task not found in existing tasks, adding as completed")
+                                    tasks_to_show.append({'name': 'Clone Auto-installer', 'status': 'success'})
                                 
                                 # Determine how many nodes to show and which ones
                                 if total_nodes_count > MAX_VISIBLE_NODES:
@@ -883,12 +889,16 @@ class WorkflowExecutor:
                                 # Only update if tasks changed
                                 update_hash = str(tasks_to_show)
                                 if update_hash != last_update_hash:
+                                    logger.info(f"Updating task list with {len(tasks_to_show)} tasks: {[t['name'] for t in tasks_to_show]}")
                                     state['steps'][step_index]['tasks'] = tasks_to_show
                                     state_manager.save_state(state)
                                     last_update_hash = update_hash
+                                    logger.info(f"Task list updated successfully")
+                                else:
+                                    logger.debug(f"Task list unchanged, skipping update")
                 
                 except Exception as e:
-                    logger.debug(f"Progress poll error: {e}")
+                    logger.error(f"Progress poll error: {e}", exc_info=True)
                 
                 # Break if installation completed
                 if install_result['success'] is not None:

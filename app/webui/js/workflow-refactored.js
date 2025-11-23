@@ -545,6 +545,12 @@ function renderTasklist(stepElement, stepData) {
   const tasks = stepData.tasks || [];
   const completionNote = stepData.completion_note || '';
   
+  console.log('renderTasklist called:', {
+    step: stepData.action,
+    taskCount: tasks.length,
+    tasks: tasks.map(t => ({name: t.name, status: t.status}))
+  });
+  
   // Check if tasklist already exists
   let tasklistElement = stepElement.querySelector('.tasklist');
   
