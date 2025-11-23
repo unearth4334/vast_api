@@ -25,6 +25,7 @@ try:
     from ..webui.templates import get_index_template
     from ..webui.template_manager import template_manager
     from .ssh_test import SSHTester
+    from .background_tasks import get_task_manager
 except ImportError:
     # Handle imports for both module and direct execution
     import sys
@@ -36,6 +37,7 @@ except ImportError:
     from utils.sync_logs import get_logs_manifest, get_log_file_content, get_active_syncs, get_latest_sync, get_sync_progress
     from utils.config_loader import load_config, load_api_key
     from webui.templates import get_index_template
+    from background_tasks import get_task_manager
     try:
         from ssh_test import SSHTester
     except ImportError:
@@ -1162,46 +1164,318 @@ def ssh_test_civitdl():
         })
 
 
-@app.route('/ssh/install-custom-nodes', methods=['POST', 'OPTIONS'])
-def ssh_install_custom_nodes():
-    """Install ComfyUI custom nodes on remote instance"""
-    if request.method == 'OPTIONS':
-        return ("", 204)
+def _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data):
+    """Helper to write progress JSON to remote instance"""
+    try:
+        logger.debug(f"Writing progress to remote: {progress_data.get('current_node')} - {progress_data.get('processed')}/{progress_data.get('total_nodes')}")
+        # Write to local temp file
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as tmp:
+            json.dump(progress_data, tmp)
+            tmp_path = tmp.name
+        
+        # SCP to remote
+        scp_cmd = [
+            'scp',
+            '-P', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=5',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            tmp_path,
+            f'root@{ssh_host}:{progress_file}'
+        ]
+        result = subprocess.run(scp_cmd, timeout=5, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            logger.warning(f"SCP failed: {result.stderr}")
+        else:
+            logger.debug(f"Progress written successfully")
+        
+        # Clean up local temp file
+        import os
+        os.unlink(tmp_path)
+    except Exception as e:
+        logger.error(f"Failed to write progress: {e}", exc_info=True)
+
+
+def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str):
+    """
+    Background worker that runs custom nodes installation.
+    Writes progress to remote file as installation proceeds.
+    """
+    try:
+        ssh_host, ssh_port = _extract_host_port(ssh_connection)
+    except ValueError as e:
+        logger.error(f"Invalid SSH connection format: {e}")
+        return
     
-    def write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data):
-        """Helper to write progress JSON to remote instance"""
-        try:
-            logger.debug(f"Writing progress to remote: {progress_data.get('current_node')} - {progress_data.get('processed')}/{progress_data.get('total_nodes')}")
-            # Write to local temp file
-            import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as tmp:
-                json.dump(progress_data, tmp)
-                tmp_path = tmp.name
+    ssh_key = '/root/.ssh/id_ed25519'
+    progress_file = f'/tmp/custom_nodes_progress_{task_id}.json'
+    
+    logger.info(f"Starting background installation for task {task_id} on {ssh_host}:{ssh_port}")
+    
+    try:
+        # Write initial progress
+        initial_progress = {
+            'in_progress': True,
+            'task_id': task_id,
+            'total_nodes': 0,
+            'processed': 0,
+            'current_node': 'Initializing',
+            'current_status': 'running',
+            'successful': 0,
+            'failed': 0,
+            'has_requirements': False
+        }
+        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, initial_progress)
+        
+        # Check if ComfyUI-Auto_installer exists, clone if needed
+        check_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            'test -d /workspace/ComfyUI-Auto_installer'
+        ]
+        
+        check_result = subprocess.run(check_cmd, timeout=10, capture_output=True)
+        
+        if check_result.returncode != 0:
+            logger.info("ComfyUI-Auto_installer not found, cloning repository...")
             
-            # SCP to remote
-            scp_cmd = [
-                'scp',
-                '-P', str(ssh_port),
+            # Update progress
+            clone_progress = initial_progress.copy()
+            clone_progress['current_node'] = 'Cloning Auto-installer'
+            _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, clone_progress)
+            
+            clone_cmd = [
+                'ssh',
+                '-p', str(ssh_port),
                 '-i', ssh_key,
-                '-o', 'ConnectTimeout=5',
+                '-o', 'ConnectTimeout=10',
                 '-o', 'StrictHostKeyChecking=yes',
                 '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
                 '-o', 'IdentitiesOnly=yes',
-                tmp_path,
-                f'root@{ssh_host}:{progress_file}'
+                f'root@{ssh_host}',
+                'cd /workspace && git clone https://github.com/unearth4334/ComfyUI-Auto_installer'
             ]
-            result = subprocess.run(scp_cmd, timeout=5, capture_output=True, text=True)
             
-            if result.returncode != 0:
-                logger.warning(f"SCP failed: {result.stderr}")
-            else:
-                logger.debug(f"Progress written successfully")
+            clone_result = subprocess.run(clone_cmd, timeout=300, capture_output=True, text=True)
             
-            # Clean up local temp file
-            import os
-            os.unlink(tmp_path)
-        except Exception as e:
-            logger.error(f"Failed to write progress: {e}", exc_info=True)
+            if clone_result.returncode != 0:
+                logger.error(f"Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}")
+                error_progress = {
+                    'in_progress': False,
+                    'task_id': task_id,
+                    'error': f'Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}',
+                    'completed': False
+                }
+                _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
+                return
+            
+            logger.info("ComfyUI-Auto_installer cloned successfully")
+        else:
+            logger.info("ComfyUI-Auto_installer already exists")
+        
+        # Run the custom nodes installer
+        install_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            f'source /etc/environment 2>/dev/null; cd /workspace/ComfyUI-Auto_installer/scripts && ./install-custom-nodes.sh {ui_home} --venv-path /venv/main/bin/python 2>&1'
+        ]
+        
+        # Use Popen for real-time output streaming
+        process = subprocess.Popen(
+            install_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        
+        # Parse output to track progress
+        total_nodes = 0
+        processed_nodes = 0
+        successful_clones = 0
+        failed_clones = 0
+        successful_requirements = 0
+        failed_requirements = 0
+        current_node = None
+        current_node_has_requirements = False
+        output_lines = []
+        
+        for line in process.stdout:
+            output_lines.append(line.rstrip())
+            logger.debug(f"Install output: {line.rstrip()}")
+            
+            # Parse progress: [X/Y] Processing custom node: NodeName
+            if 'Processing custom node:' in line:
+                match = re.search(r'\[(\d+)/(\d+)\]\s+Processing custom node:\s+(.+)', line)
+                if match:
+                    processed_nodes = int(match.group(1))
+                    total_nodes = int(match.group(2))
+                    current_node = match.group(3).strip()
+                    current_node_has_requirements = False
+                    logger.info(f"Processing node {processed_nodes}/{total_nodes}: {current_node}")
+                    
+                    # Write progress to file
+                    progress_data = {
+                        'in_progress': True,
+                        'task_id': task_id,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'running',
+                        'successful': successful_clones,
+                        'failed': failed_clones,
+                        'has_requirements': False
+                    }
+                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
+            
+            # Detect when installing requirements
+            elif 'Installing requirements' in line and current_node:
+                current_node_has_requirements = True
+                progress_data = {
+                    'in_progress': True,
+                    'task_id': task_id,
+                    'total_nodes': total_nodes,
+                    'processed': processed_nodes,
+                    'current_node': current_node,
+                    'current_status': 'running',
+                    'successful': successful_clones,
+                    'failed': failed_clones,
+                    'has_requirements': True,
+                    'requirements_status': 'running'
+                }
+                _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
+            
+            # Track successes and failures
+            elif 'Successfully cloned' in line:
+                successful_clones += 1
+                if current_node:
+                    progress_data = {
+                        'in_progress': True,
+                        'task_id': task_id,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'success',
+                        'successful': successful_clones,
+                        'failed': failed_clones,
+                        'has_requirements': current_node_has_requirements,
+                        'requirements_status': 'pending' if current_node_has_requirements else None
+                    }
+                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
+                        
+            elif 'Failed to clone' in line:
+                failed_clones += 1
+                if current_node:
+                    progress_data = {
+                        'in_progress': True,
+                        'task_id': task_id,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'failed',
+                        'successful': successful_clones,
+                        'failed': failed_clones,
+                        'has_requirements': False
+                    }
+                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
+            elif 'Successfully installed requirements' in line:
+                successful_requirements += 1
+                if current_node and current_node_has_requirements:
+                    progress_data = {
+                        'in_progress': True,
+                        'task_id': task_id,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'success',
+                        'successful': successful_clones,
+                        'failed': failed_clones,
+                        'has_requirements': True,
+                        'requirements_status': 'success'
+                    }
+                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
+            elif 'Failed to install requirements' in line:
+                failed_requirements += 1
+                if current_node and current_node_has_requirements:
+                    progress_data = {
+                        'in_progress': True,
+                        'task_id': task_id,
+                        'total_nodes': total_nodes,
+                        'processed': processed_nodes,
+                        'current_node': current_node,
+                        'current_status': 'success',  # Node cloned but reqs failed
+                        'successful': successful_clones,
+                        'failed': failed_clones,
+                        'has_requirements': True,
+                        'requirements_status': 'failed'
+                    }
+                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
+        
+        # Wait for process to complete
+        return_code = process.wait(timeout=1800)  # 30 minute timeout
+        
+        # Write completion progress
+        installation_succeeded = return_code == 0 or (failed_requirements > 0 and failed_clones == 0)
+        
+        completion_progress = {
+            'in_progress': False,
+            'task_id': task_id,
+            'completed': True,
+            'success': installation_succeeded,
+            'total_nodes': total_nodes,
+            'processed': processed_nodes,
+            'successful_clones': successful_clones,
+            'failed_clones': failed_clones,
+            'successful_requirements': successful_requirements,
+            'failed_requirements': failed_requirements,
+            'return_code': return_code
+        }
+        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, completion_progress)
+        
+        logger.info(f"Installation task {task_id} completed. Success: {installation_succeeded}, " +
+                   f"Processed: {processed_nodes}/{total_nodes}")
+        
+    except subprocess.TimeoutExpired:
+        logger.error(f"Installation task {task_id} timed out")
+        error_progress = {
+            'in_progress': False,
+            'task_id': task_id,
+            'completed': False,
+            'error': 'Installation timed out (exceeded 30 minutes)'
+        }
+        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
+    except Exception as e:
+        logger.error(f"Installation task {task_id} failed: {e}", exc_info=True)
+        error_progress = {
+            'in_progress': False,
+            'task_id': task_id,
+            'completed': False,
+            'error': str(e)
+        }
+        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
+
+
+@app.route('/ssh/install-custom-nodes', methods=['POST', 'OPTIONS'])
+def ssh_install_custom_nodes():
+    """Start custom nodes installation asynchronously and return task ID"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
     
     try:
         data = request.get_json() if request.is_json else {}
@@ -1222,53 +1496,12 @@ def ssh_install_custom_nodes():
                 'message': f'Invalid SSH connection format: {str(e)}'
             })
         
-        logger.info(f"Installing custom nodes on {ssh_host}:{ssh_port}")
+        # Generate unique task ID
+        task_id = str(uuid.uuid4())
+        logger.info(f"Starting async custom nodes installation with task_id: {task_id}")
         
+        # Clear any existing progress files for this connection
         ssh_key = '/root/.ssh/id_ed25519'
-        
-        # Check if ComfyUI-Auto_installer exists, clone if needed
-        check_cmd = [
-            'ssh',
-            '-p', str(ssh_port),
-            '-i', ssh_key,
-            '-o', 'ConnectTimeout=10',
-            '-o', 'StrictHostKeyChecking=yes',
-            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-            '-o', 'IdentitiesOnly=yes',
-            f'root@{ssh_host}',
-            'test -d /workspace/ComfyUI-Auto_installer'
-        ]
-        
-        check_result = subprocess.run(check_cmd, timeout=10, capture_output=True)
-        
-        if check_result.returncode != 0:
-            logger.info("ComfyUI-Auto_installer not found, cloning repository...")
-            clone_cmd = [
-                'ssh',
-                '-p', str(ssh_port),
-                '-i', ssh_key,
-                '-o', 'ConnectTimeout=10',
-                '-o', 'StrictHostKeyChecking=yes',
-                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-                '-o', 'IdentitiesOnly=yes',
-                f'root@{ssh_host}',
-                'cd /workspace && git clone https://github.com/unearth4334/ComfyUI-Auto_installer'
-            ]
-            
-            clone_result = subprocess.run(clone_cmd, timeout=300, capture_output=True, text=True)
-            
-            if clone_result.returncode != 0:
-                logger.error(f"Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}")
-                return jsonify({
-                    'success': False,
-                    'message': f'Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}'
-                })
-            
-            logger.info("ComfyUI-Auto_installer cloned successfully")
-        else:
-            logger.info("ComfyUI-Auto_installer already exists")
-        
-        # Clear any existing progress file
         clear_progress_cmd = [
             'ssh',
             '-p', str(ssh_port),
@@ -1278,230 +1511,63 @@ def ssh_install_custom_nodes():
             '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
             '-o', 'IdentitiesOnly=yes',
             f'root@{ssh_host}',
-            'rm -f /tmp/custom_nodes_progress.json'
+            f'rm -f /tmp/custom_nodes_progress_{task_id}.json'
         ]
         subprocess.run(clear_progress_cmd, timeout=10, capture_output=True)
         
-        # Run the custom nodes installer with VastAI's Python venv
-        install_cmd = [
-            'ssh',
-            '-p', str(ssh_port),
-            '-i', ssh_key,
-            '-o', 'ConnectTimeout=10',
-            '-o', 'StrictHostKeyChecking=yes',
-            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-            '-o', 'IdentitiesOnly=yes',
-            f'root@{ssh_host}',
-            f'source /etc/environment 2>/dev/null; cd /workspace/ComfyUI-Auto_installer/scripts && ./install-custom-nodes.sh {ui_home} --venv-path /venv/main/bin/python 2>&1'
-        ]
-        
-        # Use Popen for real-time output streaming (important for long-running process)
-        process = subprocess.Popen(
-            install_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
-        
-        # Parse output to track progress
-        total_nodes = 0
-        processed_nodes = 0
-        successful_clones = 0
-        failed_clones = 0
-        successful_requirements = 0
-        failed_requirements = 0
-        current_node = None
-        current_node_has_requirements = False
-        output_lines = []
-        
-        # Write progress to remote file for tracking
-        progress_file = '/tmp/custom_nodes_progress.json'
-        
-        # Write initial progress immediately so polling can detect installation is running
-        initial_progress = {
-            'in_progress': True,
-            'total_nodes': 0,
-            'processed': 0,
-            'current_node': 'Initializing',
-            'current_status': 'running',
-            'successful': 0,
-            'failed': 0,
-            'has_requirements': False
-        }
-        write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, initial_progress)
-        logger.info("Wrote initial progress file")
-        
-        for line in process.stdout:
-            output_lines.append(line.rstrip())
-            logger.debug(f"Install output: {line.rstrip()}")
-            
-            # Parse progress: [X/Y] Processing custom node: NodeName
-            if 'Processing custom node:' in line:
-                match = re.search(r'\[(\d+)/(\d+)\]\s+Processing custom node:\s+(.+)', line)
-                if match:
-                    processed_nodes = int(match.group(1))
-                    total_nodes = int(match.group(2))
-                    current_node = match.group(3).strip()
-                    current_node_has_requirements = False
-                    logger.info(f"Processing node {processed_nodes}/{total_nodes}: {current_node}")
-                    
-                    # Write progress to file
-                    progress_data = {
-                        'in_progress': True,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'running',
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': False
-                    }
-                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
-            
-            # Detect when installing requirements
-            elif 'Installing requirements' in line and current_node:
-                current_node_has_requirements = True
-                progress_data = {
-                    'in_progress': True,
-                    'total_nodes': total_nodes,
-                    'processed': processed_nodes,
-                    'current_node': current_node,
-                    'current_status': 'running',
-                    'successful': successful_clones,
-                    'failed': failed_clones,
-                    'has_requirements': True,
-                    'requirements_status': 'running'
-                }
-                write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
-            
-            # Track successes and failures
-            elif 'Successfully cloned' in line:
-                successful_clones += 1
-                # Update progress file with success count
-                if current_node:
-                    progress_data = {
-                        'in_progress': True,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'success',
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': current_node_has_requirements,
-                        'requirements_status': 'pending' if current_node_has_requirements else None
-                    }
-                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
-                        
-            elif 'Failed to clone' in line:
-                failed_clones += 1
-                if current_node:
-                    progress_data = {
-                        'in_progress': True,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'failed',
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': False
-                    }
-                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
-            elif 'Successfully installed requirements' in line:
-                successful_requirements += 1
-                if current_node and current_node_has_requirements:
-                    progress_data = {
-                        'in_progress': True,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'success',
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': True,
-                        'requirements_status': 'success'
-                    }
-                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
-            elif 'Failed to install requirements' in line:
-                failed_requirements += 1
-                if current_node and current_node_has_requirements:
-                    progress_data = {
-                        'in_progress': True,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'success',  # Node cloned but reqs failed
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': True,
-                        'requirements_status': 'failed'
-                    }
-                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
-        
-        # Clear progress file when done
-        write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, {'in_progress': False})
-        
-        # Wait for process to complete
-        return_code = process.wait(timeout=1800)  # 30 minute timeout for all nodes
-        
-        # Determine success - installation is successful even if some requirements fail
-        # Only fail if the script itself fails (return code != 0 and not just requirements failures)
-        installation_succeeded = return_code == 0 or (failed_requirements > 0 and failed_clones == 0)
-        
-        if installation_succeeded:
-            logger.info(f"Custom nodes installation completed. Processed: {processed_nodes}/{total_nodes}, " +
-                       f"Clones: {successful_clones} success / {failed_clones} failed, " +
-                       f"Requirements: {successful_requirements} success / {failed_requirements} failed")
-            
-            return jsonify({
-                'success': True,
-                'message': 'Custom nodes installation completed',
-                'total_nodes': total_nodes,
-                'processed': processed_nodes,
-                'successful_clones': successful_clones,
-                'failed_clones': failed_clones,
-                'successful_requirements': successful_requirements,
-                'failed_requirements': failed_requirements,
-                'has_warnings': failed_requirements > 0 or failed_clones > 0,
-                'output': output_lines[-50:] if len(output_lines) > 50 else output_lines  # Last 50 lines
-            })
-        else:
-            logger.error(f"Custom nodes installation failed with return code {return_code}")
+        # Start installation in background
+        task_manager = get_task_manager()
+        try:
+            task_manager.start_task(
+                task_id,
+                _run_installation_background,
+                task_id,
+                ssh_connection,
+                ui_home
+            )
+        except ValueError as e:
+            # Task already running
             return jsonify({
                 'success': False,
-                'message': 'Custom nodes installation failed',
-                'return_code': return_code,
-                'output': output_lines[-50:] if len(output_lines) > 50 else output_lines
-            })
-            
-    except subprocess.TimeoutExpired:
-        logger.error("Custom nodes installation timed out")
+                'message': str(e)
+            }), 409
+        
+        # Return immediately with task ID
         return jsonify({
-            'success': False,
-            'message': 'Custom nodes installation timed out (exceeded 30 minutes)'
+            'success': True,
+            'task_id': task_id,
+            'message': 'Installation started in background'
         })
+        
     except Exception as e:
-        logger.error(f"Custom nodes installation error: {str(e)}")
+        logger.error(f"Error starting custom nodes installation: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'Custom nodes installation error: {str(e)}'
+            'message': f'Error starting installation: {str(e)}'
         })
 
 
 @app.route('/ssh/install-custom-nodes/progress', methods=['POST', 'OPTIONS'])
 def ssh_install_custom_nodes_progress():
-    """Get real-time progress of custom nodes installation"""
+    """Get real-time progress of custom nodes installation by task_id"""
     if request.method == 'OPTIONS':
         return handle_cors_preflight()
     
     try:
         data = request.get_json()
         ssh_connection = data.get('ssh_connection')
+        task_id = data.get('task_id')
         
         if not ssh_connection:
             return jsonify({
                 'success': False,
                 'message': 'Missing ssh_connection parameter'
+            }), 400
+        
+        if not task_id:
+            return jsonify({
+                'success': False,
+                'message': 'Missing task_id parameter'
             }), 400
         
         # Parse SSH connection using the same helper function
@@ -1516,8 +1582,8 @@ def ssh_install_custom_nodes_progress():
         # SSH key path
         ssh_key = '/root/.ssh/id_ed25519'
         
-        # Read the progress file from remote instance using subprocess (consistent with other SSH operations)
-        progress_file = '/tmp/custom_nodes_progress.json'
+        # Read the progress file for this specific task_id
+        progress_file = f'/tmp/custom_nodes_progress_{task_id}.json'
         
         try:
             # Use subprocess SSH like all other operations in this file
@@ -1540,25 +1606,26 @@ def ssh_install_custom_nodes_progress():
             
             progress_json = result.stdout.strip()
             
-            logger.debug(f"Progress file content: {progress_json}")
+            logger.debug(f"Progress file content for task {task_id}: {progress_json}")
             
             if not progress_json or progress_json == '{}':
-                logger.debug("No active installation found")
+                logger.debug(f"No progress found for task {task_id}")
                 return jsonify({
                     'success': True,
                     'in_progress': False,
-                    'message': 'No active installation'
+                    'task_id': task_id,
+                    'message': 'No progress available for this task'
                 })
             
             progress_data = json.loads(progress_json)
-            logger.info(f"Returning progress: {progress_data.get('current_node')} - {progress_data.get('processed')}/{progress_data.get('total_nodes')}")
+            logger.info(f"Returning progress for task {task_id}: {progress_data.get('current_node')} - {progress_data.get('processed')}/{progress_data.get('total_nodes')}")
             return jsonify({
                 'success': True,
                 **progress_data
             })
             
         except Exception as e:
-            logger.error(f"Error reading progress: {str(e)}")
+            logger.error(f"Error reading progress for task {task_id}: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': f'Error reading progress: {str(e)}'

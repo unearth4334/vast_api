@@ -724,36 +724,30 @@ class WorkflowExecutor:
             self._set_completion_note(state_manager, workflow_id, step_index, f"Error cloning auto-installer: {error_msg}")
             return False, error_msg
         
-        # Task 2: Install Custom Nodes (with real-time progress tracking)
-        logger.info("Starting custom nodes installation with progress tracking...")
+        # Task 2: Install Custom Nodes (with real-time progress tracking using new async API)
+        logger.info("Starting custom nodes installation with async progress tracking...")
         
         try:
-            # Start the installation in a thread and poll progress
-            import threading
+            # Start the installation asynchronously (returns immediately with task_id)
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/install-custom-nodes",
+                json={
+                    'ssh_connection': ssh_connection,
+                    'ui_home': ui_home
+                },
+                timeout=30  # Should return quickly now
+            )
             
-            install_result = {'success': None, 'error': None, 'data': None}
+            result = response.json()
+            if not result.get('success'):
+                error_msg = result.get('message', 'Unknown error')
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Failed to start installation: {error_msg}")
+                return False, error_msg
             
-            def run_install():
-                try:
-                    response = requests.post(
-                        f"{API_BASE_URL}/ssh/install-custom-nodes",
-                        json={
-                            'ssh_connection': ssh_connection,
-                            'ui_home': ui_home
-                        },
-                        timeout=1800
-                    )
-                    result = response.json()
-                    install_result['success'] = result.get('success')
-                    install_result['data'] = result
-                except Exception as e:
-                    install_result['success'] = False
-                    install_result['error'] = str(e)
+            task_id = result.get('task_id')
+            logger.info(f"Installation started with task_id: {task_id}")
             
-            install_thread = threading.Thread(target=run_install, daemon=True)
-            install_thread.start()
-            
-            # Poll progress while installation runs
+            # Poll progress using task_id
             nodes_seen = []  # List to maintain order
             node_statuses = {}  # Track status of each node
             MAX_VISIBLE_NODES = 4  # Show 4 nodes max, 5th line is for "# others"
@@ -764,19 +758,43 @@ class WorkflowExecutor:
             current_node = None  # Initialize to prevent UnboundLocalError
             has_requirements = False
             requirements_status = None
+            installation_completed = False
+            installation_success = False
             
-            while install_thread.is_alive() or install_result['success'] is None:
+            while not installation_completed:
                 try:
-                    # Read progress from remote instance
+                    # Read progress from remote instance using task_id
                     progress_response = requests.post(
                         f"{API_BASE_URL}/ssh/install-custom-nodes/progress",
-                        json={'ssh_connection': ssh_connection},
+                        json={
+                            'ssh_connection': ssh_connection,
+                            'task_id': task_id
+                        },
                         timeout=10
                     )
                     
                     if progress_response.status_code == 200:
                         progress = progress_response.json()
                         logger.debug(f"Progress poll response: {progress}")
+                        
+                        # Check if installation completed
+                        if progress.get('completed'):
+                            installation_completed = True
+                            installation_success = progress.get('success', False)
+                            logger.info(f"Installation completed. Success: {installation_success}")
+                            
+                            # Get final stats
+                            total_nodes_count = progress.get('total_nodes', 0)
+                            successful_count = progress.get('successful_clones', 0)
+                            failed_count = progress.get('failed_clones', 0)
+                            break
+                        
+                        # Check for error
+                        if progress.get('error'):
+                            error_msg = progress.get('error')
+                            logger.error(f"Installation error: {error_msg}")
+                            self._set_completion_note(state_manager, workflow_id, step_index, f"Installation error: {error_msg}")
+                            return False, error_msg
                         
                         if progress.get('in_progress'):
                             total_nodes_count = progress.get('total_nodes', 0)
@@ -789,8 +807,6 @@ class WorkflowExecutor:
                             requirements_status = progress.get('requirements_status')
                             
                             logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}")
-                        else:
-                            logger.warning(f"Progress response shows not in_progress: {progress}")
                             
                             # Track this node if we haven't seen it
                             if current_node and current_node not in nodes_seen:
@@ -905,25 +921,17 @@ class WorkflowExecutor:
                 except Exception as e:
                     logger.error(f"Progress poll error: {e}", exc_info=True)
                 
-                # Break if installation completed
-                if install_result['success'] is not None:
-                    break
-                
+                # Sleep before next poll
                 time.sleep(2)  # Poll every 2 seconds
             
             # Installation finished - check result
-            if not install_result['success']:
-                error_msg = install_result.get('error') or install_result.get('data', {}).get('message', 'Unknown error')
-                logger.error(f"Custom nodes installation failed: {error_msg}")
-                self._set_completion_note(state_manager, workflow_id, step_index, f"Custom nodes installation failed: {error_msg}")
+            if not installation_success:
+                error_msg = "Installation failed"
+                logger.error(f"Custom nodes installation failed")
+                self._set_completion_note(state_manager, workflow_id, step_index, f"Custom nodes installation failed")
                 return False, error_msg
             
-            result_data = install_result['data']
-            total_nodes = result_data.get('total_nodes', 0)
-            successful_nodes = result_data.get('successful_clones', 0)
-            failed_nodes = result_data.get('failed_clones', 0)
-            
-            logger.info(f"Custom nodes installation completed: {successful_nodes}/{total_nodes} successful, {failed_nodes} failed")
+            logger.info(f"Custom nodes installation completed: {successful_count}/{total_nodes_count} successful, {failed_count} failed")
             
             # Final tasklist update - add "Verify Dependencies" task
             state = state_manager.load_state()
