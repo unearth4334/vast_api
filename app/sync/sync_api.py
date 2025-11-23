@@ -1168,6 +1168,35 @@ def ssh_install_custom_nodes():
     if request.method == 'OPTIONS':
         return ("", 204)
     
+    def write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data):
+        """Helper to write progress JSON to remote instance"""
+        try:
+            # Write to local temp file
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as tmp:
+                json.dump(progress_data, tmp)
+                tmp_path = tmp.name
+            
+            # SCP to remote
+            scp_cmd = [
+                'scp',
+                '-P', str(ssh_port),
+                '-i', ssh_key,
+                '-o', 'ConnectTimeout=5',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
+                tmp_path,
+                f'root@{ssh_host}:{progress_file}'
+            ]
+            subprocess.run(scp_cmd, timeout=5, capture_output=True)
+            
+            # Clean up local temp file
+            import os
+            os.unlink(tmp_path)
+        except Exception as e:
+            logger.debug(f"Failed to write progress: {e}")
+    
     try:
         data = request.get_json() if request.is_json else {}
         ssh_connection = data.get('ssh_connection')
@@ -1308,21 +1337,7 @@ def ssh_install_custom_nodes():
                         'failed': failed_clones,
                         'has_requirements': False
                     }
-                    try:
-                        write_cmd = [
-                            'ssh',
-                            '-p', str(ssh_port),
-                            '-i', ssh_key,
-                            '-o', 'ConnectTimeout=5',
-                            '-o', 'StrictHostKeyChecking=yes',
-                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-                            '-o', 'IdentitiesOnly=yes',
-                            f'root@{ssh_host}',
-                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        ]
-                        subprocess.run(write_cmd, timeout=5, capture_output=True)
-                    except Exception as e:
-                        logger.debug(f"Failed to write progress: {e}")
+                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
             
             # Detect when installing requirements
             elif 'Installing requirements' in line and current_node:
@@ -1338,21 +1353,7 @@ def ssh_install_custom_nodes():
                     'has_requirements': True,
                     'requirements_status': 'running'
                 }
-                try:
-                    write_cmd = [
-                        'ssh',
-                        '-p', str(ssh_port),
-                        '-i', ssh_key,
-                        '-o', 'ConnectTimeout=5',
-                        '-o', 'StrictHostKeyChecking=yes',
-                        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-                        '-o', 'IdentitiesOnly=yes',
-                        f'root@{ssh_host}',
-                        f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                    ]
-                    subprocess.run(write_cmd, timeout=5, capture_output=True)
-                except Exception as e:
-                    logger.debug(f"Failed to write progress: {e}")
+                write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
             
             # Track successes and failures
             elif 'Successfully cloned' in line:
@@ -1370,21 +1371,7 @@ def ssh_install_custom_nodes():
                         'has_requirements': current_node_has_requirements,
                         'requirements_status': 'pending' if current_node_has_requirements else None
                     }
-                    try:
-                        write_cmd = [
-                            'ssh',
-                            '-p', str(ssh_port),
-                            '-i', ssh_key,
-                            '-o', 'ConnectTimeout=5',
-                            '-o', 'StrictHostKeyChecking=yes',
-                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-                            '-o', 'IdentitiesOnly=yes',
-                            f'root@{ssh_host}',
-                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        ]
-                        subprocess.run(write_cmd, timeout=5, capture_output=True)
-                    except Exception as e:
-                        logger.debug(f"Failed to write progress: {e}")
+                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
                         
             elif 'Failed to clone' in line:
                 failed_clones += 1
@@ -1399,21 +1386,7 @@ def ssh_install_custom_nodes():
                         'failed': failed_clones,
                         'has_requirements': False
                     }
-                    try:
-                        write_cmd = [
-                            'ssh',
-                            '-p', str(ssh_port),
-                            '-i', ssh_key,
-                            '-o', 'ConnectTimeout=5',
-                            '-o', 'StrictHostKeyChecking=yes',
-                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-                            '-o', 'IdentitiesOnly=yes',
-                            f'root@{ssh_host}',
-                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        ]
-                        subprocess.run(write_cmd, timeout=5, capture_output=True)
-                    except Exception as e:
-                        logger.debug(f"Failed to write progress: {e}")
+                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
             elif 'Successfully installed requirements' in line:
                 successful_requirements += 1
                 if current_node and current_node_has_requirements:
@@ -1428,21 +1401,7 @@ def ssh_install_custom_nodes():
                         'has_requirements': True,
                         'requirements_status': 'success'
                     }
-                    try:
-                        write_cmd = [
-                            'ssh',
-                            '-p', str(ssh_port),
-                            '-i', ssh_key,
-                            '-o', 'ConnectTimeout=5',
-                            '-o', 'StrictHostKeyChecking=yes',
-                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-                            '-o', 'IdentitiesOnly=yes',
-                            f'root@{ssh_host}',
-                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        ]
-                        subprocess.run(write_cmd, timeout=5, capture_output=True)
-                    except Exception as e:
-                        logger.debug(f"Failed to write progress: {e}")
+                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
             elif 'Failed to install requirements' in line:
                 failed_requirements += 1
                 if current_node and current_node_has_requirements:
@@ -1457,38 +1416,10 @@ def ssh_install_custom_nodes():
                         'has_requirements': True,
                         'requirements_status': 'failed'
                     }
-                    try:
-                        write_cmd = [
-                            'ssh',
-                            '-p', str(ssh_port),
-                            '-i', ssh_key,
-                            '-o', 'ConnectTimeout=5',
-                            '-o', 'StrictHostKeyChecking=yes',
-                            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-                            '-o', 'IdentitiesOnly=yes',
-                            f'root@{ssh_host}',
-                            f"echo '{json.dumps(progress_data)}' > {progress_file}"
-                        ]
-                        subprocess.run(write_cmd, timeout=5, capture_output=True)
-                    except Exception as e:
-                        logger.debug(f"Failed to write progress: {e}")
+                    write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
         
         # Clear progress file when done
-        try:
-            clear_cmd = [
-                'ssh',
-                '-p', str(ssh_port),
-                '-i', ssh_key,
-                '-o', 'ConnectTimeout=5',
-                '-o', 'StrictHostKeyChecking=yes',
-                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
-                '-o', 'IdentitiesOnly=yes',
-                f'root@{ssh_host}',
-                f"echo '{{\"in_progress\": false}}' > {progress_file}"
-            ]
-            subprocess.run(clear_cmd, timeout=5, capture_output=True)
-        except Exception as e:
-            logger.debug(f"Failed to clear progress: {e}")
+        write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, {'in_progress': False})
         
         # Wait for process to complete
         return_code = process.wait(timeout=1800)  # 30 minute timeout for all nodes

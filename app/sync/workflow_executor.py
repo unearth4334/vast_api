@@ -762,7 +762,7 @@ class WorkflowExecutor:
             failed_count = 0
             last_update_hash = None
             
-            while install_thread.is_alive() or install_result['success'] is not None:
+            while install_thread.is_alive() or install_result['success'] is None:
                 try:
                     # Read progress from remote instance
                     progress_response = requests.post(
@@ -773,6 +773,7 @@ class WorkflowExecutor:
                     
                     if progress_response.status_code == 200:
                         progress = progress_response.json()
+                        logger.debug(f"Progress poll response: {progress}")
                         
                         if progress.get('in_progress'):
                             total_nodes_count = progress.get('total_nodes', 0)
@@ -783,6 +784,8 @@ class WorkflowExecutor:
                             failed_count = progress.get('failed', 0)
                             has_requirements = progress.get('has_requirements', False)
                             requirements_status = progress.get('requirements_status')
+                            
+                            logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}")
                             
                             # Track this node if we haven't seen it
                             if current_node and current_node not in nodes_seen:
