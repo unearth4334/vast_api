@@ -1504,6 +1504,9 @@ def ssh_install_custom_nodes_progress():
         parts = ssh_connection.split('@')
         username = parts[0] if len(parts) == 2 else 'root'
         
+        # SSH key path
+        ssh_key = '/root/.ssh/id_ed25519'
+        
         # Read the progress file from remote instance
         progress_file = '/tmp/custom_nodes_progress.json'
         
@@ -1515,7 +1518,7 @@ def ssh_install_custom_nodes_progress():
                 hostname=ssh_host,
                 port=ssh_port,
                 username=username,
-                key_filename=SSH_KEY_PATH,
+                key_filename=ssh_key,
                 timeout=10
             )
             
