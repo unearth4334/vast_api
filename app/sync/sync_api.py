@@ -1490,18 +1490,18 @@ def ssh_install_custom_nodes_progress():
                 'message': 'Missing ssh_connection parameter'
             }), 400
         
-        # Parse SSH connection
-        parts = ssh_connection.split('@')
-        if len(parts) != 2:
+        # Parse SSH connection using the same helper function
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
             return jsonify({
                 'success': False,
-                'message': 'Invalid SSH connection format. Expected: root@host:port'
+                'message': f'Invalid SSH connection format: {str(e)}'
             }), 400
         
-        username = parts[0]
-        host_port = parts[1].split(':')
-        hostname = host_port[0]
-        port = int(host_port[1]) if len(host_port) > 1 else 22
+        # Extract username from connection string
+        parts = ssh_connection.split('@')
+        username = parts[0] if len(parts) == 2 else 'root'
         
         # Read the progress file from remote instance
         progress_file = '/tmp/custom_nodes_progress.json'
@@ -1511,8 +1511,8 @@ def ssh_install_custom_nodes_progress():
         
         try:
             client.connect(
-                hostname=hostname,
-                port=port,
+                hostname=ssh_host,
+                port=ssh_port,
                 username=username,
                 key_filename=SSH_KEY_PATH,
                 timeout=10

@@ -548,7 +548,8 @@ function renderTasklist(stepElement, stepData) {
   console.log('renderTasklist called:', {
     step: stepData.action,
     taskCount: tasks.length,
-    tasks: tasks.map(t => ({name: t.name, status: t.status}))
+    tasks: tasks.map(t => ({name: t.name, status: t.status})),
+    fullTasks: tasks  // Show complete task objects
   });
   
   // Check if tasklist already exists

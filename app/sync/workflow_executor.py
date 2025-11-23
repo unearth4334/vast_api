@@ -786,6 +786,8 @@ class WorkflowExecutor:
                             requirements_status = progress.get('requirements_status')
                             
                             logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}")
+                        else:
+                            logger.warning(f"Progress response shows not in_progress: {progress}")
                             
                             # Track this node if we haven't seen it
                             if current_node and current_node not in nodes_seen:
