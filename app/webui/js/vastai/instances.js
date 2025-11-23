@@ -864,7 +864,7 @@ export async function refreshInstanceCard(instanceId) {
     const actions = card.querySelector('.instance-actions');
     if (actions) {
       actions.innerHTML = sshConnection && state === 'running'
-        ? `<button class="use-instance-btn" onclick="VastAIInstances.useInstance('${sshConnection.replace(/'/g, "\\'")}')">
+        ? `<button class="use-instance-btn" onclick="VastAIInstances.useInstance('${sshConnection.replace(/'/g, "\\'")}', ${instanceId})">
              🔗 Connect to SSH Connection Field
            </button>`
         : `<button class="use-instance-btn" onclick="VastAIInstances.refreshInstanceCard(${instanceId})">
@@ -965,7 +965,7 @@ export function displayVastaiInstances(instances) {
         <div class="instance-actions">
           ${
             sshConnection && normalizedStatus === 'running'
-              ? `<button class="use-instance-btn" onclick="VastAIInstances.useInstance('${sshConnection.replace(/'/g, "\\'")}')">
+              ? `<button class="use-instance-btn" onclick="VastAIInstances.useInstance('${sshConnection.replace(/'/g, "\\'")}', ${instance.id})">
                    🔗 Connect to SSH Connection Field
                  </button>`
               : `<button class="use-instance-btn" onclick="VastAIInstances.refreshInstanceCard(${instance.id})">
@@ -1002,10 +1002,17 @@ export function displayVastaiInstances(instances) {
  * Use instance SSH connection string
  * @param {string} sshConnection - SSH connection string to use
  */
-export function useInstance(sshConnection) {
+export function useInstance(sshConnection, instanceId) {
   const sshInput = document.getElementById('sshConnectionString');
   if (sshInput) {
     sshInput.value = sshConnection;
+    
+    // Store instance ID globally for workflow use
+    if (instanceId) {
+      window.currentInstanceId = instanceId;
+      console.log(`📌 Set current instance ID: ${instanceId}`);
+    }
+    
     showSetupResult('✅ SSH connection parameters copied to SSH Connection String field', 'success');
   }
 }
