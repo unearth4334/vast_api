@@ -1318,6 +1318,20 @@ def ssh_install_custom_nodes():
         # Write progress to remote file for tracking
         progress_file = '/tmp/custom_nodes_progress.json'
         
+        # Write initial progress immediately so polling can detect installation is running
+        initial_progress = {
+            'in_progress': True,
+            'total_nodes': 0,
+            'processed': 0,
+            'current_node': 'Initializing',
+            'current_status': 'running',
+            'successful': 0,
+            'failed': 0,
+            'has_requirements': False
+        }
+        write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, initial_progress)
+        logger.info("Wrote initial progress file")
+        
         for line in process.stdout:
             output_lines.append(line.rstrip())
             logger.debug(f"Install output: {line.rstrip()}")
