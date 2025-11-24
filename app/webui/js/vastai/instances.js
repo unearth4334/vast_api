@@ -960,6 +960,14 @@ export function displayVastaiInstances(instances) {
           <div class="instance-detail"><strong>Template:</strong> ${instance.template || 'N/A'}</div>
           <div class="instance-detail"><strong>SSH Host:</strong> <span data-field="ssh_host">${instance.ssh_host || 'N/A'}</span></div>
           <div class="instance-detail"><strong>SSH Port:</strong> <span data-field="ssh_port">${instance.ssh_port || 'N/A'}</span></div>
+          <div class="instance-detail" data-instance-id="${instance.id ?? ''}" data-ob-token-detail>
+            <strong>OB Token:</strong> 
+            <span class="ob-token-value">
+              ${sshConnection && normalizedStatus === 'running'
+                ? `<a href="#" class="fetch-token-link" onclick="VastAIInstances.fetchOpenButtonToken(${instance.id}, '${sshConnection.replace(/'/g, "\\'")}'); return false;">fetch</a>`
+                : 'N/A'}
+            </span>
+          </div>
         </div>
 
         <div class="instance-actions">
@@ -1069,6 +1077,111 @@ export async function destroyInstance(instanceId) {
   } catch (error) {
     console.error('Error destroying instance:', error);
     showSetupResult(`❌ Error destroying instance #${instanceId}: ${error.message}`, 'error');
+  }
+}
+
+/**
+ * Fetch OPEN_BUTTON_TOKEN from instance via SSH
+ * @param {number} instanceId - ID of the instance
+ * @param {string} sshConnection - SSH connection string
+ */
+export async function fetchOpenButtonToken(instanceId, sshConnection) {
+  const tokenDetail = document.querySelector(`[data-instance-id="${instanceId}"][data-ob-token-detail]`);
+  if (!tokenDetail) return;
+  
+  const tokenValueSpan = tokenDetail.querySelector('.ob-token-value');
+  if (!tokenValueSpan) return;
+  
+  try {
+    // Show loading state
+    tokenValueSpan.innerHTML = '<span style="color: #888;">fetching...</span>';
+    
+    const response = await fetch(`/vastai/instances/${instanceId}/open-button-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        ssh_connection: sshConnection
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.require_verification) {
+      // Host key verification needed - show modal
+      tokenValueSpan.innerHTML = '<a href="#" class="fetch-token-link" onclick="VastAIInstances.fetchOpenButtonToken(' + instanceId + ', \'' + sshConnection.replace(/'/g, "\\'") + '\'); return false;">fetch</a>';
+      
+      if (window.VastAIHostKey && window.VastAIHostKey.showVerificationModal) {
+        window.VastAIHostKey.showVerificationModal(
+          data.host,
+          data.port,
+          data.fingerprint,
+          () => {
+            // On verification success, retry fetching the token
+            fetchOpenButtonToken(instanceId, sshConnection);
+          }
+        );
+      } else {
+        showSetupResult('⚠️ Host key verification required. Please verify the host key first.', 'warning');
+      }
+      return;
+    }
+    
+    if (data.success && data.token) {
+      // Store the full token for copying
+      const fullToken = data.token;
+      const truncatedToken = fullToken.substring(0, 4) + '...';
+      
+      // Display truncated token with copy button
+      tokenValueSpan.innerHTML = `
+        <span class="token-display">${truncatedToken}</span>
+        <button class="copy-token-btn" onclick="VastAIInstances.copyTokenToClipboard('${fullToken.replace(/'/g, "\\'")}', ${instanceId}); return false;" title="Copy full token to clipboard">
+          📋 Copy
+        </button>
+      `;
+      
+      showSetupResult(`✅ OPEN_BUTTON_TOKEN fetched for instance #${instanceId}`, 'success');
+    } else {
+      tokenValueSpan.innerHTML = '<span style="color: #e74c3c;">failed</span>';
+      showSetupResult(`❌ Failed to fetch token: ${data.message}`, 'error');
+    }
+    
+  } catch (error) {
+    console.error('Error fetching OPEN_BUTTON_TOKEN:', error);
+    tokenValueSpan.innerHTML = '<a href="#" class="fetch-token-link" onclick="VastAIInstances.fetchOpenButtonToken(' + instanceId + ', \'' + sshConnection.replace(/'/g, "\\'") + '\'); return false;">fetch</a>';
+    showSetupResult(`❌ Error fetching token: ${error.message}`, 'error');
+  }
+}
+
+/**
+ * Copy OPEN_BUTTON_TOKEN to clipboard
+ * @param {string} token - The full token to copy
+ * @param {number} instanceId - ID of the instance
+ */
+export async function copyTokenToClipboard(token, instanceId) {
+  try {
+    await navigator.clipboard.writeText(token);
+    showSetupResult(`✅ OPEN_BUTTON_TOKEN copied to clipboard for instance #${instanceId}`, 'success');
+  } catch (error) {
+    console.error('Error copying to clipboard:', error);
+    
+    // Fallback: create temporary textarea
+    const textarea = document.createElement('textarea');
+    textarea.value = token;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+      document.execCommand('copy');
+      showSetupResult(`✅ OPEN_BUTTON_TOKEN copied to clipboard for instance #${instanceId}`, 'success');
+    } catch (fallbackError) {
+      showSetupResult(`❌ Failed to copy token to clipboard`, 'error');
+    }
+    
+    document.body.removeChild(textarea);
   }
 }
 
