@@ -848,6 +848,86 @@ def ssh_set_ui_home():
         })
 
 
+@app.route('/ssh/configure-links', methods=['POST', 'OPTIONS'])
+def ssh_configure_links():
+    """Configure symbolic links for ComfyUI models directories"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        ui_home = data.get('ui_home', '/workspace/ComfyUI')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        try:
+            ssh_host, ssh_port = _extract_host_port(ssh_connection)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SSH connection format: {str(e)}'
+            })
+        
+        logger.info(f"Configuring model links on {ssh_host}:{ssh_port}")
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Configure upscale_models link
+        upscale_cmd = f'rm -fr "{ui_home}/models/upscale_models/" && ln -s "{ui_home}/models/ESRGAN" "{ui_home}/models/upscale_models"'
+        
+        # Configure loras link
+        loras_cmd = f'rm -fr "{ui_home}/models/loras/" && ln -s "{ui_home}/models/Lora" "{ui_home}/models/loras"'
+        
+        # Combine commands
+        combined_cmd = f'{upscale_cmd} && {loras_cmd}'
+        
+        ssh_cmd = [
+            'ssh',
+            '-p', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            f'root@{ssh_host}',
+            combined_cmd
+        ]
+        
+        result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=15)
+        
+        if result.returncode == 0:
+            logger.info(f"Model links configured successfully on {ssh_host}:{ssh_port}")
+            return jsonify({
+                'success': True,
+                'message': 'Model links configured successfully',
+                'output': result.stdout
+            })
+        else:
+            logger.error(f"Failed to configure model links on {ssh_host}:{ssh_port}: {result.stderr}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to configure model links',
+                'error': result.stderr,
+                'return_code': result.returncode
+            })
+            
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'message': 'SSH command timed out'
+        })
+    except Exception as e:
+        logger.error(f"Configure links error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Configure links error: {str(e)}'
+        })
+
 @app.route('/ssh/setup-civitdl', methods=['POST', 'OPTIONS'])
 def ssh_setup_civitdl():
     """Install and configure CivitDL on remote instance"""

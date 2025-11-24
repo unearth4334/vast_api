@@ -256,6 +256,10 @@ class WorkflowExecutor:
                 # Consolidated: Set and Read UI_HOME
                 ui_home = step.get('ui_home', '/workspace/ComfyUI')
                 return self._execute_set_ui_home_consolidated(ssh_connection, ui_home, state_manager, workflow_id, step_index)
+            elif action == 'configure_links':
+                # Configure model symbolic links
+                ui_home = step.get('ui_home', '/workspace/ComfyUI')
+                return self._execute_configure_links(ssh_connection, ui_home)
             elif action == 'sync_instance':
                 return self._execute_sync_instance(ssh_connection)
             elif action == 'install_custom_nodes':
@@ -475,6 +479,34 @@ class WorkflowExecutor:
             self._update_task_status(state_manager, workflow_id, step_index, 'test', 'failed')
             self._set_completion_note(state_manager, workflow_id, step_index, f"Error verifying UI_HOME: {error_msg}")
             return False, error_msg
+    
+    def _execute_configure_links(self, ssh_connection: str, ui_home: str) -> tuple:
+        """Configure model symbolic links by calling /ssh/configure-links API endpoint."""
+        logger.info(f"Configuring model links for UI_HOME: {ui_home}")
+        
+        try:
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/configure-links",
+                json={
+                    'ssh_connection': ssh_connection,
+                    'ui_home': ui_home
+                },
+                timeout=30
+            )
+            
+            result = response.json()
+            if result.get('success'):
+                logger.info("Model links configured successfully")
+                return True, None
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"Configure links failed: {error_msg}")
+                return False, error_msg
+                
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Configure links failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
     
     def _execute_get_ui_home(self, ssh_connection: str) -> tuple:
         """Get UI_HOME environment variable by calling /ssh/get-ui-home API endpoint."""

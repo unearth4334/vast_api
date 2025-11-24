@@ -29,6 +29,7 @@ window.VastAISearch = VastAISearch;
 window.testVastAISSH = VastAIInstances.testVastAISSH;
 window.setUIHome = VastAIInstances.setUIHome;
 window.getUIHome = VastAIInstances.getUIHome;
+window.configureLinks = VastAIInstances.configureLinks;
 window.terminateConnection = VastAIInstances.terminateConnection;
 window.setupCivitDL = VastAIInstances.setupCivitDL;
 window.testCivitDL = VastAIInstances.testCivitDL;

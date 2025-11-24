@@ -421,6 +421,9 @@ function updateWorkflowSteps(template) {
       case 'set_ui_home':
         stepButton.onclick = setUIHome;
         break;
+      case 'configure_links':
+        stepButton.onclick = configureLinks;
+        break;
       case 'setup_python_venv':
         stepButton.onclick = setupPythonVenv;
         break;

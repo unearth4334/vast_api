@@ -78,6 +78,11 @@ ui_config:
       style: "primary"
       tooltip: "Set and verify UI_HOME environment variable"
       
+    - label: "🔗 Configure Links"
+      action: "configure_links"
+      style: "primary"
+      tooltip: "Create symbolic links for model directories (upscale_models, loras)"
+      
     - label: "🔌 Install Custom Nodes"
       action: "install_custom_nodes"
       style: "primary"

@@ -549,6 +549,95 @@ export async function getUIHome() {
 }
 
 /**
+ * Configure model symbolic links on remote instance
+ */
+export async function configureLinks() {
+  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  if (!sshConnectionString) return showSetupResult('Please enter an SSH connection string first.', 'error');
+
+  // Get the workflow step element
+  const stepElement = document.querySelector('.workflow-step[data-action="configure_links"]');
+  
+  // Show progress indicator
+  if (stepElement && window.progressIndicators) {
+    window.progressIndicators.showSimpleProgress(
+      stepElement,
+      'Configuring model links...',
+      'Creating symbolic links for upscale_models and loras'
+    );
+  }
+  
+  showSetupResult('Configuring model links...', 'info');
+  
+  try {
+    const data = await api.post('/ssh/configure-links', {
+      ssh_connection: sshConnectionString,
+      ui_home: '/workspace/ComfyUI'
+    });
+    
+    if (data.success) {
+      showSetupResult('✅ Model links configured successfully!', 'success');
+      if (data.output) {
+        console.log('Configure links output:', data.output);
+      }
+      
+      // Show success completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showSuccess(
+          stepElement,
+          'Model links configured',
+          'Symbolic links created successfully',
+          ['✓ upscale_models → ESRGAN', '✓ loras → Lora']
+        );
+      }
+      
+      // Emit success event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'configure_links', success: true }
+      }));
+    } else {
+      showSetupResult(`❌ Failed to configure links: ${data.message}`, 'error');
+      
+      // Show error completion indicator
+      if (stepElement && window.progressIndicators) {
+        window.progressIndicators.showError(
+          stepElement,
+          'Failed to configure links',
+          data.message || 'Command execution failed',
+          [
+            { class: 'retry-btn', onclick: 'configureLinks()', label: '🔄 Retry' }
+          ]
+        );
+      }
+      
+      // Emit failure event for workflow
+      document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+        detail: { stepAction: 'configure_links', success: false }
+      }));
+    }
+  } catch (error) {
+    showSetupResult('❌ Configure links request failed: ' + error.message, 'error');
+    
+    // Show error completion indicator
+    if (stepElement && window.progressIndicators) {
+      window.progressIndicators.showError(
+        stepElement,
+        'Failed to configure links',
+        error.message || 'Request failed',
+        [
+          { class: 'retry-btn', onclick: 'configureLinks()', label: '🔄 Retry' }
+        ]
+      );
+    }
+    
+    // Emit failure event for workflow
+    document.dispatchEvent(new CustomEvent('stepExecutionComplete', {
+      detail: { stepAction: 'configure_links', success: false }
+    }));
+  }
+}
+
+/**
  * Terminate SSH connection
  */
 export async function terminateConnection() {

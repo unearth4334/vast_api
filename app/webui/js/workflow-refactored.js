@@ -177,7 +177,7 @@ async function runWorkflow() {
     };
     
     // Add action-specific parameters
-    if (action === 'set_ui_home' || action === 'install_custom_nodes' || action === 'verify_dependencies') {
+    if (action === 'set_ui_home' || action === 'configure_links' || action === 'install_custom_nodes' || action === 'verify_dependencies') {
       stepConfig.ui_home = '/workspace/ComfyUI'; // TODO: Make configurable
     }
     
