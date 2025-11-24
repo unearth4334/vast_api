@@ -1299,6 +1299,27 @@ def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str
         _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, venv_progress)
         logger.info("Configuring venv path for installation")
         
+        # Upload the latest install-custom-nodes.sh script to the remote instance
+        logger.info("Uploading latest install-custom-nodes.sh script to instance")
+        script_path = '/app/scripts/install-custom-nodes.sh'
+        scp_script_cmd = [
+            'scp',
+            '-P', str(ssh_port),
+            '-i', ssh_key,
+            '-o', 'ConnectTimeout=10',
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            script_path,
+            f'root@{ssh_host}:/workspace/ComfyUI-Auto_installer/scripts/install-custom-nodes.sh'
+        ]
+        
+        scp_result = subprocess.run(scp_script_cmd, timeout=30, capture_output=True, text=True)
+        if scp_result.returncode != 0:
+            logger.warning(f"Failed to upload script (will use existing): {scp_result.stderr}")
+        else:
+            logger.info("Script uploaded successfully")
+        
         # Run the custom nodes installer
         install_cmd = [
             'ssh',
