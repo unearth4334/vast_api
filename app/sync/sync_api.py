@@ -1533,10 +1533,11 @@ def ssh_install_custom_nodes_progress():
             cmd = [
                 'ssh',
                 '-i', ssh_key,
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'UserKnownHostsFile=/dev/null',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
                 '-p', str(ssh_port),
-                ssh_connection,
+                f'root@{ssh_host}',
                 f"cat {progress_file} 2>/dev/null || echo '{{}}'"
             ]
             
