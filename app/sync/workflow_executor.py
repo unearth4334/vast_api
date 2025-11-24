@@ -859,6 +859,13 @@ class WorkflowExecutor:
                             
                             logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}")
                             
+                            # Mark all previously seen nodes as success (they're completed if we've moved past them)
+                            for prev_node in nodes_seen:
+                                if prev_node != current_node and prev_node not in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']:
+                                    # Only update if not already explicitly failed
+                                    if node_statuses.get(prev_node) != 'failed':
+                                        node_statuses[prev_node] = 'success'
+                            
                             # Track this node if we haven't seen it
                             if current_node and current_node not in nodes_seen:
                                 nodes_seen.append(current_node)
