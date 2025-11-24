@@ -105,6 +105,13 @@ export function createResourceCard(resource) {
             return;
         }
         
+        // Toggle selection if clicking the status badge
+        if (e.target.closest('.status-badge')) {
+            e.stopPropagation();
+            window.resourceBrowser?.toggleSelection(resource.filepath);
+            return;
+        }
+        
         window.resourceBrowser?.expandCard(resource.filepath);
     });
     

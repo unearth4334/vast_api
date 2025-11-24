@@ -280,6 +280,13 @@
     text-transform: uppercase;
     white-space: nowrap;
     margin-left: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.status-badge:hover {
+    transform: scale(1.05);
+    opacity: 0.8;
 }
 
 .status-badge.status-available {
@@ -287,9 +294,17 @@
     color: #1976d2;
 }
 
+.status-badge.status-available:hover {
+    background: #bbdefb;
+}
+
 .status-badge.status-selected {
     background: #e8f5e9;
     color: #2e7d32;
+}
+
+.status-badge.status-selected:hover {
+    background: #c8e6c9;
 }
 
 .compact-meta {
