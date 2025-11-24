@@ -24,6 +24,26 @@ function showTab(tabName) {
     if (tabName === 'resources' && !window.resourceBrowserInitialized) {
         initResourceBrowser();
     }
+    
+    // Sync SSH connection strings between tabs
+    syncSshConnectionStrings();
+}
+
+// Sync SSH connection strings between VastAI Setup and Resources tabs
+function syncSshConnectionStrings() {
+    const vastaiInput = document.getElementById('sshConnectionString');
+    const resourcesInput = document.getElementById('resourcesSshConnectionString');
+    
+    if (vastaiInput && resourcesInput) {
+        // Sync from VastAI Setup to Resources if Resources is empty
+        if (!resourcesInput.value && vastaiInput.value) {
+            resourcesInput.value = vastaiInput.value;
+        }
+        // Sync from Resources to VastAI Setup if VastAI Setup is empty
+        else if (!vastaiInput.value && resourcesInput.value) {
+            vastaiInput.value = resourcesInput.value;
+        }
+    }
 }
 
 // Initialize application when DOM is loaded
@@ -43,7 +63,157 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof initWorkflow === 'function') {
         initWorkflow();
     }
+    
+    // Setup bidirectional sync for SSH connection strings
+    setupSshInputSync();
 });
+
+// Setup bidirectional sync between SSH connection inputs
+function setupSshInputSync() {
+    const vastaiInput = document.getElementById('sshConnectionString');
+    const resourcesInput = document.getElementById('resourcesSshConnectionString');
+    
+    if (vastaiInput && resourcesInput) {
+        vastaiInput.addEventListener('input', function() {
+            resourcesInput.value = vastaiInput.value;
+        });
+        
+        resourcesInput.addEventListener('input', function() {
+            vastaiInput.value = resourcesInput.value;
+        });
+    }
+}
+
+// Load VastAI instances for Resources tab
+async function loadVastaiInstancesForResources() {
+    const instancesList = document.getElementById('resources-vastai-instances-list');
+    if (instancesList) {
+        instancesList.innerHTML = '<div class="no-instances-message">Loading instances...</div>';
+    }
+
+    try {
+        const data = await api.get('/vastai/instances');
+        if (!data || data.success === false) {
+            const msg = (data && data.message) ? data.message : 'Failed to load instances';
+            if (instancesList) {
+                instancesList.innerHTML = `<div class="no-instances-message" style="color: var(--text-error);">❌ ${msg}</div>`;
+            }
+            return;
+        }
+
+        const rawInstances = Array.isArray(data.instances) ? data.instances : [];
+        const instances = rawInstances.map(inst => window.VastAIInstances ? window.VastAIInstances.normalizeInstance(inst) : inst);
+        displayVastaiInstancesForResources(instances);
+    } catch (error) {
+        if (instancesList) {
+            instancesList.innerHTML = `<div class="no-instances-message" style="color: var(--text-error);">❌ Error: ${error.message}</div>`;
+        }
+    }
+}
+
+// Display VastAI instances in the Resources tab
+function displayVastaiInstancesForResources(instances) {
+    const instancesList = document.getElementById('resources-vastai-instances-list');
+
+    if (!instances || instances.length === 0) {
+        if (instancesList) {
+            instancesList.innerHTML = '<div class="no-instances-message">No instances found</div>';
+        }
+        return;
+    }
+
+    let html = '';
+    instances.forEach(instance => {
+        const normalizedStatus = window.normStatus ? window.normStatus(instance.status) : (instance.status || 'unknown');
+        const sshConnection = buildSSHStringForResources(instance);
+
+        html += `
+          <div class="instance-item" data-instance-id="${instance.id ?? ''}">
+            <div class="instance-header">
+              <div class="instance-title">Instance #${instance.id ?? 'Unknown'}</div>
+              <div class="instance-status ${normalizedStatus}" data-field="status">${normalizedStatus}</div>
+            </div>
+
+            <div class="instance-details">
+              <div class="instance-detail"><strong>GPU:</strong> ${instance.gpu ? instance.gpu : 'N/A'}${instance.gpu_count ? ` (${instance.gpu_count}x)` : ''}</div>
+              <div class="instance-detail"><strong>GPU RAM:</strong> ${window.fmtGb ? window.fmtGb(instance.gpu_ram_gb) : (instance.gpu_ram_gb || 'N/A')}</div>
+              <div class="instance-detail"><strong>Location:</strong> ${instance.geolocation || 'N/A'}</div>
+              <div class="instance-detail"><strong>Cost:</strong> ${window.fmtMoney ? window.fmtMoney(instance.cost_per_hour) : (instance.cost_per_hour || 'N/A')}</div>
+              <div class="instance-detail"><strong>SSH Host:</strong> <span data-field="ssh_host">${instance.ssh_host || 'N/A'}</span></div>
+              <div class="instance-detail"><strong>SSH Port:</strong> <span data-field="ssh_port">${instance.ssh_port || 'N/A'}</span></div>
+            </div>
+
+            <div class="instance-actions">
+              ${
+                sshConnection && normalizedStatus === 'running'
+                  ? `<button class="use-instance-btn" onclick="useInstanceForResources('${sshConnection.replace(/'/g, "\\'")}', ${instance.id})">
+                       🔗 Use This Instance
+                     </button>`
+                  : `<button class="use-instance-btn" onclick="refreshInstanceCardForResources(${instance.id})">
+                       🔄 Load SSH
+                     </button>`
+              }
+            </div>
+          </div>
+        `;
+    });
+
+    if (instancesList) {
+        instancesList.innerHTML = html;
+    }
+}
+
+// Build SSH string for Resources tab
+function buildSSHStringForResources(inst) {
+    if (!inst.ssh_host || !inst.ssh_port) return null;
+    return `ssh -p ${inst.ssh_port} root@${inst.ssh_host} -L 8080:localhost:8080`;
+}
+
+// Use instance SSH connection string in Resources tab
+function useInstanceForResources(sshConnection, instanceId) {
+    const resourcesInput = document.getElementById('resourcesSshConnectionString');
+    const vastaiInput = document.getElementById('sshConnectionString');
+    
+    if (resourcesInput) {
+        resourcesInput.value = sshConnection;
+    }
+    
+    // Also sync to VastAI Setup tab
+    if (vastaiInput) {
+        vastaiInput.value = sshConnection;
+    }
+    
+    // Store instance ID globally for workflow use
+    if (instanceId) {
+        window.currentInstanceId = instanceId;
+        console.log(`📌 Set current instance ID: ${instanceId}`);
+    }
+    
+    if (window.showSetupResult) {
+        window.showSetupResult('✅ SSH connection parameters copied to SSH Connection String field', 'success');
+    }
+}
+
+// Refresh instance card in Resources tab
+async function refreshInstanceCardForResources(instanceId) {
+    try {
+        if (window.VastAIInstances && window.VastAIInstances.fetchVastaiInstanceDetails) {
+            const inst = await window.VastAIInstances.fetchVastaiInstanceDetails(instanceId);
+            // Reload the instances list to get updated data
+            await loadVastaiInstancesForResources();
+            if (window.showSetupResult) {
+                window.showSetupResult(`Instance #${instanceId} details refreshed.`, 'success');
+            }
+        } else {
+            // Fallback - just reload the list
+            await loadVastaiInstancesForResources();
+        }
+    } catch (err) {
+        if (window.showSetupResult) {
+            window.showSetupResult(`Failed to refresh instance #${instanceId}: ${err.message}`, 'error');
+        }
+    }
+}
 
 // Initialize resource browser
 async function initResourceBrowser() {

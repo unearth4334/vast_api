@@ -266,12 +266,46 @@
                 </div>
             </div>
         </div>
-        
-        <!-- Resources Tab -->
-        <div id="resources-tab" class="tab-content">
-            <div id="resource-manager-container">
-                <!-- Resource manager will be initialized here by JavaScript -->
+    </div>
+    
+    <!-- Resources Tab -->
+    <div id="resources-tab" class="tab-content">
+        <!-- VastAI Instances Section -->
+        <div class="vastai-instances-section">
+            <h4>🖥️ Active VastAI Instances</h4>
+            <div class="instances-buttons">
+                <button class="setup-button secondary" onclick="loadVastaiInstancesForResources()">
+                    🔄 Load Instances
+                </button>
+                <button class="setup-button" onclick="openSearchOffersModal()">
+                    Search Offers
+                </button>
             </div>
+            <div id="resources-vastai-instances-list" class="instances-list">
+                <!-- Instances will be displayed here -->
+                <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances</div>
+            </div>
+        </div>
+        
+        <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
+        
+        <!-- Step 1: SSH Connection -->
+        <div class="workflow-tile">
+            <h4 class="tile-header">🔌 Step 1: SSH Connection</h4>
+            <div class="tile-content">
+                <div class="setup-field">
+                    <label for="resourcesSshConnectionString">SSH Connection String:</label>
+                    <input type="text" id="resourcesSshConnectionString" 
+                           placeholder="ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
+                           title="Enter the SSH connection string from your VastAI instance">
+                </div>
+            </div>
+        </div>
+        
+        <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
+        
+        <div id="resource-manager-container">
+            <!-- Resource manager will be initialized here by JavaScript -->
         </div>
     </div>
     
