@@ -1332,165 +1332,65 @@ def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str
         current_node_has_requirements = False
         output_lines = []
         
-        # Mark venv config as complete and start node installation
-        venv_complete = initial_progress.copy()
-        venv_complete['current_node'] = 'Configure venv path'
-        venv_complete['current_status'] = 'success'
-        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, venv_complete)
-        
+        # Let the script write its own progress - don't overwrite it from backend
+        # Just consume stdout for logging purposes
         for line in process.stdout:
             output_lines.append(line.rstrip())
             logger.debug(f"Install output: {line.rstrip()}")
             
-            # Parse progress: [X/Y] Processing custom node: NodeName
+            # Parse progress: [X/Y] Processing custom node: NodeName (for logging only)
             if 'Processing custom node:' in line:
                 match = re.search(r'\[(\d+)/(\d+)\]\s+Processing custom node:\s+(.+)', line)
                 if match:
                     processed_nodes = int(match.group(1))
                     total_nodes = int(match.group(2))
                     current_node = match.group(3).strip()
-                    current_node_has_requirements = False
                     logger.info(f"Processing node {processed_nodes}/{total_nodes}: {current_node}")
-                    
-                    # Write progress to file
-                    progress_data = {
-                        'in_progress': True,
-                        'task_id': task_id,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'running',
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': False
-                    }
-                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
             
-            # Detect when installing requirements
-            elif 'Installing requirements' in line and current_node:
-                current_node_has_requirements = True
-                progress_data = {
-                    'in_progress': True,
-                    'task_id': task_id,
-                    'total_nodes': total_nodes,
-                    'processed': processed_nodes,
-                    'current_node': current_node,
-                    'current_status': 'running',
-                    'successful': successful_clones,
-                    'failed': failed_clones,
-                    'has_requirements': True,
-                    'requirements_status': 'running'
-                }
-                _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
-            
-            # Track successes and failures
+            # Track successes and failures (for logging only)
             elif 'Successfully cloned' in line:
                 successful_clones += 1
-                if current_node:
-                    progress_data = {
-                        'in_progress': True,
-                        'task_id': task_id,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'success',
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': current_node_has_requirements,
-                        'requirements_status': 'pending' if current_node_has_requirements else None
-                    }
-                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
-                        
             elif 'Failed to clone' in line:
                 failed_clones += 1
-                if current_node:
-                    progress_data = {
-                        'in_progress': True,
-                        'task_id': task_id,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'failed',
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': False
-                    }
-                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
             elif 'Successfully installed requirements' in line:
                 successful_requirements += 1
-                if current_node and current_node_has_requirements:
-                    progress_data = {
-                        'in_progress': True,
-                        'task_id': task_id,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'success',
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': True,
-                        'requirements_status': 'success'
-                    }
-                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
             elif 'Failed to install requirements' in line:
                 failed_requirements += 1
-                if current_node and current_node_has_requirements:
-                    progress_data = {
-                        'in_progress': True,
-                        'task_id': task_id,
-                        'total_nodes': total_nodes,
-                        'processed': processed_nodes,
-                        'current_node': current_node,
-                        'current_status': 'success',  # Node cloned but reqs failed
-                        'successful': successful_clones,
-                        'failed': failed_clones,
-                        'has_requirements': True,
-                        'requirements_status': 'failed'
-                    }
-                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, progress_data)
         
         # Wait for process to complete
         return_code = process.wait(timeout=1800)  # 30 minute timeout
         
-        # Write completion progress
+        # Script writes its own completion progress - just log here
         installation_succeeded = return_code == 0 or (failed_requirements > 0 and failed_clones == 0)
-        
-        completion_progress = {
-            'in_progress': False,
-            'task_id': task_id,
-            'completed': True,
-            'success': installation_succeeded,
-            'total_nodes': total_nodes,
-            'processed': processed_nodes,
-            'successful_clones': successful_clones,
-            'failed_clones': failed_clones,
-            'successful_requirements': successful_requirements,
-            'failed_requirements': failed_requirements,
-            'return_code': return_code
-        }
-        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, completion_progress)
-        
-        logger.info(f"Installation task {task_id} completed. Success: {installation_succeeded}, " +
-                   f"Processed: {processed_nodes}/{total_nodes}")
+        logger.info(f"Installation task {task_id} completed. Return code: {return_code}, " +
+                   f"Success: {installation_succeeded}, Processed: {processed_nodes}/{total_nodes}")
         
     except subprocess.TimeoutExpired:
         logger.error(f"Installation task {task_id} timed out")
-        error_progress = {
-            'in_progress': False,
-            'task_id': task_id,
-            'completed': False,
-            'error': 'Installation timed out (exceeded 30 minutes)'
-        }
-        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
+        # Script should have written error, but write one just in case
+        try:
+            error_progress = {
+                'in_progress': False,
+                'task_id': task_id,
+                'completed': False,
+                'error': 'Installation timed out (exceeded 30 minutes)'
+            }
+            _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
+        except:
+            pass
     except Exception as e:
         logger.error(f"Installation task {task_id} failed: {e}", exc_info=True)
-        error_progress = {
-            'in_progress': False,
-            'task_id': task_id,
-            'completed': False,
-            'error': str(e)
-        }
-        _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
+        # Script should have written error, but write one just in case
+        try:
+            error_progress = {
+                'in_progress': False,
+                'task_id': task_id,
+                'completed': False,
+                'error': str(e)
+            }
+            _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
+        except:
+            pass
 
 
 @app.route('/ssh/install-custom-nodes', methods=['POST', 'OPTIONS'])

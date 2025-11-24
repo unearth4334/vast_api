@@ -98,16 +98,31 @@ write_json_progress() {
     # Escape node name for JSON (replace quotes with escaped quotes)
     local escaped_node=$(echo "$current_node" | sed 's/"/\\"/g')
     
-    # Build JSON object
+    # Determine completion status
+    local completed="false"
+    local success_status="true"
+    if [ "$in_progress" = "false" ]; then
+        completed="true"
+        # Installation is successful if we have no failed nodes, or at least some successful ones
+        if [ "$failed" -gt 0 ] && [ "$successful" -eq 0 ]; then
+            success_status="false"
+        fi
+    fi
+    
+    # Build JSON object with completed and success fields
     cat > "$PROGRESS_JSON" <<EOF
 {
   "in_progress": $in_progress,
+  "completed": $completed,
+  "success": $success_status,
   "total_nodes": $total_nodes,
   "processed": $processed,
   "current_node": "$escaped_node",
   "current_status": "$current_status",
   "successful": $successful,
   "failed": $failed,
+  "successful_clones": $successful,
+  "failed_clones": $failed,
   "has_requirements": $has_requirements$([ -n "$requirements_status" ] && echo ",
   \"requirements_status\": \"$requirements_status\"" || echo "")
 }
