@@ -9,7 +9,7 @@ ecosystem: sdxl
 basemodel: sdxl-1.0
 type: lora
 AIR: "detail_enhancer_sdxl_v2"
-image: detail_enhancer.jpg
+image: encoder.jpg
 ---
 
 # Description

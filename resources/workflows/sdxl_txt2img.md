@@ -9,7 +9,7 @@ ecosystem: sdxl
 basemodel: sdxl-1.0
 type: workflow
 AIR: "sdxl_txt2img"
-image: sdxl_t2i.jpg
+image: encoder.jpg
 ---
 
 # Description

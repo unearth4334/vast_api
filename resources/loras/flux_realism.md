@@ -9,7 +9,7 @@ ecosystem: flux
 basemodel: flux-dev
 type: lora
 AIR: "flux_realism_v1"
-image: flux_realism.jpg
+image: encoder.jpg
 license: apache-2.0
 ---
 

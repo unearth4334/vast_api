@@ -9,7 +9,7 @@ ecosystem: sd15
 basemodel: sd1.5
 type: workflow
 AIR: "sd15_img2img"
-image: sd15_img2img.jpg
+image: encoder.jpg
 ---
 
 # Description

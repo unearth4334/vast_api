@@ -9,7 +9,7 @@ ecosystem: wan
 basemodel: wan2.1
 type: lora
 AIR: "urn:air:wanvideo14b_i2v_720p:lora:civitai:1678575@1900322"
-image: fusionx_lora.jpg
+image: encoder.jpg
 license: CreativeML Open RAIL-M
 url: https://civitai.com/models/1678575
 ---

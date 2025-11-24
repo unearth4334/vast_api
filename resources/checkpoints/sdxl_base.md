@@ -9,7 +9,7 @@ ecosystem: sdxl
 basemodel: sdxl1.0
 type: checkpoint
 AIR: "sdxl_base_1.0"
-image: sdxl_base.jpg
+image: encoder.jpg
 license: CreativeML Open RAIL++-M
 url: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0
 ---

@@ -9,7 +9,7 @@ ecosystem: sd15
 basemodel: sd-1.5
 type: checkpoint
 AIR: "sd15_base"
-image: sd15.jpg
+image: encoder.jpg
 license: CreativeML Open RAIL-M
 url: https://huggingface.co/runwayml/stable-diffusion-v1-5
 ---

@@ -9,7 +9,7 @@ ecosystem: flux
 basemodel: flux-schnell
 type: checkpoint
 AIR: "flux1_schnell"
-image: flux_schnell.jpg
+image: encoder.jpg
 license: Apache-2.0
 url: https://huggingface.co/black-forest-labs/FLUX.1-schnell
 ---

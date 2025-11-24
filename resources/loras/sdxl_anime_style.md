@@ -9,7 +9,7 @@ ecosystem: sdxl
 basemodel: sdxl1.0
 type: lora
 AIR: "anime_sdxl_v2"
-image: anime_sdxl.jpg
+image: encoder.jpg
 license: CreativeML Open RAIL-M
 ---
 

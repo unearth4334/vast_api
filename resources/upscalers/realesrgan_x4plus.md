@@ -9,7 +9,7 @@ ecosystem: realesrgan
 basemodel: other
 type: upscaler
 AIR: "realesrgan_x4plus"
-image: RealESRGAN_x4plus.png
+image: encoder.jpg
 license: BSD-3-Clause
 url: https://github.com/xinntao/Real-ESRGAN
 ---

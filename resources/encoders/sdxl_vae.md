@@ -9,7 +9,7 @@ ecosystem: sdxl
 basemodel: sdxl1.0
 type: vae
 AIR: "sdxl_vae"
-image: sdxl_vae.jpg
+image: encoder.jpg
 license: CreativeML Open RAIL-M
 url: https://huggingface.co/stabilityai/sdxl-vae
 ---

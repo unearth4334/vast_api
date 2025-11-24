@@ -9,7 +9,7 @@ ecosystem: wan
 basemodel: wan2.2
 type: workflow
 AIR: "urn:air:wanvideo14b_i2v_720p:unknown:civitai:1824577@2077046"
-image: wan22_i2v.jpg
+image: encoder.jpg
 license: CreativeML Open RAIL-M
 url: https://civitai.com/models/1824577
 dependencies:

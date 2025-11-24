@@ -9,7 +9,7 @@ ecosystem: ltxv
 basemodel: ltxv-0.9
 type: workflow
 AIR: "ltxv_video_gen"
-image: ltxv_video.jpg
+image: encoder.jpg
 dependencies:
   - ltxv_checkpoint
 ---

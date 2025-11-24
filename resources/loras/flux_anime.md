@@ -9,7 +9,7 @@ ecosystem: flux
 basemodel: flux-dev
 type: lora
 AIR: "flux_anime_v1.2"
-image: flux_anime.jpg
+image: encoder.jpg
 dependencies:
   - flux_dev_checkpoint
 ---

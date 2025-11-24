@@ -9,7 +9,7 @@ ecosystem: flux
 basemodel: flux-schnell
 type: workflow
 AIR: "flux_schnell_t2i"
-image: flux_t2i_simple.jpg
+image: encoder.jpg
 ---
 
 # Description

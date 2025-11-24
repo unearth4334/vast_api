@@ -9,7 +9,7 @@ ecosystem: flux
 basemodel: flux
 type: vae
 AIR: "flux_vae"
-image: flux_vae.jpg
+image: encoder.jpg
 ---
 
 # Description
