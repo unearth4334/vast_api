@@ -26,6 +26,7 @@ try:
     from ..webui.template_manager import template_manager
     from .ssh_test import SSHTester
     from .background_tasks import get_task_manager
+    from .ssh_host_key_manager import SSHHostKeyManager
 except ImportError:
     # Handle imports for both module and direct execution
     import sys
@@ -39,6 +40,7 @@ except ImportError:
     from webui.templates import get_index_template
     from background_tasks import get_task_manager
     try:
+        from ssh_host_key_manager import SSHHostKeyManager
         from ssh_test import SSHTester
     except ImportError:
         SSHTester = None
