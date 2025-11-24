@@ -872,7 +872,10 @@ class WorkflowExecutor:
                                         else:
                                             # Past 4th node - show completed "# others" at top and current nodes at bottom
                                             completed_others_count = processed - MAX_VISIBLE_NODES
-                                            successful_others = successful_count - len([n for n in nodes_seen[:processed-MAX_VISIBLE_NODES] if node_statuses.get(n) == 'success'])
+                                            
+                                            # Count successful nodes in the collapsed section only (not including visible window)
+                                            collapsed_nodes = nodes_seen[:processed-MAX_VISIBLE_NODES] if processed > MAX_VISIBLE_NODES else []
+                                            successful_others = len([n for n in collapsed_nodes if node_statuses.get(n) == 'success'])
                                             
                                             tasks_to_show.append({
                                                 'name': f'{completed_others_count} others',
@@ -881,8 +884,23 @@ class WorkflowExecutor:
                                             
                                             # Show last 4 nodes (current window)
                                             visible_nodes = nodes_seen[-MAX_VISIBLE_NODES:]
-                                            for node in visible_nodes:
-                                                status = node_statuses.get(node, 'success')
+                                            for i, node in enumerate(visible_nodes):
+                                                # Determine the actual index of this node in nodes_seen
+                                                node_index = len(nodes_seen) - MAX_VISIBLE_NODES + i
+                                                
+                                                # If this node's index is < processed-1, it's completed
+                                                # If it's == processed-1, it might be the current node
+                                                # If it's > processed-1, it shouldn't happen (nodes_seen shouldn't be ahead of processed)
+                                                if node == current_node:
+                                                    # This is the current node being processed
+                                                    status = node_statuses.get(node, 'running')
+                                                elif node_index < processed - 1:
+                                                    # This node is completed
+                                                    status = node_statuses.get(node, 'success')
+                                                else:
+                                                    # Shouldn't happen, but default to status from tracking
+                                                    status = node_statuses.get(node, 'pending')
+                                                
                                                 node_task = {'name': node, 'status': status}
                                                 
                                                 # Add sub-task for requirements if this node has them
