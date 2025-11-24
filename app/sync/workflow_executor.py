@@ -787,6 +787,57 @@ class WorkflowExecutor:
                             total_nodes_count = progress.get('total_nodes', 0)
                             successful_count = progress.get('successful_clones', 0)
                             failed_count = progress.get('failed_clones', 0)
+                            processed = progress.get('processed', 0)
+                            
+                            # Final task list update - show all nodes as completed
+                            state = state_manager.load_state()
+                            if state:
+                                logger.info(f"Building final task list with {successful_count} successful nodes")
+                                tasks_to_show = []
+                                
+                                # Clone Auto-installer
+                                existing_tasks = state['steps'][step_index].get('tasks', [])
+                                clone_task = next((t for t in existing_tasks if t['name'] == 'Clone Auto-installer'), None)
+                                if clone_task:
+                                    tasks_to_show.append(clone_task)
+                                else:
+                                    tasks_to_show.append({'name': 'Clone Auto-installer', 'status': 'success'})
+                                
+                                # Configure venv path
+                                tasks_to_show.append({'name': 'Configure venv path', 'status': 'success'})
+                                
+                                # Filter actual nodes (excluding initialization nodes)
+                                actual_nodes = [n for n in nodes_seen if n not in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']]
+                                
+                                if len(actual_nodes) > MAX_VISIBLE_NODES:
+                                    # Rolling window for final display
+                                    completed_others_count = len(actual_nodes) - MAX_VISIBLE_NODES
+                                    successful_others = len([n for n in actual_nodes[:completed_others_count] if node_statuses.get(n, 'success') == 'success'])
+                                    
+                                    tasks_to_show.append({
+                                        'name': f'{completed_others_count} others',
+                                        'status': f'success ({successful_others}/{completed_others_count})'
+                                    })
+                                    
+                                    # Show last 4 nodes, all as success
+                                    for node in actual_nodes[-MAX_VISIBLE_NODES:]:
+                                        tasks_to_show.append({
+                                            'name': node,
+                                            'status': node_statuses.get(node, 'success')
+                                        })
+                                else:
+                                    # Show all nodes
+                                    for node in actual_nodes:
+                                        tasks_to_show.append({
+                                            'name': node,
+                                            'status': node_statuses.get(node, 'success')
+                                        })
+                                
+                                # Update state
+                                logger.info(f"Final task list: {[t['name'] for t in tasks_to_show]}")
+                                state['steps'][step_index]['tasks'] = tasks_to_show
+                                state_manager.save_state(state)
+                            
                             break
                         
                         # Check for error
