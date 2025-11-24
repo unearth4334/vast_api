@@ -102,6 +102,8 @@ async function loadVastaiInstancesForResources() {
         }
 
         const rawInstances = Array.isArray(data.instances) ? data.instances : [];
+        // Use VastAI modular system's normalizeInstance if available for consistent data format,
+        // otherwise use raw instance data which will be handled by display function
         const instances = rawInstances.map(inst => window.VastAIInstances ? window.VastAIInstances.normalizeInstance(inst) : inst);
         displayVastaiInstancesForResources(instances);
     } catch (error) {
@@ -122,45 +124,113 @@ function displayVastaiInstancesForResources(instances) {
         return;
     }
 
-    let html = '';
+    // Clear the list first
+    if (instancesList) {
+        instancesList.innerHTML = '';
+    }
+    
     instances.forEach(instance => {
+        // Normalize instance data using available functions
         const normalizedStatus = window.normStatus ? window.normStatus(instance.status) : (instance.status || 'unknown');
         const sshConnection = buildSSHStringForResources(instance);
+        
+        // Validate instance.id is a number to prevent XSS
+        const instanceId = typeof instance.id === 'number' ? instance.id : parseInt(instance.id, 10);
+        if (isNaN(instanceId)) {
+            console.warn('Invalid instance ID:', instance.id);
+            return; // Skip this instance
+        }
 
-        html += `
-          <div class="instance-item" data-instance-id="${instance.id ?? ''}">
-            <div class="instance-header">
-              <div class="instance-title">Instance #${instance.id ?? 'Unknown'}</div>
-              <div class="instance-status ${normalizedStatus}" data-field="status">${normalizedStatus}</div>
-            </div>
-
-            <div class="instance-details">
-              <div class="instance-detail"><strong>GPU:</strong> ${instance.gpu ? instance.gpu : 'N/A'}${instance.gpu_count ? ` (${instance.gpu_count}x)` : ''}</div>
-              <div class="instance-detail"><strong>GPU RAM:</strong> ${window.fmtGb ? window.fmtGb(instance.gpu_ram_gb) : (instance.gpu_ram_gb || 'N/A')}</div>
-              <div class="instance-detail"><strong>Location:</strong> ${instance.geolocation || 'N/A'}</div>
-              <div class="instance-detail"><strong>Cost:</strong> ${window.fmtMoney ? window.fmtMoney(instance.cost_per_hour) : (instance.cost_per_hour || 'N/A')}</div>
-              <div class="instance-detail"><strong>SSH Host:</strong> <span data-field="ssh_host">${instance.ssh_host || 'N/A'}</span></div>
-              <div class="instance-detail"><strong>SSH Port:</strong> <span data-field="ssh_port">${instance.ssh_port || 'N/A'}</span></div>
-            </div>
-
-            <div class="instance-actions">
-              ${
-                sshConnection && normalizedStatus === 'running'
-                  ? `<button class="use-instance-btn" onclick="useInstanceForResources('${sshConnection.replace(/'/g, "\\'")}', ${instance.id})">
-                       🔗 Use This Instance
-                     </button>`
-                  : `<button class="use-instance-btn" onclick="refreshInstanceCardForResources(${instance.id})">
-                       🔄 Load SSH
-                     </button>`
-              }
-            </div>
-          </div>
-        `;
+        // Create DOM elements safely instead of using innerHTML with untrusted data
+        const instanceItem = document.createElement('div');
+        instanceItem.className = 'instance-item';
+        instanceItem.setAttribute('data-instance-id', instanceId);
+        
+        const instanceHeader = document.createElement('div');
+        instanceHeader.className = 'instance-header';
+        
+        const instanceTitle = document.createElement('div');
+        instanceTitle.className = 'instance-title';
+        instanceTitle.textContent = `Instance #${instanceId}`;
+        
+        const instanceStatus = document.createElement('div');
+        instanceStatus.className = `instance-status ${normalizedStatus}`;
+        instanceStatus.setAttribute('data-field', 'status');
+        instanceStatus.textContent = normalizedStatus;
+        
+        instanceHeader.appendChild(instanceTitle);
+        instanceHeader.appendChild(instanceStatus);
+        
+        const instanceDetails = document.createElement('div');
+        instanceDetails.className = 'instance-details';
+        
+        // Helper function to create detail element
+        const createDetail = (label, value) => {
+            const detail = document.createElement('div');
+            detail.className = 'instance-detail';
+            const strong = document.createElement('strong');
+            strong.textContent = label;
+            detail.appendChild(strong);
+            detail.appendChild(document.createTextNode(value));
+            return detail;
+        };
+        
+        // Helper function to create detail with span
+        const createDetailWithSpan = (label, value, dataField) => {
+            const detail = document.createElement('div');
+            detail.className = 'instance-detail';
+            const strong = document.createElement('strong');
+            strong.textContent = label;
+            detail.appendChild(strong);
+            const span = document.createElement('span');
+            span.setAttribute('data-field', dataField);
+            span.textContent = value || 'N/A';
+            detail.appendChild(span);
+            return detail;
+        };
+        
+        const gpuValue = instance.gpu ? (instance.gpu_count ? ` ${instance.gpu} (${instance.gpu_count}x)` : ` ${instance.gpu}`) : ' N/A';
+        instanceDetails.appendChild(createDetail('GPU:', gpuValue));
+        
+        const gpuRamValue = window.fmtGb ? ` ${window.fmtGb(instance.gpu_ram_gb)}` : ` ${instance.gpu_ram_gb || 'N/A'}`;
+        instanceDetails.appendChild(createDetail('GPU RAM:', gpuRamValue));
+        
+        instanceDetails.appendChild(createDetail('Location:', ` ${instance.geolocation || 'N/A'}`));
+        
+        const costValue = window.fmtMoney ? ` ${window.fmtMoney(instance.cost_per_hour)}` : ` ${instance.cost_per_hour || 'N/A'}`;
+        instanceDetails.appendChild(createDetail('Cost:', costValue));
+        
+        instanceDetails.appendChild(createDetailWithSpan('SSH Host: ', instance.ssh_host, 'ssh_host'));
+        instanceDetails.appendChild(createDetailWithSpan('SSH Port: ', instance.ssh_port, 'ssh_port'));
+        
+        const instanceActions = document.createElement('div');
+        instanceActions.className = 'instance-actions';
+        
+        const actionButton = document.createElement('button');
+        actionButton.className = 'use-instance-btn';
+        
+        if (sshConnection && normalizedStatus === 'running') {
+            actionButton.textContent = '🔗 Use This Instance';
+            actionButton.addEventListener('click', function() {
+                useInstanceForResources(sshConnection, instanceId);
+            });
+        } else {
+            actionButton.textContent = '🔄 Load SSH';
+            actionButton.addEventListener('click', function() {
+                refreshInstanceCardForResources(instanceId);
+            });
+        }
+        
+        instanceActions.appendChild(actionButton);
+        
+        instanceItem.appendChild(instanceHeader);
+        instanceItem.appendChild(instanceDetails);
+        instanceItem.appendChild(instanceActions);
+        
+        if (instancesList) {
+            instancesList.appendChild(instanceItem);
+        }
     });
-
-    if (instancesList) {
-        instancesList.innerHTML = html;
-    }
 }
 
 // Build SSH string for Resources tab
