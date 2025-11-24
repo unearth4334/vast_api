@@ -26,6 +26,7 @@ RUN .venv/bin/pip install --no-cache-dir --trusted-host pypi.org --trusted-host 
 # Copy application files
 COPY app/ ./app/
 COPY scripts/ ./scripts/
+COPY resources/ ./resources/
 COPY config.yaml ./ 
 
 # Make scripts executable

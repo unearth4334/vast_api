@@ -9,7 +9,7 @@ services:
       - "${HOST_MEDIA_PATH}:/media"
       - "${API_KEY_PATH}:/app/api_key.txt:ro"
       - vast_api_logs:/app/logs
-      - resources_data:/app/resources
+      - ./resources:/app/resources
     environment:
       - PYTHONUNBUFFERED=1
       - PUID=${PUID}
@@ -33,6 +33,4 @@ networks:
 
 volumes:
   vast_api_logs:
-    driver: local
-  resources_data:
     driver: local
