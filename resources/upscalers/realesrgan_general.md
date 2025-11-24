@@ -1,33 +1,26 @@
 ---
 tags: [upscaler, realesrgan, general, 4x]
+title: "RealESRGAN General 4x"
+version: "v3"
+published: 2024-03-01
+size: 67000000
+creator: Tencent ARC
 ecosystem: other
 basemodel: universal
 type: upscaler
-version: v3
+AIR: "realesrgan_x4plus"
 image: realesrgan.jpg
-author: Tencent ARC
-published: 2024-03-01
-size: 67000000
-url: https://github.com/xinntao/Real-ESRGAN
 license: BSD-3-Clause
+url: https://github.com/xinntao/Real-ESRGAN
 ---
 
-# RealESRGAN General 4x
+# Description
 
-General-purpose upscaling model that works well with various image types. 4x upscaling with excellent detail preservation.
+- General-purpose upscaling model that works well with various image types. 4x upscaling with excellent detail preservation.
+- Works with photos and artwork with good balance of sharpness and smoothness.
+- Scale: 4x | Input: Any resolution | Format: .pth model file
 
-## Features
-- 4x upscaling
-- Works with photos and artwork
-- Good balance of sharpness and smoothness
-- Fast processing
-
-## Specifications
-- Scale: 4x
-- Input: Any resolution
-- Format: .pth model file
-
-### Download
+# Download
 ```bash
 mkdir -p "$UI_HOME/models/upscale_models" && \
 wget -O "$UI_HOME/models/upscale_models/RealESRGAN_x4plus.pth" \

@@ -1,31 +1,24 @@
 ---
 tags: [vae, encoder, flux]
+title: "FLUX VAE Encoder"
+version: "v1.0"
+published: 2024-08-01
+size: 335000000
+creator: Black Forest Labs
 ecosystem: flux
 basemodel: flux
 type: vae
-version: v1.0
+AIR: "flux_vae"
 image: flux_vae.jpg
-author: Black Forest Labs
-published: 2024-08-01
-size: 335000000
 ---
 
-# FLUX VAE Encoder
+# Description
 
-Official VAE encoder for FLUX models. Required for proper encoding/decoding of latent representations.
+- Official VAE encoder for FLUX models. Required for proper encoding/decoding of latent representations.
+- Optimized for FLUX models with high-quality encoding/decoding and fast processing.
+- Size: ~335MB | Format: Safetensors | Compatible with all FLUX variants
 
-## Features
-- Optimized for FLUX models
-- High-quality encoding/decoding
-- Fast processing
-- Standard component
-
-## Specifications
-- Size: ~335MB
-- Format: Safetensors
-- Compatible with all FLUX variants
-
-### Download
+# Download
 ```bash
 mkdir -p "$UI_HOME/models/vae" && \
 wget -O "$UI_HOME/models/vae/flux_vae.safetensors" \

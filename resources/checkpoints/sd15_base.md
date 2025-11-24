@@ -1,34 +1,26 @@
 ---
 tags: [checkpoint, sd15, base, classic]
+title: "Stable Diffusion 1.5 Base"
+version: "v1.5"
+published: 2022-10-21
+size: 4270000000
+creator: Stability AI
 ecosystem: sd15
 basemodel: sd-1.5
 type: checkpoint
-version: v1.5
+AIR: "sd15_base"
 image: sd15.jpg
-author: Stability AI
-published: 2022-10-21
-size: 4270000000
-url: https://huggingface.co/runwayml/stable-diffusion-v1-5
 license: CreativeML Open RAIL-M
+url: https://huggingface.co/runwayml/stable-diffusion-v1-5
 ---
 
-# Stable Diffusion 1.5 Base
+# Description
 
-The classic Stable Diffusion 1.5 checkpoint. Widely compatible with countless LoRAs, embeddings, and tools.
+- The classic Stable Diffusion 1.5 checkpoint. Widely compatible with countless LoRAs, embeddings, and tools.
+- Huge ecosystem of add-ons, well-documented and tested with fast inference.
+- Size: ~4.27GB | Resolution: 512x512 (native) | Format: Safetensors
 
-## Features
-- Huge ecosystem of add-ons
-- Well-documented and tested
-- Fast inference
-- 512x512 native resolution
-
-## Specifications
-- Size: ~4.27GB
-- Format: Safetensors
-- Resolution: 512x512 (native)
-- Compatible with thousands of LoRAs
-
-### Download
+# Download
 ```bash
 mkdir -p "$UI_HOME/models/checkpoints" && \
 wget -O "$UI_HOME/models/checkpoints/v1-5-pruned-emaonly.safetensors" \
