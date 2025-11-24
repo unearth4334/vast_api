@@ -29,3 +29,6 @@ const api = {
         body: JSON.stringify(data) 
     })
 };
+
+// Make API client globally available
+window.api = api;
