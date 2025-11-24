@@ -849,7 +849,12 @@ class WorkflowExecutor:
                                         
                                         if processed <= MAX_VISIBLE_NODES:
                                             # Still in first 4 nodes - show them + pending "# others"
+                                            # Filter out initialization nodes
                                             for node in nodes_seen:
+                                                # Skip initialization nodes
+                                                if node in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']:
+                                                    continue
+                                                    
                                                 status = node_statuses.get(node, 'success')
                                                 node_task = {'name': node, 'status': status}
                                                 
@@ -871,34 +876,39 @@ class WorkflowExecutor:
                                                 })
                                         else:
                                             # Past 4th node - show completed "# others" at top and current nodes at bottom
-                                            completed_others_count = processed - MAX_VISIBLE_NODES
+                                            # Filter out initialization nodes from nodes_seen for counting
+                                            actual_nodes = [n for n in nodes_seen if n not in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']]
                                             
-                                            # Count successful nodes in the collapsed section only (not including visible window)
-                                            collapsed_nodes = nodes_seen[:processed-MAX_VISIBLE_NODES] if processed > MAX_VISIBLE_NODES else []
-                                            successful_others = len([n for n in collapsed_nodes if node_statuses.get(n) == 'success'])
+                                            # Calculate how many actual nodes to collapse
+                                            visible_node_count = min(MAX_VISIBLE_NODES, len(actual_nodes))
+                                            completed_others_count = max(0, len(actual_nodes) - visible_node_count)
                                             
-                                            tasks_to_show.append({
-                                                'name': f'{completed_others_count} others',
-                                                'status': f'success ({successful_others}/{completed_others_count})'
-                                            })
+                                            if completed_others_count > 0:
+                                                # Count successful nodes in the collapsed section only
+                                                collapsed_nodes = actual_nodes[:completed_others_count]
+                                                successful_others = len([n for n in collapsed_nodes if node_statuses.get(n) == 'success'])
+                                                
+                                                tasks_to_show.append({
+                                                    'name': f'{completed_others_count} others',
+                                                    'status': f'success ({successful_others}/{completed_others_count})'
+                                                })
                                             
-                                            # Show last 4 nodes (current window)
-                                            visible_nodes = nodes_seen[-MAX_VISIBLE_NODES:]
+                                            # Show last 4 actual nodes (current window)
+                                            visible_nodes = actual_nodes[-visible_node_count:] if actual_nodes else []
                                             for i, node in enumerate(visible_nodes):
-                                                # Determine the actual index of this node in nodes_seen
-                                                node_index = len(nodes_seen) - MAX_VISIBLE_NODES + i
+                                                # Determine the actual index of this node in actual_nodes list
+                                                node_index = len(actual_nodes) - visible_node_count + i
                                                 
                                                 # If this node's index is < processed-1, it's completed
                                                 # If it's == processed-1, it might be the current node
-                                                # If it's > processed-1, it shouldn't happen (nodes_seen shouldn't be ahead of processed)
                                                 if node == current_node:
                                                     # This is the current node being processed
                                                     status = node_statuses.get(node, 'running')
-                                                elif node_index < processed - 1:
+                                                elif node_index < len(actual_nodes) - 1:
                                                     # This node is completed
                                                     status = node_statuses.get(node, 'success')
                                                 else:
-                                                    # Shouldn't happen, but default to status from tracking
+                                                    # Use tracked status
                                                     status = node_statuses.get(node, 'pending')
                                                 
                                                 node_task = {'name': node, 'status': status}
@@ -920,19 +930,23 @@ class WorkflowExecutor:
                                                     'status': 'pending'
                                                 })
                                     else:
-                                        # 4 or fewer nodes total - show all
+                                        # 4 or fewer nodes total - show all (except initialization nodes)
                                         for node in nodes_seen:
+                                            # Skip initialization nodes
+                                            if node in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']:
+                                                continue
+                                                
                                             status = node_statuses.get(node, 'success')
                                             node_task = {'name': node, 'status': status}
                                             
-                                        # Add sub-task for requirements if this node has them
-                                        if node == current_node and has_requirements and requirements_status:
-                                            node_task['subtasks'] = [{
-                                                'name': 'Install dependencies',
-                                                'status': requirements_status
-                                            }]
-                                        
-                                        tasks_to_show.append(node_task)
+                                            # Add sub-task for requirements if this node has them
+                                            if node == current_node and has_requirements and requirements_status:
+                                                node_task['subtasks'] = [{
+                                                    'name': 'Install dependencies',
+                                                    'status': requirements_status
+                                                }]
+                                            
+                                            tasks_to_show.append(node_task)
                                 
                                 # Only update if tasks changed
                                 update_hash = str(tasks_to_show)
