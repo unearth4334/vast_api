@@ -7,23 +7,88 @@ Executes download commands and tracks installation progress.
 
 import subprocess
 import logging
-from typing import Dict, List, Tuple
+import re
+from typing import Dict, List, Tuple, Optional, Callable
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
+class ProgressParser:
+    """Parse civitdl progress output"""
+    
+    # Regex patterns for civitdl output
+    PROGRESS_PATTERN = re.compile(
+        r'(Images|Model|Cache):\s*(\d+)%\|[█▓▒░\s]*\|\s*([\d.]+[KMGT]?i?B?)/([\d.]+[KMGT]?i?B?)\s*\[([^\]]+)\<([^\]]+),\s*([\d.]+[KMGT]?i?B?/s)\]'
+    )
+    STAGE_START = re.compile(r'Now downloading "([^"]+)"')
+    STAGE_COMPLETE = re.compile(r'Download completed for "([^"]+)"')
+    
+    @classmethod
+    def parse_line(cls, line: str) -> Optional[Dict]:
+        """
+        Parse a single line of civitdl output
+        
+        Args:
+            line: Output line from civitdl
+            
+        Returns:
+            Dictionary with progress info or None if not a progress line
+        """
+        # Check for download start
+        match = cls.STAGE_START.search(line)
+        if match:
+            return {
+                'type': 'stage_start',
+                'name': match.group(1)
+            }
+        
+        # Check for download complete
+        match = cls.STAGE_COMPLETE.search(line)
+        if match:
+            return {
+                'type': 'stage_complete',
+                'name': match.group(1)
+            }
+        
+        # Check for progress bar
+        match = cls.PROGRESS_PATTERN.search(line)
+        if match:
+            stage = match.group(1)  # Images, Model, or Cache
+            percent = int(match.group(2))
+            downloaded = match.group(3)
+            total = match.group(4)
+            elapsed = match.group(5)
+            remaining = match.group(6)
+            speed = match.group(7)
+            
+            return {
+                'type': 'progress',
+                'stage': stage.lower(),
+                'percent': percent,
+                'downloaded': downloaded,
+                'total': total,
+                'elapsed': elapsed,
+                'remaining': remaining,
+                'speed': speed
+            }
+        
+        return None
+
+
 class ResourceInstaller:
     """Installer for deploying resources to remote instances"""
     
-    def __init__(self, ssh_key: str = '/root/.ssh/id_ed25519'):
+    def __init__(self, ssh_key: str = '/root/.ssh/id_ed25519', progress_callback: Optional[Callable] = None):
         """
         Initialize resource installer
         
         Args:
             ssh_key: Path to SSH private key
+            progress_callback: Optional callback for progress updates
         """
         self.ssh_key = ssh_key
+        self.progress_callback = progress_callback
         logger.info(f"Initialized ResourceInstaller with SSH key: {self.ssh_key}")
     
     def install_resource(
@@ -82,6 +147,13 @@ class ResourceInstaller:
                 line_stripped = line.rstrip()
                 output_lines.append(line_stripped)
                 logger.debug(f"  {line_stripped}")
+                
+                # Parse and report progress
+                if self.progress_callback:
+                    progress_data = ProgressParser.parse_line(line_stripped)
+                    if progress_data:
+                        progress_data['resource'] = resource_name
+                        self.progress_callback(progress_data)
             
             return_code = process.wait(timeout=3600)  # 1 hour timeout
             

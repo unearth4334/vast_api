@@ -49,6 +49,38 @@ def init_socketio(app):
         """Client disconnected."""
         logger.info("Client disconnected from sync websocket")
     
+    # Resource installation progress handlers
+    @_socketio.on('subscribe_install', namespace='/resources')
+    def handle_subscribe_install(data):
+        """Client subscribes to installation progress for a job."""
+        job_id = data.get('job_id')
+        if job_id:
+            join_room(job_id)
+            emit('subscribed', {'job_id': job_id})
+            logger.info(f"Client subscribed to installation progress: {job_id}")
+        else:
+            emit('error', {'message': 'job_id required'})
+    
+    @_socketio.on('unsubscribe_install', namespace='/resources')
+    def handle_unsubscribe_install(data):
+        """Client unsubscribes from installation progress."""
+        job_id = data.get('job_id')
+        if job_id:
+            leave_room(job_id)
+            emit('unsubscribed', {'job_id': job_id})
+            logger.info(f"Client unsubscribed from installation progress: {job_id}")
+    
+    @_socketio.on('connect', namespace='/resources')
+    def handle_resource_connect():
+        """Client connected to resources namespace."""
+        logger.info("Client connected to resource installation websocket")
+        emit('connected', {'message': 'Connected to resource installation stream'})
+    
+    @_socketio.on('disconnect', namespace='/resources')
+    def handle_resource_disconnect():
+        """Client disconnected from resources namespace."""
+        logger.info("Client disconnected from resource installation websocket")
+    
     logger.info("Flask-SocketIO initialized")
     return _socketio
 
