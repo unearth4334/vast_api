@@ -30,7 +30,7 @@ COPY resources/ ./resources/
 COPY config.yaml ./ 
 
 # Make scripts executable
-RUN chmod +x scripts/*.sh
+RUN chmod +x scripts/*.sh scripts/entrypoint.sh
 
 # Create directory for SSH keys (will be mounted as volume)
 RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh
@@ -59,5 +59,5 @@ ENV FLASK_APP=app.sync.sync_api
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/status || exit 1
 
-# Run the application
-CMD ["python", "-m", "app.sync.sync_api"]
+# Run the application using entrypoint script
+CMD ["./scripts/entrypoint.sh"]
