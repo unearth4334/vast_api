@@ -7,6 +7,7 @@ size: 57200000000
 creator: Comfy-Org
 ecosystem: wan
 basemodel: wan2.2
+type: checkpoint
 AIR: "wan2.2_t2v_14B_fp16"
 image: wan2.2_t2v_14B_fp16.jpg
 ---
