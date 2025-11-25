@@ -33,6 +33,11 @@ class SSHHostKeyManager:
         r"WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED"
     )
     
+    # Pattern for unknown host (not in known_hosts)
+    UNKNOWN_HOST_PATTERN = re.compile(
+        r"No (\w+) host key is known for \[([^\]]+)\]:(\d+) and you have requested strict checking"
+    )
+    
     FINGERPRINT_PATTERN = re.compile(
         r"The fingerprint for the (\w+) key sent by the remote host is\s+(\S+)"
     )
@@ -70,6 +75,29 @@ class SSHHostKeyManager:
         Returns:
             HostKeyError if detected, None otherwise
         """
+        # Check for unknown host error (host not in known_hosts)
+        unknown_host_match = self.UNKNOWN_HOST_PATTERN.search(ssh_output)
+        if unknown_host_match:
+            logger.warning("Detected unknown SSH host (not in known_hosts)")
+            key_type = unknown_host_match.group(1)
+            host = unknown_host_match.group(2)
+            port = int(unknown_host_match.group(3))
+            
+            from datetime import datetime
+            error = HostKeyError(
+                host=host,
+                port=port,
+                known_hosts_file=self.known_hosts_path,
+                line_number=0,
+                new_fingerprint=f"{key_type} key (unknown)",
+                error_message=ssh_output,
+                detected_at=datetime.now().isoformat()
+            )
+            
+            logger.info(f"Unknown host detected: {host}:{port}")
+            return error
+        
+        # Check for host key changed error
         if not self.HOST_KEY_ERROR_PATTERN.search(ssh_output):
             return None
         
