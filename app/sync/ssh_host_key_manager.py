@@ -3,6 +3,8 @@ SSH Host Key Manager
 Detects and resolves SSH host identification errors
 """
 
+import base64
+import hashlib
 import os
 import re
 import subprocess
@@ -273,8 +275,10 @@ class SSHHostKeyManager:
                     line = line.strip()
                     if not line or line.startswith('#'):
                         continue
-                    # Check if the host_spec appears in the line
-                    if host_spec in line:
+                    # Check if the line starts with the exact host_spec
+                    # known_hosts format: hostname/IP key-type key [comment]
+                    # For non-standard ports: [hostname]:port key-type key [comment]
+                    if line.startswith(host_spec + ' '):
                         logger.debug(f"Found host key for {host_spec} in known_hosts")
                         return True
             
@@ -285,7 +289,7 @@ class SSHHostKeyManager:
             logger.error(f"Error checking host key verification: {str(e)}")
             return False
     
-    def _get_key_fingerprint(self, key: str) -> str:
+    def get_key_fingerprint(self, key: str) -> str:
         """
         Get SHA256 fingerprint for an SSH public key
         
@@ -295,9 +299,6 @@ class SSHHostKeyManager:
         Returns:
             SHA256 fingerprint string
         """
-        import base64
-        import hashlib
-        
         try:
             # Decode the base64 key
             key_bytes = base64.b64decode(key)

@@ -2432,7 +2432,7 @@ def get_open_button_token(instance_id):
                             if len(parts) >= 3:
                                 key_type = parts[1]
                                 key = parts[2]
-                                fingerprint = host_key_manager._get_key_fingerprint(key)
+                                fingerprint = host_key_manager.get_key_fingerprint(key)
                                 
                                 return jsonify({
                                     'success': False,

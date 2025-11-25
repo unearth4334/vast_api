@@ -332,13 +332,33 @@ SHA256:TestFingerprint123.
         finally:
             os.unlink(temp_path)
     
+    def test_is_host_key_verified_no_false_positive(self):
+        """Test that partial host matches don't cause false positives"""
+        import tempfile
+        import os
+        
+        # Create a temporary known_hosts file with a similar but different host
+        # This tests that [10.0.78.10]:22 doesn't match when looking for [10.0.78.1]:22
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_known_hosts', delete=False) as f:
+            f.write("[10.0.78.10]:22 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...\n")
+            temp_path = f.name
+        
+        try:
+            manager = SSHHostKeyManager(known_hosts_path=temp_path)
+            # Should not match [10.0.78.1]:22 when file has [10.0.78.10]:22
+            result = manager.is_host_key_verified("10.0.78.1", 22)
+            
+            self.assertFalse(result)
+        finally:
+            os.unlink(temp_path)
+    
     def test_get_key_fingerprint_valid(self):
         """Test fingerprint calculation for a valid SSH key"""
         # This is a sample ED25519 public key (base64 encoded)
         # Using a known key to test the fingerprint calculation
         sample_key = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
         
-        fingerprint = self.manager._get_key_fingerprint(sample_key)
+        fingerprint = self.manager.get_key_fingerprint(sample_key)
         
         # Should start with SHA256:
         self.assertTrue(fingerprint.startswith("SHA256:"))
@@ -349,7 +369,7 @@ SHA256:TestFingerprint123.
         """Test fingerprint calculation for an invalid key"""
         invalid_key = "not_valid_base64!!!"
         
-        fingerprint = self.manager._get_key_fingerprint(invalid_key)
+        fingerprint = self.manager.get_key_fingerprint(invalid_key)
         
         # Should return "Unknown" for invalid keys
         self.assertEqual(fingerprint, "Unknown")
