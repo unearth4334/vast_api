@@ -26,18 +26,15 @@ except Exception as e:
 
 
 def extract_commands_from_resource(resource):
-    """Extract bash commands from resource's download section"""
-    description = resource.get('description', '')
+    """Extract bash commands from resource's download_command field"""
+    # The ResourceParser already extracted the download_command
+    download_command = resource.get('download_command', '')
     
-    # Find the # Download section
-    download_match = re.search(r'#\s+Download\s*\n+```bash\s*\n(.*?)\n```', description, re.DOTALL)
-    if not download_match:
+    if not download_command:
         return []
     
-    commands_text = download_match.group(1).strip()
-    
     # Split by newlines and handle line continuations (\)
-    lines = commands_text.split('\n')
+    lines = download_command.split('\n')
     commands = []
     current_command = []
     
