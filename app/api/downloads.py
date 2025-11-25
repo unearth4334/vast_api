@@ -89,7 +89,10 @@ def add_to_queue():
     
     # Get resource details and extract commands
     all_commands = []
-    for resource_path in resource_paths:
+    for resource_obj in resource_paths:
+        # Extract filepath from resource object (can be dict or string)
+        resource_path = resource_obj.get('filepath') if isinstance(resource_obj, dict) else resource_obj
+        
         if resource_manager:
             resource = resource_manager.get_resource(resource_path)
             if resource:

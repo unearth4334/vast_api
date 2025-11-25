@@ -500,17 +500,26 @@ export class ResourceBrowser {
         installBtn.textContent = 'Installing...';
         
         try {
-            const response = await window.api.post('/resources/install', {
+            // Convert filepaths to resource objects with filepath property
+            const resources = Array.from(this.selectedResources).map(filepath => ({
+                filepath: filepath
+            }));
+            
+            const response = await window.api.post('/downloads/queue', {
                 ssh_connection: sshConnection,
-                resources: Array.from(this.selectedResources),
+                resources: resources,
                 ui_home: '/workspace/ComfyUI'
             });
             
             if (response.success) {
-                alert(`Successfully installed ${response.installed}/${response.total} resources!`);
+                alert(`Successfully queued ${resources.length} resource(s) for installation!`);
                 this.clearSelection();
+                
+                // Start polling download status
+                const instanceId = this._extractInstanceId(sshConnection);
+                if (instanceId) this.downloadStatus.setInstanceId(instanceId);
             } else {
-                alert(`Installation failed: ${response.message}`);
+                alert(`Failed to queue downloads: ${response.message}`);
             }
         } catch (error) {
             console.error('Installation error:', error);
@@ -519,10 +528,6 @@ export class ResourceBrowser {
             installBtn.disabled = false;
             installBtn.textContent = originalText;
         }
-        
-        // After install, refresh download status
-        const instanceId = this._extractInstanceId(sshConnection);
-        if (instanceId) this.downloadStatus.setInstanceId(instanceId);
     }
     
     /**
