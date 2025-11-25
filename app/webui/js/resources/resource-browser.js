@@ -5,6 +5,7 @@
  */
 
 import { createResourceCard, updateCardSelection, expandCard, collapseCard } from './resource-card.js';
+import { ResourceDownloadStatus } from '../resource-download-status.js';
 
 export class ResourceBrowser {
     constructor(containerId) {
@@ -21,6 +22,9 @@ export class ResourceBrowser {
         
         // Make globally available
         window.resourceBrowser = this;
+
+        // Download status UI
+        this.downloadStatus = new ResourceDownloadStatus('download-status-container');
     }
     
     /**
@@ -83,6 +87,13 @@ export class ResourceBrowser {
             </div>
         `;
         
+        // Add download status container to UI
+        const footer = this.container.querySelector('.resource-footer');
+        const statusDiv = document.createElement('div');
+        statusDiv.id = 'download-status-container';
+        statusDiv.className = 'download-status-container';
+        footer.parentNode.insertBefore(statusDiv, footer.nextSibling);
+        
         // Attach event listeners
         this._attachEventListeners();
         
@@ -140,6 +151,20 @@ export class ResourceBrowser {
             previewClose.addEventListener('click', () => {
                 this.closePreview();
             });
+        }
+        
+        // Set instance ID for download status polling
+        const sshInput = document.getElementById('resourcesSshConnectionString');
+        if (sshInput) {
+            sshInput.addEventListener('change', (e) => {
+                const instanceId = this._extractInstanceId(e.target.value);
+                this.downloadStatus.setInstanceId(instanceId);
+            });
+            // Set initial value if present
+            if (sshInput.value) {
+                const instanceId = this._extractInstanceId(sshInput.value);
+                this.downloadStatus.setInstanceId(instanceId);
+            }
         }
     }
     
@@ -462,7 +487,7 @@ export class ResourceBrowser {
         }
         
         // Get SSH connection string (should come from UI state)
-        const sshConnection = document.getElementById('sshConnectionString')?.value;
+        const sshConnection = document.getElementById('resourcesSshConnectionString')?.value;
         
         if (!sshConnection) {
             alert('Please provide an SSH connection string first');
@@ -494,6 +519,20 @@ export class ResourceBrowser {
             installBtn.disabled = false;
             installBtn.textContent = originalText;
         }
+        
+        // After install, refresh download status
+        const instanceId = this._extractInstanceId(sshConnection);
+        if (instanceId) this.downloadStatus.setInstanceId(instanceId);
+    }
+    
+    /**
+     * Extract instance ID from SSH connection string
+     */
+    _extractInstanceId(sshConnection) {
+        // Example: ssh -p 44686 root@109.231.106.68 -L 8080:localhost:8080
+        // Use IP as instance ID for now (or parse as needed)
+        const match = sshConnection.match(/@([\d.]+)/);
+        return match ? match[1].replace(/\./g, '') : null;
     }
     
     /**
