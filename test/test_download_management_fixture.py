@@ -21,7 +21,7 @@ import threading
 from unittest import TestCase, main as unittest_main
 from unittest.mock import patch, MagicMock, Mock
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Generator
+from typing import Dict, List, Optional, Generator, Tuple
 from pathlib import Path
 
 # Add the project root to the path
@@ -110,8 +110,10 @@ class MockDownloadProgressEmitter:
             speed = 60.9  # MB/s
             elapsed = downloaded / speed
             remaining = (total_size_mb - downloaded) / speed
+            elapsed_min, elapsed_sec = divmod(int(elapsed), 60)
+            remain_min, remain_sec = divmod(int(remaining), 60)
             
-            yield f"Model: {percent}%|{'█' * bar_filled}{'░' * bar_empty}| {downloaded:.2f}M/{total_size_mb:.2f}M [00:{elapsed:04.1f}<00:{remaining:04.1f}, {speed:.1f}MiB/s]"
+            yield f"Model: {percent}%|{'█' * bar_filled}{'░' * bar_empty}| {downloaded:.2f}M/{total_size_mb:.2f}M [{elapsed_min:02d}:{elapsed_sec:02d}<{remain_min:02d}:{remain_sec:02d}, {speed:.1f}MiB/s]"
         
         # Completion message
         yield ""
@@ -190,7 +192,7 @@ class MockSSHCommandExecutor:
         self,
         command: str,
         progress_callback: Optional[callable] = None
-    ) -> tuple[int, List[str]]:
+    ) -> Tuple[int, List[str]]:
         """
         Execute a mock command and return exit code and output.
         

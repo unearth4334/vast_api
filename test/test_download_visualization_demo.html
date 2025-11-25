@@ -396,7 +396,9 @@
 
                 // Images download
                 for (let percent = 25; percent <= 100; percent += 25) {
-                    yield `Images: ${percent}%|${'█'.repeat(percent/10)}${'░'.repeat(10-percent/10)}| ${(percent*3/100).toFixed(2)}/3.00 [00:00<00:00, 6.74iB/s]`;
+                    const filled = Math.floor(percent / 10);
+                    const empty = 10 - filled;
+                    yield `Images: ${percent}%|${'█'.repeat(filled)}${'░'.repeat(empty)}| ${(percent*3/100).toFixed(2)}/3.00 [00:00<00:00, 6.74iB/s]`;
                 }
 
                 yield `Cache of model not found.`;
@@ -408,10 +410,13 @@
                 }
 
                 // Model download with progress
+                const speed = 50.0;  // MiB/s
                 for (let i = 0; i <= 10; i++) {
                     const downloaded = (totalSizeMb * i / 10).toFixed(2);
                     const percent = i * 10;
-                    yield `Model: ${percent}%|${'█'.repeat(i)}${'░'.repeat(10-i)}| ${downloaded}M/${totalSizeMb.toFixed(2)}M [00:${(i*2).toString().padStart(2,'0')}<00:${((10-i)*2).toString().padStart(2,'0')}, 50.0MiB/s]`;
+                    const elapsed = Math.floor((downloaded / speed) * 10);
+                    const remaining = Math.floor(((totalSizeMb - downloaded) / speed) * 10);
+                    yield `Model: ${percent}%|${'█'.repeat(i)}${'░'.repeat(10-i)}| ${downloaded}M/${totalSizeMb.toFixed(2)}M [00:${elapsed.toString().padStart(2,'0')}<00:${remaining.toString().padStart(2,'0')}, ${speed.toFixed(1)}MiB/s]`;
                 }
 
                 yield '';
