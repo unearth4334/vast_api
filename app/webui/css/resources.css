@@ -557,3 +557,254 @@
         width: 100%;
     }
 }
+
+/* ==============================================
+   Download Tasklist Visualization
+   Similar to custom node installer tasklist
+   ============================================== */
+
+.download-status-container {
+    margin-top: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.download-tasklist-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 30px 20px;
+    color: #888;
+    font-size: 14px;
+}
+
+.download-tasklist-empty .empty-icon {
+    font-size: 24px;
+}
+
+.download-error {
+    padding: 20px;
+    text-align: center;
+    color: #dc3545;
+    font-size: 14px;
+}
+
+/* Download Summary Header */
+.download-summary {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.summary-item {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.summary-total {
+    background: #e0e0e0;
+    color: #555;
+}
+
+.summary-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.summary-running {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.summary-complete {
+    background: #d4edda;
+    color: #155724;
+}
+
+.summary-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Download Task List */
+.download-task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Individual Task Item */
+.download-task-item {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px 16px;
+    transition: all 0.2s ease;
+}
+
+.download-task-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Status-specific borders */
+.download-task-item.pending {
+    border-left: 3px solid #ffc107;
+}
+
+.download-task-item.running {
+    border-left: 3px solid #007bff;
+    background: #f8fbff;
+}
+
+.download-task-item.complete {
+    border-left: 3px solid #28a745;
+}
+
+.download-task-item.failed {
+    border-left: 3px solid #dc3545;
+    background: #fff8f8;
+}
+
+/* Task Main Row (icon, name, status tag) */
+.task-main-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.task-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    width: 24px;
+    text-align: center;
+}
+
+.task-name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Status Tags on the right */
+.task-status-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+}
+
+.task-status-tag.pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.task-status-tag.running {
+    background: #cce5ff;
+    color: #004085;
+    animation: pulse 1.5s infinite;
+}
+
+.task-status-tag.complete {
+    background: #d4edda;
+    color: #155724;
+}
+
+.task-status-tag.failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Task Progress Bar */
+.task-progress-bar {
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.task-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+/* Running task: animated progress bar */
+.download-task-item.running .task-progress-fill {
+    animation: progressShimmer 1.5s infinite;
+    background: linear-gradient(90deg, #007bff, #66b0ff, #007bff);
+    background-size: 200% 100%;
+}
+
+@keyframes progressShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Progress Details */
+.task-progress-details {
+    font-size: 12px;
+    color: #666;
+    margin-top: 8px;
+    padding-left: 36px; /* Align with task name */
+}
+
+/* Error Message */
+.task-error-msg {
+    font-size: 12px;
+    color: #dc3545;
+    margin-top: 8px;
+    padding-left: 36px;
+    font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .download-status-container {
+        padding: 12px;
+    }
+    
+    .download-summary {
+        justify-content: center;
+    }
+    
+    .task-main-row {
+        gap: 8px;
+    }
+    
+    .task-name {
+        font-size: 13px;
+    }
+    
+    .task-status-tag {
+        font-size: 10px;
+        padding: 3px 8px;
+    }
+    
+    .task-progress-details,
+    .task-error-msg {
+        padding-left: 0;
+    }
+}
