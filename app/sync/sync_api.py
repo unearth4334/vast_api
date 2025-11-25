@@ -4422,12 +4422,6 @@ def workflow_clear():
 
 
 # Register downloads API blueprint
-try:
-    from app.api import downloads_bp
-except ImportError:
-    from ..api import downloads_bp
-app.register_blueprint(downloads_bp)
-
 if __name__ == '__main__':
     # Initialize log directories
     try:
