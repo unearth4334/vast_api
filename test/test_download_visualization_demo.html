@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Management Test Fixture - Visualization Demo</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --accent: #e94560;
+            --success: #4ade80;
+            --warning: #facc15;
+            --error: #f87171;
+            --pending: #60a5fa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--accent);
+            margin-bottom: 30px;
+        }
+
+        .demo-section {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .demo-section h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--bg-card);
+            padding-bottom: 10px;
+        }
+
+        /* Download Status Container Styles */
+        .download-status-container {
+            padding: 15px;
+        }
+
+        .download-job {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--pending);
+            transition: all 0.3s ease;
+        }
+
+        .download-job.pending {
+            border-left-color: var(--pending);
+        }
+
+        .download-job.running {
+            border-left-color: var(--warning);
+            animation: pulse 2s infinite;
+        }
+
+        .download-job.complete {
+            border-left-color: var(--success);
+        }
+
+        .download-job.failed {
+            border-left-color: var(--error);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .job-id {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .job-status {
+            font-weight: bold;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+
+        .job-status.pending {
+            background: rgba(96, 165, 250, 0.2);
+            color: var(--pending);
+        }
+
+        .job-status.running {
+            background: rgba(250, 204, 21, 0.2);
+            color: var(--warning);
+        }
+
+        .job-status.complete {
+            background: rgba(74, 222, 128, 0.2);
+            color: var(--success);
+        }
+
+        .job-status.failed {
+            background: rgba(248, 113, 113, 0.2);
+            color: var(--error);
+        }
+
+        .job-commands {
+            margin: 10px 0;
+            font-size: 0.85rem;
+        }
+
+        .job-commands code {
+            display: block;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-top: 5px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8rem;
+            color: #a8dadc;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #f39c12);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .no-downloads {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 30px;
+            font-style: italic;
+        }
+
+        .error {
+            text-align: center;
+            color: var(--error);
+            padding: 20px;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-primary);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: black;
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        /* Instance Selector */
+        .instance-selector {
+            margin-bottom: 20px;
+        }
+
+        .instance-selector select {
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid var(--bg-card);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 1rem;
+            cursor: pointer;
+            min-width: 200px;
+        }
+
+        /* Console Output */
+        .console {
+            background: #000;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8rem;
+            max-height: 300px;
+            overflow-y: auto;
+            color: #4ade80;
+        }
+
+        .console .log-line {
+            margin: 2px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .console .log-line.error {
+            color: var(--error);
+        }
+
+        .console .log-line.info {
+            color: var(--pending);
+        }
+
+        .console .log-line.progress {
+            color: var(--warning);
+        }
+
+        /* Test Results */
+        .test-results {
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .test-pass {
+            color: var(--success);
+        }
+
+        .test-fail {
+            color: var(--error);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📥 Download Management Test Fixture</h1>
+
+        <div class="demo-section">
+            <h2>Instance Selector</h2>
+            <div class="instance-selector">
+                <select id="instanceSelect" onchange="selectInstance()">
+                    <option value="">-- Select Instance --</option>
+                    <option value="instance_123">Instance 123 (192.168.1.100)</option>
+                    <option value="instance_456">Instance 456 (10.0.0.50)</option>
+                    <option value="test_instance">Test Instance (Mock)</option>
+                </select>
+            </div>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="addMockJob()">➕ Add Mock Job</button>
+                <button class="btn btn-secondary" onclick="startSimulation()">▶️ Start Simulation</button>
+                <button class="btn btn-secondary" onclick="clearJobs()">🗑️ Clear All</button>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📥 Download Queue & Progress</h2>
+            <div id="downloadStatus" class="download-status-container">
+                <div class="no-downloads">No downloads queued for this instance.</div>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📟 Mock Console Output</h2>
+            <div id="console" class="console">
+                <div class="log-line info">Console ready. Start a simulation to see progress output...</div>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🧪 Test Fixture Status</h2>
+            <div id="testResults" class="test-results">
+                <p>Click buttons to interact with the mock download management system.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock Download Management Test Fixture (JavaScript Implementation)
+        
+        class MockDownloadQueue {
+            constructor() {
+                this.jobs = [];
+                this.selectedInstance = null;
+            }
+
+            addJob(instanceId, sshConnection, commands, resourcePaths = []) {
+                const job = {
+                    id: this.generateUUID(),
+                    instance_id: instanceId,
+                    ssh_connection: sshConnection,
+                    resource_paths: resourcePaths,
+                    commands: commands,
+                    added_at: new Date().toISOString(),
+                    status: 'PENDING',
+                    progress: {}
+                };
+                this.jobs.push(job);
+                return job;
+            }
+
+            updateJobStatus(jobId, status, progress = null, error = null) {
+                const job = this.jobs.find(j => j.id === jobId);
+                if (job) {
+                    job.status = status;
+                    if (progress) job.progress = progress;
+                    if (error) job.error = error;
+                }
+            }
+
+            getJobsForInstance(instanceId) {
+                return this.jobs.filter(j => j.instance_id === instanceId);
+            }
+
+            clearAll() {
+                this.jobs = [];
+            }
+
+            generateUUID() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    const r = Math.random() * 16 | 0;
+                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+        }
+
+        class MockProgressEmitter {
+            static *generateCivitdlProgress(modelName, totalSizeMb = 100, simulateFailure = false) {
+                yield `Now downloading "${modelName}"...`;
+                yield `                - Model ID: ${Math.floor(Math.random() * 1000000)}`;
+                yield `                - Version ID: ${Math.floor(Math.random() * 1000000)}`;
+                yield '';
+
+                // Images download
+                for (let percent = 25; percent <= 100; percent += 25) {
+                    yield `Images: ${percent}%|${'█'.repeat(percent/10)}${'░'.repeat(10-percent/10)}| ${(percent*3/100).toFixed(2)}/3.00 [00:00<00:00, 6.74iB/s]`;
+                }
+
+                yield `Cache of model not found.`;
+
+                if (simulateFailure) {
+                    yield 'Error: Connection timeout while downloading model';
+                    yield `Download failed for "${modelName}"`;
+                    return;
+                }
+
+                // Model download with progress
+                for (let i = 0; i <= 10; i++) {
+                    const downloaded = (totalSizeMb * i / 10).toFixed(2);
+                    const percent = i * 10;
+                    yield `Model: ${percent}%|${'█'.repeat(i)}${'░'.repeat(10-i)}| ${downloaded}M/${totalSizeMb.toFixed(2)}M [00:${(i*2).toString().padStart(2,'0')}<00:${((10-i)*2).toString().padStart(2,'0')}, 50.0MiB/s]`;
+                }
+
+                yield '';
+                yield `Download completed for "${modelName}"`;
+            }
+
+            static *generateWgetProgress(filename, totalSizeMb = 50, simulateFailure = false) {
+                yield `--2024-11-25 12:00:00--  https://example.com/${filename}`;
+                yield 'Resolving example.com... 93.184.216.34';
+                yield 'Connecting to example.com|93.184.216.34|:443... connected.';
+                yield 'HTTP request sent, awaiting response... 200 OK';
+                yield `Length: ${Math.floor(totalSizeMb * 1024 * 1024)} (${totalSizeMb}M) [application/octet-stream]`;
+                yield `Saving to: '${filename}'`;
+                yield '';
+
+                if (simulateFailure) {
+                    yield 'Read error at byte 0 (Connection reset by peer).';
+                    yield 'Retrying.';
+                    yield '';
+                    yield 'Connection failed.';
+                    return;
+                }
+
+                for (let i = 0; i <= 5; i++) {
+                    const downloaded = (totalSizeMb * i / 5).toFixed(2);
+                    const percent = i * 20;
+                    const eta = (5 - i) * 2;
+                    yield `${filename}           ${percent}%[${'='.repeat(i*10)}>${'.'.repeat(50-i*10)}] ${downloaded}M  45.3MB/s  eta ${eta}s`;
+                }
+
+                yield '';
+                yield `'${filename}' saved [${Math.floor(totalSizeMb * 1024 * 1024)}/${Math.floor(totalSizeMb * 1024 * 1024)}]`;
+            }
+        }
+
+        // Global state
+        const queue = new MockDownloadQueue();
+        let simulationInterval = null;
+
+        // UI Functions
+        function selectInstance() {
+            const select = document.getElementById('instanceSelect');
+            queue.selectedInstance = select.value;
+            renderDownloadStatus();
+        }
+
+        function addMockJob() {
+            if (!queue.selectedInstance) {
+                alert('Please select an instance first');
+                return;
+            }
+
+            const modelNames = ['Detail Enhancer LoRA', 'Anime Style LoRA', 'Realism LoRA', 'Test Checkpoint'];
+            const modelName = modelNames[Math.floor(Math.random() * modelNames.length)];
+            
+            const commands = [
+                `civitdl "https://civitai.com/models/${Math.floor(Math.random() * 1000000)}" "$UI_HOME/models/loras"`
+            ];
+
+            const job = queue.addJob(
+                queue.selectedInstance,
+                `ssh -p 44686 root@192.168.1.100 -L 8080:localhost:8080`,
+                commands,
+                [`loras/${modelName.toLowerCase().replace(/\s+/g, '_')}.md`]
+            );
+
+            logToConsole(`Added job ${job.id.slice(0, 8)} for ${modelName}`, 'info');
+            renderDownloadStatus();
+        }
+
+        function clearJobs() {
+            queue.clearAll();
+            logToConsole('Cleared all jobs', 'info');
+            renderDownloadStatus();
+        }
+
+        function startSimulation() {
+            const jobs = queue.getJobsForInstance(queue.selectedInstance);
+            const pendingJobs = jobs.filter(j => j.status === 'PENDING');
+            
+            if (pendingJobs.length === 0) {
+                logToConsole('No pending jobs to simulate', 'error');
+                return;
+            }
+
+            const job = pendingJobs[0];
+            simulateJobExecution(job);
+        }
+
+        async function simulateJobExecution(job) {
+            logToConsole(`Starting execution of job ${job.id.slice(0, 8)}`, 'info');
+            queue.updateJobStatus(job.id, 'RUNNING', { percent: 0 });
+            renderDownloadStatus();
+
+            // Determine if civitdl or wget
+            const isCivitdl = job.commands[0].includes('civitdl');
+            const simulateFailure = Math.random() < 0.2; // 20% chance of failure
+
+            const progressGenerator = isCivitdl
+                ? MockProgressEmitter.generateCivitdlProgress('Test Model', 50, simulateFailure)
+                : MockProgressEmitter.generateWgetProgress('model.safetensors', 50, simulateFailure);
+
+            let percent = 0;
+            for (const line of progressGenerator) {
+                await sleep(100); // Simulate delay between lines
+                
+                // Parse progress
+                if (line.includes('Model:') || line.includes('%[')) {
+                    const match = line.match(/(\d+)%/);
+                    if (match) {
+                        percent = parseInt(match[1]);
+                        queue.updateJobStatus(job.id, 'RUNNING', { percent, speed: '50.0MiB/s' });
+                        renderDownloadStatus();
+                    }
+                    logToConsole(line, 'progress');
+                } else if (line.includes('failed') || line.includes('Error')) {
+                    logToConsole(line, 'error');
+                } else {
+                    logToConsole(line);
+                }
+            }
+
+            // Final status
+            if (simulateFailure) {
+                queue.updateJobStatus(job.id, 'FAILED', null, 'Connection timeout');
+                logToConsole(`Job ${job.id.slice(0, 8)} FAILED`, 'error');
+            } else {
+                queue.updateJobStatus(job.id, 'COMPLETE', { percent: 100 });
+                logToConsole(`Job ${job.id.slice(0, 8)} COMPLETE`, 'info');
+            }
+            renderDownloadStatus();
+        }
+
+        function renderDownloadStatus() {
+            const container = document.getElementById('downloadStatus');
+            const jobs = queue.getJobsForInstance(queue.selectedInstance);
+
+            if (!queue.selectedInstance || jobs.length === 0) {
+                container.innerHTML = '<div class="no-downloads">No downloads queued for this instance.</div>';
+                return;
+            }
+
+            container.innerHTML = jobs.map(job => renderJob(job)).join('');
+        }
+
+        function renderJob(job) {
+            let progressBar = '';
+            if (job.status === 'RUNNING' && job.progress && typeof job.progress.percent === 'number') {
+                progressBar = `
+                    <div class="progress-bar">
+                        <div class="progress" style="width: ${job.progress.percent}%;"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span>${job.progress.percent}% complete</span>
+                        <span>${job.progress.speed || ''}</span>
+                    </div>
+                `;
+            }
+
+            let statusText = job.status;
+            if (job.status === 'RUNNING' && job.progress && job.progress.speed) {
+                statusText += ` (${job.progress.percent || 0}% @ ${job.progress.speed})`;
+            }
+            if (job.status === 'FAILED' && job.error) {
+                statusText += `: ${job.error}`;
+            }
+
+            const commands = job.commands || [];
+            const commandsHtml = commands.length > 0
+                ? commands.map(cmd => `<code>${escapeHtml(cmd)}</code>`).join('')
+                : '<em>No commands</em>';
+
+            return `
+                <div class="download-job ${job.status.toLowerCase()}">
+                    <div class="job-header">
+                        <span class="job-id">Job: ${job.id.slice(0, 8)}</span>
+                        <span class="job-status ${job.status.toLowerCase()}">${statusText}</span>
+                    </div>
+                    <div class="job-commands">
+                        ${commandsHtml}
+                    </div>
+                    ${progressBar}
+                </div>
+            `;
+        }
+
+        function logToConsole(message, type = '') {
+            const console = document.getElementById('console');
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = message;
+            console.appendChild(line);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            logToConsole('Download Management Test Fixture loaded', 'info');
+            logToConsole('Select an instance and add mock jobs to test the UI', 'info');
+        });
+    </script>
+</body>
+</html>
