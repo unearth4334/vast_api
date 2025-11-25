@@ -1213,11 +1213,19 @@ export async function fetchOpenButtonToken(instanceId, sshConnection) {
         if (userAccepted) {
           // User accepted - add host key to known_hosts
           showSetupResult('Adding host key to known_hosts...', 'info');
-          const api = (await import('../api.js')).api;
-          const addKeyData = await api.post('/ssh/verify-host', {
-            ssh_connection: sshConnection,
-            accept: true
+          
+          const response = await fetch('/ssh/verify-host', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              ssh_connection: sshConnection,
+              accept: true
+            })
           });
+          
+          const addKeyData = await response.json();
           
           if (addKeyData.success) {
             showSetupResult('Host key added. Retrying token fetch...', 'info');
