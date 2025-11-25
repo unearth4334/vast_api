@@ -13,8 +13,12 @@ bp = Blueprint('downloads', __name__, url_prefix='/downloads')
 
 # Paths to queue and status files
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-QUEUE_PATH = BASE_DIR / 'downloads' / 'download_queue.json'
-STATUS_PATH = BASE_DIR / 'downloads' / 'download_status.json'
+DOWNLOADS_DIR = BASE_DIR / 'downloads'
+QUEUE_PATH = DOWNLOADS_DIR / 'download_queue.json'
+STATUS_PATH = DOWNLOADS_DIR / 'download_status.json'
+
+# Ensure downloads directory exists
+DOWNLOADS_DIR.mkdir(exist_ok=True)
 
 # Import resource manager to read resource files
 try:

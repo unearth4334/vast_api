@@ -45,6 +45,9 @@ RUN mkdir -p /app/logs/vastai/api \
     && mkdir -p /app/logs/sync/progress \
     && mkdir -p /app/logs/app
 
+# Create downloads directory for queue and status files
+RUN mkdir -p /app/downloads
+
 # Expose port
 EXPOSE 5000
 
