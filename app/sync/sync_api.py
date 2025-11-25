@@ -51,6 +51,13 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# Register downloads API blueprint
+try:
+    from app.api import downloads_bp
+except ImportError:
+    from ..api import downloads_bp
+app.register_blueprint(downloads_bp)
+
 # Cache for VastAI status to prevent excessive API calls from health checks
 _vastai_status_cache = {
     'data': None,
@@ -661,7 +668,7 @@ def ssh_verify_host():
                 })
             
             # Add the host keys to known_hosts
-            # Format: [host]:port key-type key-data
+            # Format: [host]:port key-type key
             with open(known_hosts_file, 'a') as f:
                 for host_key in host_keys:
                     # Reformat to include port in brackets
@@ -2515,8 +2522,9 @@ def setup_civitdl():
         # Add API key configuration if available
         if civitdl_api_key:
             setup_commands.extend([
+                'echo "Configuring CivitDL API key..."',
                 f'echo "{civitdl_api_key}" | /venv/main/bin/civitconfig default --api-key',
-                'echo "CivitDL API key configured successfully"'
+                'echo "API key configured successfully"'
             ])
         else:
             setup_commands.append('echo "Warning: No CivitDL API key found in api_key.txt"')
@@ -3993,12 +4001,16 @@ def resources_install():
         resources = []
         for path in resource_paths:
             resource = resource_manager.get_resource(path)
-            if not resource:
-                return jsonify({
-                    'success': False,
-                    'message': f'Resource not found: {path}'
-                }), 404
-            resources.append(resource)
+            if resource:
+                resources.append(resource)
+            else:
+                logger.warning(f"Resource not found: {path}")
+        
+        if not resources:
+            return jsonify({
+                'success': False,
+                'message': 'No valid resources found'
+            }, 404)
         
         # Install
         logger.info(f"Installing {len(resources)} resources to {ssh_host}:{ssh_port}")
@@ -4183,7 +4195,7 @@ def resources_install():
             return jsonify({
                 'success': False,
                 'message': 'No valid resources found'
-            }), 404
+            }, 404)
         
         # Create progress callback for WebSocket streaming
         def progress_callback(progress_data):
@@ -4428,6 +4440,7 @@ def workflow_state():
             return jsonify({
                 'success': False,
                 'message': 'No workflow state found'
+
             })
         
         # If workflow_id specified, check if it matches
@@ -4530,6 +4543,13 @@ def workflow_clear():
             'message': f'Error clearing workflow state: {str(e)}'
         })
 
+
+# Register downloads API blueprint
+try:
+    from app.api import downloads_bp
+except ImportError:
+    from ..api import downloads_bp
+app.register_blueprint(downloads_bp)
 
 if __name__ == '__main__':
     # Initialize log directories
