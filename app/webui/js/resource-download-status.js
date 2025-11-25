@@ -20,16 +20,19 @@ export class ResourceDownloadStatus {
     }
 
     async pollStatus() {
-        if (!this.instanceId) return;
+        if (!this.instanceId || !this.container) return;
         try {
             const jobs = await window.api.get(`/downloads/status?instance_id=${this.instanceId}`);
             this.render(jobs);
         } catch (e) {
-            this.container.innerHTML = '<div class="error">Failed to load download status</div>';
+            if (this.container) {
+                this.container.innerHTML = '<div class="error">Failed to load download status</div>';
+            }
         }
     }
 
     render(jobs) {
+        if (!this.container) return;
         if (!jobs || jobs.length === 0) {
             this.container.innerHTML = '<div class="no-downloads">No downloads queued for this instance.</div>';
             return;
