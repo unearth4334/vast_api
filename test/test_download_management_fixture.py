@@ -410,13 +410,15 @@ class TestProgressParsers(TestCase):
         result = CivitdlProgressParser.parse_line(line)
         self.assertIsNone(result)
     
-    def test_wget_parser_placeholder(self):
-        """Test wget parser (placeholder implementation)."""
-        # Current implementation returns None - test documents expected behavior
+    def test_wget_parser_progress(self):
+        """Test wget parser with progress output."""
+        # Wget parser now returns parsed progress
         line = "model.safetensors   50%[====>        ] 50.0M  45.3MB/s  eta 5s"
         result = WgetProgressParser.parse_line(line)
-        # Currently returns None as it's a placeholder
-        self.assertIsNone(result)
+        # Now properly parses wget progress lines
+        self.assertIsNotNone(result)
+        self.assertEqual(result['type'], 'progress')
+        self.assertEqual(result['percent'], 50)
 
 
 class TestMockCloudInstance(TestCase):

@@ -31,9 +31,75 @@ class CivitdlProgressParser:
             }
         return None
 
+
 class WgetProgressParser:
-    # TODO: Implement wget progress parsing
-    @staticmethod
-    def parse_line(line: str) -> Optional[Dict]:
-        # Placeholder: parse wget output for progress
+    """
+    Parser for wget download progress output.
+    
+    Wget outputs progress in formats like:
+    - filename           50%[====>        ] 50.0M  45.3MB/s  eta 5s
+    - 'filename' saved [104857600/104857600]
+    - Resolving host... IP
+    - Connecting to host|IP|:443... connected.
+    """
+    
+    # Progress bar pattern: filename  percent[bar] size speed eta
+    # Made more flexible with \s+ and optional B suffix
+    PROGRESS_PATTERN = re.compile(
+        r'(\S+)\s+(\d+)%\[[=\s>\.]*\]\s*([\d.]+[KMGT]?B?)\s+([\d.]+[KMGT]?B/s)\s+eta\s+(\d+s?)'
+    )
+    
+    # File saved pattern: 'filename' saved [size/size]
+    SAVED_PATTERN = re.compile(r"'([^']+)'\s+saved\s+\[(\d+)/(\d+)\]")
+    
+    # HTTP response pattern
+    HTTP_RESPONSE = re.compile(r'HTTP request sent, awaiting response\.\.\.\s+(\d+)\s+(.+)')
+    
+    # Connection pattern
+    CONNECTING = re.compile(r'Connecting to\s+(.+)\.\.\.\s+connected')
+    
+    @classmethod
+    def parse_line(cls, line: str) -> Optional[Dict]:
+        """Parse a line of wget output"""
+        
+        # Check for progress bar
+        match = cls.PROGRESS_PATTERN.search(line)
+        if match:
+            return {
+                'type': 'progress',
+                'stage': 'download',
+                'filename': match.group(1),
+                'percent': int(match.group(2)),
+                'downloaded': match.group(3),
+                'speed': match.group(4),
+                'eta': match.group(5)
+            }
+        
+        # Check for file saved (completion)
+        match = cls.SAVED_PATTERN.search(line)
+        if match:
+            return {
+                'type': 'stage_complete',
+                'filename': match.group(1),
+                'size': int(match.group(2)),
+                'percent': 100
+            }
+        
+        # Check for HTTP response
+        match = cls.HTTP_RESPONSE.search(line)
+        if match:
+            return {
+                'type': 'http_response',
+                'status_code': int(match.group(1)),
+                'status_text': match.group(2)
+            }
+        
+        # Check for connection established
+        match = cls.CONNECTING.search(line)
+        if match:
+            return {
+                'type': 'connecting',
+                'host': match.group(1)
+            }
+        
         return None

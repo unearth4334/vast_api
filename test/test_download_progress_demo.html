@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Progress Visualization Test</title>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --text-primary: #333;
+            --text-secondary: #666;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #007bff;
+            margin-bottom: 30px;
+        }
+
+        .demo-section {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .demo-section h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #ccc;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        /* Download Status Container - Copy from resources.css */
+        .download-status-container {
+            margin-top: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .download-tasklist-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 30px 20px;
+            color: #888;
+            font-size: 14px;
+        }
+
+        .download-tasklist-empty .empty-icon {
+            font-size: 24px;
+        }
+
+        .download-error {
+            padding: 20px;
+            text-align: center;
+            color: #dc3545;
+            font-size: 14px;
+        }
+
+        /* Download Summary Header */
+        .download-summary {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .summary-item {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .summary-total { background: #e0e0e0; color: #555; }
+        .summary-pending { background: #fff3cd; color: #856404; }
+        .summary-running { background: #cce5ff; color: #004085; }
+        .summary-complete { background: #d4edda; color: #155724; }
+        .summary-failed { background: #f8d7da; color: #721c24; }
+
+        /* Download Task List */
+        .download-task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Individual Task Item */
+        .download-task-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 12px 16px;
+            transition: all 0.2s ease;
+        }
+
+        .download-task-item:hover {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .download-task-item.pending { border-left: 3px solid #ffc107; }
+        .download-task-item.running { border-left: 3px solid #007bff; background: #f8fbff; }
+        .download-task-item.complete { border-left: 3px solid #28a745; }
+        .download-task-item.failed { border-left: 3px solid #dc3545; background: #fff8f8; }
+
+        .task-main-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .task-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            width: 24px;
+            text-align: center;
+        }
+
+        .task-name {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .task-status-tag {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
+        }
+
+        .task-status-tag.pending { background: #fff3cd; color: #856404; }
+        .task-status-tag.running { background: #cce5ff; color: #004085; animation: pulse 1.5s infinite; }
+        .task-status-tag.complete { background: #d4edda; color: #155724; }
+        .task-status-tag.failed { background: #f8d7da; color: #721c24; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Progress bar */
+        .task-progress-bar {
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .task-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .download-task-item.running .task-progress-fill {
+            animation: progressShimmer 1.5s infinite;
+            background: linear-gradient(90deg, #007bff, #66b0ff, #007bff);
+            background-size: 200% 100%;
+        }
+
+        @keyframes progressShimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .task-progress-details {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            padding-left: 36px;
+        }
+
+        .task-error-msg {
+            font-size: 12px;
+            color: #dc3545;
+            margin-top: 8px;
+            padding-left: 36px;
+            font-style: italic;
+        }
+
+        /* Log Area */
+        .log-area {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📥 Download Progress Visualization Test</h1>
+
+        <div class="demo-section">
+            <h2>Controls</h2>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="addPendingJob()">➕ Add Pending Job</button>
+                <button class="btn btn-primary" onclick="addRunningJob()">⬇️ Add Running Job</button>
+                <button class="btn btn-success" onclick="addCompleteJob()">✅ Add Complete Job</button>
+                <button class="btn btn-danger" onclick="addFailedJob()">❌ Add Failed Job</button>
+                <button class="btn btn-secondary" onclick="simulateDownload()">▶️ Simulate Download</button>
+                <button class="btn btn-secondary" onclick="clearAllJobs()">🗑️ Clear All</button>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📥 Download Queue & Progress (Tasklist View)</h2>
+            <div id="download-status-container" class="download-status-container">
+                <div class="download-tasklist-empty">
+                    <span class="empty-icon">📭</span>
+                    <span class="empty-text">No downloads queued. Use the controls above to add jobs.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📋 Status Log</h2>
+            <div id="log-area" class="log-area">Ready. Click buttons to test download visualization...</div>
+        </div>
+    </div>
+
+    <script>
+        // Mock download status data
+        let jobs = [];
+        let jobIdCounter = 1;
+        let simulationInterval = null;
+
+        function generateJobId() {
+            const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+            return uuid;
+        }
+
+        function log(message) {
+            const logArea = document.getElementById('log-area');
+            const timestamp = new Date().toLocaleTimeString();
+            logArea.textContent = `[${timestamp}] ${message}\n` + logArea.textContent;
+        }
+
+        function addPendingJob() {
+            const job = {
+                id: generateJobId(),
+                instance_id: 'test_instance',
+                added_at: new Date().toISOString(),
+                status: 'PENDING',
+                progress: {},
+                resource_paths: [`loras/pending_model_${jobIdCounter++}.md`],
+                commands: [`civitdl "https://civitai.com/models/${Math.floor(Math.random() * 1000000)}" "$UI_HOME/models/loras"`]
+            };
+            jobs.push(job);
+            log(`Added PENDING job: ${job.id.slice(0, 8)}`);
+            render();
+        }
+
+        function addRunningJob() {
+            const job = {
+                id: generateJobId(),
+                instance_id: 'test_instance',
+                added_at: new Date().toISOString(),
+                status: 'RUNNING',
+                progress: { percent: 45, speed: '45.3MiB/s', stage: 'model', name: 'Test Model Download' },
+                resource_paths: [`loras/running_model_${jobIdCounter++}.md`],
+                commands: [`civitdl "https://civitai.com/models/${Math.floor(Math.random() * 1000000)}" "$UI_HOME/models/loras"`]
+            };
+            jobs.push(job);
+            log(`Added RUNNING job: ${job.id.slice(0, 8)} at ${job.progress.percent}%`);
+            render();
+        }
+
+        function addCompleteJob() {
+            const job = {
+                id: generateJobId(),
+                instance_id: 'test_instance',
+                added_at: new Date().toISOString(),
+                status: 'COMPLETE',
+                progress: { percent: 100 },
+                resource_paths: [`loras/complete_model_${jobIdCounter++}.md`],
+                commands: [`civitdl "https://civitai.com/models/${Math.floor(Math.random() * 1000000)}" "$UI_HOME/models/loras"`]
+            };
+            jobs.push(job);
+            log(`Added COMPLETE job: ${job.id.slice(0, 8)}`);
+            render();
+        }
+
+        function addFailedJob() {
+            const job = {
+                id: generateJobId(),
+                instance_id: 'test_instance',
+                added_at: new Date().toISOString(),
+                status: 'FAILED',
+                progress: { percent: 60 },
+                error: 'Connection timeout while downloading model',
+                resource_paths: [`loras/failed_model_${jobIdCounter++}.md`],
+                commands: [`civitdl "https://civitai.com/models/${Math.floor(Math.random() * 1000000)}" "$UI_HOME/models/loras"`]
+            };
+            jobs.push(job);
+            log(`Added FAILED job: ${job.id.slice(0, 8)} - ${job.error}`);
+            render();
+        }
+
+        function simulateDownload() {
+            // Find a pending job or create one
+            let job = jobs.find(j => j.status === 'PENDING');
+            if (!job) {
+                addPendingJob();
+                job = jobs[jobs.length - 1];
+            }
+
+            log(`Starting download simulation for job ${job.id.slice(0, 8)}`);
+
+            job.status = 'RUNNING';
+            job.progress = { percent: 0, speed: '0 MiB/s', stage: 'starting', name: 'Initializing...' };
+            render();
+
+            let percent = 0;
+            const updateInterval = setInterval(() => {
+                percent += 10;
+                
+                if (percent >= 100) {
+                    clearInterval(updateInterval);
+                    job.status = 'COMPLETE';
+                    job.progress = { percent: 100 };
+                    log(`Download complete for job ${job.id.slice(0, 8)}`);
+                    render();
+                    return;
+                }
+
+                job.progress = {
+                    percent: percent,
+                    speed: `${(45 + Math.random() * 10).toFixed(1)} MiB/s`,
+                    stage: 'model',
+                    name: 'Test Model Download'
+                };
+                log(`Progress update: ${job.id.slice(0, 8)} - ${percent}%`);
+                render();
+            }, 2000); // Update every 2 seconds
+        }
+
+        function clearAllJobs() {
+            jobs = [];
+            jobIdCounter = 1;
+            log('Cleared all jobs');
+            render();
+        }
+
+        function render() {
+            const container = document.getElementById('download-status-container');
+            
+            if (jobs.length === 0) {
+                container.innerHTML = `
+                    <div class="download-tasklist-empty">
+                        <span class="empty-icon">📭</span>
+                        <span class="empty-text">No downloads queued. Use the controls above to add jobs.</span>
+                    </div>`;
+                return;
+            }
+
+            // Group by status
+            const pending = jobs.filter(j => j.status === 'PENDING');
+            const running = jobs.filter(j => j.status === 'RUNNING');
+            const complete = jobs.filter(j => j.status === 'COMPLETE');
+            const failed = jobs.filter(j => j.status === 'FAILED');
+
+            let html = '<div class="download-tasklist">';
+            
+            // Summary header
+            html += `
+                <div class="download-summary">
+                    <span class="summary-item summary-total">${jobs.length} total</span>
+                    ${pending.length > 0 ? `<span class="summary-item summary-pending">${pending.length} queued</span>` : ''}
+                    ${running.length > 0 ? `<span class="summary-item summary-running">${running.length} in progress</span>` : ''}
+                    ${complete.length > 0 ? `<span class="summary-item summary-complete">${complete.length} complete</span>` : ''}
+                    ${failed.length > 0 ? `<span class="summary-item summary-failed">${failed.length} failed</span>` : ''}
+                </div>
+            `;
+
+            // Render each job
+            html += '<div class="download-task-list">';
+            jobs.forEach(job => {
+                html += renderTaskItem(job);
+            });
+            html += '</div></div>';
+
+            container.innerHTML = html;
+        }
+
+        function renderTaskItem(job) {
+            const statusClass = job.status.toLowerCase();
+            const statusIcon = getStatusIcon(job.status);
+            const statusTag = getStatusTag(job);
+            const resourceName = extractResourceName(job);
+
+            let progressBar = '';
+            if (job.status === 'RUNNING' && job.progress && typeof job.progress.percent === 'number') {
+                progressBar = `
+                    <div class="task-progress-bar">
+                        <div class="task-progress-fill" style="width: ${job.progress.percent}%;"></div>
+                    </div>
+                `;
+            }
+
+            let progressDetails = '';
+            if (job.status === 'RUNNING' && job.progress) {
+                const parts = [];
+                if (job.progress.percent !== undefined) parts.push(`${job.progress.percent}%`);
+                if (job.progress.speed) parts.push(job.progress.speed);
+                if (job.progress.stage) parts.push(job.progress.stage);
+                if (job.progress.name) parts.push(`"${job.progress.name}"`);
+                if (parts.length > 0) {
+                    progressDetails = `<div class="task-progress-details">${parts.join(' • ')}</div>`;
+                }
+            }
+
+            let errorMsg = '';
+            if (job.status === 'FAILED' && job.error) {
+                errorMsg = `<div class="task-error-msg">${escapeHtml(job.error)}</div>`;
+            }
+
+            return `
+                <div class="download-task-item ${statusClass}" data-job-id="${job.id}">
+                    <div class="task-main-row">
+                        <span class="task-icon">${statusIcon}</span>
+                        <span class="task-name">${escapeHtml(resourceName)}</span>
+                        <span class="task-status-tag ${statusClass}">${statusTag}</span>
+                    </div>
+                    ${progressBar}
+                    ${progressDetails}
+                    ${errorMsg}
+                </div>
+            `;
+        }
+
+        function getStatusIcon(status) {
+            switch (status) {
+                case 'PENDING': return '⏳';
+                case 'RUNNING': return '⬇️';
+                case 'COMPLETE': return '✅';
+                case 'FAILED': return '❌';
+                default: return '❓';
+            }
+        }
+
+        function getStatusTag(job) {
+            switch (job.status) {
+                case 'PENDING': return 'Queued';
+                case 'RUNNING':
+                    return job.progress && job.progress.percent !== undefined
+                        ? `${job.progress.percent}%`
+                        : 'Downloading...';
+                case 'COMPLETE': return 'Complete';
+                case 'FAILED': return 'Failed';
+                default: return job.status;
+            }
+        }
+
+        function extractResourceName(job) {
+            if (job.resource_paths && job.resource_paths.length > 0) {
+                const path = job.resource_paths[0];
+                const filepath = typeof path === 'object' ? path.filepath : path;
+                if (filepath) {
+                    const filename = filepath.split('/').pop();
+                    return filename.replace('.md', '').replace(/_/g, ' ');
+                }
+            }
+            if (job.commands && job.commands.length > 0) {
+                const cmd = job.commands[0];
+                const civitMatch = cmd.match(/civitdl\s+"([^"]+)"/i);
+                if (civitMatch) {
+                    const urlMatch = civitMatch[1].match(/models\/(\d+)/);
+                    return urlMatch ? `Civitai Model ${urlMatch[1]}` : 'Civitai Download';
+                }
+            }
+            return `Download ${job.id.slice(0, 8)}`;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        render();
+        log('Download visualization demo loaded');
+    </script>
+</body>
+</html>

@@ -1,74 +1,259 @@
 // Resource Download Status UI
 // Polls /downloads/status and renders download queue/progress for the selected instance
+// Similar to custom nodes installer tasklist visualization pattern
 
 export class ResourceDownloadStatus {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
         this.instanceId = null;
         this.pollInterval = null;
+        this.isPolling = false;
     }
 
+    /**
+     * Set the instance ID and start polling
+     */
     setInstanceId(instanceId) {
         this.instanceId = instanceId;
         this.startPolling();
     }
 
+    /**
+     * Start polling for status updates every 2 seconds
+     */
     startPolling() {
         if (this.pollInterval) clearInterval(this.pollInterval);
+        this.isPolling = true;
         this.pollInterval = setInterval(() => this.pollStatus(), 2000);
+        // Poll immediately on start
         this.pollStatus();
     }
 
+    /**
+     * Stop polling for status updates
+     */
+    stopPolling() {
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+        }
+        this.isPolling = false;
+    }
+
+    /**
+     * Poll the status endpoint for download progress
+     */
     async pollStatus() {
         if (!this.instanceId || !this.container) return;
         try {
             const jobs = await window.api.get(`/downloads/status?instance_id=${this.instanceId}`);
             this.render(jobs);
+            
+            // If no jobs are in progress, we can slow down polling
+            const hasActiveJobs = jobs && jobs.some(j => j.status === 'PENDING' || j.status === 'RUNNING');
+            if (!hasActiveJobs && this.isPolling) {
+                // Keep polling but at a slower rate when no active jobs
+                // This ensures we still catch new jobs being added
+            }
         } catch (e) {
+            console.error('Error polling download status:', e);
             if (this.container) {
-                this.container.innerHTML = '<div class="error">Failed to load download status</div>';
+                this.container.innerHTML = '<div class="download-error">Failed to load download status</div>';
             }
         }
     }
 
+    /**
+     * Render the download status list (tasklist format with status tags)
+     */
     render(jobs) {
         if (!this.container) return;
+        
         if (!jobs || jobs.length === 0) {
-            this.container.innerHTML = '<div class="no-downloads">No downloads queued for this instance.</div>';
+            this.container.innerHTML = `
+                <div class="download-tasklist-empty">
+                    <span class="empty-icon">📭</span>
+                    <span class="empty-text">No downloads queued for this instance.</span>
+                </div>`;
             return;
         }
-        this.container.innerHTML = jobs.map(job => this.renderJob(job)).join('');
-    }
 
-    renderJob(job) {
-        let progressBar = '';
-        if (job.status === 'RUNNING' && job.progress && typeof job.progress.percent === 'number') {
-            progressBar = `<div class="progress-bar"><div class="progress" style="width: ${job.progress.percent}%;"></div></div>`;
-        }
-        let statusText = job.status;
-        if (job.status === 'RUNNING' && job.progress && job.progress.speed) {
-            statusText += ` (${job.progress.percent || 0}% @ ${job.progress.speed})`;
-        }
-        if (job.status === 'FAILED' && job.error) {
-            statusText += `: ${job.error}`;
-        }
+        // Group jobs by status for summary
+        const pending = jobs.filter(j => j.status === 'PENDING');
+        const running = jobs.filter(j => j.status === 'RUNNING');
+        const complete = jobs.filter(j => j.status === 'COMPLETE');
+        const failed = jobs.filter(j => j.status === 'FAILED');
+
+        // Build the tasklist HTML
+        let html = '<div class="download-tasklist">';
         
-        const commands = job.commands || [];
-        const commandsHtml = commands.length > 0 
-            ? commands.map(cmd => `<code>${cmd}</code>`).join('<br>')
-            : '<em>No commands</em>';
-            
-        return `
-            <div class="download-job ${job.status.toLowerCase()}">
-                <div class="job-header">
-                    <span class="job-id">Job: ${job.id.slice(0,8)}</span>
-                    <span class="job-status">${statusText}</span>
-                </div>
-                <div class="job-commands">
-                    ${commandsHtml}
-                </div>
-                ${progressBar}
+        // Summary header
+        html += `
+            <div class="download-summary">
+                <span class="summary-item summary-total">${jobs.length} total</span>
+                ${pending.length > 0 ? `<span class="summary-item summary-pending">${pending.length} queued</span>` : ''}
+                ${running.length > 0 ? `<span class="summary-item summary-running">${running.length} in progress</span>` : ''}
+                ${complete.length > 0 ? `<span class="summary-item summary-complete">${complete.length} complete</span>` : ''}
+                ${failed.length > 0 ? `<span class="summary-item summary-failed">${failed.length} failed</span>` : ''}
             </div>
         `;
+
+        // Render each job as a task item
+        html += '<div class="download-task-list">';
+        jobs.forEach(job => {
+            html += this.renderTaskItem(job);
+        });
+        html += '</div>';
+        
+        html += '</div>';
+        
+        this.container.innerHTML = html;
+    }
+
+    /**
+     * Render a single download task item with status tag on the right
+     */
+    renderTaskItem(job) {
+        const statusClass = job.status.toLowerCase();
+        const statusIcon = this.getStatusIcon(job.status);
+        const statusTag = this.getStatusTag(job);
+        
+        // Extract resource name from resource_paths or commands
+        const resourceName = this.extractResourceName(job);
+        
+        // Progress bar for running jobs
+        let progressBar = '';
+        if (job.status === 'RUNNING' && job.progress && typeof job.progress.percent === 'number') {
+            const percent = job.progress.percent;
+            progressBar = `
+                <div class="task-progress-bar">
+                    <div class="task-progress-fill" style="width: ${percent}%;"></div>
+                </div>
+            `;
+        }
+        
+        // Progress details
+        let progressDetails = '';
+        if (job.status === 'RUNNING' && job.progress) {
+            const parts = [];
+            if (job.progress.percent !== undefined) {
+                parts.push(`${job.progress.percent}%`);
+            }
+            if (job.progress.speed) {
+                parts.push(job.progress.speed);
+            }
+            if (job.progress.stage) {
+                parts.push(job.progress.stage);
+            }
+            if (job.progress.name) {
+                parts.push(`"${job.progress.name}"`);
+            }
+            if (parts.length > 0) {
+                progressDetails = `<div class="task-progress-details">${parts.join(' • ')}</div>`;
+            }
+        }
+        
+        // Error message for failed jobs
+        let errorMsg = '';
+        if (job.status === 'FAILED' && job.error) {
+            errorMsg = `<div class="task-error-msg">${this.escapeHtml(job.error)}</div>`;
+        }
+
+        return `
+            <div class="download-task-item ${statusClass}" data-job-id="${job.id}">
+                <div class="task-main-row">
+                    <span class="task-icon">${statusIcon}</span>
+                    <span class="task-name">${this.escapeHtml(resourceName)}</span>
+                    <span class="task-status-tag ${statusClass}">${statusTag}</span>
+                </div>
+                ${progressBar}
+                ${progressDetails}
+                ${errorMsg}
+            </div>
+        `;
+    }
+
+    /**
+     * Get status icon based on job status
+     */
+    getStatusIcon(status) {
+        switch (status) {
+            case 'PENDING': return '⏳';
+            case 'RUNNING': return '⬇️';
+            case 'COMPLETE': return '✅';
+            case 'FAILED': return '❌';
+            default: return '❓';
+        }
+    }
+
+    /**
+     * Get status tag text and any additional info
+     */
+    getStatusTag(job) {
+        switch (job.status) {
+            case 'PENDING':
+                return 'Queued';
+            case 'RUNNING':
+                if (job.progress && job.progress.percent !== undefined) {
+                    return `${job.progress.percent}%`;
+                }
+                return 'Downloading...';
+            case 'COMPLETE':
+                return 'Complete';
+            case 'FAILED':
+                return 'Failed';
+            default:
+                return job.status;
+        }
+    }
+
+    /**
+     * Extract a human-readable resource name from job data
+     */
+    extractResourceName(job) {
+        // Try resource_paths first
+        if (job.resource_paths && job.resource_paths.length > 0) {
+            const path = job.resource_paths[0];
+            // Handle both string paths and object with filepath
+            const filepath = typeof path === 'object' ? path.filepath : path;
+            if (filepath) {
+                // Extract filename from path, e.g., "loras/my_lora.md" -> "my_lora"
+                const filename = filepath.split('/').pop();
+                return filename.replace('.md', '').replace(/_/g, ' ');
+            }
+        }
+        
+        // Try to extract from commands
+        if (job.commands && job.commands.length > 0) {
+            const cmd = job.commands[0];
+            // Try to extract model name from civitdl command
+            const civitMatch = cmd.match(/civitdl\s+"([^"]+)"/i);
+            if (civitMatch) {
+                // Extract model ID from URL
+                const urlMatch = civitMatch[1].match(/models\/(\d+)/);
+                if (urlMatch) {
+                    return `Civitai Model ${urlMatch[1]}`;
+                }
+                return 'Civitai Download';
+            }
+            // Try to extract filename from wget command
+            const wgetMatch = cmd.match(/wget.*\/([^\/\s]+\.(?:safetensors|ckpt|pt|bin))/i);
+            if (wgetMatch) {
+                return wgetMatch[1];
+            }
+        }
+        
+        // Fallback to job ID
+        return `Download ${job.id.slice(0, 8)}`;
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
