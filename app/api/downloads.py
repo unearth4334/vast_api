@@ -19,7 +19,7 @@ STATUS_PATH = BASE_DIR / 'downloads' / 'download_status.json'
 # Import resource manager to read resource files
 try:
     from ..resources import ResourceManager
-    resource_manager = ResourceManager()
+    resource_manager = ResourceManager(resources_path=BASE_DIR / 'resources')
 except Exception as e:
     print(f"Warning: Could not initialize ResourceManager: {e}")
     resource_manager = None
