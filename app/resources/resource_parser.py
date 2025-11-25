@@ -64,9 +64,9 @@ class ResourceParser:
         if missing_fields:
             raise ValueError(f"Missing required fields in {filepath}: {missing_fields}")
         
-        # Extract download command
+        # Extract download command (supports both # Download and ### Download)
         download_match = re.search(
-            r'###\s+Download\s*\n\s*```bash\n(.*?)\n```',
+            r'#{1,3}\s+Download\s*\n\s*```bash\n(.*?)\n```',
             body,
             re.DOTALL
         )
