@@ -2675,8 +2675,22 @@ def create_vastai_instance():
         
         template_hash_id = config.get('template_hash_id')
         ui_home_env = config.get('ui_home_env')
-        # Use frontend disk_size if provided, otherwise fallback to config default
-        disk_size_gb = frontend_disk_size if frontend_disk_size is not None else config.get('disk_size_gb', 32)
+        
+        # Validate and use frontend disk_size if provided, otherwise fallback to config default
+        config_disk_size = config.get('disk_size_gb', 32)
+        if frontend_disk_size is not None:
+            try:
+                disk_size_gb = int(frontend_disk_size)
+                # Validate disk size is within reasonable bounds (8-500 GB)
+                if disk_size_gb < 8:
+                    disk_size_gb = 8
+                elif disk_size_gb > 500:
+                    disk_size_gb = 500
+            except (ValueError, TypeError):
+                # If invalid, fallback to config default
+                disk_size_gb = config_disk_size
+        else:
+            disk_size_gb = config_disk_size
         
         if not template_hash_id or template_hash_id == "None":
             return jsonify({

@@ -593,7 +593,13 @@ function showDiskSizePopover(offerId, gpuName) {
   
   submitBtn.addEventListener('click', () => {
     const diskSizeInput = document.getElementById('disk-size-input');
-    const diskSize = diskSizeInput ? parseInt(diskSizeInput.value) || 32 : 32;
+    let diskSize = diskSizeInput ? parseInt(diskSizeInput.value, 10) : 32;
+    // Validate disk size is within reasonable bounds (8-500 GB)
+    if (isNaN(diskSize) || diskSize < 8) {
+      diskSize = 8;
+    } else if (diskSize > 500) {
+      diskSize = 500;
+    }
     closeDiskSizePopover();
     submitCreateInstance(offerId, gpuName, diskSize);
   });
@@ -677,7 +683,11 @@ function buildDiskSizeEditor() {
   
   // Sync slider and input
   input.addEventListener('input', () => {
-    slider.value = input.value || '32';
+    const val = parseInt(input.value, 10);
+    // Only sync if valid number, otherwise keep current slider position
+    if (!isNaN(val) && val >= 8 && val <= 500) {
+      slider.value = val;
+    }
     updateDiskSizeChipSelection(chips, input.value);
   });
   
