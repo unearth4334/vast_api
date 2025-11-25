@@ -13,26 +13,30 @@ import json
 import time
 import subprocess
 from datetime import datetime
+from pathlib import Path
 from threading import Lock, Thread
 from typing import Dict, Optional
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.utils.progress_parsers import CivitdlProgressParser, WgetProgressParser
 
-QUEUE_PATH = os.path.join(os.path.dirname(__file__), '../downloads/download_queue.json')
-STATUS_PATH = os.path.join(os.path.dirname(__file__), '../downloads/download_status.json')
+DOWNLOADS_DIR = PROJECT_ROOT / 'downloads'
+QUEUE_PATH = DOWNLOADS_DIR / 'download_queue.json'
+STATUS_PATH = DOWNLOADS_DIR / 'download_status.json'
 LOCK = Lock()
 
 POLL_INTERVAL = 2  # seconds - how often to check for new jobs
 STATUS_UPDATE_INTERVAL = 2  # seconds - how often to write status updates
 
 
-def read_json(path: str) -> list:
+def read_json(path: Path) -> list:
     """Read JSON file with locking"""
     with LOCK:
-        if not os.path.exists(path):
+        if not path.exists():
             return []
         try:
             with open(path, 'r') as f:
@@ -41,11 +45,11 @@ def read_json(path: str) -> list:
             return []
 
 
-def write_json(path: str, data: list) -> None:
+def write_json(path: Path, data: list) -> None:
     """Write JSON file with locking"""
     with LOCK:
         # Ensure directory exists
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'w') as f:
             json.dump(data, f, indent=2)
 
@@ -226,8 +230,7 @@ def main():
     print(f"Download handler started. Polling every {POLL_INTERVAL}s, status updates every {STATUS_UPDATE_INTERVAL}s")
     
     # Ensure directories exist
-    os.makedirs(os.path.dirname(QUEUE_PATH), exist_ok=True)
-    os.makedirs(os.path.dirname(STATUS_PATH), exist_ok=True)
+    DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     
     while True:
         try:

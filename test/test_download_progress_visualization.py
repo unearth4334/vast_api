@@ -10,19 +10,20 @@ and validates that:
 4. Status tags are correctly generated based on job state
 """
 
-import os
 import sys
 import json
 import time
 import uuid
 import tempfile
 import threading
+from pathlib import Path
 from unittest import TestCase, main as unittest_main
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-# Add the project root to the path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the project root to the path using pathlib
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.utils.progress_parsers import CivitdlProgressParser, WgetProgressParser
 
@@ -36,9 +37,9 @@ class DownloadProgressTestFixture:
     """
     
     def __init__(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="download_progress_test_")
-        self.queue_path = os.path.join(self.temp_dir, "download_queue.json")
-        self.status_path = os.path.join(self.temp_dir, "download_status.json")
+        self.temp_dir = Path(tempfile.mkdtemp(prefix="download_progress_test_"))
+        self.queue_path = self.temp_dir / "download_queue.json"
+        self.status_path = self.temp_dir / "download_status.json"
         
         # Initialize empty files
         self._write_json(self.queue_path, [])
@@ -47,14 +48,14 @@ class DownloadProgressTestFixture:
         # Progress update interval
         self.update_interval = 2  # seconds
     
-    def _write_json(self, path: str, data: list) -> None:
+    def _write_json(self, path: Path, data: list) -> None:
         """Write data to JSON file"""
         with open(path, 'w') as f:
             json.dump(data, f, indent=2)
     
-    def _read_json(self, path: str) -> list:
+    def _read_json(self, path: Path) -> list:
         """Read data from JSON file"""
-        if not os.path.exists(path):
+        if not path.exists():
             return []
         with open(path, 'r') as f:
             return json.load(f)
@@ -213,7 +214,7 @@ class DownloadProgressTestFixture:
     def cleanup(self) -> None:
         """Clean up temporary files"""
         import shutil
-        if os.path.exists(self.temp_dir):
+        if self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
 
 

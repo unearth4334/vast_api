@@ -44,8 +44,9 @@ class WgetProgressParser:
     """
     
     # Progress bar pattern: filename  percent[bar] size speed eta
+    # Made more flexible with \s+ and optional B suffix
     PROGRESS_PATTERN = re.compile(
-        r'(\S+)\s+(\d+)%\[[=\s>\.]*\]\s*([\d.]+[KMGT]?)\s+([\d.]+[KMGT]?B/s)\s+eta\s+(\d+s?)'
+        r'(\S+)\s+(\d+)%\[[=\s>\.]*\]\s*([\d.]+[KMGT]?B?)\s+([\d.]+[KMGT]?B/s)\s+eta\s+(\d+s?)'
     )
     
     # File saved pattern: 'filename' saved [size/size]
