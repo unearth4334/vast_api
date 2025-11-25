@@ -76,7 +76,7 @@ export function createResourceCard(resource) {
                 <img src="/resources/images/${imagePath}" 
                      alt="${title}"
                      class="resource-thumbnail"
-                     onerror="this.src='/resources/images/placeholder.png'">
+                     onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; this.onerror=null;">
             </div>
             <div class="resource-card-body">
                 <h3 class="resource-title">${title}</h3>

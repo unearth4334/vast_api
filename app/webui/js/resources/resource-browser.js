@@ -314,7 +314,7 @@ export class ResourceBrowser {
                 <div class="preview-thumbnail">
                     <img src="/resources/images/${imagePath}" 
                          alt="${title}"
-                         onerror="this.src='/resources/images/placeholder.png'">
+                         onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; this.onerror=null;">
                 </div>
             </div>
             <div class="preview-body">
