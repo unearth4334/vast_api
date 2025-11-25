@@ -1201,18 +1201,38 @@ export async function fetchOpenButtonToken(instanceId, sshConnection) {
       // Host key verification needed - show modal
       tokenValueSpan.innerHTML = '<a href="#" class="fetch-token-link" onclick="VastAIInstances.fetchOpenButtonToken(' + instanceId + ', \'' + sshConnection.replace(/'/g, "\\'") + '\'); return false;">fetch</a>';
       
-      if (window.VastAIHostKey && window.VastAIHostKey.showVerificationModal) {
-        window.VastAIHostKey.showVerificationModal(
-          data.host,
-          data.port,
-          data.fingerprint,
-          () => {
-            // On verification success, retry fetching the token
+      try {
+        // Import and show SSH verification modal
+        const { showSSHHostVerificationModal } = await import('./ui.js');
+        const userAccepted = await showSSHHostVerificationModal({
+          host: data.host,
+          port: data.port,
+          fingerprints: data.fingerprint ? [data.fingerprint] : []
+        });
+        
+        if (userAccepted) {
+          // User accepted - add host key to known_hosts
+          showSetupResult('Adding host key to known_hosts...', 'info');
+          const api = (await import('../api.js')).api;
+          const addKeyData = await api.post('/ssh/verify-host', {
+            ssh_connection: sshConnection,
+            accept: true
+          });
+          
+          if (addKeyData.success) {
+            showSetupResult('Host key added. Retrying token fetch...', 'info');
+            
+            // Retry fetching the token
             fetchOpenButtonToken(instanceId, sshConnection);
+          } else {
+            showSetupResult(`❌ Failed to add host key: ${addKeyData.message}`, 'error');
           }
-        );
-      } else {
-        showSetupResult('⚠️ Host key verification required. Please verify the host key first.', 'warning');
+        } else {
+          // User rejected
+          showSetupResult('❌ Host key verification rejected by user', 'error');
+        }
+      } catch (verifyError) {
+        showSetupResult(`❌ Host verification failed: ${verifyError.message}`, 'error');
       }
       return;
     }
