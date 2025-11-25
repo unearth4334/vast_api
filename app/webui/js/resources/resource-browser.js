@@ -535,9 +535,9 @@ export class ResourceBrowser {
      */
     _extractInstanceId(sshConnection) {
         // Example: ssh -p 44686 root@109.231.106.68 -L 8080:localhost:8080
-        // Use IP as instance ID for now (or parse as needed)
+        // Use IP as instance ID, replacing dots with underscores to match backend
         const match = sshConnection.match(/@([\d.]+)/);
-        return match ? match[1].replace(/\./g, '') : null;
+        return match ? match[1].replace(/\./g, '_') : null;
     }
     
     /**
