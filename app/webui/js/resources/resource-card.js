@@ -34,7 +34,7 @@ export function createResourceCard(resource) {
     card.dataset.resourcePath = resource.filepath;
     
     const metadata = resource.metadata;
-    const title = extractTitle(resource.description);
+    const title = metadata.title || extractTitle(resource.description);
     
     // Extract short description (first paragraph after title)
     const descLines = resource.description.split('\n').filter(l => l.trim());
