@@ -162,6 +162,20 @@ def get_status():
         with open(STATUS_PATH, 'r') as f:
             status = json.load(f)
     
+    # Load queue to get full job details (commands, etc.)
+    queue = []
+    if QUEUE_PATH.exists():
+        with open(QUEUE_PATH, 'r') as f:
+            queue = json.load(f)
+    
+    # Merge status with queue data to include commands
+    job_map = {j['id']: j for j in queue}
+    for s in status:
+        job_id = s.get('id')
+        if job_id in job_map:
+            s['commands'] = job_map[job_id].get('commands', [])
+            s['resource_paths'] = job_map[job_id].get('resource_paths', [])
+    
     if instance_id:
         status = [j for j in status if str(j.get('instance_id')) == str(instance_id)]
     

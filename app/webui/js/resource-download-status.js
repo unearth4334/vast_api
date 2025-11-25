@@ -52,6 +52,12 @@ export class ResourceDownloadStatus {
         if (job.status === 'FAILED' && job.error) {
             statusText += `: ${job.error}`;
         }
+        
+        const commands = job.commands || [];
+        const commandsHtml = commands.length > 0 
+            ? commands.map(cmd => `<code>${cmd}</code>`).join('<br>')
+            : '<em>No commands</em>';
+            
         return `
             <div class="download-job ${job.status.toLowerCase()}">
                 <div class="job-header">
@@ -59,7 +65,7 @@ export class ResourceDownloadStatus {
                     <span class="job-status">${statusText}</span>
                 </div>
                 <div class="job-commands">
-                    ${job.commands.map(cmd => `<code>${cmd}</code>`).join('<br>')}
+                    ${commandsHtml}
                 </div>
                 ${progressBar}
             </div>
