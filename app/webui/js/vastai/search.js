@@ -527,20 +527,228 @@ export function viewOfferDetails(offerKey) {
 }
 
 /**
- * Create instance from offer
+ * Show disk size editor popover before creating instance
  * @param {string} offerId - ID of the offer
- * @param {string} gpuName - Name of the GPU for confirmation
+ * @param {string} gpuName - Name of the GPU for display
  */
-export async function createInstanceFromOffer(offerId, gpuName) {
-  if (!confirm(`Create instance from offer: ${gpuName}?\n\nThis will use your VastAI account to create a new instance.`)) {
-    return;
+export function createInstanceFromOffer(offerId, gpuName) {
+  showDiskSizePopover(offerId, gpuName);
+}
+
+/**
+ * Show disk size configuration popover
+ * @param {string} offerId - ID of the offer
+ * @param {string} gpuName - Name of the GPU for display
+ */
+function showDiskSizePopover(offerId, gpuName) {
+  // Remove any existing popover
+  const existingPopover = document.getElementById('disk-size-popover-overlay');
+  if (existingPopover) {
+    existingPopover.remove();
   }
   
-  showSetupResult(`Creating instance from offer ${offerId}...`, 'info');
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'disk-size-popover-overlay';
+  overlay.className = 'disk-size-overlay';
+  
+  // Create popover container
+  const popover = document.createElement('div');
+  popover.className = 'disk-size-popover';
+  
+  // Create header
+  const header = document.createElement('div');
+  header.className = 'disk-size-popover__header';
+  header.innerHTML = `
+    <strong>Set Disk Size</strong>
+    <span class="disk-size-popover__gpu">${gpuName}</span>
+  `;
+  
+  // Create content
+  const content = document.createElement('div');
+  content.className = 'disk-size-popover__content';
+  
+  // Build the disk size editor (similar to GPU RAM Filter)
+  const editorSection = buildDiskSizeEditor();
+  content.appendChild(editorSection);
+  
+  // Create actions
+  const actions = document.createElement('div');
+  actions.className = 'disk-size-popover__actions';
+  actions.innerHTML = `
+    <button class="search-button" id="disk-size-submit-btn">Submit</button>
+    <button class="search-button secondary" id="disk-size-cancel-btn">Cancel</button>
+  `;
+  
+  // Assemble popover
+  popover.appendChild(header);
+  popover.appendChild(content);
+  popover.appendChild(actions);
+  overlay.appendChild(popover);
+  document.body.appendChild(overlay);
+  
+  // Wire up event handlers
+  const submitBtn = document.getElementById('disk-size-submit-btn');
+  const cancelBtn = document.getElementById('disk-size-cancel-btn');
+  
+  submitBtn.addEventListener('click', () => {
+    const diskSizeInput = document.getElementById('disk-size-input');
+    let diskSize = diskSizeInput ? parseInt(diskSizeInput.value, 10) : 32;
+    // Validate disk size is within reasonable bounds (8-500 GB)
+    if (isNaN(diskSize) || diskSize < 8) {
+      diskSize = 8;
+    } else if (diskSize > 500) {
+      diskSize = 500;
+    }
+    closeDiskSizePopover();
+    submitCreateInstance(offerId, gpuName, diskSize);
+  });
+  
+  cancelBtn.addEventListener('click', () => {
+    closeDiskSizePopover();
+  });
+  
+  // Close on overlay click (but not when clicking inside popover)
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      closeDiskSizePopover();
+    }
+  });
+  
+  // Close on ESC key
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeDiskSizePopover();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+  
+  // Focus the input
+  setTimeout(() => {
+    const diskSizeInput = document.getElementById('disk-size-input');
+    if (diskSizeInput) {
+      diskSizeInput.focus();
+      diskSizeInput.select();
+    }
+  }, 100);
+}
+
+/**
+ * Build disk size editor (similar to GPU RAM Filter)
+ * @returns {Element} Editor element
+ */
+function buildDiskSizeEditor() {
+  const section = document.createElement('div');
+  section.className = 'editor-section';
+  
+  const label = document.createElement('label');
+  label.className = 'editor-label';
+  label.textContent = 'Disk Size (GB)';
+  
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'editor-input';
+  input.id = 'disk-size-input';
+  input.min = '8';
+  input.max = '500';
+  input.value = '32'; // Default value
+  input.placeholder = 'Enter disk size in GB';
+  
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'editor-slider';
+  slider.id = 'disk-size-slider';
+  slider.min = '8';
+  slider.max = '500';
+  slider.value = '32';
+  
+  const chips = document.createElement('div');
+  chips.className = 'editor-chips';
+  [16, 32, 64, 100, 150, 200].forEach(value => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'editor-chip';
+    if (value === 32) {
+      chip.classList.add('selected');
+    }
+    chip.textContent = `${value} GB`;
+    chip.dataset.value = value;
+    chips.appendChild(chip);
+  });
+  
+  const helper = document.createElement('div');
+  helper.className = 'editor-helper-text';
+  helper.textContent = 'Specify the disk space for your instance';
+  
+  // Sync slider and input
+  input.addEventListener('input', () => {
+    const val = parseInt(input.value, 10);
+    // Only sync if valid number, otherwise keep current slider position
+    if (!isNaN(val) && val >= 8 && val <= 500) {
+      slider.value = val;
+    }
+    updateDiskSizeChipSelection(chips, input.value);
+  });
+  
+  slider.addEventListener('input', () => {
+    input.value = slider.value;
+    updateDiskSizeChipSelection(chips, slider.value);
+  });
+  
+  // Handle chip clicks
+  chips.addEventListener('click', (e) => {
+    if (e.target.classList.contains('editor-chip')) {
+      const value = e.target.dataset.value;
+      input.value = value;
+      slider.value = value;
+      updateDiskSizeChipSelection(chips, value);
+    }
+  });
+  
+  section.appendChild(label);
+  section.appendChild(input);
+  section.appendChild(slider);
+  section.appendChild(chips);
+  section.appendChild(helper);
+  
+  return section;
+}
+
+/**
+ * Update disk size chip selection state
+ * @param {Element} chipsContainer - Container with chip buttons
+ * @param {string|number} value - Selected value
+ */
+function updateDiskSizeChipSelection(chipsContainer, value) {
+  chipsContainer.querySelectorAll('.editor-chip').forEach(chip => {
+    chip.classList.toggle('selected', chip.dataset.value == value);
+  });
+}
+
+/**
+ * Close the disk size popover
+ */
+function closeDiskSizePopover() {
+  const overlay = document.getElementById('disk-size-popover-overlay');
+  if (overlay) {
+    overlay.remove();
+  }
+}
+
+/**
+ * Submit create instance request with disk size
+ * @param {string} offerId - ID of the offer
+ * @param {string} gpuName - Name of the GPU
+ * @param {number} diskSize - Disk size in GB
+ */
+async function submitCreateInstance(offerId, gpuName, diskSize) {
+  showSetupResult(`Creating instance from offer ${offerId} with ${diskSize} GB disk...`, 'info');
   
   try {
     const data = await api.post('/vastai/create-instance', {
-      offer_id: offerId
+      offer_id: offerId,
+      disk_size: diskSize
     });
     
     if (data.success) {

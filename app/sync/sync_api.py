@@ -2644,6 +2644,8 @@ def create_vastai_instance():
     try:
         data = request.get_json() if request.is_json else {}
         offer_id = data.get('offer_id')
+        # Get disk_size from frontend request, fallback to config default
+        frontend_disk_size = data.get('disk_size')
         
         if not offer_id:
             return jsonify({
@@ -2673,7 +2675,22 @@ def create_vastai_instance():
         
         template_hash_id = config.get('template_hash_id')
         ui_home_env = config.get('ui_home_env')
-        disk_size_gb = config.get('disk_size_gb', 32)
+        
+        # Validate and use frontend disk_size if provided, otherwise fallback to config default
+        config_disk_size = config.get('disk_size_gb', 32)
+        if frontend_disk_size is not None:
+            try:
+                disk_size_gb = int(frontend_disk_size)
+                # Validate disk size is within reasonable bounds (8-500 GB)
+                if disk_size_gb < 8:
+                    disk_size_gb = 8
+                elif disk_size_gb > 500:
+                    disk_size_gb = 500
+            except (ValueError, TypeError):
+                # If invalid, fallback to config default
+                disk_size_gb = config_disk_size
+        else:
+            disk_size_gb = config_disk_size
         
         if not template_hash_id or template_hash_id == "None":
             return jsonify({
@@ -2688,7 +2705,7 @@ def create_vastai_instance():
             })
         
         # Create the instance
-        logger.info(f"Creating VastAI instance from offer {offer_id}")
+        logger.info(f"Creating VastAI instance from offer {offer_id} with disk size {disk_size_gb} GB")
         result = create_instance(api_key, offer_id, template_hash_id, ui_home_env, disk_size_gb)
         
         if result.get('success'):
