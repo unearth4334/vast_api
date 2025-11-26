@@ -158,13 +158,28 @@ export class ResourceBrowser {
         if (sshInput) {
             sshInput.addEventListener('change', (e) => {
                 const instanceId = this._extractInstanceId(e.target.value);
-                this.downloadStatus.setInstanceId(instanceId);
+                // Don't auto-start polling, wait for user to click refresh
+                this.downloadStatus.instanceId = instanceId;
             });
-            // Set initial value if present
+            // Store initial value if present, but don't start polling
             if (sshInput.value) {
                 const instanceId = this._extractInstanceId(sshInput.value);
-                this.downloadStatus.setInstanceId(instanceId);
+                this.downloadStatus.instanceId = instanceId;
             }
+        }
+        
+        // Add refresh button handler
+        const refreshBtn = document.getElementById('btn-refresh-downloads');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                const sshInput = document.getElementById('resourcesSshConnectionString');
+                if (sshInput && sshInput.value) {
+                    const instanceId = this._extractInstanceId(sshInput.value);
+                    this.downloadStatus.setInstanceId(instanceId);
+                } else {
+                    alert('Please provide an SSH connection string first');
+                }
+            });
         }
     }
     
@@ -512,12 +527,12 @@ export class ResourceBrowser {
             });
             
             if (response.success) {
-                alert(`Successfully queued ${resources.length} resource(s) for installation!`);
+                alert(`Successfully queued ${resources.length} resource(s) for installation!\n\nClick the 🔄 Refresh button to monitor progress.`);
                 this.clearSelection();
                 
-                // Start polling download status
+                // Store instance ID but don't start polling - user must click refresh
                 const instanceId = this._extractInstanceId(sshConnection);
-                if (instanceId) this.downloadStatus.setInstanceId(instanceId);
+                if (instanceId) this.downloadStatus.instanceId = instanceId;
             } else {
                 alert(`Failed to queue downloads: ${response.message}`);
             }
