@@ -134,20 +134,36 @@ export class ResourceDownloadStatus {
         
         // Progress details
         let progressDetails = '';
-        if (job.status === 'RUNNING' && job.progress) {
+        if (job.status === 'RUNNING') {
             const parts = [];
-            if (job.progress.percent !== undefined) {
-                parts.push(`${job.progress.percent}%`);
+            
+            // Show progress stats if available
+            if (job.progress) {
+                if (job.progress.percent !== undefined) {
+                    parts.push(`${job.progress.percent}%`);
+                }
+                if (job.progress.speed) {
+                    parts.push(job.progress.speed);
+                }
+                if (job.progress.stage) {
+                    parts.push(job.progress.stage);
+                }
+                if (job.progress.name) {
+                    parts.push(`"${job.progress.name}"`);
+                }
+                if (job.progress.downloaded) {
+                    parts.push(job.progress.downloaded);
+                }
+                if (job.progress.eta) {
+                    parts.push(`ETA: ${job.progress.eta}`);
+                }
             }
-            if (job.progress.speed) {
-                parts.push(job.progress.speed);
+            
+            // Show command progress if no detailed stats
+            if (parts.length === 0 && job.command_index && job.total_commands) {
+                parts.push(`Command ${job.command_index}/${job.total_commands}`);
             }
-            if (job.progress.stage) {
-                parts.push(job.progress.stage);
-            }
-            if (job.progress.name) {
-                parts.push(`"${job.progress.name}"`);
-            }
+            
             if (parts.length > 0) {
                 progressDetails = `<div class="task-progress-details">${parts.join(' • ')}</div>`;
             }
@@ -196,6 +212,10 @@ export class ResourceDownloadStatus {
             case 'RUNNING':
                 if (job.progress && job.progress.percent !== undefined) {
                     return `${job.progress.percent}%`;
+                }
+                // Show command progress if available
+                if (job.command_index && job.total_commands) {
+                    return `${job.command_index}/${job.total_commands}`;
                 }
                 return 'Downloading...';
             case 'COMPLETE':
