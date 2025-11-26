@@ -610,12 +610,10 @@ export class ResourceBrowser {
                 updateCardSelection(card, true);
             }
             
-            // Setup lazy loading for media
+            // Setup lazy loading for media (images and videos)
             if (this.lazyLoadObserver) {
-                const img = card.querySelector('img[data-src]');
-                if (img) {
-                    this.lazyLoadObserver.observe(img);
-                }
+                const mediaElements = card.querySelectorAll('[data-src]');
+                mediaElements.forEach(el => this.lazyLoadObserver.observe(el));
             }
             
             // Setup video hover autoplay
@@ -638,7 +636,10 @@ export class ResourceBrowser {
         
         card.addEventListener('mouseenter', () => {
             hoverTimeout = setTimeout(() => {
-                video.play().catch(() => {});
+                video.play().catch(err => {
+                    // Log autoplay failures (often due to browser policies)
+                    console.warn('Video autoplay failed:', err.message);
+                });
             }, TILE_VIEWER_CONFIG.videoHoverDelay);
         });
         

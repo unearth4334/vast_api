@@ -933,6 +933,13 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+    /* Define custom properties for responsive layout calculations */
+    :root {
+        --mobile-thumbnail-width: 60px;
+        --mobile-actions-width: 40px;
+        --mobile-gap: 10px;
+    }
+    
     /* Mobile: Stack content vertically, hide desktop preview pane */
     .resource-content {
         flex-direction: column;
@@ -995,13 +1002,14 @@
     }
     
     .list-thumbnail {
-        width: 60px;
+        width: var(--mobile-thumbnail-width);
         height: 45px;
     }
     
     .list-content {
         flex: 1;
-        min-width: calc(100% - 80px);
+        /* Calculate based on thumbnail width plus gap and actions button */
+        min-width: calc(100% - var(--mobile-thumbnail-width) - var(--mobile-actions-width) - var(--mobile-gap));
     }
     
     .list-description {

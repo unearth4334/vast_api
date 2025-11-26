@@ -34,6 +34,30 @@ function isVideoFile(filename) {
 }
 
 /**
+ * Handle image load error by hiding image and showing gradient background
+ */
+function handleImageError(img) {
+    img.style.display = 'none';
+    img.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+}
+
+/**
+ * Create an image element with lazy loading and error handling
+ */
+function createImageElement(src, alt, useLazyLoading = true) {
+    const srcAttr = useLazyLoading ? 'data-src' : 'src';
+    return `<img class="resource-media" ${srcAttr}="${src}" alt="${alt}" loading="lazy" onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)';">`;
+}
+
+/**
+ * Create a video element with lazy loading support
+ */
+function createVideoElement(src, useLazyLoading = true) {
+    const srcAttr = useLazyLoading ? 'data-src' : 'src';
+    return `<video class="resource-media" muted loop playsinline ${srcAttr}="${src}" poster="/resources/images/video-placeholder.png"></video>`;
+}
+
+/**
  * Create a resource card element (compact with expand-on-tap)
  * @param {Object} resource - Resource object from API
  * @param {string} viewMode - 'grid' or 'list'
@@ -62,6 +86,7 @@ export function createResourceCard(resource, viewMode = 'grid') {
     
     // Build card HTML
     const imagePath = metadata.image || 'placeholder.png';
+    const imageUrl = `/resources/images/${imagePath}`;
     const sizeStr = metadata.size ? formatBytes(metadata.size) : null;
     const hasDeps = metadata.dependencies && metadata.dependencies.length > 0;
     const isVideo = isVideoFile(imagePath);
@@ -74,8 +99,8 @@ export function createResourceCard(resource, viewMode = 'grid') {
     
     // Create media element with lazy loading support
     const mediaHtml = isVideo
-        ? `<video class="resource-media" muted loop playsinline data-src="/resources/images/${imagePath}" poster="/resources/images/video-placeholder.png"></video>`
-        : `<img class="resource-media" data-src="/resources/images/${imagePath}" alt="${title}" loading="lazy" onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; this.onerror=null;">`;
+        ? createVideoElement(imageUrl, true)
+        : createImageElement(imageUrl, title, true);
     
     if (viewMode === 'list') {
         // List view layout
@@ -106,6 +131,11 @@ export function createResourceCard(resource, viewMode = 'grid') {
         `;
     } else {
         // Grid view layout (tile design)
+        // Create expanded media HTML with src for immediate loading when expanded
+        const expandedMediaHtml = isVideo
+            ? createVideoElement(imageUrl, false)
+            : createImageElement(imageUrl, title, false);
+        
         card.innerHTML = `
             <div class="resource-card-compact">
                 <div class="compact-header">
@@ -119,7 +149,7 @@ export function createResourceCard(resource, viewMode = 'grid') {
             </div>
             <div class="resource-card-expanded" style="display: none;">
                 <div class="resource-card-header">
-                    ${mediaHtml.replace('data-src=', 'src=')}
+                    ${expandedMediaHtml}
                 </div>
                 <div class="resource-card-body">
                     <h3 class="resource-title">${title}</h3>
