@@ -37,23 +37,16 @@ class WgetProgressParser:
     Parser for wget download progress output.
     
     Wget outputs progress in formats like:
-    - filename           50%[====>        ] 50.0M  45.3MB/s  eta 5s
+    - Bar format: wan2.2_...  45%[=====>       ] 12.3G  45.3MB/s  eta 5m 30s
     - 'filename' saved [104857600/104857600]
     - Resolving host... IP
     - Connecting to host|IP|:443... connected.
-    - Dot progress: .......... 10% 45.3M 5s
     """
     
-    # Progress bar pattern: filename  percent[bar] size speed eta
-    # Made more flexible with \s+ and optional B suffix
-    PROGRESS_PATTERN = re.compile(
-        r'(\S+)\s+(\d+)%\[[=\s>\.]*\]\s+([\d.]+[KMGT]?B?)\s+([\d.]+[KMGT]?B/s)\s+eta\s+(\d+s?)'
-    )
-    
-    # Dot progress pattern: dots followed by percent, optional size and eta
-    # Format: .......... 10% 45.3M 5s  or  .......... 10%
-    DOT_PROGRESS_PATTERN = re.compile(
-        r'^\.+\s+(\d+)%(?:\s+([\d.]+[KMGT]?)\s+(\d+)s)?'
+    # Bar progress pattern - more flexible to handle carriage returns
+    # Format: filename  percent[bar] size  speed  eta time
+    BAR_PROGRESS_PATTERN = re.compile(
+        r'([\w\-\.]+)\s+(\d+)%\[(?:[=\s>]+)\]\s+([\d.]+[KMGT]?)\s+([\d.]+[KMGT]?B?/s)(?:\s+(?:eta|in)\s+([\dhmsd\s]+))?'
     )
     
     # File saved pattern: 'filename' saved [size/size]
@@ -69,32 +62,20 @@ class WgetProgressParser:
     def parse_line(cls, line: str) -> Optional[Dict]:
         """Parse a line of wget output"""
         
-        # Check for dot progress (more reliable over SSH)
-        match = cls.DOT_PROGRESS_PATTERN.search(line)
+        # Check for bar progress (most common with --progress=bar:force)
+        match = cls.BAR_PROGRESS_PATTERN.search(line)
         if match:
             result = {
-                'type': 'progress',
-                'stage': 'download',
-                'percent': int(match.group(1))
-            }
-            if match.group(2):  # Size available
-                result['downloaded'] = match.group(2)
-            if match.group(3):  # ETA available
-                result['eta'] = match.group(3) + 's'
-            return result
-        
-        # Check for progress bar (traditional format)
-        match = cls.PROGRESS_PATTERN.search(line)
-        if match:
-            return {
                 'type': 'progress',
                 'stage': 'download',
                 'filename': match.group(1),
                 'percent': int(match.group(2)),
                 'downloaded': match.group(3),
-                'speed': match.group(4),
-                'eta': match.group(5)
+                'speed': match.group(4)
             }
+            if match.group(5):  # ETA available
+                result['eta'] = match.group(5).strip()
+            return result
         
         # Check for file saved (completion)
         match = cls.SAVED_PATTERN.search(line)
