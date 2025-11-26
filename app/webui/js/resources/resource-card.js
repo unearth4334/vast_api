@@ -2,6 +2,7 @@
  * Resource Card Component
  * 
  * Creates a visual card representation for a resource (workflow, model, etc.)
+ * Supports grid and list view modes with lazy loading
  */
 
 /**
@@ -24,13 +25,23 @@ function extractTitle(description) {
 }
 
 /**
+ * Check if file is a video based on extension
+ */
+function isVideoFile(filename) {
+    if (!filename) return false;
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov'];
+    return videoExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+}
+
+/**
  * Create a resource card element (compact with expand-on-tap)
  * @param {Object} resource - Resource object from API
+ * @param {string} viewMode - 'grid' or 'list'
  * @returns {HTMLElement} Card element
  */
-export function createResourceCard(resource) {
+export function createResourceCard(resource, viewMode = 'grid') {
     const card = document.createElement('div');
-    card.className = 'resource-card';
+    card.className = `resource-card resource-card-${viewMode}`;
     card.dataset.resourcePath = resource.filepath;
     
     const metadata = resource.metadata;
@@ -53,6 +64,7 @@ export function createResourceCard(resource) {
     const imagePath = metadata.image || 'placeholder.png';
     const sizeStr = metadata.size ? formatBytes(metadata.size) : null;
     const hasDeps = metadata.dependencies && metadata.dependencies.length > 0;
+    const isVideo = isVideoFile(imagePath);
     
     // Determine status badge
     const isSelected = window.resourceBrowser?.selectedResources?.has(resource.filepath);
@@ -60,41 +72,73 @@ export function createResourceCard(resource) {
         '<span class="status-badge status-selected">Selected</span>' : 
         '<span class="status-badge status-available">Available</span>';
     
-    card.innerHTML = `
-        <div class="resource-card-compact">
-            <div class="compact-header">
-                <h3 class="compact-title">${title}</h3>
-                ${statusBadge}
-            </div>
-            <div class="compact-meta">
-                <span class="compact-type">${metadata.type}</span>
-                <span class="compact-ecosystem">${metadata.ecosystem}</span>
-            </div>
-        </div>
-        <div class="resource-card-expanded" style="display: none;">
-            <div class="resource-card-header">
-                <img src="/resources/images/${imagePath}" 
-                     alt="${title}"
-                     class="resource-thumbnail"
-                     onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; this.onerror=null;">
-            </div>
-            <div class="resource-card-body">
-                <h3 class="resource-title">${title}</h3>
-                <div class="resource-tags">
-                    <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
-                    <span class="tag tag-type">${metadata.type}</span>
+    // Create media element with lazy loading support
+    const mediaHtml = isVideo
+        ? `<video class="resource-media" muted loop playsinline data-src="/resources/images/${imagePath}" poster="/resources/images/video-placeholder.png"></video>`
+        : `<img class="resource-media" data-src="/resources/images/${imagePath}" alt="${title}" loading="lazy" onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; this.onerror=null;">`;
+    
+    if (viewMode === 'list') {
+        // List view layout
+        card.innerHTML = `
+            <div class="resource-card-list-layout">
+                <div class="list-thumbnail">
+                    ${mediaHtml}
                 </div>
-                ${shortDesc ? `<p class="resource-description">${shortDesc}</p>` : ''}
-                ${sizeStr ? `<div class="resource-size">Size: ${sizeStr}</div>` : ''}
-                ${hasDeps ? `<div class="resource-deps">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+                <div class="list-content">
+                    <div class="list-header">
+                        <h3 class="list-title">${title}</h3>
+                        ${statusBadge}
+                    </div>
+                    <div class="list-meta">
+                        <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
+                        <span class="tag tag-type">${metadata.type}</span>
+                        ${sizeStr ? `<span class="meta-size">📦 ${sizeStr}</span>` : ''}
+                        ${hasDeps ? `<span class="meta-deps">⚠ ${metadata.dependencies.length} deps</span>` : ''}
+                    </div>
+                    ${shortDesc ? `<p class="list-description">${shortDesc}</p>` : ''}
+                </div>
+                <div class="list-actions">
+                    <button class="btn-select" data-action="select">
+                        <span class="icon">${isSelected ? '☑' : '☐'}</span>
+                    </button>
+                </div>
             </div>
-            <div class="resource-card-footer">
-                <button class="btn-select" data-action="select">
-                    <span class="icon">☐</span> Select
-                </button>
+        `;
+    } else {
+        // Grid view layout (tile design)
+        card.innerHTML = `
+            <div class="resource-card-compact">
+                <div class="compact-header">
+                    <h3 class="compact-title">${title}</h3>
+                    ${statusBadge}
+                </div>
+                <div class="compact-meta">
+                    <span class="compact-type">${metadata.type}</span>
+                    <span class="compact-ecosystem">${metadata.ecosystem}</span>
+                </div>
             </div>
-        </div>
-    `;
+            <div class="resource-card-expanded" style="display: none;">
+                <div class="resource-card-header">
+                    ${mediaHtml.replace('data-src=', 'src=')}
+                </div>
+                <div class="resource-card-body">
+                    <h3 class="resource-title">${title}</h3>
+                    <div class="resource-tags">
+                        <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
+                        <span class="tag tag-type">${metadata.type}</span>
+                    </div>
+                    ${shortDesc ? `<p class="resource-description">${shortDesc}</p>` : ''}
+                    ${sizeStr ? `<div class="resource-size">Size: ${sizeStr}</div>` : ''}
+                    ${hasDeps ? `<div class="resource-deps">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+                </div>
+                <div class="resource-card-footer">
+                    <button class="btn-select" data-action="select">
+                        <span class="icon">☐</span> Select
+                    </button>
+                </div>
+            </div>
+        `;
+    }
     
     // Add click listener to expand/collapse
     card.addEventListener('click', (e) => {
