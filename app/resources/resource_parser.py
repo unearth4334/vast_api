@@ -180,20 +180,15 @@ class ResourceParser:
         return sorted(list(ecosystems))
     
     def get_types(self) -> List[str]:
-        """Get list of all unique resource types"""
+        """Get list of all unique resource types (directory names)"""
         types = set()
         
-        for filepath in self.resources_path.rglob('*.md'):
-            if filepath.name.startswith('_'):
-                continue
-            try:
-                resource = self.parse_file(filepath)
-                resource_type = resource['metadata'].get('type')
-                if resource_type:
-                    types.add(resource_type)
-            except Exception as e:
-                logger.debug(f"Skipping {filepath}: {e}")
-                continue
+        # Get type directories directly from the filesystem
+        for item in self.resources_path.iterdir():
+            if item.is_dir() and not item.name.startswith('_') and not item.name == 'images':
+                # Only include directories that have .md files
+                if any(item.glob('*.md')):
+                    types.add(item.name)
         
         return sorted(list(types))
     
