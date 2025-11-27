@@ -249,6 +249,130 @@ SHA256:TestFingerprint123.
         
         self.assertFalse(success)
         self.assertIn("failed to accept new key", message)
+    
+    def test_is_host_key_verified_no_file(self):
+        """Test verification check when known_hosts doesn't exist"""
+        # Manager points to a non-existent file
+        manager = SSHHostKeyManager(known_hosts_path="/tmp/nonexistent_known_hosts_12345")
+        
+        result = manager.is_host_key_verified("10.0.78.108", 2222)
+        
+        self.assertFalse(result)
+    
+    def test_is_host_key_verified_found(self):
+        """Test verification check when host key is in known_hosts"""
+        import tempfile
+        import os
+        
+        # Create a temporary known_hosts file with a test entry
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_known_hosts', delete=False) as f:
+            f.write("[10.0.78.108]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...\n")
+            temp_path = f.name
+        
+        try:
+            manager = SSHHostKeyManager(known_hosts_path=temp_path)
+            result = manager.is_host_key_verified("10.0.78.108", 2222)
+            
+            self.assertTrue(result)
+        finally:
+            os.unlink(temp_path)
+    
+    def test_is_host_key_verified_not_found(self):
+        """Test verification check when host key is NOT in known_hosts"""
+        import tempfile
+        import os
+        
+        # Create a temporary known_hosts file with a different host
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_known_hosts', delete=False) as f:
+            f.write("[192.168.1.1]:22 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...\n")
+            temp_path = f.name
+        
+        try:
+            manager = SSHHostKeyManager(known_hosts_path=temp_path)
+            result = manager.is_host_key_verified("10.0.78.108", 2222)
+            
+            self.assertFalse(result)
+        finally:
+            os.unlink(temp_path)
+    
+    def test_is_host_key_verified_empty_file(self):
+        """Test verification check with empty known_hosts file"""
+        import tempfile
+        import os
+        
+        # Create an empty temporary known_hosts file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_known_hosts', delete=False) as f:
+            temp_path = f.name
+        
+        try:
+            manager = SSHHostKeyManager(known_hosts_path=temp_path)
+            result = manager.is_host_key_verified("10.0.78.108", 2222)
+            
+            self.assertFalse(result)
+        finally:
+            os.unlink(temp_path)
+    
+    def test_is_host_key_verified_with_comments(self):
+        """Test verification check skips comment lines"""
+        import tempfile
+        import os
+        
+        # Create a temporary known_hosts file with comments and a matching entry
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_known_hosts', delete=False) as f:
+            f.write("# This is a comment\n")
+            f.write("\n")  # Empty line
+            f.write("[10.0.78.108]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...\n")
+            temp_path = f.name
+        
+        try:
+            manager = SSHHostKeyManager(known_hosts_path=temp_path)
+            result = manager.is_host_key_verified("10.0.78.108", 2222)
+            
+            self.assertTrue(result)
+        finally:
+            os.unlink(temp_path)
+    
+    def test_is_host_key_verified_no_false_positive(self):
+        """Test that partial host matches don't cause false positives"""
+        import tempfile
+        import os
+        
+        # Create a temporary known_hosts file with a similar but different host
+        # This tests that [10.0.78.10]:22 doesn't match when looking for [10.0.78.1]:22
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_known_hosts', delete=False) as f:
+            f.write("[10.0.78.10]:22 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...\n")
+            temp_path = f.name
+        
+        try:
+            manager = SSHHostKeyManager(known_hosts_path=temp_path)
+            # Should not match [10.0.78.1]:22 when file has [10.0.78.10]:22
+            result = manager.is_host_key_verified("10.0.78.1", 22)
+            
+            self.assertFalse(result)
+        finally:
+            os.unlink(temp_path)
+    
+    def test_get_key_fingerprint_valid(self):
+        """Test fingerprint calculation for a valid SSH key"""
+        # This is a sample ED25519 public key (base64 encoded)
+        # Using a known key to test the fingerprint calculation
+        sample_key = "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+        
+        fingerprint = self.manager.get_key_fingerprint(sample_key)
+        
+        # Should start with SHA256:
+        self.assertTrue(fingerprint.startswith("SHA256:"))
+        # Should have content after SHA256:
+        self.assertGreater(len(fingerprint), 7)
+    
+    def test_get_key_fingerprint_invalid(self):
+        """Test fingerprint calculation for an invalid key"""
+        invalid_key = "not_valid_base64!!!"
+        
+        fingerprint = self.manager.get_key_fingerprint(invalid_key)
+        
+        # Should return "Unknown" for invalid keys
+        self.assertEqual(fingerprint, "Unknown")
 
 
 if __name__ == '__main__':

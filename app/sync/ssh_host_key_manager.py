@@ -3,6 +3,8 @@ SSH Host Key Manager
 Detects and resolves SSH host identification errors
 """
 
+import base64
+import hashlib
 import os
 import re
 import subprocess
@@ -274,3 +276,69 @@ class SSHHostKeyManager:
             return False, f"Old key removed but failed to accept new key: {message}"
         
         return True, f"Host key resolved successfully for {error.host}:{error.port}"
+    
+    def is_host_key_verified(self, host: str, port: int) -> bool:
+        """
+        Check if host key is already in known_hosts
+        
+        Args:
+            host: Hostname or IP address
+            port: Port number
+            
+        Returns:
+            True if host key is verified (in known_hosts), False otherwise
+        """
+        try:
+            # Construct the host specification
+            host_spec = f"[{host}]:{port}"
+            
+            # Check if known_hosts file exists
+            if not os.path.exists(self.known_hosts_path):
+                logger.debug(f"known_hosts file does not exist: {self.known_hosts_path}")
+                return False
+            
+            # Read known_hosts file and check for the host
+            with open(self.known_hosts_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    # Check if the line starts with the exact host_spec
+                    # known_hosts format: hostname/IP key-type key [comment]
+                    # For non-standard ports: [hostname]:port key-type key [comment]
+                    if line.startswith(host_spec + ' '):
+                        logger.debug(f"Found host key for {host_spec} in known_hosts")
+                        return True
+            
+            logger.debug(f"Host key for {host_spec} not found in known_hosts")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking host key verification: {str(e)}")
+            return False
+    
+    def get_key_fingerprint(self, key: str) -> str:
+        """
+        Get SHA256 fingerprint for an SSH public key
+        
+        Args:
+            key: Base64-encoded SSH public key
+            
+        Returns:
+            SHA256 fingerprint string
+        """
+        try:
+            # Decode the base64 key
+            key_bytes = base64.b64decode(key)
+            
+            # Calculate SHA256 hash
+            sha256_hash = hashlib.sha256(key_bytes).digest()
+            
+            # Encode as base64 and format
+            fingerprint = base64.b64encode(sha256_hash).decode('ascii').rstrip('=')
+            
+            return f"SHA256:{fingerprint}"
+            
+        except Exception as e:
+            logger.error(f"Error calculating key fingerprint: {str(e)}")
+            return "Unknown"

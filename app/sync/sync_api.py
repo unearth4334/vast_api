@@ -2411,35 +2411,64 @@ def get_open_button_token(instance_id):
                 'message': f'Invalid SSH connection string: {str(e)}'
             })
         
-        # Try to execute SSH command to get the token
+        # Check if host key is verified
+        host_key_manager = SSHHostKeyManager()
+        
+        if not host_key_manager.is_host_key_verified(ssh_host, ssh_port):
+            # Get the host key for verification
+            try:
+                result = subprocess.run(
+                    ['ssh-keyscan', '-p', str(ssh_port), ssh_host],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if result.returncode == 0 and result.stdout:
+                    # Parse the key from ssh-keyscan output
+                    for line in result.stdout.strip().split('\n'):
+                        if line and not line.startswith('#'):
+                            parts = line.split()
+                            if len(parts) >= 3:
+                                key_type = parts[1]
+                                key = parts[2]
+                                fingerprint = host_key_manager.get_key_fingerprint(key)
+                                
+                                return jsonify({
+                                    'success': False,
+                                    'require_verification': True,
+                                    'host': ssh_host,
+                                    'port': ssh_port,
+                                    'key_type': key_type,
+                                    'fingerprint': fingerprint,
+                                    'key': key
+                                })
+                
+                return jsonify({
+                    'success': False,
+                    'message': f'Could not retrieve host key from {ssh_host}:{ssh_port}'
+                })
+                
+            except subprocess.TimeoutExpired:
+                return jsonify({
+                    'success': False,
+                    'message': 'Timeout while retrieving host key'
+                })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'message': f'Error retrieving host key: {str(e)}'
+                })
+        
+        # Host key is verified, proceed with SSH command
         try:
             result = subprocess.run(
-                ['ssh', '-p', str(ssh_port), '-o', 'StrictHostKeyChecking=yes', 
-                 '-o', 'ConnectTimeout=10', f'root@{ssh_host}', 
-                 'echo $OPEN_BUTTON_TOKEN'],
+                ['ssh', '-p', str(ssh_port), f'root@{ssh_host}', 'echo $OPEN_BUTTON_TOKEN'],
                 capture_output=True,
                 text=True,
-                timeout=15
+                timeout=10
             )
             
-            # Check if there's a host key error
-            if result.returncode != 0 and result.stderr:
-                host_key_manager = SSHHostKeyManager()
-                error = host_key_manager.detect_host_key_error(result.stderr)
-                
-                if error:
-                    logger.warning(f"Host key error detected for {ssh_host}:{ssh_port}")
-                    return jsonify({
-                        'success': False,
-                        'require_verification': True,
-                        'host': error.host,
-                        'port': error.port,
-                        'fingerprint': error.new_fingerprint,
-                        'known_hosts_file': error.known_hosts_file,
-                        'line_number': error.line_number
-                    })
-            
-            # Check if command succeeded
             if result.returncode == 0:
                 token = result.stdout.strip()
                 if token:
