@@ -2,6 +2,7 @@
  * Resource Card Component
  * 
  * Creates a visual card representation for a resource (workflow, model, etc.)
+ * Supports grid and list view modes with lazy loading
  */
 
 /**
@@ -24,13 +25,47 @@ function extractTitle(description) {
 }
 
 /**
+ * Check if file is a video based on extension
+ */
+function isVideoFile(filename) {
+    if (!filename) return false;
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov'];
+    return videoExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+}
+
+/**
+ * Handle image load error by hiding image and showing gradient background
+ */
+function handleImageError(img) {
+    img.style.display = 'none';
+    img.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+}
+
+/**
+ * Create an image element with lazy loading and error handling
+ */
+function createImageElement(src, alt, useLazyLoading = true) {
+    const srcAttr = useLazyLoading ? 'data-src' : 'src';
+    return `<img class="resource-media" ${srcAttr}="${src}" alt="${alt}" loading="lazy" onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)';">`;
+}
+
+/**
+ * Create a video element with lazy loading support
+ */
+function createVideoElement(src, useLazyLoading = true) {
+    const srcAttr = useLazyLoading ? 'data-src' : 'src';
+    return `<video class="resource-media" muted loop playsinline ${srcAttr}="${src}" poster="/resources/images/video-placeholder.png"></video>`;
+}
+
+/**
  * Create a resource card element (compact with expand-on-tap)
  * @param {Object} resource - Resource object from API
+ * @param {string} viewMode - 'grid' or 'list'
  * @returns {HTMLElement} Card element
  */
-export function createResourceCard(resource) {
+export function createResourceCard(resource, viewMode = 'grid') {
     const card = document.createElement('div');
-    card.className = 'resource-card';
+    card.className = `resource-card resource-card-${viewMode}`;
     card.dataset.resourcePath = resource.filepath;
     
     const metadata = resource.metadata;
@@ -51,8 +86,10 @@ export function createResourceCard(resource) {
     
     // Build card HTML
     const imagePath = metadata.image || 'placeholder.png';
+    const imageUrl = `/resources/images/${imagePath}`;
     const sizeStr = metadata.size ? formatBytes(metadata.size) : null;
     const hasDeps = metadata.dependencies && metadata.dependencies.length > 0;
+    const isVideo = isVideoFile(imagePath);
     
     // Determine status badge
     const isSelected = window.resourceBrowser?.selectedResources?.has(resource.filepath);
@@ -60,41 +97,78 @@ export function createResourceCard(resource) {
         '<span class="status-badge status-selected">Selected</span>' : 
         '<span class="status-badge status-available">Available</span>';
     
-    card.innerHTML = `
-        <div class="resource-card-compact">
-            <div class="compact-header">
-                <h3 class="compact-title">${title}</h3>
-                ${statusBadge}
-            </div>
-            <div class="compact-meta">
-                <span class="compact-type">${metadata.type}</span>
-                <span class="compact-ecosystem">${metadata.ecosystem}</span>
-            </div>
-        </div>
-        <div class="resource-card-expanded" style="display: none;">
-            <div class="resource-card-header">
-                <img src="/resources/images/${imagePath}" 
-                     alt="${title}"
-                     class="resource-thumbnail"
-                     onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; this.onerror=null;">
-            </div>
-            <div class="resource-card-body">
-                <h3 class="resource-title">${title}</h3>
-                <div class="resource-tags">
-                    <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
-                    <span class="tag tag-type">${metadata.type}</span>
+    // Create media element with lazy loading support
+    const mediaHtml = isVideo
+        ? createVideoElement(imageUrl, true)
+        : createImageElement(imageUrl, title, true);
+    
+    if (viewMode === 'list') {
+        // List view layout
+        card.innerHTML = `
+            <div class="resource-card-list-layout">
+                <div class="list-thumbnail">
+                    ${mediaHtml}
                 </div>
-                ${shortDesc ? `<p class="resource-description">${shortDesc}</p>` : ''}
-                ${sizeStr ? `<div class="resource-size">Size: ${sizeStr}</div>` : ''}
-                ${hasDeps ? `<div class="resource-deps">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+                <div class="list-content">
+                    <div class="list-header">
+                        <h3 class="list-title">${title}</h3>
+                        ${statusBadge}
+                    </div>
+                    <div class="list-meta">
+                        <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
+                        <span class="tag tag-type">${metadata.type}</span>
+                        ${sizeStr ? `<span class="meta-size">📦 ${sizeStr}</span>` : ''}
+                        ${hasDeps ? `<span class="meta-deps">⚠ ${metadata.dependencies.length} deps</span>` : ''}
+                    </div>
+                    ${shortDesc ? `<p class="list-description">${shortDesc}</p>` : ''}
+                </div>
+                <div class="list-actions">
+                    <button class="btn-select" data-action="select">
+                        <span class="icon">${isSelected ? '☑' : '☐'}</span>
+                    </button>
+                </div>
             </div>
-            <div class="resource-card-footer">
-                <button class="btn-select" data-action="select">
-                    <span class="icon">☐</span> Select
-                </button>
+        `;
+    } else {
+        // Grid view layout (tile design)
+        // Create expanded media HTML with src for immediate loading when expanded
+        const expandedMediaHtml = isVideo
+            ? createVideoElement(imageUrl, false)
+            : createImageElement(imageUrl, title, false);
+        
+        card.innerHTML = `
+            <div class="resource-card-compact">
+                <div class="compact-header">
+                    <h3 class="compact-title">${title}</h3>
+                    ${statusBadge}
+                </div>
+                <div class="compact-meta">
+                    <span class="compact-type">${metadata.type}</span>
+                    <span class="compact-ecosystem">${metadata.ecosystem}</span>
+                </div>
             </div>
-        </div>
-    `;
+            <div class="resource-card-expanded" style="display: none;">
+                <div class="resource-card-header">
+                    ${expandedMediaHtml}
+                </div>
+                <div class="resource-card-body">
+                    <h3 class="resource-title">${title}</h3>
+                    <div class="resource-tags">
+                        <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
+                        <span class="tag tag-type">${metadata.type}</span>
+                    </div>
+                    ${shortDesc ? `<p class="resource-description">${shortDesc}</p>` : ''}
+                    ${sizeStr ? `<div class="resource-size">Size: ${sizeStr}</div>` : ''}
+                    ${hasDeps ? `<div class="resource-deps">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+                </div>
+                <div class="resource-card-footer">
+                    <button class="btn-select" data-action="select">
+                        <span class="icon">☐</span> Select
+                    </button>
+                </div>
+            </div>
+        `;
+    }
     
     // Add click listener to expand/collapse
     card.addEventListener('click', (e) => {
