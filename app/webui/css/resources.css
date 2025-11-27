@@ -282,7 +282,8 @@
     background: #f5f7fa;
 }
 
-.dropdown-option input[type="radio"] {
+.dropdown-option input[type="radio"],
+.dropdown-option input[type="checkbox"] {
     margin: 0;
     accent-color: #007bff;
 }
@@ -290,6 +291,47 @@
 .dropdown-option span {
     font-size: 14px;
     color: #333;
+}
+
+/* Dropdown Footer with Apply/Clear buttons */
+.dropdown-footer {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+}
+
+.dropdown-apply-btn,
+.dropdown-clear-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dropdown-apply-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+}
+
+.dropdown-apply-btn:hover {
+    background: #0056b3;
+}
+
+.dropdown-clear-btn {
+    background: white;
+    color: #666;
+    border: 1px solid #ddd;
+}
+
+.dropdown-clear-btn:hover {
+    background: #f0f0f0;
+    border-color: #ccc;
 }
 
 /* Resource Stats Bar */

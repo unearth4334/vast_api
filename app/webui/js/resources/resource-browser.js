@@ -38,8 +38,8 @@ export class ResourceBrowser {
         this.resources = [];
         this.expandedCard = null; // Track currently expanded card
         this.filters = {
-            ecosystem: null,
-            type: null,
+            ecosystems: [],  // Changed to array for multiple selection
+            types: [],       // Changed to array for multiple selection
             tags: [],
             search: ''
         };
@@ -128,22 +128,24 @@ export class ResourceBrowser {
                 
                 <!-- Filter Dropdowns (hidden by default) -->
                 <div id="filter-dropdown-ecosystem" class="filter-dropdown" style="display: none;">
-                    <div class="dropdown-header">Select Ecosystem</div>
+                    <div class="dropdown-header">Select Ecosystems</div>
                     <div class="dropdown-options" id="ecosystem-options">
-                        <label class="dropdown-option">
-                            <input type="radio" name="ecosystem" value="" checked>
-                            <span>All Ecosystems</span>
-                        </label>
+                        <!-- Options will be populated dynamically -->
+                    </div>
+                    <div class="dropdown-footer">
+                        <button class="dropdown-apply-btn" data-filter="ecosystem">Apply</button>
+                        <button class="dropdown-clear-btn" data-filter="ecosystem">Clear</button>
                     </div>
                 </div>
                 
                 <div id="filter-dropdown-type" class="filter-dropdown" style="display: none;">
-                    <div class="dropdown-header">Select Type</div>
+                    <div class="dropdown-header">Select Types</div>
                     <div class="dropdown-options" id="type-options">
-                        <label class="dropdown-option">
-                            <input type="radio" name="type" value="" checked>
-                            <span>All Types</span>
-                        </label>
+                        <!-- Options will be populated dynamically -->
+                    </div>
+                    <div class="dropdown-footer">
+                        <button class="dropdown-apply-btn" data-filter="type">Apply</button>
+                        <button class="dropdown-clear-btn" data-filter="type">Clear</button>
                     </div>
                 </div>
                 
@@ -258,31 +260,20 @@ export class ResourceBrowser {
             }
         });
         
-        // Dropdown option handlers
-        const ecosystemOptions = document.getElementById('ecosystem-options');
-        const typeOptions = document.getElementById('type-options');
-        
-        if (ecosystemOptions) {
-            ecosystemOptions.addEventListener('change', (e) => {
-                if (e.target.name === 'ecosystem') {
-                    this.filters.ecosystem = e.target.value || null;
-                    this._updatePillValue('ecosystem', e.target.value);
-                    this._closeAllDropdowns();
-                    this.loadResources();
-                }
+        // Dropdown apply/clear button handlers
+        this.container.querySelectorAll('.dropdown-apply-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const filterType = btn.dataset.filter;
+                this._applyFilterSelection(filterType);
             });
-        }
+        });
         
-        if (typeOptions) {
-            typeOptions.addEventListener('change', (e) => {
-                if (e.target.name === 'type') {
-                    this.filters.type = e.target.value || null;
-                    this._updatePillValue('type', e.target.value);
-                    this._closeAllDropdowns();
-                    this.loadResources();
-                }
+        this.container.querySelectorAll('.dropdown-clear-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const filterType = btn.dataset.filter;
+                this._clearFilterSelection(filterType);
             });
-        }
+        });
         
         // Sort change handler
         if (sortSelect) {
@@ -409,19 +400,73 @@ export class ResourceBrowser {
     }
     
     /**
-     * Update pill display value
+     * Apply filter selection from checkboxes
      */
-    _updatePillValue(filterType, value) {
+    _applyFilterSelection(filterType) {
+        const optionsContainer = document.getElementById(`${filterType}-options`);
+        if (!optionsContainer) return;
+        
+        const checkedBoxes = optionsContainer.querySelectorAll('input[type="checkbox"]:checked');
+        const selectedValues = Array.from(checkedBoxes).map(cb => cb.value);
+        
+        if (filterType === 'ecosystem') {
+            this.filters.ecosystems = selectedValues;
+        } else if (filterType === 'type') {
+            this.filters.types = selectedValues;
+        }
+        
+        this._updatePillValue(filterType, selectedValues);
+        this._closeAllDropdowns();
+        this.loadResources();
+    }
+    
+    /**
+     * Clear filter selection
+     */
+    _clearFilterSelection(filterType) {
+        const optionsContainer = document.getElementById(`${filterType}-options`);
+        if (optionsContainer) {
+            optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+            });
+        }
+        
+        if (filterType === 'ecosystem') {
+            this.filters.ecosystems = [];
+        } else if (filterType === 'type') {
+            this.filters.types = [];
+        }
+        
+        this._updatePillValue(filterType, []);
+        this._closeAllDropdowns();
+        this.loadResources();
+    }
+    
+    /**
+     * Update pill display value (supports multiple selections)
+     */
+    _updatePillValue(filterType, values) {
         const pill = this.container.querySelector(`.filter-pill-${filterType}`);
         if (!pill) return;
         
         const valueSpan = pill.querySelector('.pill-value');
         if (valueSpan) {
-            valueSpan.textContent = value ? value.toUpperCase() : 'All';
+            if (Array.isArray(values)) {
+                if (values.length === 0) {
+                    valueSpan.textContent = 'All';
+                } else if (values.length === 1) {
+                    valueSpan.textContent = values[0].toUpperCase();
+                } else {
+                    valueSpan.textContent = `${values.length} selected`;
+                }
+            } else {
+                valueSpan.textContent = values ? values.toUpperCase() : 'All';
+            }
         }
         
         // Add/remove has-value class
-        if (value) {
+        const hasValue = Array.isArray(values) ? values.length > 0 : !!values;
+        if (hasValue) {
             pill.classList.add('has-value');
         } else {
             pill.classList.remove('has-value');
@@ -500,11 +545,12 @@ export class ResourceBrowser {
             if (ecosystems.success) {
                 const optionsContainer = document.getElementById('ecosystem-options');
                 if (optionsContainer) {
+                    optionsContainer.innerHTML = ''; // Clear existing options
                     ecosystems.ecosystems.forEach(eco => {
                         const label = document.createElement('label');
                         label.className = 'dropdown-option';
                         label.innerHTML = `
-                            <input type="radio" name="ecosystem" value="${eco}">
+                            <input type="checkbox" name="ecosystem" value="${eco}">
                             <span>${eco.toUpperCase()}</span>
                         `;
                         optionsContainer.appendChild(label);
@@ -515,11 +561,12 @@ export class ResourceBrowser {
             if (types.success) {
                 const optionsContainer = document.getElementById('type-options');
                 if (optionsContainer) {
+                    optionsContainer.innerHTML = ''; // Clear existing options
                     types.types.forEach(type => {
                         const label = document.createElement('label');
                         label.className = 'dropdown-option';
                         label.innerHTML = `
-                            <input type="radio" name="type" value="${type}">
+                            <input type="checkbox" name="type" value="${type}">
                             <span>${type.charAt(0).toUpperCase() + type.slice(1)}</span>
                         `;
                         optionsContainer.appendChild(label);
@@ -540,8 +587,14 @@ export class ResourceBrowser {
         
         try {
             const params = new URLSearchParams();
-            if (this.filters.ecosystem) params.append('ecosystem', this.filters.ecosystem);
-            if (this.filters.type) params.append('type', this.filters.type);
+            // Support multiple ecosystem selections
+            if (this.filters.ecosystems && this.filters.ecosystems.length > 0) {
+                this.filters.ecosystems.forEach(eco => params.append('ecosystem', eco));
+            }
+            // Support multiple type selections
+            if (this.filters.types && this.filters.types.length > 0) {
+                this.filters.types.forEach(type => params.append('type', type));
+            }
             if (this.filters.search) params.append('search', this.filters.search);
             
             const response = await window.api.get(`/resources/list?${params}`);
@@ -579,7 +632,9 @@ export class ResourceBrowser {
     _updateFilterStatus() {
         const statusEl = document.getElementById('filter-status');
         if (statusEl) {
-            const hasFilters = this.filters.ecosystem || this.filters.type || this.filters.search;
+            const hasFilters = (this.filters.ecosystems && this.filters.ecosystems.length > 0) || 
+                               (this.filters.types && this.filters.types.length > 0) || 
+                               this.filters.search;
             statusEl.style.display = hasFilters ? 'inline-flex' : 'none';
         }
     }
@@ -852,8 +907,8 @@ export class ResourceBrowser {
      */
     clearFilters() {
         this.filters = {
-            ecosystem: null,
-            type: null,
+            ecosystems: [],
+            types: [],
             tags: [],
             search: ''
         };
@@ -863,19 +918,19 @@ export class ResourceBrowser {
         if (searchInput) searchInput.value = '';
         
         // Reset pill values
-        this._updatePillValue('ecosystem', '');
-        this._updatePillValue('type', '');
+        this._updatePillValue('ecosystem', []);
+        this._updatePillValue('type', []);
         
-        // Reset radio buttons in dropdowns
-        const ecosystemRadios = document.querySelectorAll('input[name="ecosystem"]');
-        const typeRadios = document.querySelectorAll('input[name="type"]');
+        // Reset checkboxes in dropdowns
+        const ecosystemCheckboxes = document.querySelectorAll('input[name="ecosystem"]');
+        const typeCheckboxes = document.querySelectorAll('input[name="type"]');
         
-        ecosystemRadios.forEach(radio => {
-            radio.checked = radio.value === '';
+        ecosystemCheckboxes.forEach(cb => {
+            cb.checked = false;
         });
         
-        typeRadios.forEach(radio => {
-            radio.checked = radio.value === '';
+        typeCheckboxes.forEach(cb => {
+            cb.checked = false;
         });
         
         this.loadResources();
