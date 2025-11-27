@@ -498,7 +498,13 @@ export class ResourceBrowser {
      */
     _sortAndRenderResources() {
         const sortConfig = TILE_VIEWER_CONFIG.sortOptions.find(opt => opt.value === this.sortBy);
-        if (!sortConfig || !this.resources.length) return;
+        if (!sortConfig) return;
+        
+        // Handle empty resources array
+        if (this.resources.length === 0) {
+            this.renderResources([]);
+            return;
+        }
         
         const sorted = [...this.resources].sort((a, b) => {
             let aVal, bVal;
