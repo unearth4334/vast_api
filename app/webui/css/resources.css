@@ -1,13 +1,47 @@
 /**
  * Resource Manager Styles
- * Tile Viewer Design with lazy loading, sorting, and filtering
+ * Dark Neon Theme - Tile Viewer Design with lazy loading, sorting, and filtering
  */
 
+/* Dark Neon Theme Variables */
 .resource-browser {
+    --neon-cyan: #00f5ff;
+    --neon-magenta: #ff00ff;
+    --neon-green: #00ff88;
+    --neon-purple: #bf00ff;
+    --neon-orange: #ff6600;
+    --neon-pink: #ff0099;
+    --neon-yellow: #ffff00;
+    
+    /* Background colors */
+    --dark-bg-primary: #0a0a0f;
+    --dark-bg-secondary: #12121a;
+    --dark-bg-tertiary: #1a1a25;
+    --dark-bg-card: #15151f;
+    --dark-bg-hover: #1f1f2e;
+    
+    /* Text colors */
+    --dark-text-primary: #e0e0e0;
+    --dark-text-secondary: #a0a0a0;
+    --dark-text-muted: #606060;
+    
+    /* Border colors */
+    --dark-border: #2a2a3a;
+    --dark-border-glow: rgba(0, 245, 255, 0.3);
+    
+    /* Glow effects */
+    --glow-cyan: 0 0 20px rgba(0, 245, 255, 0.5), 0 0 40px rgba(0, 245, 255, 0.2);
+    --glow-magenta: 0 0 20px rgba(255, 0, 255, 0.5), 0 0 40px rgba(255, 0, 255, 0.2);
+    --glow-green: 0 0 20px rgba(0, 255, 136, 0.5), 0 0 40px rgba(0, 255, 136, 0.2);
+    --glow-purple: 0 0 20px rgba(191, 0, 255, 0.5), 0 0 40px rgba(191, 0, 255, 0.2);
+    
     max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
     position: relative;
+    background: var(--dark-bg-primary);
+    color: var(--dark-text-primary);
+    min-height: 100vh;
 }
 
 .resource-header {
@@ -18,29 +52,32 @@
 .resource-header h2 {
     margin: 0 0 10px 0;
     font-size: 28px;
-    color: #333;
+    color: var(--neon-cyan);
+    text-shadow: var(--glow-cyan);
+    font-weight: 700;
+    letter-spacing: 1px;
 }
 
 .resource-header p {
     margin: 0;
-    color: #666;
+    color: var(--dark-text-secondary);
     font-size: 14px;
 }
 
 /* ==========================================
-   Tile Viewer Filter Bar - New Design
+   Tile Viewer Filter Bar - Dark Neon Design
    ========================================== */
 .tile-viewer-filters {
     display: flex;
     gap: 16px;
     margin-bottom: 16px;
     padding: 16px 20px;
-    background: linear-gradient(to bottom, #f8f9fa, #f0f1f3);
+    background: linear-gradient(135deg, var(--dark-bg-secondary) 0%, var(--dark-bg-tertiary) 100%);
     border-radius: 12px;
     align-items: center;
     flex-wrap: wrap;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--dark-border);
 }
 
 .filter-pills {
@@ -54,33 +91,36 @@
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    background: white;
-    border: 1px solid #ddd;
+    background: var(--dark-bg-card);
+    border: 1px solid var(--dark-border);
     border-radius: 24px;
-    color: #555;
+    color: var(--dark-text-secondary);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     white-space: nowrap;
 }
 
 .filter-pill:hover {
-    border-color: #007bff;
-    background: #f8faff;
+    border-color: var(--neon-cyan);
+    background: var(--dark-bg-hover);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 15px rgba(0, 245, 255, 0.3);
     transform: translateY(-1px);
 }
 
 .filter-pill.active {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.2) 0%, rgba(191, 0, 255, 0.2) 100%);
+    color: var(--neon-cyan);
+    border-color: var(--neon-cyan);
+    box-shadow: var(--glow-cyan);
 }
 
 .filter-pill.has-value {
-    background: #e7f3ff;
-    border-color: #007bff;
-    color: #0056b3;
+    background: rgba(0, 245, 255, 0.15);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
 }
 
 .pill-icon {
@@ -106,7 +146,7 @@
     transform: rotate(180deg);
 }
 
-/* Filter Search Container */
+/* Filter Search Container - Dark Neon */
 .filter-search-container {
     flex: 1;
     min-width: 200px;
@@ -121,25 +161,31 @@
     transform: translateY(-50%);
     font-size: 14px;
     opacity: 0.5;
+    color: var(--dark-text-muted);
 }
 
 .filter-search-input {
     width: 100%;
     padding: 10px 14px 10px 36px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--dark-border);
     border-radius: 24px;
     font-size: 14px;
-    background: white;
-    transition: all 0.2s;
+    background: var(--dark-bg-card);
+    color: var(--dark-text-primary);
+    transition: all 0.3s;
+}
+
+.filter-search-input::placeholder {
+    color: var(--dark-text-muted);
 }
 
 .filter-search-input:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+    border-color: var(--neon-magenta);
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
 }
 
-/* Filter Controls */
+/* Filter Controls - Dark Neon */
 .filter-controls {
     display: flex;
     align-items: center;
@@ -155,31 +201,34 @@
 .sort-control label {
     font-size: 12px;
     font-weight: 600;
-    color: #666;
+    color: var(--dark-text-secondary);
     text-transform: uppercase;
 }
 
 .sort-select {
     padding: 8px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--dark-border);
     border-radius: 8px;
     font-size: 13px;
-    background: white;
+    background: var(--dark-bg-card);
+    color: var(--dark-text-primary);
     cursor: pointer;
-    transition: border-color 0.2s;
+    transition: all 0.3s;
 }
 
 .sort-select:focus {
     outline: none;
-    border-color: #007bff;
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 15px rgba(191, 0, 255, 0.3);
 }
 
-/* View Toggle Buttons */
+/* View Toggle Buttons - Dark Neon */
 .view-toggle {
     display: flex;
-    background: #e9ecef;
+    background: var(--dark-bg-card);
     border-radius: 8px;
     padding: 2px;
+    border: 1px solid var(--dark-border);
 }
 
 .view-btn {
@@ -192,50 +241,51 @@
     background: transparent;
     border-radius: 6px;
     cursor: pointer;
-    color: #666;
-    transition: all 0.2s;
+    color: var(--dark-text-muted);
+    transition: all 0.3s;
 }
 
 .view-btn:hover {
-    color: #333;
-    background: rgba(0, 0, 0, 0.05);
+    color: var(--neon-cyan);
+    background: rgba(0, 245, 255, 0.1);
 }
 
 .view-btn.active {
-    background: white;
-    color: #007bff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.2) 0%, rgba(0, 255, 136, 0.2) 100%);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
 }
 
-/* Clear Filters Button */
+/* Clear Filters Button - Dark Neon */
 .btn-clear-filters {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     padding: 8px 14px;
-    background: #fff0f0;
-    border: 1px solid #ffcdd2;
+    background: rgba(255, 0, 153, 0.1);
+    border: 1px solid rgba(255, 0, 153, 0.3);
     border-radius: 8px;
-    color: #c62828;
+    color: var(--neon-pink);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s;
 }
 
 .btn-clear-filters:hover {
-    background: #ffebee;
-    border-color: #ef9a9a;
+    background: rgba(255, 0, 153, 0.2);
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 15px rgba(255, 0, 153, 0.3);
 }
 
-/* Filter Dropdowns */
+/* Filter Dropdowns - Dark Neon */
 .filter-dropdown {
     position: absolute;
     z-index: 100;
-    background: white;
-    border: 1px solid #e0e0e0;
+    background: var(--dark-bg-secondary);
+    border: 1px solid var(--dark-border);
     border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 245, 255, 0.1);
     min-width: 200px;
     overflow: hidden;
     animation: dropdownSlide 0.2s ease-out;
@@ -256,11 +306,12 @@
     padding: 12px 16px;
     font-size: 12px;
     font-weight: 600;
-    color: #888;
+    color: var(--neon-cyan);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #e0e0e0;
+    background: var(--dark-bg-tertiary);
+    border-bottom: 1px solid var(--dark-border);
+    text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
 }
 
 .dropdown-options {
@@ -275,31 +326,32 @@
     gap: 10px;
     padding: 10px 16px;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.2s;
+    color: var(--dark-text-primary);
 }
 
 .dropdown-option:hover {
-    background: #f5f7fa;
+    background: var(--dark-bg-hover);
 }
 
 .dropdown-option input[type="radio"],
 .dropdown-option input[type="checkbox"] {
     margin: 0;
-    accent-color: #007bff;
+    accent-color: var(--neon-cyan);
 }
 
 .dropdown-option span {
     font-size: 14px;
-    color: #333;
+    color: var(--dark-text-primary);
 }
 
-/* Dropdown Footer with Apply/Clear buttons */
+/* Dropdown Footer with Apply/Clear buttons - Dark Neon */
 .dropdown-footer {
     display: flex;
     gap: 8px;
     padding: 12px 16px;
-    background: #f8f9fa;
-    border-top: 1px solid #e0e0e0;
+    background: var(--dark-bg-tertiary);
+    border-top: 1px solid var(--dark-border);
 }
 
 .dropdown-apply-btn,
@@ -310,31 +362,34 @@
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s;
 }
 
 .dropdown-apply-btn {
-    background: #007bff;
-    color: white;
+    background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-green) 100%);
+    color: var(--dark-bg-primary);
     border: none;
+    font-weight: 600;
 }
 
 .dropdown-apply-btn:hover {
-    background: #0056b3;
+    box-shadow: var(--glow-cyan);
+    transform: translateY(-1px);
 }
 
 .dropdown-clear-btn {
-    background: white;
-    color: #666;
-    border: 1px solid #ddd;
+    background: transparent;
+    color: var(--dark-text-secondary);
+    border: 1px solid var(--dark-border);
 }
 
 .dropdown-clear-btn:hover {
-    background: #f0f0f0;
-    border-color: #ccc;
+    background: var(--dark-bg-hover);
+    border-color: var(--neon-pink);
+    color: var(--neon-pink);
 }
 
-/* Resource Stats Bar */
+/* Resource Stats Bar - Dark Neon */
 .resource-stats-bar {
     display: flex;
     gap: 16px;
@@ -347,7 +402,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: #666;
+    color: var(--dark-text-secondary);
 }
 
 .stat-icon {
@@ -356,11 +411,12 @@
 
 .stat-value {
     font-weight: 600;
-    color: #333;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 8px rgba(0, 245, 255, 0.5);
 }
 
 .stat-item.filter-active {
-    color: #007bff;
+    color: var(--neon-magenta);
     font-weight: 500;
 }
 
@@ -389,7 +445,7 @@
     gap: 8px;
 }
 
-/* Loading State */
+/* Loading State - Dark Neon */
 .resource-grid .loading {
     grid-column: 1 / -1;
     display: flex;
@@ -397,24 +453,25 @@
     justify-content: center;
     gap: 12px;
     padding: 60px 20px;
-    color: #666;
+    color: var(--dark-text-secondary);
     font-size: 15px;
 }
 
 .loading-spinner {
     width: 20px;
     height: 20px;
-    border: 2px solid #e0e0e0;
-    border-top-color: #007bff;
+    border: 2px solid var(--dark-border);
+    border-top-color: var(--neon-cyan);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+    box-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
 }
 
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
 
-/* No Results State */
+/* No Results State - Dark Neon */
 .no-results {
     grid-column: 1 / -1;
     display: flex;
@@ -434,26 +491,27 @@
 .no-results-text {
     font-size: 18px;
     font-weight: 600;
-    color: #333;
+    color: var(--dark-text-primary);
     margin-bottom: 8px;
 }
 
 .no-results-hint {
     font-size: 14px;
-    color: #888;
+    color: var(--dark-text-muted);
 }
 
-/* Preview Pane (Desktop only) */
+/* Preview Pane (Desktop only) - Dark Neon */
 .resource-preview-pane {
     width: 400px;
-    background: white;
-    border: 1px solid #e0e0e0;
+    background: var(--dark-bg-secondary);
+    border: 1px solid var(--dark-border);
     border-radius: 8px;
     overflow: hidden;
     position: sticky;
     top: 20px;
     max-height: calc(100vh - 100px);
     overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .preview-close {
@@ -462,8 +520,8 @@
     right: 10px;
     width: 30px;
     height: 30px;
-    background: rgba(0, 0, 0, 0.5);
-    color: white;
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--neon-pink);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -472,11 +530,13 @@
     z-index: 10;
     font-size: 20px;
     line-height: 1;
-    transition: background 0.2s;
+    transition: all 0.3s;
+    border: 1px solid rgba(255, 0, 153, 0.3);
 }
 
 .preview-close:hover {
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(255, 0, 153, 0.3);
+    box-shadow: 0 0 15px rgba(255, 0, 153, 0.5);
 }
 
 .preview-content {
@@ -491,7 +551,7 @@
 .preview-thumbnail {
     width: 100%;
     padding-top: 75%; /* 4:3 aspect ratio */
-    background: #f0f0f0;
+    background: var(--dark-bg-tertiary);
     position: relative;
     overflow: hidden;
 }
@@ -513,7 +573,7 @@
     font-size: 20px;
     font-weight: 600;
     margin: 0 0 12px 0;
-    color: #333;
+    color: var(--dark-text-primary);
 }
 
 .preview-tags {
@@ -525,21 +585,21 @@
 
 .preview-description {
     font-size: 14px;
-    color: #666;
+    color: var(--dark-text-secondary);
     line-height: 1.6;
     margin-bottom: 16px;
 }
 
 .preview-meta {
     font-size: 13px;
-    color: #888;
+    color: var(--dark-text-muted);
     margin: 8px 0;
 }
 
 .preview-footer {
     padding: 16px 20px;
-    background: #f9f9f9;
-    border-top: 1px solid #e0e0e0;
+    background: var(--dark-bg-tertiary);
+    border-top: 1px solid var(--dark-border);
 }
 
 .btn-select-preview {
@@ -550,26 +610,29 @@
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
-    background: #007bff;
-    color: white;
+    transition: all 0.3s;
+    background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
+    color: var(--dark-bg-primary);
+    font-weight: 600;
 }
 
 .btn-select-preview:hover {
-    background: #0056b3;
+    box-shadow: var(--glow-cyan);
+    transform: translateY(-1px);
 }
 
 .btn-select-preview.selected {
-    background: #28a745;
+    background: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-cyan) 100%);
 }
 
 .btn-select-preview.selected:hover {
-    background: #218838;
+    box-shadow: var(--glow-green);
 }
 
+/* Resource Card - Dark Neon */
 .resource-card {
-    background: white;
-    border: 1px solid #e0e0e0;
+    background: var(--dark-bg-card);
+    border: 1px solid var(--dark-border);
     border-radius: 12px;
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -577,19 +640,19 @@
 }
 
 .resource-card:hover {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    border-color: #ccc;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 245, 255, 0.15);
+    border-color: rgba(0, 245, 255, 0.3);
     transform: translateY(-2px);
 }
 
 .resource-card.selected {
-    border-color: #28a745;
-    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+    border-color: var(--neon-green);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
 }
 
 .resource-card.expanded {
     grid-column: span 2;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 245, 255, 0.2);
 }
 
 /* Resource Media (images and videos) */
@@ -608,7 +671,7 @@
     opacity: 1;
 }
 
-/* List View Card Layout */
+/* List View Card Layout - Dark Neon */
 .resource-card-list {
     border-radius: 8px;
 }
@@ -625,7 +688,7 @@
     height: 60px;
     border-radius: 8px;
     overflow: hidden;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--neon-purple) 0%, var(--neon-cyan) 100%);
     flex-shrink: 0;
 }
 
@@ -645,7 +708,7 @@
     font-size: 15px;
     font-weight: 600;
     margin: 0;
-    color: #333;
+    color: var(--dark-text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -666,16 +729,16 @@
 .meta-size,
 .meta-deps {
     font-size: 11px;
-    color: #888;
+    color: var(--dark-text-muted);
 }
 
 .meta-deps {
-    color: #f57c00;
+    color: var(--neon-orange);
 }
 
 .list-description {
     font-size: 12px;
-    color: #666;
+    color: var(--dark-text-secondary);
     margin: 6px 0 0 0;
     line-height: 1.4;
     display: -webkit-box;
@@ -698,7 +761,7 @@
     justify-content: center;
 }
 
-/* Compact Card View */
+/* Compact Card View - Dark Neon */
 .resource-card-compact {
     padding: 12px 16px;
 }
@@ -714,7 +777,7 @@
     font-size: 14px;
     font-weight: 600;
     margin: 0;
-    color: #333;
+    color: var(--dark-text-primary);
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -730,30 +793,33 @@
     white-space: nowrap;
     margin-left: 8px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s;
 }
 
 .status-badge:hover {
     transform: scale(1.05);
-    opacity: 0.8;
 }
 
 .status-badge.status-available {
-    background: #e3f2fd;
-    color: #1976d2;
+    background: rgba(0, 245, 255, 0.15);
+    color: var(--neon-cyan);
+    border: 1px solid rgba(0, 245, 255, 0.3);
 }
 
 .status-badge.status-available:hover {
-    background: #bbdefb;
+    background: rgba(0, 245, 255, 0.25);
+    box-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
 }
 
 .status-badge.status-selected {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: rgba(0, 255, 136, 0.15);
+    color: var(--neon-green);
+    border: 1px solid rgba(0, 255, 136, 0.3);
 }
 
 .status-badge.status-selected:hover {
-    background: #c8e6c9;
+    background: rgba(0, 255, 136, 0.25);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
 }
 
 .compact-meta {
@@ -766,17 +832,18 @@
 .compact-ecosystem {
     padding: 2px 6px;
     border-radius: 3px;
-    background: #f5f5f5;
-    color: #666;
+    background: var(--dark-bg-tertiary);
+    color: var(--dark-text-secondary);
     text-transform: capitalize;
 }
 
 .compact-ecosystem {
-    background: #007bff;
-    color: white;
+    background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
+    color: var(--dark-bg-primary);
+    font-weight: 600;
 }
 
-/* Expanded Card View */
+/* Expanded Card View - Dark Neon */
 .resource-card-expanded {
     animation: expandCard 0.3s ease-out;
 }
@@ -795,7 +862,7 @@
 .resource-card-header {
     position: relative;
     padding-top: 56.25%; /* 16:9 aspect ratio */
-    background: #f0f0f0;
+    background: var(--dark-bg-tertiary);
     overflow: hidden;
 }
 
@@ -816,7 +883,7 @@
     font-size: 16px;
     font-weight: 600;
     margin: 0 0 10px 0;
-    color: #333;
+    color: var(--dark-text-primary);
     line-height: 1.3;
 }
 
@@ -836,18 +903,20 @@
 }
 
 .tag-ecosystem {
-    background: #007bff;
-    color: white;
+    background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
+    color: var(--dark-bg-primary);
+    font-weight: 600;
 }
 
 .tag-type {
-    background: #e0e0e0;
-    color: #555;
+    background: var(--dark-bg-tertiary);
+    color: var(--dark-text-secondary);
+    border: 1px solid var(--dark-border);
 }
 
 .resource-description {
     font-size: 13px;
-    color: #666;
+    color: var(--dark-text-secondary);
     margin: 0 0 12px 0;
     line-height: 1.4;
 }
@@ -855,18 +924,18 @@
 .resource-size,
 .resource-deps {
     font-size: 12px;
-    color: #888;
+    color: var(--dark-text-muted);
     margin: 4px 0;
 }
 
 .resource-deps {
-    color: #f57c00;
+    color: var(--neon-orange);
     font-weight: 500;
 }
 
 .resource-card-footer {
     padding: 12px 16px;
-    background: #f9f9f9;
+    background: var(--dark-bg-tertiary);
     display: flex;
     gap: 8px;
     justify-content: center;
@@ -878,43 +947,42 @@
     border-radius: 4px;
     font-size: 14px;
     cursor: pointer;
-    transition: all 0.2s;
-    font-weight: 500;
-    background: #007bff;
-    color: white;
-    border: 1px solid #007bff;
+    transition: all 0.3s;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
+    color: var(--dark-bg-primary);
+    border: 1px solid transparent;
 }
 
 .btn-select:hover {
-    background: #0056b3;
-    border-color: #0056b3;
+    box-shadow: var(--glow-cyan);
+    transform: translateY(-1px);
 }
 
 .resource-card.selected .btn-select {
-    background: #28a745;
-    border-color: #28a745;
+    background: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-cyan) 100%);
 }
 
 .resource-card.selected .btn-select:hover {
-    background: #218838;
-    border-color: #218838;
+    box-shadow: var(--glow-green);
 }
 
-/* Footer */
+/* Footer - Dark Neon */
 .resource-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 20px;
-    background: #f5f5f5;
+    background: var(--dark-bg-secondary);
     border-radius: 8px;
     margin-top: 20px;
+    border: 1px solid var(--dark-border);
 }
 
 .selection-info {
     font-size: 14px;
     font-weight: 500;
-    color: #333;
+    color: var(--dark-text-primary);
 }
 
 .action-buttons {
@@ -924,18 +992,19 @@
 
 .btn-primary {
     padding: 10px 20px;
-    background: #007bff;
-    color: white;
+    background: linear-gradient(135deg, var(--neon-green) 0%, var(--neon-cyan) 100%);
+    color: var(--dark-bg-primary);
     border: none;
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s;
+    font-weight: 600;
+    transition: all 0.3s;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: #0056b3;
+    box-shadow: var(--glow-green);
+    transform: translateY(-1px);
 }
 
 .btn-primary:disabled {
@@ -943,29 +1012,31 @@
     cursor: not-allowed;
 }
 
-/* Loading and error states */
+/* Loading and error states - Dark Neon */
 .error {
     grid-column: 1 / -1;
     text-align: center;
     padding: 60px 20px;
-    color: #dc3545;
+    color: var(--neon-pink);
     font-size: 16px;
 }
 
-/* Button secondary base style */
+/* Button secondary base style - Dark Neon */
 .btn-secondary {
     padding: 8px 16px;
-    background: white;
-    border: 1px solid #ddd;
+    background: var(--dark-bg-card);
+    border: 1px solid var(--dark-border);
     border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
-    transition: all 0.2s;
+    color: var(--dark-text-primary);
+    transition: all 0.3s;
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: #f0f0f0;
-    border-color: #ccc;
+    background: var(--dark-bg-hover);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
 }
 
 .btn-secondary:disabled {
@@ -1076,15 +1147,16 @@
 }
 
 /* ==============================================
-   Download Tasklist Visualization
+   Download Tasklist Visualization - Dark Neon
    Similar to custom node installer tasklist
    ============================================== */
 
 .download-status-container {
     margin-top: 20px;
-    background: #f8f9fa;
+    background: var(--dark-bg-secondary);
     border-radius: 8px;
     padding: 16px;
+    border: 1px solid var(--dark-border);
 }
 
 .download-tasklist-empty {
@@ -1093,7 +1165,7 @@
     justify-content: center;
     gap: 10px;
     padding: 30px 20px;
-    color: #888;
+    color: var(--dark-text-muted);
     font-size: 14px;
 }
 
@@ -1104,18 +1176,18 @@
 .download-error {
     padding: 20px;
     text-align: center;
-    color: #dc3545;
+    color: var(--neon-pink);
     font-size: 14px;
 }
 
-/* Download Summary Header */
+/* Download Summary Header - Dark Neon */
 .download-summary {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
     margin-bottom: 16px;
     padding-bottom: 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--dark-border);
 }
 
 .summary-item {
@@ -1128,28 +1200,33 @@
 }
 
 .summary-total {
-    background: #e0e0e0;
-    color: #555;
+    background: var(--dark-bg-tertiary);
+    color: var(--dark-text-secondary);
+    border: 1px solid var(--dark-border);
 }
 
 .summary-pending {
-    background: #fff3cd;
-    color: #856404;
+    background: rgba(255, 255, 0, 0.1);
+    color: var(--neon-yellow);
+    border: 1px solid rgba(255, 255, 0, 0.3);
 }
 
 .summary-running {
-    background: #cce5ff;
-    color: #004085;
+    background: rgba(0, 245, 255, 0.1);
+    color: var(--neon-cyan);
+    border: 1px solid rgba(0, 245, 255, 0.3);
 }
 
 .summary-complete {
-    background: #d4edda;
-    color: #155724;
+    background: rgba(0, 255, 136, 0.1);
+    color: var(--neon-green);
+    border: 1px solid rgba(0, 255, 136, 0.3);
 }
 
 .summary-failed {
-    background: #f8d7da;
-    color: #721c24;
+    background: rgba(255, 0, 153, 0.1);
+    color: var(--neon-pink);
+    border: 1px solid rgba(255, 0, 153, 0.3);
 }
 
 /* Download Task List */
@@ -1159,36 +1236,36 @@
     gap: 8px;
 }
 
-/* Individual Task Item */
+/* Individual Task Item - Dark Neon */
 .download-task-item {
-    background: white;
-    border: 1px solid #e0e0e0;
+    background: var(--dark-bg-card);
+    border: 1px solid var(--dark-border);
     border-radius: 6px;
     padding: 12px 16px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
 }
 
 .download-task-item:hover {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-/* Status-specific borders */
+/* Status-specific borders - Dark Neon */
 .download-task-item.pending {
-    border-left: 3px solid #ffc107;
+    border-left: 3px solid var(--neon-yellow);
 }
 
 .download-task-item.running {
-    border-left: 3px solid #007bff;
-    background: #f8fbff;
+    border-left: 3px solid var(--neon-cyan);
+    background: rgba(0, 245, 255, 0.05);
 }
 
 .download-task-item.complete {
-    border-left: 3px solid #28a745;
+    border-left: 3px solid var(--neon-green);
 }
 
 .download-task-item.failed {
-    border-left: 3px solid #dc3545;
-    background: #fff8f8;
+    border-left: 3px solid var(--neon-pink);
+    background: rgba(255, 0, 153, 0.05);
 }
 
 /* Task Main Row (icon, name, status tag) */
@@ -1209,13 +1286,13 @@
     flex: 1;
     font-size: 14px;
     font-weight: 500;
-    color: #333;
+    color: var(--dark-text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* Status Tags on the right */
+/* Status Tags on the right - Dark Neon */
 .task-status-tag {
     font-size: 11px;
     font-weight: 600;
@@ -1227,35 +1304,41 @@
 }
 
 .task-status-tag.pending {
-    background: #fff3cd;
-    color: #856404;
+    background: rgba(255, 255, 0, 0.15);
+    color: var(--neon-yellow);
 }
 
 .task-status-tag.running {
-    background: #cce5ff;
-    color: #004085;
-    animation: pulse 1.5s infinite;
+    background: rgba(0, 245, 255, 0.15);
+    color: var(--neon-cyan);
+    animation: neonPulse 1.5s infinite;
 }
 
 .task-status-tag.complete {
-    background: #d4edda;
-    color: #155724;
+    background: rgba(0, 255, 136, 0.15);
+    color: var(--neon-green);
 }
 
 .task-status-tag.failed {
-    background: #f8d7da;
-    color: #721c24;
+    background: rgba(255, 0, 153, 0.15);
+    color: var(--neon-pink);
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+@keyframes neonPulse {
+    0%, 100% { 
+        opacity: 1;
+        box-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
+    }
+    50% { 
+        opacity: 0.7;
+        box-shadow: 0 0 20px rgba(0, 245, 255, 0.5);
+    }
 }
 
-/* Task Progress Bar */
+/* Task Progress Bar - Dark Neon */
 .task-progress-bar {
     height: 4px;
-    background: #e0e0e0;
+    background: var(--dark-bg-tertiary);
     border-radius: 2px;
     margin-top: 10px;
     overflow: hidden;
@@ -1263,19 +1346,19 @@
 
 .task-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #007bff, #0056b3);
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
     border-radius: 2px;
     transition: width 0.3s ease;
 }
 
 /* Running task: animated progress bar */
 .download-task-item.running .task-progress-fill {
-    animation: progressShimmer 1.5s infinite;
-    background: linear-gradient(90deg, #007bff, #66b0ff, #007bff);
+    animation: neonProgressShimmer 1.5s infinite;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta), var(--neon-cyan));
     background-size: 200% 100%;
 }
 
-@keyframes progressShimmer {
+@keyframes neonProgressShimmer {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
@@ -1283,7 +1366,7 @@
 /* Progress Details */
 .task-progress-details {
     font-size: 12px;
-    color: #666;
+    color: var(--dark-text-muted);
     margin-top: 8px;
     padding-left: 36px; /* Align with task name */
 }
@@ -1291,13 +1374,13 @@
 /* Error Message */
 .task-error-msg {
     font-size: 12px;
-    color: #dc3545;
+    color: var(--neon-pink);
     margin-top: 8px;
     padding-left: 36px;
     font-style: italic;
 }
 
-/* Responsive adjustments */
+/* Responsive adjustments - Dark Neon */
 @media (max-width: 768px) {
     .download-status-container {
         padding: 12px;
