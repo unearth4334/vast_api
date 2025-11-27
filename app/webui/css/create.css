@@ -1,0 +1,644 @@
+/* =========================
+   CREATE TAB STYLES
+   ========================= */
+
+/* =========================
+   WORKFLOW GRID
+   ========================= */
+
+.workflow-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--size-4-4);
+    margin: var(--size-4-4) 0;
+}
+
+.workflow-card {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-4);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+}
+
+.workflow-card:hover {
+    border-color: var(--interactive-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--background-modifier-box-shadow);
+}
+
+.workflow-card.selected {
+    border-color: var(--interactive-accent);
+    background: var(--background-modifier-hover);
+    box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.workflow-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+.workflow-card-icon {
+    font-size: 24px;
+}
+
+.workflow-card-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--text-normal);
+    flex: 1;
+}
+
+.workflow-card-description {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.workflow-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-4-1);
+    margin-top: auto;
+}
+
+.workflow-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--background-modifier-hover);
+    border-radius: 9999px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.workflow-tag.category {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+/* =========================
+   DYNAMIC FORM STYLES
+   ========================= */
+
+.create-form-container {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-4);
+    margin: var(--size-4-4) 0;
+}
+
+.create-form-section {
+    margin-bottom: var(--size-4-4);
+}
+
+.create-form-section:last-child {
+    margin-bottom: 0;
+}
+
+.create-form-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--size-4-3);
+    padding-bottom: var(--size-4-2);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.create-form-section-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--text-normal);
+    margin: 0;
+}
+
+.create-form-section-toggle {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: var(--size-4-1);
+    font-size: 16px;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+}
+
+.create-form-section-toggle.collapsed {
+    transform: rotate(-90deg);
+}
+
+.create-form-section-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-3);
+}
+
+.create-form-section-content.collapsed {
+    display: none;
+}
+
+/* =========================
+   FORM INPUT FIELDS
+   ========================= */
+
+.create-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+}
+
+.create-form-field label {
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.create-form-field .field-description {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    margin-bottom: var(--size-4-1);
+}
+
+.create-form-field input[type="text"],
+.create-form-field input[type="number"],
+.create-form-field textarea,
+.create-form-field select {
+    width: 100%;
+    padding: var(--size-4-2) var(--size-4-3);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-modifier-form-field);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    font-family: inherit;
+}
+
+.create-form-field textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+}
+
+.create-form-field input:focus,
+.create-form-field textarea:focus,
+.create-form-field select:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.1);
+}
+
+/* Required field indicator */
+.create-form-field label.required::after {
+    content: ' *';
+    color: var(--text-error);
+}
+
+/* =========================
+   IMAGE UPLOAD FIELD
+   ========================= */
+
+.image-upload-container {
+    border: 2px dashed var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-6);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--size-4-2);
+}
+
+.image-upload-container:hover {
+    border-color: var(--interactive-accent);
+    background: var(--background-modifier-hover);
+}
+
+.image-upload-container.has-image {
+    border-style: solid;
+    padding: var(--size-4-2);
+}
+
+.image-upload-container input[type="file"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.image-upload-icon {
+    font-size: 32px;
+    color: var(--text-muted);
+}
+
+.image-upload-text {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
+.image-upload-preview {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: var(--radius-s);
+    object-fit: contain;
+}
+
+.image-upload-clear {
+    position: absolute;
+    top: var(--size-4-2);
+    right: var(--size-4-2);
+    background: var(--text-error);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-upload-clear:hover {
+    background: #e53e3e;
+}
+
+/* =========================
+   SLIDER FIELD
+   ========================= */
+
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-3);
+}
+
+.slider-input {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: var(--background-modifier-border);
+    border-radius: 3px;
+    outline: none;
+}
+
+.slider-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--interactive-accent);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.slider-input::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.slider-input::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--interactive-accent);
+    cursor: pointer;
+    border: none;
+}
+
+.slider-value {
+    min-width: 60px;
+    padding: var(--size-4-1) var(--size-4-2);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-modifier-form-field);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    text-align: center;
+}
+
+.slider-unit {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    min-width: 40px;
+}
+
+/* =========================
+   SEED INPUT FIELD
+   ========================= */
+
+.seed-container {
+    display: flex;
+    gap: var(--size-4-2);
+}
+
+.seed-input {
+    flex: 1;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.seed-randomize {
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-2);
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+.seed-randomize:hover {
+    background: var(--interactive-hover);
+}
+
+.seed-randomize:active {
+    transform: rotate(180deg);
+}
+
+/* =========================
+   CHECKBOX FIELD
+   ========================= */
+
+.checkbox-field-container {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+.checkbox-field-container input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--interactive-accent);
+    cursor: pointer;
+}
+
+.checkbox-field-label {
+    cursor: pointer;
+}
+
+/* =========================
+   PRESETS SECTION
+   ========================= */
+
+.presets-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-4-2);
+    margin-bottom: var(--size-4-3);
+}
+
+.preset-button {
+    padding: var(--size-4-2) var(--size-4-3);
+    background: var(--interactive-normal);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-button:hover {
+    background: var(--interactive-hover);
+}
+
+.preset-button.active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+/* =========================
+   EXECUTION SECTION
+   ========================= */
+
+.create-execute-section {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-4);
+    margin: var(--size-4-4) 0;
+}
+
+.create-execute-button {
+    width: 100%;
+    padding: var(--size-4-4);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: var(--radius-m);
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--size-4-2);
+}
+
+.create-execute-button:hover:not(:disabled) {
+    background: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--background-modifier-box-shadow);
+}
+
+.create-execute-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.create-execute-button.executing {
+    background: #f59e0b;
+    animation: pulse 2s infinite;
+}
+
+/* =========================
+   PROGRESS DISPLAY
+   ========================= */
+
+.create-progress-container {
+    margin-top: var(--size-4-4);
+    display: none;
+}
+
+.create-progress-container.active {
+    display: block;
+}
+
+.create-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--size-4-2);
+}
+
+.create-progress-status {
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.create-progress-percent {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+}
+
+.create-progress-bar {
+    height: 8px;
+    background: var(--background-modifier-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.create-progress-fill {
+    height: 100%;
+    background: var(--interactive-accent);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.create-progress-details {
+    margin-top: var(--size-4-2);
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+/* =========================
+   OUTPUT PREVIEW
+   ========================= */
+
+.create-output-container {
+    margin-top: var(--size-4-4);
+    display: none;
+}
+
+.create-output-container.active {
+    display: block;
+}
+
+.create-output-header {
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--text-normal);
+    margin-bottom: var(--size-4-3);
+}
+
+.create-output-preview {
+    background: var(--background-modifier-form-field);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-3);
+    text-align: center;
+}
+
+.create-output-preview video,
+.create-output-preview img {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: var(--radius-s);
+}
+
+/* =========================
+   REQUIREMENTS INFO
+   ========================= */
+
+.workflow-requirements {
+    background: var(--background-modifier-hover);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-3);
+    margin: var(--size-4-3) 0;
+}
+
+.workflow-requirements-title {
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-normal);
+    margin-bottom: var(--size-4-2);
+}
+
+.workflow-requirements-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-4-2);
+}
+
+.workflow-requirement-item {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.workflow-requirement-icon {
+    color: var(--text-warning);
+}
+
+/* =========================
+   EMPTY STATE
+   ========================= */
+
+.create-empty-state {
+    text-align: center;
+    padding: var(--size-4-8);
+    color: var(--text-muted);
+}
+
+.create-empty-state-icon {
+    font-size: 48px;
+    margin-bottom: var(--size-4-3);
+}
+
+.create-empty-state-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--text-normal);
+    margin-bottom: var(--size-4-2);
+}
+
+.create-empty-state-description {
+    font-size: var(--font-ui-small);
+}
+
+/* =========================
+   RESPONSIVE ADJUSTMENTS
+   ========================= */
+
+@media (max-width: 768px) {
+    .workflow-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .slider-container {
+        flex-wrap: wrap;
+    }
+    
+    .slider-input {
+        flex: 1 1 100%;
+        order: 1;
+    }
+    
+    .slider-value {
+        order: 2;
+    }
+    
+    .slider-unit {
+        order: 3;
+    }
+}

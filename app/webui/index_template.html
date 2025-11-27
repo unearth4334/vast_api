@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/progress-indicators.css">
     <link rel="stylesheet" href="css/resources.css">
+    <link rel="stylesheet" href="css/create.css">
 </head>
 <body>
     <div class="container">
@@ -28,6 +29,9 @@
             </button>
             <button class="tab-button" onclick="showTab('resources')">
                 📦 Resource Manager
+            </button>
+            <button class="tab-button" onclick="showTab('create')">
+                🎨 Create
             </button>
         </div>
         
@@ -320,6 +324,105 @@
         </div>
     </div>
     
+    <!-- Create Tab -->
+    <div id="create-tab" class="tab-content">
+        <h3>🎨 Create with ComfyUI Workflows</h3>
+        <p>Select a workflow, configure inputs, and execute on your cloud instance.</p>
+        
+        <!-- VastAI Instances Section (same as other tabs) -->
+        <div class="vastai-instances-section">
+            <h4>🖥️ Active VastAI Instances</h4>
+            <div class="instances-buttons">
+                <button class="setup-button secondary" onclick="loadVastaiInstancesForCreate()">
+                    🔄 Load Instances
+                </button>
+                <button class="setup-button" onclick="openSearchOffersModal()">
+                    Search Offers
+                </button>
+            </div>
+            <div id="create-vastai-instances-list" class="instances-list">
+                <!-- Instances will be displayed here -->
+                <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances</div>
+            </div>
+        </div>
+        
+        <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
+        
+        <!-- Step 1: SSH Connection -->
+        <div class="workflow-tile">
+            <h4 class="tile-header">🔌 Step 1: SSH Connection</h4>
+            <div class="tile-content">
+                <div class="setup-field">
+                    <label for="createSshConnectionString">SSH Connection String:</label>
+                    <input type="text" id="createSshConnectionString" 
+                           placeholder="ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
+                           title="Enter the SSH connection string from your VastAI instance">
+                </div>
+            </div>
+        </div>
+        
+        <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
+        
+        <!-- Step 2: Workflow Selection -->
+        <div class="workflow-tile">
+            <h4 class="tile-header">🎨 Step 2: Select Workflow</h4>
+            <div class="tile-content">
+                <div id="create-workflows-grid" class="workflow-grid">
+                    <!-- Workflows will be loaded here -->
+                    <div class="create-empty-state">
+                        <div class="create-empty-state-icon">📭</div>
+                        <div class="create-empty-state-description">Click a tab button or wait for workflows to load...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 3: Configure Inputs -->
+        <div class="workflow-tile">
+            <h4 class="tile-header">📝 Step 3: Configure Inputs</h4>
+            <div class="tile-content">
+                <div id="create-form-container" class="create-form-container" style="display: none;">
+                    <!-- Form will be dynamically generated here -->
+                </div>
+                <div id="create-form-empty" class="create-empty-state">
+                    <div class="create-empty-state-icon">👆</div>
+                    <div class="create-empty-state-description">Select a workflow above to configure inputs</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 4: Execute -->
+        <div id="create-execute-section" class="create-execute-section" style="display: none;">
+            <h4 style="margin: 0 0 var(--size-4-3) 0;">▶️ Step 4: Execute</h4>
+            <button id="create-execute-button" class="create-execute-button" onclick="executeWorkflow()">
+                <span>▶️</span> Run Workflow
+            </button>
+            
+            <!-- Progress display -->
+            <div id="create-progress-container" class="create-progress-container">
+                <div class="create-progress-header">
+                    <span class="create-progress-status" id="create-progress-status">Initializing...</span>
+                    <span class="create-progress-percent" id="create-progress-percent">0%</span>
+                </div>
+                <div class="create-progress-bar">
+                    <div class="create-progress-fill" id="create-progress-fill" style="width: 0%;"></div>
+                </div>
+                <div class="create-progress-details" id="create-progress-details"></div>
+            </div>
+            
+            <!-- Output preview -->
+            <div id="create-output-container" class="create-output-container">
+                <div class="create-output-header">Output</div>
+                <div class="create-output-preview" id="create-output-preview">
+                    <!-- Output will be displayed here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Result message -->
+        <div id="create-result" class="setup-result" style="display: none;"></div>
+    </div>
+    
     <!-- SSH Host Key Error Modal -->
     <div id="hostKeyErrorOverlay" class="log-overlay" style="display: none;">
         <div class="log-modal">
@@ -391,10 +494,13 @@
     <!-- Resource Manager -->
     <script src="js/resources/resource-browser.js?v=20251118-v1" type="module"></script>
     
+    <!-- Create Tab -->
+    <script src="js/create/create-tab.js?v=20251127-v1"></script>
+    
     <!-- Legacy Support (temporary) -->
     <script src="js/vastai.js?v=20251116-v2"></script>
     
     <!-- Main application -->
-    <script src="js/main.js?v=20251020-v3"></script>
+    <script src="js/main.js?v=20251127-v1"></script>
 </body>
 </html>

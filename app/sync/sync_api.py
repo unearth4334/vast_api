@@ -58,6 +58,14 @@ except ImportError:
     from ..api import downloads_bp
 app.register_blueprint(downloads_bp)
 
+# Register Create API blueprint
+try:
+    from app.sync.create_api import create_bp
+except ImportError:
+    from .create_api import create_bp
+app.register_blueprint(create_bp)
+logger.info("Registered Create API blueprint")
+
 # Cache for VastAI status to prevent excessive API calls from health checks
 _vastai_status_cache = {
     'data': None,
@@ -80,6 +88,7 @@ CORS(
         r"/test/*": {"origins": ALLOWED_ORIGINS},
         r"/logs/*": {"origins": ALLOWED_ORIGINS},
         r"/resources/*": {"origins": ALLOWED_ORIGINS},
+        r"/create/*": {"origins": ALLOWED_ORIGINS},
         r"/": {"origins": ALLOWED_ORIGINS},
     },
     supports_credentials=False,

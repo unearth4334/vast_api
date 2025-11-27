@@ -25,25 +25,31 @@ function showTab(tabName) {
         initResourceBrowser();
     }
     
+    // Initialize Create tab when shown
+    if (tabName === 'create' && !window.createTabInitialized) {
+        if (typeof initCreateTab === 'function') {
+            initCreateTab();
+            window.createTabInitialized = true;
+        }
+    }
+    
     // Sync SSH connection strings between tabs
     syncSshConnectionStrings();
 }
 
-// Sync SSH connection strings between VastAI Setup and Resources tabs
+// Sync SSH connection strings between all tabs
 function syncSshConnectionStrings() {
     const vastaiInput = document.getElementById('sshConnectionString');
     const resourcesInput = document.getElementById('resourcesSshConnectionString');
+    const createInput = document.getElementById('createSshConnectionString');
     
-    if (vastaiInput && resourcesInput) {
-        // Sync from VastAI Setup to Resources if Resources is empty
-        if (!resourcesInput.value && vastaiInput.value) {
-            resourcesInput.value = vastaiInput.value;
-        }
-        // Sync from Resources to VastAI Setup if VastAI Setup is empty
-        else if (!vastaiInput.value && resourcesInput.value) {
-            vastaiInput.value = resourcesInput.value;
-        }
-    }
+    // Get the first non-empty value
+    const value = vastaiInput?.value || resourcesInput?.value || createInput?.value || '';
+    
+    // Sync to all inputs
+    if (vastaiInput && !vastaiInput.value && value) vastaiInput.value = value;
+    if (resourcesInput && !resourcesInput.value && value) resourcesInput.value = value;
+    if (createInput && !createInput.value && value) createInput.value = value;
 }
 
 // Initialize application when DOM is loaded
@@ -72,14 +78,29 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupSshInputSync() {
     const vastaiInput = document.getElementById('sshConnectionString');
     const resourcesInput = document.getElementById('resourcesSshConnectionString');
+    const createInput = document.getElementById('createSshConnectionString');
     
-    if (vastaiInput && resourcesInput) {
+    // Sync VastAI input to all others
+    if (vastaiInput) {
         vastaiInput.addEventListener('input', function() {
-            resourcesInput.value = vastaiInput.value;
+            if (resourcesInput) resourcesInput.value = vastaiInput.value;
+            if (createInput) createInput.value = vastaiInput.value;
         });
-        
+    }
+    
+    // Sync Resources input to all others
+    if (resourcesInput) {
         resourcesInput.addEventListener('input', function() {
-            vastaiInput.value = resourcesInput.value;
+            if (vastaiInput) vastaiInput.value = resourcesInput.value;
+            if (createInput) createInput.value = resourcesInput.value;
+        });
+    }
+    
+    // Sync Create input to all others
+    if (createInput) {
+        createInput.addEventListener('input', function() {
+            if (vastaiInput) vastaiInput.value = createInput.value;
+            if (resourcesInput) resourcesInput.value = createInput.value;
         });
     }
 }
@@ -282,6 +303,188 @@ async function refreshInstanceCardForResources(instanceId) {
         if (window.showSetupResult) {
             window.showSetupResult(`Failed to refresh instance #${instanceId}: ${err.message}`, 'error');
         }
+    }
+}
+
+// Load VastAI instances for Create tab
+async function loadVastaiInstancesForCreate() {
+    const instancesList = document.getElementById('create-vastai-instances-list');
+    if (instancesList) {
+        instancesList.innerHTML = '<div class="no-instances-message">Loading instances...</div>';
+    }
+
+    try {
+        const data = await api.get('/vastai/instances');
+        if (!data || data.success === false) {
+            const msg = (data && data.message) ? data.message : 'Failed to load instances';
+            if (instancesList) {
+                instancesList.innerHTML = `<div class="no-instances-message" style="color: var(--text-error);">❌ ${msg}</div>`;
+            }
+            return;
+        }
+
+        const rawInstances = Array.isArray(data.instances) ? data.instances : [];
+        const instances = rawInstances.map(inst => window.VastAIInstances ? window.VastAIInstances.normalizeInstance(inst) : inst);
+        displayVastaiInstancesForCreate(instances);
+    } catch (error) {
+        if (instancesList) {
+            instancesList.innerHTML = `<div class="no-instances-message" style="color: var(--text-error);">❌ Error: ${error.message}</div>`;
+        }
+    }
+}
+
+// Display VastAI instances in the Create tab
+function displayVastaiInstancesForCreate(instances) {
+    const instancesList = document.getElementById('create-vastai-instances-list');
+
+    if (!instances || instances.length === 0) {
+        if (instancesList) {
+            instancesList.innerHTML = '<div class="no-instances-message">No instances found</div>';
+        }
+        return;
+    }
+
+    // Clear the list first
+    if (instancesList) {
+        instancesList.innerHTML = '';
+    }
+    
+    instances.forEach(instance => {
+        // Normalize instance data using available functions
+        const normalizedStatus = window.normStatus ? window.normStatus(instance.status) : (instance.status || 'unknown');
+        const sshConnection = buildSSHStringForCreate(instance);
+        
+        // Validate instance.id is a number to prevent XSS
+        const instanceId = typeof instance.id === 'number' ? instance.id : parseInt(instance.id, 10);
+        if (isNaN(instanceId)) {
+            console.warn('Invalid instance ID:', instance.id);
+            return; // Skip this instance
+        }
+
+        // Create DOM elements safely instead of using innerHTML with untrusted data
+        const instanceItem = document.createElement('div');
+        instanceItem.className = 'instance-item';
+        instanceItem.setAttribute('data-instance-id', instanceId);
+        
+        const instanceHeader = document.createElement('div');
+        instanceHeader.className = 'instance-header';
+        
+        const instanceTitle = document.createElement('div');
+        instanceTitle.className = 'instance-title';
+        instanceTitle.textContent = `Instance #${instanceId}`;
+        
+        const instanceStatus = document.createElement('div');
+        instanceStatus.className = `instance-status ${normalizedStatus}`;
+        instanceStatus.setAttribute('data-field', 'status');
+        instanceStatus.textContent = normalizedStatus;
+        
+        instanceHeader.appendChild(instanceTitle);
+        instanceHeader.appendChild(instanceStatus);
+        
+        const instanceDetails = document.createElement('div');
+        instanceDetails.className = 'instance-details';
+        
+        // Helper function to create detail element
+        const createDetail = (label, value) => {
+            const detail = document.createElement('div');
+            detail.className = 'instance-detail';
+            const strong = document.createElement('strong');
+            strong.textContent = label;
+            detail.appendChild(strong);
+            detail.appendChild(document.createTextNode(value));
+            return detail;
+        };
+        
+        const gpuValue = instance.gpu ? (instance.gpu_count ? ` ${instance.gpu} (${instance.gpu_count}x)` : ` ${instance.gpu}`) : ' N/A';
+        instanceDetails.appendChild(createDetail('GPU:', gpuValue));
+        
+        const gpuRamValue = window.fmtGb ? ` ${window.fmtGb(instance.gpu_ram_gb)}` : ` ${instance.gpu_ram_gb || 'N/A'}`;
+        instanceDetails.appendChild(createDetail('GPU RAM:', gpuRamValue));
+        
+        instanceDetails.appendChild(createDetail('Location:', ` ${instance.geolocation || 'N/A'}`));
+        
+        const instanceActions = document.createElement('div');
+        instanceActions.className = 'instance-actions';
+        
+        const actionButton = document.createElement('button');
+        actionButton.className = 'use-instance-btn';
+        
+        if (sshConnection && normalizedStatus === 'running') {
+            actionButton.textContent = '🔗 Use This Instance';
+            actionButton.addEventListener('click', function() {
+                useInstanceForCreate(sshConnection, instanceId);
+            });
+        } else {
+            actionButton.textContent = '🔄 Load SSH';
+            actionButton.addEventListener('click', function() {
+                refreshInstanceCardForCreate(instanceId);
+            });
+        }
+        
+        instanceActions.appendChild(actionButton);
+        
+        instanceItem.appendChild(instanceHeader);
+        instanceItem.appendChild(instanceDetails);
+        instanceItem.appendChild(instanceActions);
+        
+        if (instancesList) {
+            instancesList.appendChild(instanceItem);
+        }
+    });
+}
+
+// Build SSH string for Create tab
+function buildSSHStringForCreate(inst) {
+    if (!inst.ssh_host || !inst.ssh_port) return null;
+    return `ssh -p ${inst.ssh_port} root@${inst.ssh_host} -L 8080:localhost:8080`;
+}
+
+// Use instance SSH connection string in Create tab
+function useInstanceForCreate(sshConnection, instanceId) {
+    const createInput = document.getElementById('createSshConnectionString');
+    const vastaiInput = document.getElementById('sshConnectionString');
+    const resourcesInput = document.getElementById('resourcesSshConnectionString');
+    
+    if (createInput) {
+        createInput.value = sshConnection;
+    }
+    
+    // Also sync to other tabs
+    if (vastaiInput) {
+        vastaiInput.value = sshConnection;
+    }
+    if (resourcesInput) {
+        resourcesInput.value = sshConnection;
+    }
+    
+    // Store instance ID globally for workflow use
+    if (instanceId) {
+        window.currentInstanceId = instanceId;
+        console.log(`📌 Set current instance ID: ${instanceId}`);
+    }
+    
+    // Show result message
+    const result = document.getElementById('create-result');
+    if (result) {
+        result.className = 'setup-result success';
+        result.textContent = '✅ SSH connection parameters copied to SSH Connection String field';
+        result.style.display = 'block';
+    }
+}
+
+// Refresh instance card in Create tab
+async function refreshInstanceCardForCreate(instanceId) {
+    try {
+        if (window.VastAIInstances && window.VastAIInstances.fetchVastaiInstanceDetails) {
+            await window.VastAIInstances.fetchVastaiInstanceDetails(instanceId);
+            // Reload the instances list to get updated data
+            await loadVastaiInstancesForCreate();
+        } else {
+            // Fallback - just reload the list
+            await loadVastaiInstancesForCreate();
+        }
+    } catch (err) {
+        console.error(`Failed to refresh instance #${instanceId}:`, err);
     }
 }
 
