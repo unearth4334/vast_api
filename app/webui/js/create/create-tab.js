@@ -428,6 +428,7 @@ function updateSliderFromInput(fieldId, value) {
 function randomizeSeed(fieldId) {
     const input = document.getElementById(`create-field-${fieldId}`);
     if (input) {
+        // Use a safe maximum that matches backend range (2^53 - 1 is JS safe integer max)
         const randomSeed = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
         input.value = randomSeed;
         updateFormValue(fieldId, randomSeed);
@@ -443,17 +444,49 @@ function handleImageUpload(fieldId, input) {
     const file = input.files[0];
     if (!file) return;
     
+    // Validate file is actually an image
+    if (!file.type.startsWith('image/')) {
+        console.warn('Invalid file type:', file.type);
+        return;
+    }
+    
     const container = document.getElementById(`create-field-${fieldId}-container`);
     if (!container) return;
     
-    // Show preview
+    // Show preview using DOM methods for security
     const reader = new FileReader();
     reader.onload = function(e) {
-        container.innerHTML = `
-            <input type="file" id="create-field-${fieldId}" accept="${input.accept || 'image/*'}" onchange="handleImageUpload('${fieldId}', this)">
-            <img src="${e.target.result}" class="image-upload-preview" alt="Preview">
-            <button type="button" class="image-upload-clear" onclick="clearImageUpload('${fieldId}')" title="Remove">✕</button>
-        `;
+        // Clear container safely
+        container.innerHTML = '';
+        
+        // Create file input
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.id = `create-field-${fieldId}`;
+        fileInput.accept = input.accept || 'image/*';
+        fileInput.addEventListener('change', function() {
+            handleImageUpload(fieldId, this);
+        });
+        
+        // Create preview image
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.className = 'image-upload-preview';
+        img.alt = 'Preview';
+        
+        // Create clear button
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'image-upload-clear';
+        clearBtn.title = 'Remove';
+        clearBtn.textContent = '✕';
+        clearBtn.addEventListener('click', function() {
+            clearImageUpload(fieldId);
+        });
+        
+        container.appendChild(fileInput);
+        container.appendChild(img);
+        container.appendChild(clearBtn);
         container.classList.add('has-image');
         
         // Store base64 data

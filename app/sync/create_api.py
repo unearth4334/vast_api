@@ -8,6 +8,7 @@ import os
 import logging
 import json
 import uuid
+import random
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 
@@ -80,6 +81,27 @@ def load_workflow_json(workflow_file: str) -> Optional[Dict]:
     return None
 
 
+def normalize_workflow_id(filename_stem: str) -> str:
+    """Normalize a filename stem to a workflow ID"""
+    return filename_stem.replace('.webui', '').replace(' ', '_').lower()
+
+
+def build_workflow_entry(wrapper: Dict, workflow_id: str) -> Dict:
+    """Build a workflow entry dictionary from wrapper and ID"""
+    return {
+        'id': workflow_id,
+        'name': wrapper.get('name', workflow_id),
+        'description': wrapper.get('description', ''),
+        'category': wrapper.get('category', 'other'),
+        'tags': wrapper.get('tags', []),
+        'icon': get_workflow_icon(wrapper.get('category', 'default')),
+        'thumbnail': wrapper.get('thumbnail'),
+        'vram_estimate': wrapper.get('vram_estimate'),
+        'time_estimate': wrapper.get('time_estimate'),
+        'has_webui': True
+    }
+
+
 def list_available_workflows() -> List[Dict]:
     """List all available workflows with webui wrappers"""
     workflows = []
@@ -92,39 +114,17 @@ def list_available_workflows() -> List[Dict]:
     for yaml_file in WORKFLOWS_DIR.glob("*.webui.yml"):
         wrapper = load_webui_wrapper(yaml_file.stem.replace('.webui', ''))
         if wrapper:
-            workflow_id = yaml_file.stem.replace('.webui', '').replace(' ', '_').lower()
-            workflows.append({
-                'id': workflow_id,
-                'name': wrapper.get('name', workflow_id),
-                'description': wrapper.get('description', ''),
-                'category': wrapper.get('category', 'other'),
-                'tags': wrapper.get('tags', []),
-                'icon': get_workflow_icon(wrapper.get('category', 'default')),
-                'thumbnail': wrapper.get('thumbnail'),
-                'vram_estimate': wrapper.get('vram_estimate'),
-                'time_estimate': wrapper.get('time_estimate'),
-                'has_webui': True
-            })
+            workflow_id = normalize_workflow_id(yaml_file.stem)
+            workflows.append(build_workflow_entry(wrapper, workflow_id))
     
     # Also look for .webui.yaml files
     for yaml_file in WORKFLOWS_DIR.glob("*.webui.yaml"):
         wrapper = load_webui_wrapper(yaml_file.stem.replace('.webui', ''))
         if wrapper:
-            workflow_id = yaml_file.stem.replace('.webui', '').replace(' ', '_').lower()
+            workflow_id = normalize_workflow_id(yaml_file.stem)
             # Check if already added
             if not any(w['id'] == workflow_id for w in workflows):
-                workflows.append({
-                    'id': workflow_id,
-                    'name': wrapper.get('name', workflow_id),
-                    'description': wrapper.get('description', ''),
-                    'category': wrapper.get('category', 'other'),
-                    'tags': wrapper.get('tags', []),
-                    'icon': get_workflow_icon(wrapper.get('category', 'default')),
-                    'thumbnail': wrapper.get('thumbnail'),
-                    'vram_estimate': wrapper.get('vram_estimate'),
-                    'time_estimate': wrapper.get('time_estimate'),
-                    'has_webui': True
-                })
+                workflows.append(build_workflow_entry(wrapper, workflow_id))
     
     return workflows
 
@@ -218,7 +218,6 @@ def fill_workflow_json(workflow_json: Dict, inputs: Dict, wrapper: Dict) -> Dict
                 target_field = field.get('field', 'noise_seed')
                 # Handle random seed (-1)
                 if value == -1:
-                    import random
                     value = random.randint(0, 2**63 - 1)
                 node['inputs'][target_field] = value
         
