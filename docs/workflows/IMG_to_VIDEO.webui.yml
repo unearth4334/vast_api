@@ -1,0 +1,311 @@
+# IMG to VIDEO Workflow - WebUI Wrapper
+# This file specifies how to display the workflow inputs in the Create tab UI
+
+name: "IMG to VIDEO"
+description: "Generate video from a single image using WAN 2.2 Image-to-Video model with high/low noise dual sampling"
+version: "1.0.0"
+category: "video"
+tags:
+  - image-to-video
+  - wan-2.2
+  - video-generation
+  - 14B-model
+
+# Workflow JSON file reference (relative to this file)
+workflow_file: "IMG to VIDEO.json"
+
+# Thumbnail/preview image (optional)
+thumbnail: null
+
+# Estimated VRAM requirement
+vram_estimate: "24GB"
+
+# Estimated generation time (in seconds, approximate)
+time_estimate:
+  min: 120
+  max: 600
+  note: "Varies significantly based on duration and resolution"
+
+# Input fields to expose in UI (main inputs)
+inputs:
+  # Image input
+  - id: "image_input"
+    node_id: "88"
+    field: "image"
+    type: "image"
+    label: "Input Image"
+    description: "Source image to animate. Will be resized to fit the selected output size."
+    required: true
+    accept: "image/png,image/jpeg,image/webp"
+    max_size_mb: 10
+
+  # Positive prompt
+  - id: "positive_prompt"
+    node_id: "408"
+    field: "value"
+    type: "textarea"
+    label: "Positive Prompt"
+    description: "Describe what motion and style you want in the video"
+    required: true
+    default: "cinematic video still, high quality, detailed"
+    placeholder: "cinematic video of a beautiful scene, smooth motion, high detail..."
+    max_length: 2000
+    rows: 4
+
+  # Negative prompt
+  - id: "negative_prompt"
+    node_id: "409"
+    field: "value"
+    type: "textarea"
+    label: "Negative Prompt"
+    description: "Describe what to avoid in the generation"
+    required: false
+    default: "blurry, low quality, static, overexposed, worst quality, JPEG artifacts, ugly, deformed, extra fingers, poorly drawn hands, poorly drawn face, disfigured, deformed limbs, fused fingers, static frame, cluttered background, fast movements, mouth moving, talking"
+    max_length: 2000
+    rows: 3
+
+  # Duration
+  - id: "duration"
+    node_id: "426"
+    field: "Xi"
+    type: "slider"
+    label: "Duration"
+    description: "Video duration in seconds"
+    min: 1
+    max: 10
+    step: 0.5
+    default: 5
+    unit: "seconds"
+
+  # Frame rate
+  - id: "frame_rate"
+    node_id: "490"
+    field: "Xi"
+    type: "slider"
+    label: "Frame Rate"
+    description: "Output frames per second"
+    min: 8
+    max: 24
+    step: 1
+    default: 16
+    unit: "FPS"
+
+  # Size/Resolution options
+  - id: "custom_size"
+    node_id: "518"
+    field: "value"
+    type: "checkbox"
+    label: "Use Custom Size"
+    description: "Enable custom width/height instead of auto-scaling from image"
+    default: false
+
+  # Seed
+  - id: "seed"
+    node_id: "73"
+    field: "noise_seed"
+    type: "seed"
+    label: "Seed"
+    description: "Random seed for reproducibility (-1 for random)"
+    randomize_button: true
+    default: -1
+
+# Advanced settings (collapsed by default)
+advanced:
+  # Steps
+  - id: "steps"
+    node_id: "82"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Steps"
+    description: "Number of denoising steps. Higher = better quality but slower."
+    min: 10
+    max: 40
+    step: 1
+    default: 20
+
+  # CFG Scale
+  - id: "cfg"
+    node_id: "85"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "CFG Scale"
+    description: "Classifier-free guidance strength. Higher = more prompt adherence."
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    default: 3.5
+
+  # Speed (sampling shift)
+  - id: "speed"
+    node_id: "157"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Sampling Speed"
+    description: "ModelSamplingSD3 shift parameter. Higher values speed up generation."
+    min: 1.0
+    max: 15.0
+    step: 0.5
+    default: 7.0
+
+  # Custom width (only shown when custom_size is true)
+  - id: "custom_width"
+    node_id: "83"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Width"
+    description: "Custom output width (requires Custom Size enabled)"
+    min: 512
+    max: 1920
+    step: 64
+    default: 896
+    depends_on:
+      field: "custom_size"
+      value: true
+
+  # Custom height (only shown when custom_size is true)
+  - id: "custom_height"
+    node_id: "83"
+    fields:
+      - "Yi"
+      - "Yf"
+    type: "slider"
+    label: "Height"
+    description: "Custom output height (requires Custom Size enabled)"
+    min: 512
+    max: 1920
+    step: 64
+    default: 1120
+    depends_on:
+      field: "custom_size"
+      value: true
+
+  # Upscale ratio (for interpolation output)
+  - id: "upscale_ratio"
+    node_id: "421"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Upscale Ratio"
+    description: "Scale factor for the upscaled output"
+    min: 1.0
+    max: 4.0
+    step: 0.5
+    default: 2.0
+
+  # VRAM reduction (BlockSwap)
+  - id: "vram_reduction"
+    node_id: "502"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "VRAM Reduction"
+    description: "Percentage of model offloading to CPU. 0% = fastest (requires most VRAM), 100% = slowest (uses least VRAM). Use higher values if running out of GPU memory."
+    min: 0
+    max: 100
+    step: 10
+    default: 50
+    unit: "%"
+
+# Output configuration
+outputs:
+  - id: "original_video"
+    node_id: "398"
+    type: "video"
+    format: "mp4"
+    label: "Original Video"
+    description: "Video at native frame rate with color matching"
+
+  - id: "interpolated_video"
+    node_id: "433"
+    type: "video"
+    format: "mp4"
+    label: "Interpolated Video"
+    description: "Video with 2x frame interpolation using RIFE"
+
+# Model requirements (for validation)
+requirements:
+  models:
+    - type: "unet"
+      name: "WAN 2.2 High Noise 14B"
+      path: "Wan-2.2_ComfyUI_repackaged/wan2.2_t2v_high_noise_14B_fp16.safetensors"
+      size_gb: 27.8
+    - type: "unet"
+      name: "WAN 2.2 Low Noise 14B"
+      path: "Wan-2.2_ComfyUI_repackaged/wan2.2_t2v_low_noise_14B_fp16.safetensors"
+      size_gb: 27.8
+    - type: "clip"
+      name: "UMT5 XXL"
+      path: "Wan-2.2/umt5_xxl_fp16.safetensors"
+      size_gb: 9.8
+    - type: "vae"
+      name: "WAN 2.1 VAE"
+      path: "Wan-2.1/wan_2.1_vae.safetensors"
+      size_gb: 0.2
+    - type: "upscale"
+      name: "RealESRGAN x4 Plus"
+      path: "upscale_models/RealESRGAN_x4plus.pth"
+      size_gb: 0.06
+    - type: "rife"
+      name: "RIFE 4.7"
+      path: "rife/rife47.pth"
+      size_gb: 0.1
+
+  custom_nodes:
+    - name: "ComfyUI-VideoHelperSuite"
+      repo: "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
+      required: true
+    - name: "ComfyUI-KJNodes"
+      repo: "https://github.com/kijai/ComfyUI-KJNodes"
+      required: true
+    - name: "rgthree-comfy"
+      repo: "https://github.com/rgthree/rgthree-comfy"
+      required: true
+    - name: "ComfyUI-mxToolkit"
+      repo: "https://github.com/Intersection98/ComfyUI_mxToolkit"
+      required: true
+    - name: "ComfyUI-WanVideoWrapper"
+      repo: "https://github.com/kijai/ComfyUI-WanVideoWrapper"
+      required: true
+    - name: "ComfyUI-Easy-Use"
+      repo: "https://github.com/yolain/ComfyUI-Easy-Use"
+      required: true
+
+  vram: "24GB minimum (48GB recommended for longer videos)"
+  compute: "NVIDIA GPU with CUDA support"
+
+# Presets for quick configuration
+presets:
+  - name: "Quick Preview"
+    description: "Fast generation for testing"
+    values:
+      duration: 2
+      steps: 15
+      frame_rate: 12
+      vram_reduction: 100
+
+  - name: "High Quality"
+    description: "Best quality, slower generation"
+    values:
+      duration: 5
+      steps: 30
+      frame_rate: 24
+      upscale_ratio: 2.0
+      vram_reduction: 0
+
+  - name: "Balanced"
+    description: "Good balance of quality and speed"
+    values:
+      duration: 5
+      steps: 20
+      frame_rate: 16
+      vram_reduction: 50
