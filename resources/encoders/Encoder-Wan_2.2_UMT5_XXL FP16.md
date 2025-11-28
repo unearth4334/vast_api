@@ -4,6 +4,7 @@ title: "Wan 2.2 UMT5-XXL FP16 Text Encoder"
 version: "umt5_xxl_fp16"
 ecosystem: wan
 basemodel: wan2.2
+size: 11400000000
 type: text_encoder
 AIR: "wan_22_umt5_xxl_fp16"
 image: encoder.jpg

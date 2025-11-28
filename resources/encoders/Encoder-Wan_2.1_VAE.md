@@ -4,6 +4,7 @@ title: "Wan 2.1 VAE"
 version: "wan_2.1_vae"
 ecosystem: wan
 basemodel: wan2.1
+size: 2540000000
 type: vae
 AIR: "wan_21_vae"
 image: encoder.jpg
