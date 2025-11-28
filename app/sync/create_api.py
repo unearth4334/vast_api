@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 create_bp = Blueprint('create', __name__, url_prefix='/create')
 
 # Path to workflows directory
-WORKFLOWS_DIR = Path(__file__).parent.parent.parent / 'docs' / 'workflows'
+WORKFLOWS_DIR = Path(__file__).parent.parent.parent / 'workflows'
 
 
 def get_workflow_icon(category: str) -> str:

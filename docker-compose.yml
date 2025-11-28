@@ -11,6 +11,7 @@ services:
       - vast_api_logs:/app/logs
       - vast_api_downloads:/app/downloads
       - ./resources:/app/resources
+      - ./workflows:/app/workflows
     environment:
       - PYTHONUNBUFFERED=1
       - PUID=${PUID}
