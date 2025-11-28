@@ -19,6 +19,6 @@ url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/blob/main/split
 # Download
 
 ```bash
-wget -P "$UI_HOME/models/text_encoders" \
+wget --progress=bar:force -P "$UI_HOME"/models/text_encoders/Wan-2.2 \
   https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp16.safetensors
 ```

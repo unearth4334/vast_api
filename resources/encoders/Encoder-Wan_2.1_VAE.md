@@ -19,6 +19,6 @@ url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/blob/main/split
 # Download
 
 ```bash
-wget -P "$UI_HOME/models/vae" \
+wget --progress=bar:force -P "$UI_HOME/models/vae/Wan-2.1" \
   https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
 ```

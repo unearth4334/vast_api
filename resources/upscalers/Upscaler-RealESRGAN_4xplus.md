@@ -23,6 +23,6 @@ url: https://github.com/xinntao/Real-ESRGAN
 # Download
 
 ```bash
-wget -P "$UI_HOME/models/upscale_models" \
+wget --progress=bar:force -P "$UI_HOME/models/ESRGAN" \
   https://huggingface.co/lllyasviel/Annotators/resolve/main/RealESRGAN_x4plus.pth
 ```
