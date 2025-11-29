@@ -20,6 +20,17 @@ function showTab(tabName) {
     const clickedButton = event.target;
     clickedButton.classList.add('active');
     
+    // Show/hide logs panel based on active tab
+    const logsPanel = document.getElementById('logs');
+    if (logsPanel) {
+        // Only show logs panel for sync tab
+        if (tabName === 'sync') {
+            logsPanel.style.display = '';
+        } else {
+            logsPanel.style.display = 'none';
+        }
+    }
+    
     // Initialize resource browser when resources tab is shown
     if (tabName === 'resources' && !window.resourceBrowserInitialized) {
         initResourceBrowser();
