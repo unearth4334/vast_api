@@ -1,7 +1,7 @@
 // Main application bootstrapping - tabs, overlays, and page wiring
 
 // Tab switching functionality
-function showTab(tabName) {
+function showTab(tabName, event) {
     // Hide all tab contents
     const tabContents = document.querySelectorAll('.tab-content');
     tabContents.forEach(tab => tab.classList.remove('active'));
@@ -17,8 +17,10 @@ function showTab(tabName) {
     }
     
     // Add active class to clicked tab button
-    const clickedButton = event.target;
-    clickedButton.classList.add('active');
+    if (event) {
+        const clickedButton = event.target;
+        clickedButton.classList.add('active');
+    }
     
     // Show/hide logs panel based on active tab
     const logsPanel = document.getElementById('logs');
