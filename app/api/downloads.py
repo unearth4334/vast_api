@@ -241,3 +241,52 @@ def retry_job():
         'success': True,
         'message': 'Job reset to PENDING for retry'
     })
+
+
+@bp.route('/job/<job_id>', methods=['DELETE'])
+def delete_job(job_id):
+    """Delete a job from the download queue and status"""
+    if not job_id:
+        return jsonify({
+            'success': False,
+            'message': 'job_id is required'
+        }), 400
+    
+    # Remove from queue
+    queue = []
+    if QUEUE_PATH.exists():
+        with open(QUEUE_PATH, 'r') as f:
+            queue = json.load(f)
+    
+    original_queue_length = len(queue)
+    queue = [job for job in queue if job['id'] != job_id]
+    queue_updated = len(queue) < original_queue_length
+    
+    if queue_updated:
+        with open(QUEUE_PATH, 'w') as f:
+            json.dump(queue, f, indent=2)
+    
+    # Remove from status
+    status = []
+    if STATUS_PATH.exists():
+        with open(STATUS_PATH, 'r') as f:
+            status = json.load(f)
+    
+    original_status_length = len(status)
+    status = [s for s in status if s['id'] != job_id]
+    status_updated = len(status) < original_status_length
+    
+    if status_updated:
+        with open(STATUS_PATH, 'w') as f:
+            json.dump(status, f, indent=2)
+    
+    if not queue_updated and not status_updated:
+        return jsonify({
+            'success': False,
+            'message': 'Job not found'
+        }), 404
+    
+    return jsonify({
+        'success': True,
+        'message': 'Job deleted successfully'
+    })
