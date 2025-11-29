@@ -44,22 +44,33 @@
             </div>
             
             <div class="sync-grid">
-                <button class="sync-button" onclick="sync('forge')">
-                    <span>🔥</span>
-                    Sync Forge
-                </button>
-                <button class="sync-button" onclick="sync('comfy')">
-                    <span>🖼️</span>
-                    Sync Comfy
-                </button>
-                <button class="sync-button" onclick="sync('vastai')">
-                    <span>☁️</span>
-                    Sync VastAI
-                </button>
-                <button class="sync-button secondary" onclick="testSSH()">
-                    <span>🔧</span>
-                    Test SSH
-                </button>
+                <div class="sync-button-wrapper">
+                    <button class="sync-button" onclick="sync('forge')">
+                        <span>🔥</span>
+                        Sync Forge
+                    </button>
+                    <button class="sync-config-btn" onclick="openSyncConfigOverlay('forge')" title="Configure Forge sync">
+                        <span>⚙️</span>
+                    </button>
+                </div>
+                <div class="sync-button-wrapper">
+                    <button class="sync-button" onclick="sync('comfy')">
+                        <span>🖼️</span>
+                        Sync Comfy
+                    </button>
+                    <button class="sync-config-btn" onclick="openSyncConfigOverlay('comfy')" title="Configure Comfy sync">
+                        <span>⚙️</span>
+                    </button>
+                </div>
+                <div class="sync-button-wrapper">
+                    <button class="sync-button" onclick="syncVastAI()" id="syncVastaiBtn">
+                        <span>☁️</span>
+                        Sync VastAI
+                    </button>
+                    <button class="sync-config-btn" onclick="openSyncConfigOverlay('vastai')" title="Configure VastAI sync">
+                        <span>⚙️</span>
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -478,11 +489,24 @@
         </div>
     </div>
     
+    <!-- Sync Configuration Overlay -->
+    <div id="syncConfigOverlay" class="log-overlay" style="display: none;">
+        <div class="sync-config-modal">
+            <div class="log-modal-header">
+                <h3 class="log-modal-title" id="syncConfigTitle">Sync Configuration</h3>
+                <button class="close-modal-btn" onclick="closeSyncConfigOverlay()">✕</button>
+            </div>
+            <div class="sync-config-content" id="syncConfigContent">
+                <!-- Content will be dynamically populated -->
+            </div>
+        </div>
+    </div>
+    
     <!-- JavaScript files -->
     <!-- Core modules -->
     <script src="js/state.js?v=20251020-v3"></script>
     <script src="js/api.js?v=20251116-v2"></script>
-    <script src="js/sync.js?v=20251020-v3"></script>
+    <script src="js/sync.js?v=20251129-v1"></script>
     <script src="js/logs.js?v=20251020-v3"></script>
     <script src="js/ssh-host-key.js?v=20251103-v1"></script>
     <script src="js/progress-indicators.js?v=20251116-v1"></script>
