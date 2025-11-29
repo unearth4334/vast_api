@@ -224,12 +224,44 @@ async function testSSH() {
 
 // Sync Configuration Overlay functions
 
-// Cache for sync configuration data
+// Cache for sync configuration data - will be populated from API
 let syncConfigCache = {
-    forge: { ip: '10.0.78.108', port: '2222', lastSync: null },
-    comfy: { ip: '10.0.78.108', port: '2223', lastSync: null },
+    forge: { ip: null, port: null, lastSync: null },
+    comfy: { ip: null, port: null, lastSync: null },
     vastai: { sshConnection: '', instances: [] }
 };
+
+// Default fallback values (used when API doesn't provide config)
+const SYNC_CONFIG_DEFAULTS = {
+    forge: { ip: '10.0.78.108', port: '2222' },
+    comfy: { ip: '10.0.78.108', port: '2223' }
+};
+
+/**
+ * Fetch sync configuration from API
+ */
+async function fetchSyncConfig() {
+    try {
+        const data = await api.get('/status');
+        if (data.success && data.sync_targets) {
+            if (data.sync_targets.forge) {
+                syncConfigCache.forge.ip = data.sync_targets.forge.host || SYNC_CONFIG_DEFAULTS.forge.ip;
+                syncConfigCache.forge.port = data.sync_targets.forge.port || SYNC_CONFIG_DEFAULTS.forge.port;
+            }
+            if (data.sync_targets.comfy) {
+                syncConfigCache.comfy.ip = data.sync_targets.comfy.host || SYNC_CONFIG_DEFAULTS.comfy.ip;
+                syncConfigCache.comfy.port = data.sync_targets.comfy.port || SYNC_CONFIG_DEFAULTS.comfy.port;
+            }
+        }
+    } catch (e) {
+        // Use defaults on API error
+        console.warn('Failed to fetch sync config, using defaults:', e);
+        syncConfigCache.forge.ip = SYNC_CONFIG_DEFAULTS.forge.ip;
+        syncConfigCache.forge.port = SYNC_CONFIG_DEFAULTS.forge.port;
+        syncConfigCache.comfy.ip = SYNC_CONFIG_DEFAULTS.comfy.ip;
+        syncConfigCache.comfy.port = SYNC_CONFIG_DEFAULTS.comfy.port;
+    }
+}
 
 /**
  * Open the sync configuration overlay for a specific sync type
@@ -251,6 +283,11 @@ async function openSyncConfigOverlay(syncType) {
     // Show loading state
     content.innerHTML = '<div class="sync-config-loading">Loading configuration...</div>';
     overlay.style.display = 'flex';
+    
+    // Fetch config from API if not already loaded (for local targets)
+    if (syncType !== 'vastai' && !syncConfigCache[syncType].ip) {
+        await fetchSyncConfig();
+    }
     
     if (syncType === 'vastai') {
         await renderVastAIConfig(content);
@@ -283,9 +320,11 @@ async function renderLocalConfig(content, syncType) {
         console.error('Failed to fetch sync logs:', e);
     }
     
-    // Get config from cache
+    // Get config from cache, with fallback to defaults
     const config = syncConfigCache[syncType];
-    const ipAddress = `${config.ip}:${config.port}`;
+    const ip = config.ip || SYNC_CONFIG_DEFAULTS[syncType]?.ip || 'N/A';
+    const port = config.port || SYNC_CONFIG_DEFAULTS[syncType]?.port || 'N/A';
+    const ipAddress = `${ip}:${port}`;
     
     // Format last sync info
     let lastSyncHtml = '';
@@ -321,7 +360,7 @@ async function renderLocalConfig(content, syncType) {
         <div class="sync-config-section">
             <div class="sync-config-item">
                 <div class="sync-config-label">IP Address</div>
-                <div class="sync-config-value sync-config-ip">${ipAddress}</div>
+                <div class="sync-config-value sync-config-ip">${escapeHtml(ipAddress)}</div>
             </div>
             ${lastSyncHtml}
         </div>
@@ -413,7 +452,11 @@ async function testConnection(syncType) {
         const data = await api.post('/test/ssh', { targets: [syncType] });
         
         if (data.success && data.results) {
-            const hostKey = syncType === 'forge' ? 'forge:10.0.78.108:2222' : 'comfy:10.0.78.108:2223';
+            // Build host key using cached config values
+            const config = syncConfigCache[syncType];
+            const ip = config.ip || SYNC_CONFIG_DEFAULTS[syncType]?.ip;
+            const port = config.port || SYNC_CONFIG_DEFAULTS[syncType]?.port;
+            const hostKey = `${syncType}:${ip}:${port}`;
             const result = data.results[hostKey] || Object.values(data.results)[0];
             
             if (result && result.success) {
@@ -447,17 +490,35 @@ async function loadVastaiInstancesForSync() {
         if (!data || data.success === false) {
             const msg = (data && data.message) ? data.message : 'Failed to load instances';
             if (instancesList) {
-                instancesList.innerHTML = `<div class="no-instances-message" style="color: var(--text-error);">❌ ${msg}</div>`;
+                instancesList.innerHTML = `<div class="no-instances-message" style="color: var(--text-error);">❌ ${escapeHtml(msg)}</div>`;
             }
             return;
         }
 
         const rawInstances = Array.isArray(data.instances) ? data.instances : [];
-        const instances = rawInstances.map(inst => window.VastAIInstances ? window.VastAIInstances.normalizeInstance(inst) : inst);
+        
+        // Normalize instances with proper error handling
+        const instances = rawInstances.map(inst => {
+            // Use VastAIInstances module if available, otherwise apply basic normalization
+            if (window.VastAIInstances && typeof window.VastAIInstances.normalizeInstance === 'function') {
+                return window.VastAIInstances.normalizeInstance(inst);
+            }
+            // Fallback basic normalization
+            return {
+                id: inst.id || inst.instance_id,
+                status: inst.actual_status || inst.status || 'unknown',
+                gpu: inst.gpu_name || inst.gpu || 'Unknown GPU',
+                gpu_count: inst.num_gpus || 1,
+                geolocation: inst.geolocation || 'N/A',
+                ssh_host: inst.public_ipaddr || inst.ssh_host,
+                ssh_port: inst.ssh_port || inst.direct_port_ssh
+            };
+        });
+        
         displayVastaiInstancesForSync(instances);
     } catch (error) {
         if (instancesList) {
-            instancesList.innerHTML = `<div class="no-instances-message" style="color: var(--text-error);">❌ Error: ${error.message}</div>`;
+            instancesList.innerHTML = `<div class="no-instances-message" style="color: var(--text-error);">❌ Error: ${escapeHtml(error.message)}</div>`;
         }
     }
 }
