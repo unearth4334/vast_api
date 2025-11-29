@@ -21,8 +21,8 @@ export function normalizeInstance(raw) {
     i.id ??
     null;
 
-  // Status normalization
-  const status = normStatus(i.cur_state || i.status || i.state || "unknown");
+  // Status normalization - prioritize actual_status
+  const status = normStatus(i.actual_status || i.cur_state || i.status || i.state || "unknown");
 
   // GPU info
   const gpuName = 
@@ -110,6 +110,7 @@ export function normalizeInstance(raw) {
   return {
     id,
     status,
+    actual_status: i.actual_status,  // Preserve original actual_status
     gpu: gpuName,
     gpu_count: truthy(gpuCount) ? +gpuCount : null,
     gpu_ram_gb: truthy(gpuRamGb) ? +gpuRamGb : null,
@@ -929,7 +930,7 @@ export async function refreshInstanceCard(instanceId) {
     
     // Use the same SSH port resolution logic as resolveSSH()
     const { port: sshPort } = resolveSSH(inst);
-    const state = normStatus(inst.cur_state || inst.status || 'unknown');
+    const state = normStatus(inst.actual_status || inst.cur_state || inst.status || 'unknown');
 
     const sshConnection = (sshHost && sshPort)
       ? `ssh -p ${sshPort} root@${sshHost} -L 8080:localhost:8080`
@@ -1030,7 +1031,8 @@ export function displayVastaiInstances(instances) {
 
   let html = '';
   instances.forEach(instance => {
-    const normalizedStatus = normStatus(instance.status);
+    // Status is already normalized by normalizeInstance()
+    const normalizedStatus = instance.status;
     const sshConnection = buildSSHString(instance);
 
     html += `

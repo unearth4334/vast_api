@@ -1321,6 +1321,16 @@ body {
     color: var(--text-warning);
 }
 
+.instance-status.loading {
+    background: var(--background-warning);
+    color: var(--text-warning);
+}
+
+.instance-status.unknown {
+    background: var(--background-modifier-border);
+    color: var(--text-muted);
+}
+
 .instance-details {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

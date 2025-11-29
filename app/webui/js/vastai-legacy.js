@@ -122,7 +122,7 @@ function normalizeInstance(raw) {
   const i = { ...raw };
 
   const id = i.id ?? i.instance_id ?? i.vast_id ?? i._id;
-  const status = normStatus(i.status ?? i.state ?? i.instance_status ?? i.cur_state);
+  const status = normStatus(i.actual_status ?? i.status ?? i.state ?? i.instance_status ?? i.cur_state);
 
   // GPU fields
   const gpuName =
@@ -191,7 +191,8 @@ function normalizeInstance(raw) {
     geolocation: normGeo(i),
     ssh_host,    // <-- always from public IP fields
     ssh_port,    // may be missing from list payload; refresh fills it
-    template
+    template,
+    actual_status: i.actual_status  // Preserve original actual_status
   };
 }
 
@@ -449,7 +450,7 @@ async function refreshInstanceCard(instanceId) {
     
     // Use the same SSH port resolution logic as resolveSSH()
     const { port: sshPort } = resolveSSH(inst);
-    const state = normStatus(inst.cur_state || inst.status || 'unknown');
+    const state = normStatus(inst.actual_status || inst.cur_state || inst.status || 'unknown');
 
     const sshConnection = (sshHost && sshPort)
       ? `ssh -p ${sshPort} root@${sshHost} -L 8080:localhost:8080`
@@ -539,7 +540,8 @@ function displayVastaiInstances(instances) {
 
   let html = '';
   instances.forEach(instance => {
-    const normalizedStatus = normStatus(instance.status);
+    // Status is already normalized by normalizeInstance()
+    const normalizedStatus = instance.status;
     const sshConnection = buildSSHString(instance);
 
     html += `
