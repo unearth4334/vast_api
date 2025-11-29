@@ -180,7 +180,7 @@ class SSHTester:
             
             for line in config_content.split('\n'):
                 line = line.strip()
-                parts = line.split()  # Split once and reuse
+                parts = line.split()
                 if line.lower().startswith('host '):
                     current_host = parts[1] if len(parts) > 1 else None
                     host_info = {}

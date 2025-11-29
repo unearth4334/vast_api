@@ -500,10 +500,25 @@ async function testConnection(syncType) {
  */
 async function handleHostKeyVerification(syncType, host, port, resultDiv) {
     try {
+        // Validate port is numeric to prevent command injection
+        const portNum = parseInt(port, 10);
+        if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+            resultDiv.className = 'sync-config-result sync-config-result-error';
+            resultDiv.textContent = `❌ Invalid port number: ${port}`;
+            return;
+        }
+        
+        // Validate host contains only safe characters (alphanumeric, dots, hyphens)
+        if (!/^[a-zA-Z0-9.-]+$/.test(host)) {
+            resultDiv.className = 'sync-config-result sync-config-result-error';
+            resultDiv.textContent = '❌ Invalid host address';
+            return;
+        }
+        
         // Build SSH connection string for the verify-host endpoint
         // Note: Uses 'root' as the default SSH user, which is standard for VastAI 
         // and local Docker container sync targets (Forge, Comfy)
-        const sshConnection = `ssh -p ${port} root@${host}`;
+        const sshConnection = `ssh -p ${portNum} root@${host}`;
         
         // First, get the host key fingerprints
         const verifyData = await api.post('/ssh/verify-host', {
