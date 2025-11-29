@@ -365,7 +365,7 @@ function displayVastaiInstancesForCreate(instances) {
     instances.forEach(instance => {
         // Status is already normalized by normalizeInstance() if VastAIInstances is available
         const normalizedStatus = instance.status || 'unknown';
-        const sshConnection = buildSSHStringForCreate(instance);e);
+        const sshConnection = buildSSHStringForCreate(instance);
         
         // Validate instance.id is a number to prevent XSS
         const instanceId = typeof instance.id === 'number' ? instance.id : parseInt(instance.id, 10);
