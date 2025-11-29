@@ -457,11 +457,21 @@ async function testConnection(syncType) {
             const ip = config.ip || SYNC_CONFIG_DEFAULTS[syncType]?.ip;
             const port = config.port || SYNC_CONFIG_DEFAULTS[syncType]?.port;
             const hostKey = `${syncType}:${ip}:${port}`;
-            const result = data.results[hostKey] || Object.values(data.results)[0];
+            const result = data.results[hostKey] || data.results[syncType] || Object.values(data.results)[0];
             
             if (result && result.success) {
                 resultDiv.className = 'sync-config-result sync-config-result-success';
                 resultDiv.textContent = `✅ Connection successful: ${result.message}`;
+            } else if (result && result.host_verification_needed) {
+                // Host key verification required - show the verification modal
+                resultDiv.className = 'sync-config-result sync-config-result-warning';
+                resultDiv.textContent = '⚠️ Host key verification required...';
+                
+                // Get host and port from result or fallback to config
+                const sshHost = result.ssh_host || ip;
+                const sshPort = result.ssh_port || port;
+                
+                await handleHostKeyVerification(syncType, sshHost, sshPort, resultDiv);
             } else {
                 resultDiv.className = 'sync-config-result sync-config-result-error';
                 resultDiv.textContent = `❌ Connection failed: ${result?.message || 'Unknown error'}`;
@@ -474,6 +484,161 @@ async function testConnection(syncType) {
         resultDiv.className = 'sync-config-result sync-config-result-error';
         resultDiv.textContent = `❌ Request failed: ${error.message}`;
     }
+}
+
+/**
+ * Handle host key verification for sync tab SSH test
+ * @param {string} syncType - The sync type (forge, comfy, etc.)
+ * @param {string} host - SSH host address
+ * @param {string|number} port - SSH port
+ * @param {HTMLElement} resultDiv - Result display element
+ */
+async function handleHostKeyVerification(syncType, host, port, resultDiv) {
+    try {
+        // Build SSH connection string for the verify-host endpoint
+        const sshConnection = `ssh -p ${port} root@${host}`;
+        
+        // First, get the host key fingerprints
+        const verifyData = await api.post('/ssh/verify-host', {
+            ssh_connection: sshConnection,
+            accept: false
+        });
+        
+        if (verifyData.success && verifyData.needs_confirmation) {
+            // Show modal to user - use VastAIUI if available, otherwise use existing host key modal
+            let userAccepted = false;
+            
+            if (window.VastAIUI && typeof window.VastAIUI.showSSHHostVerificationModal === 'function') {
+                userAccepted = await window.VastAIUI.showSSHHostVerificationModal({
+                    host: verifyData.host,
+                    port: verifyData.port,
+                    fingerprints: verifyData.fingerprints
+                });
+            } else {
+                // Fallback: use the existing host key error modal with adapted data
+                const hostKeyError = {
+                    host: verifyData.host,
+                    port: verifyData.port,
+                    new_fingerprint: verifyData.fingerprints ? verifyData.fingerprints.join('\n') : 'Unknown',
+                    known_hosts_file: '/root/.ssh/known_hosts'
+                };
+                
+                // Show the host key modal and wait for user response
+                userAccepted = await showHostKeyVerificationModalAndWait(hostKeyError);
+            }
+            
+            if (userAccepted) {
+                // User accepted - add host key to known_hosts
+                resultDiv.textContent = '⏳ Adding host key...';
+                
+                const addKeyData = await api.post('/ssh/verify-host', {
+                    ssh_connection: sshConnection,
+                    accept: true
+                });
+                
+                if (addKeyData.success) {
+                    resultDiv.textContent = '⏳ Retrying connection...';
+                    
+                    // Retry the connection test
+                    const retryData = await api.post('/test/ssh', { targets: [syncType] });
+                    
+                    if (retryData.success && retryData.results) {
+                        const retryResult = retryData.results[syncType] || Object.values(retryData.results)[0];
+                        
+                        if (retryResult && retryResult.success) {
+                            resultDiv.className = 'sync-config-result sync-config-result-success';
+                            resultDiv.textContent = `✅ Connection successful (host key added): ${retryResult.message}`;
+                        } else {
+                            resultDiv.className = 'sync-config-result sync-config-result-error';
+                            resultDiv.textContent = `❌ Connection still failed after adding host key: ${retryResult?.message || 'Unknown error'}`;
+                        }
+                    } else {
+                        resultDiv.className = 'sync-config-result sync-config-result-error';
+                        resultDiv.textContent = `❌ Retry test failed: ${retryData.message || 'Unknown error'}`;
+                    }
+                } else {
+                    resultDiv.className = 'sync-config-result sync-config-result-error';
+                    resultDiv.textContent = `❌ Failed to add host key: ${addKeyData.message || 'Unknown error'}`;
+                }
+            } else {
+                // User rejected
+                resultDiv.className = 'sync-config-result sync-config-result-error';
+                resultDiv.textContent = '❌ Host key verification cancelled';
+            }
+        } else if (verifyData.already_known) {
+            // Host key already known, but connection still failed - different issue
+            resultDiv.className = 'sync-config-result sync-config-result-error';
+            resultDiv.textContent = '❌ Connection failed (host key already known)';
+        } else {
+            resultDiv.className = 'sync-config-result sync-config-result-error';
+            resultDiv.textContent = `❌ Failed to verify host: ${verifyData.message || 'Unknown error'}`;
+        }
+    } catch (error) {
+        console.error('Error handling host key verification:', error);
+        resultDiv.className = 'sync-config-result sync-config-result-error';
+        resultDiv.textContent = `❌ Host verification error: ${error.message}`;
+    }
+}
+
+/**
+ * Show host key verification modal and wait for user response
+ * Uses the existing hostKeyErrorOverlay modal with promise-based interaction
+ * @param {Object} hostKeyError - Host key information
+ * @returns {Promise<boolean>} - True if user accepts, false otherwise
+ */
+function showHostKeyVerificationModalAndWait(hostKeyError) {
+    return new Promise((resolve) => {
+        // Update modal content
+        document.getElementById('hk-host').textContent = hostKeyError.host || 'Unknown';
+        document.getElementById('hk-port').textContent = hostKeyError.port || 'Unknown';
+        document.getElementById('hk-fingerprint').textContent = hostKeyError.new_fingerprint || 'Unknown';
+        document.getElementById('hk-file').textContent = hostKeyError.known_hosts_file || 'Unknown';
+        
+        // Store the resolve function for callbacks
+        window._hostKeyVerificationResolve = resolve;
+        
+        // Override the resolve button click handler
+        const resolveBtn = document.getElementById('resolveHostKeyBtn');
+        const originalOnclick = resolveBtn.onclick;
+        
+        resolveBtn.onclick = () => {
+            document.getElementById('hostKeyErrorOverlay').style.display = 'none';
+            resolveBtn.onclick = originalOnclick;
+            window._hostKeyVerificationResolve = null;
+            resolve(true);
+        };
+        
+        // Override the close button and modal close handlers
+        const overlay = document.getElementById('hostKeyErrorOverlay');
+        const closeBtn = overlay.querySelector('.close-modal-btn');
+        const cancelBtn = overlay.querySelector('.sync-button.secondary');
+        
+        const handleCancel = () => {
+            overlay.style.display = 'none';
+            resolveBtn.onclick = originalOnclick;
+            window._hostKeyVerificationResolve = null;
+            resolve(false);
+        };
+        
+        if (closeBtn) {
+            const originalCloseOnclick = closeBtn.onclick;
+            closeBtn.onclick = () => {
+                handleCancel();
+                closeBtn.onclick = originalCloseOnclick;
+            };
+        }
+        
+        if (cancelBtn) {
+            const originalCancelOnclick = cancelBtn.onclick;
+            cancelBtn.onclick = () => {
+                handleCancel();
+                cancelBtn.onclick = originalCancelOnclick;
+            };
+        }
+        
+        // Show the modal
+        overlay.style.display = 'flex';
+    });
 }
 
 /**

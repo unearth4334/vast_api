@@ -54,30 +54,45 @@ class SSHTester:
         
         raise FileNotFoundError("SSH config file not found")
     
-    def test_host(self, host_alias: str, timeout: int = 10) -> Dict:
+    def test_host(self, host_alias: str, timeout: int = 10, strict_host_key_checking: bool = True) -> Dict:
         """
         Test SSH connection to a specific host
         
         Args:
             host_alias: SSH host alias from config
             timeout: Connection timeout in seconds
+            strict_host_key_checking: If True, use strict host key checking and detect
+                                      host verification requirements (default True)
             
         Returns:
-            dict: Test result
+            dict: Test result including host_verification_needed if applicable
         """
         try:
             logger.info(f"Testing SSH connection to {host_alias}...")
             
-            cmd = [
-                'ssh',
-                '-F', self.ssh_config_path,
-                '-o', f'ConnectTimeout={timeout}',
-                '-o', 'BatchMode=yes',
-                '-o', 'UserKnownHostsFile=/dev/null',
-                '-o', 'StrictHostKeyChecking=no',
-                host_alias,
-                'echo "ssh-test-success"'
-            ]
+            if strict_host_key_checking:
+                # Use strict host key checking to detect host verification requirements
+                cmd = [
+                    'ssh',
+                    '-F', self.ssh_config_path,
+                    '-o', f'ConnectTimeout={timeout}',
+                    '-o', 'BatchMode=yes',
+                    '-o', 'StrictHostKeyChecking=yes',
+                    host_alias,
+                    'echo "ssh-test-success"'
+                ]
+            else:
+                # Legacy mode: bypass host key checking
+                cmd = [
+                    'ssh',
+                    '-F', self.ssh_config_path,
+                    '-o', f'ConnectTimeout={timeout}',
+                    '-o', 'BatchMode=yes',
+                    '-o', 'UserKnownHostsFile=/dev/null',
+                    '-o', 'StrictHostKeyChecking=no',
+                    host_alias,
+                    'echo "ssh-test-success"'
+                ]
             
             result = subprocess.run(
                 cmd,
@@ -95,14 +110,33 @@ class SSHTester:
                     'output': result.stdout.strip()
                 }
             else:
-                return {
+                # Check if the error is due to host key verification failure
+                stderr = result.stderr.lower() if result.stderr else ''
+                host_verification_needed = (
+                    'host key verification failed' in stderr or
+                    'no matching host key type found' in stderr or
+                    'the authenticity of host' in stderr or
+                    'are you sure you want to continue connecting' in stderr
+                )
+                
+                response = {
                     'host': host_alias,
                     'success': False,
-                    'message': 'Connection failed',
+                    'message': 'Host key verification required' if host_verification_needed else 'Connection failed',
                     'error': result.stderr.strip() or 'No error details',
                     'return_code': result.returncode,
                     'output': result.stdout.strip()
                 }
+                
+                if host_verification_needed:
+                    response['host_verification_needed'] = True
+                    # Try to extract host and port from SSH config for this alias
+                    host_info = self._get_host_info_from_config(host_alias)
+                    if host_info:
+                        response['ssh_host'] = host_info.get('host')
+                        response['ssh_port'] = host_info.get('port')
+                
+                return response
                 
         except subprocess.TimeoutExpired:
             return {
@@ -118,6 +152,48 @@ class SSHTester:
                 'message': 'Test failed',
                 'error': str(e)
             }
+    
+    def _get_host_info_from_config(self, host_alias: str) -> Optional[Dict]:
+        """
+        Extract host and port from SSH config for a given alias
+        
+        Args:
+            host_alias: SSH host alias
+            
+        Returns:
+            Dict with 'host' and 'port' if found, None otherwise
+        """
+        try:
+            if not os.path.exists(self.ssh_config_path):
+                return None
+            
+            with open(self.ssh_config_path, 'r') as f:
+                config_content = f.read()
+            
+            # Simple parsing - look for Host block matching alias
+            current_host = None
+            host_info = {}
+            
+            for line in config_content.split('\n'):
+                line = line.strip()
+                if line.lower().startswith('host '):
+                    current_host = line.split()[1] if len(line.split()) > 1 else None
+                    host_info = {}
+                elif current_host == host_alias:
+                    if line.lower().startswith('hostname '):
+                        host_info['host'] = line.split()[1] if len(line.split()) > 1 else None
+                    elif line.lower().startswith('port '):
+                        host_info['port'] = line.split()[1] if len(line.split()) > 1 else '22'
+            
+            if host_info.get('host'):
+                if 'port' not in host_info:
+                    host_info['port'] = '22'
+                return host_info
+            
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to parse SSH config for {host_alias}: {e}")
+            return None
     
     def test_all_hosts(self, targets: List[str] = None, timeout: int = 10) -> Dict:
         """
