@@ -2258,6 +2258,12 @@ body {
     color: var(--text-error);
 }
 
+.sync-config-result-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid #f59e0b;
+    color: #d97706;
+}
+
 /* VastAI instances in sync config */
 .sync-vastai-instances {
     margin-bottom: var(--size-4-3);
