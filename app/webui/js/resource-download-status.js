@@ -9,6 +9,7 @@ export class ResourceDownloadStatus {
         this.pollInterval = null;
         this.isPolling = false;
         this.deleteMode = false;
+        this.previousStateHash = null;
         this.setupEventListeners();
     }
 
@@ -171,14 +172,22 @@ export class ResourceDownloadStatus {
                 : '/downloads/status';
             const jobs = await window.api.get(url);
             
-            // Check for host verification needed
-            const hostVerificationJob = jobs && jobs.find(j => j.status === 'HOST_VERIFICATION_NEEDED');
-            if (hostVerificationJob) {
-                // Show host verification modal
-                await this.handleHostVerification(hostVerificationJob);
-            }
+            // Create a hash of the current state to detect changes
+            const stateHash = this.calculateStateHash(jobs);
             
-            this.render(jobs);
+            // Only re-render if the state has changed
+            if (stateHash !== this.previousStateHash) {
+                this.previousStateHash = stateHash;
+                
+                // Check for host verification needed
+                const hostVerificationJob = jobs && jobs.find(j => j.status === 'HOST_VERIFICATION_NEEDED');
+                if (hostVerificationJob) {
+                    // Show host verification modal
+                    await this.handleHostVerification(hostVerificationJob);
+                }
+                
+                this.render(jobs);
+            }
             
             // If no jobs are in progress, we can slow down polling
             const hasActiveJobs = jobs && jobs.some(j => j.status === 'PENDING' || j.status === 'RUNNING');
@@ -192,6 +201,27 @@ export class ResourceDownloadStatus {
                 this.container.innerHTML = '<div class="download-error">Failed to load download status</div>';
             }
         }
+    }
+
+    /**
+     * Calculate a hash of the jobs state to detect changes
+     */
+    calculateStateHash(jobs) {
+        if (!jobs || jobs.length === 0) return 'empty';
+        
+        // Create a string representation of key job properties that matter for display
+        const jobsString = jobs.map(job => {
+            return `${job.id}:${job.status}:${job.progress?.percent || 0}:${job.command_index || 0}:${job.total_commands || 0}`;
+        }).sort().join('|');
+        
+        // Simple hash function
+        let hash = 0;
+        for (let i = 0; i < jobsString.length; i++) {
+            const char = jobsString.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return hash.toString();
     }
 
     /**
@@ -304,6 +334,17 @@ export class ResourceDownloadStatus {
         
         // Attach event listeners
         this.attachEventListeners();
+        
+        // Restore delete mode state if it was active
+        if (this.deleteMode) {
+            const wrappers = this.container.querySelectorAll('.download-task-item-wrapper');
+            wrappers.forEach(wrapper => wrapper.classList.add('delete-mode'));
+            
+            const deleteAllBtn = this.container.querySelector('.download-delete-all-btn');
+            if (deleteAllBtn) {
+                deleteAllBtn.classList.add('visible');
+            }
+        }
     }
 
     /**
