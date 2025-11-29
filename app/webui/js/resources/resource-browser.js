@@ -350,8 +350,14 @@ export class ResourceBrowser {
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
                 const sshInput = document.getElementById('resourcesSshConnectionString');
-                if (sshInput && sshInput.value) {
-                    const instanceId = this._extractInstanceId(sshInput.value);
+                let instanceId = this.downloadStatus.instanceId;
+                
+                // Try to get instance ID from SSH input if not already set
+                if (!instanceId && sshInput && sshInput.value) {
+                    instanceId = this._extractInstanceId(sshInput.value);
+                }
+                
+                if (instanceId) {
                     this.downloadStatus.setInstanceId(instanceId);
                 } else {
                     alert('Please provide an SSH connection string first');
