@@ -166,6 +166,14 @@ export class ResourceDownloadStatus {
         if (!this.instanceId || !this.container) return;
         try {
             const jobs = await window.api.get(`/downloads/status?instance_id=${this.instanceId}`);
+            
+            // Check for host verification needed
+            const hostVerificationJob = jobs && jobs.find(j => j.status === 'HOST_VERIFICATION_NEEDED');
+            if (hostVerificationJob) {
+                // Show host verification modal
+                await this.handleHostVerification(hostVerificationJob);
+            }
+            
             this.render(jobs);
             
             // If no jobs are in progress, we can slow down polling
@@ -179,6 +187,66 @@ export class ResourceDownloadStatus {
             if (this.container) {
                 this.container.innerHTML = '<div class="download-error">Failed to load download status</div>';
             }
+        }
+    }
+
+    /**
+     * Handle host key verification needed
+     */
+    async handleHostVerification(job) {
+        // Only show modal once per job
+        if (this._verificationShownForJob === job.id) {
+            return;
+        }
+        this._verificationShownForJob = job.id;
+        
+        try {
+            // Import the UI module for the verification modal
+            const VastAIUI = await import('./vastai/ui.js');
+            
+            // First, get the host key fingerprints
+            const ssh_connection = job.ssh_connection || `ssh -p ${job.port} root@${job.host}`;
+            const verifyData = await window.api.post('/ssh/verify-host', {
+                ssh_connection: ssh_connection,
+                accept: false
+            });
+            
+            if (verifyData.success && verifyData.needs_confirmation) {
+                // Show modal to user
+                const userAccepted = await VastAIUI.showSSHHostVerificationModal({
+                    host: verifyData.host,
+                    port: verifyData.port,
+                    fingerprints: verifyData.fingerprints
+                });
+                
+                if (userAccepted) {
+                    // User accepted - add host key to known_hosts
+                    const addKeyData = await window.api.post('/ssh/verify-host', {
+                        ssh_connection: ssh_connection,
+                        accept: true
+                    });
+                    
+                    if (addKeyData.success) {
+                        // Reset the job status to PENDING so it will be retried
+                        // This is done by updating the queue
+                        await window.api.post('/downloads/retry', {
+                            job_id: job.id
+                        });
+                        
+                        // Reset the flag so we can show again if needed
+                        this._verificationShownForJob = null;
+                    } else {
+                        alert('Failed to add host key. Please try again.');
+                        this._verificationShownForJob = null;
+                    }
+                } else {
+                    // User rejected - mark job as failed
+                    this._verificationShownForJob = null;
+                }
+            }
+        } catch (error) {
+            console.error('Error handling host verification:', error);
+            this._verificationShownForJob = null;
         }
     }
 
@@ -202,10 +270,10 @@ export class ResourceDownloadStatus {
         const running = jobs.filter(j => j.status === 'RUNNING');
         const complete = jobs.filter(j => j.status === 'COMPLETE');
         const failed = jobs.filter(j => j.status === 'FAILED');
+        const hostVerification = jobs.filter(j => j.status === 'HOST_VERIFICATION_NEEDED');
 
         // Build the tasklist HTML
         let html = '<div class="download-tasklist">';
-        
         // Summary header
         html += `
             <div class="download-summary">
@@ -214,7 +282,9 @@ export class ResourceDownloadStatus {
                 ${running.length > 0 ? `<span class="summary-item summary-running">${running.length} in progress</span>` : ''}
                 ${complete.length > 0 ? `<span class="summary-item summary-complete">${complete.length} complete</span>` : ''}
                 ${failed.length > 0 ? `<span class="summary-item summary-failed">${failed.length} failed</span>` : ''}
+                ${hostVerification.length > 0 ? `<span class="summary-item summary-host-verification">${hostVerification.length} needs verification</span>` : ''}
             </div>
+        `;  </div>
         `;
 
         // Render each job as a task item
@@ -330,6 +400,8 @@ export class ResourceDownloadStatus {
         let errorMsg = '';
         if (job.status === 'FAILED' && job.error) {
             errorMsg = `<div class="task-error-msg">${this.escapeHtml(job.error)}</div>`;
+        } else if (job.status === 'HOST_VERIFICATION_NEEDED' && job.error) {
+            errorMsg = `<div class="task-error-msg task-verify-msg">🔐 ${this.escapeHtml(job.error)}</div>`;
         }
 
         return `
@@ -358,10 +430,10 @@ export class ResourceDownloadStatus {
             case 'RUNNING': return '⬇️';
             case 'COMPLETE': return '✅';
             case 'FAILED': return '❌';
+            case 'HOST_VERIFICATION_NEEDED': return '🔐';
             default: return '❓';
         }
     }
-
     /**
      * Get status tag text and any additional info
      */
@@ -382,9 +454,12 @@ export class ResourceDownloadStatus {
                 return 'Complete';
             case 'FAILED':
                 return 'Failed';
+            case 'HOST_VERIFICATION_NEEDED':
+                return 'Verify Host';
             default:
                 return job.status;
         }
+    }   }
     }
 
     /**

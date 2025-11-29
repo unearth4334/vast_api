@@ -180,3 +180,64 @@ def get_status():
         status = [j for j in status if str(j.get('instance_id')) == str(instance_id)]
     
     return jsonify(status)
+
+
+@bp.route('/retry', methods=['POST'])
+def retry_job():
+    """Reset a job back to PENDING status for retry"""
+    data = request.get_json()
+    job_id = data.get('job_id')
+    
+    if not job_id:
+        return jsonify({
+            'success': False,
+            'message': 'job_id is required'
+        }), 400
+    
+    # Update queue
+    queue = []
+    if QUEUE_PATH.exists():
+        with open(QUEUE_PATH, 'r') as f:
+            queue = json.load(f)
+    
+    job_found = False
+    for job in queue:
+        if job['id'] == job_id:
+            job['status'] = 'PENDING'
+            job_found = True
+            break
+    
+    if job_found:
+        with open(QUEUE_PATH, 'w') as f:
+            json.dump(queue, f, indent=2)
+    
+    # Update status
+    status = []
+    if STATUS_PATH.exists():
+        with open(STATUS_PATH, 'r') as f:
+            status = json.load(f)
+    
+    status_found = False
+    for s in status:
+        if s['id'] == job_id:
+            s['status'] = 'PENDING'
+            s['error'] = None
+            s['host_verification_needed'] = False
+            s['updated_at'] = datetime.utcnow().isoformat() + 'Z'
+            status_found = True
+            break
+    
+    if status_found:
+        with open(STATUS_PATH, 'w') as f:
+            json.dump(status, f, indent=2)
+    
+    if not job_found and not status_found:
+        return jsonify({
+            'success': False,
+            'message': 'Job not found'
+        }), 404
+    
+    return jsonify({
+        'success': True,
+        'message': 'Job reset to PENDING for retry'
+    })

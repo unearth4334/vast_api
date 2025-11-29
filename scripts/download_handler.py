@@ -134,31 +134,118 @@ class ProgressTracker:
         self.total_commands = total
 
 
-def run_command_ssh(ssh_connection: str, command: str, progress_callback) -> int:
+def is_host_key_error(stderr: str, return_code: int) -> bool:
+    """
+    Check if SSH error is due to host key verification
+    
+    Args:
+        stderr: Standard error output from SSH command
+        return_code: Process return code
+        
+    Returns:
+        True if error is related to host key verification
+    """
+    if return_code != 255:
+        return False
+    
+    stderr_lower = stderr.lower()
+    
+    # Check for common host key error patterns
+    host_key_patterns = [
+        'host key verification failed',
+        'no matching host key type found',
+        'host key for',
+        'remote host identification has changed',
+        'add correct host key'
+    ]
+    
+    return any(pattern in stderr_lower for pattern in host_key_patterns)
+
+
+def extract_host_port(ssh_connection: str) -> tuple:
+    """
+    Extract host and port from SSH connection string
+    
+    Args:
+        ssh_connection: SSH connection string like "ssh -p 12345 root@host"
+        
+    Returns:
+        Tuple of (host, port)
+    """
+    import re
+    
+    # Extract port
+    port_match = re.search(r'-p\s+(\d+)', ssh_connection)
+    port = int(port_match.group(1)) if port_match else 22
+    
+    # Extract host
+    host_match = re.search(r'root@([\d.]+)', ssh_connection)
+    host = host_match.group(1) if host_match else None
+    
+    return host, port
+
+
+def run_command_ssh(ssh_connection: str, command: str, progress_callback) -> tuple:
     """
     Run a command via SSH and capture output.
     Calls progress_callback for each line of output.
+    
+    Returns:
+        Tuple of (return_code, stderr_output)
     """
-    # Build SSH command
-    ssh_parts = ssh_connection.split()
-    ssh_cmd = ssh_parts + [command]
+    # Build SSH command with strict host key checking
+    # Parse the ssh_connection to extract components and add our options
+    import re
+    
+    # Extract port
+    port_match = re.search(r'-p\s+(\d+)', ssh_connection)
+    port = port_match.group(1) if port_match else '22'
+    
+    # Extract host
+    host_match = re.search(r'root@([\d.]+)', ssh_connection)
+    host = host_match.group(1) if host_match else None
+    
+    if not host:
+        print(f"Could not parse host from SSH connection: {ssh_connection}")
+        return -1, "Invalid SSH connection string"
+    
+    # Build SSH command with our security options
+    ssh_cmd = [
+        'ssh',
+        '-p', port,
+        '-i', '/root/.ssh/id_ed25519',
+        '-o', 'ConnectTimeout=10',
+        '-o', 'StrictHostKeyChecking=yes',
+        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+        '-o', 'IdentitiesOnly=yes',
+        f'root@{host}',
+        command
+    ]
     
     try:
         process = subprocess.Popen(
             ssh_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             text=True,
             bufsize=1
         )
         
+        stderr_lines = []
+        
+        # Read stdout
         for line in process.stdout:
             progress_callback(line.rstrip())
         
-        return process.wait()
+        # Read stderr
+        stderr_output = process.stderr.read()
+        
+        return_code = process.wait()
+        
+        return return_code, stderr_output
     except Exception as e:
         print(f"Error running SSH command: {e}")
-        return -1
+        return -1, str(e)
 
 
 def process_job(job: Dict) -> None:
@@ -212,12 +299,33 @@ def process_job(job: Dict) -> None:
                     tracker.write_status()
         
         # Run the command
-        ret = run_command_ssh(ssh_connection, cmd, progress_cb)
+        ret, stderr = run_command_ssh(ssh_connection, cmd, progress_cb)
         
         if ret != 0:
-            tracker.write_status('FAILED', f'Command failed with exit code {ret}: {cmd[:50]}...')
-            all_success = False
-            break
+            # Check if this is a host key verification error
+            if is_host_key_error(stderr, ret):
+                host, port = extract_host_port(ssh_connection)
+                error_msg = f'Host key verification required for {host}:{port}'
+                status_data = {
+                    'id': job_id,
+                    'instance_id': instance_id,
+                    'added_at': added_at,
+                    'status': 'HOST_VERIFICATION_NEEDED',
+                    'error': error_msg,
+                    'host_verification_needed': True,
+                    'host': host,
+                    'port': port,
+                    'ssh_connection': ssh_connection,
+                    'progress': tracker.current_progress,
+                    'updated_at': datetime.utcnow().isoformat() + 'Z'
+                }
+                update_status(job_id, status_data)
+                all_success = False
+                break
+            else:
+                tracker.write_status('FAILED', f'Command failed with exit code {ret}: {cmd[:50]}...')
+                all_success = False
+                break
     
     # Write final status
     if all_success:

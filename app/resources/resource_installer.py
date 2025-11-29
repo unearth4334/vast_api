@@ -14,6 +14,34 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def _is_host_key_error(stderr: str, return_code: int) -> bool:
+    """
+    Check if SSH error is due to host key verification
+    
+    Args:
+        stderr: Standard error output from SSH command
+        return_code: Process return code
+        
+    Returns:
+        True if error is related to host key verification
+    """
+    if return_code != 255:
+        return False
+    
+    stderr_lower = stderr.lower()
+    
+    # Check for common host key error patterns
+    host_key_patterns = [
+        'host key verification failed',
+        'no matching host key type found',
+        'host key for',
+        'remote host identification has changed',
+        'add correct host key'
+    ]
+    
+    return any(pattern in stderr_lower for pattern in host_key_patterns)
+
+
 class ProgressParser:
     """Parse civitdl progress output"""
     
@@ -163,6 +191,20 @@ class ResourceInstaller:
                 logger.info(f"Successfully installed resource '{resource_name}'")
             else:
                 logger.error(f"Failed to install resource '{resource_name}' (exit code {return_code})")
+                
+                # Check for host key verification error
+                stderr_text = '\n'.join(output_lines)
+                if _is_host_key_error(stderr_text, return_code):
+                    logger.warning(f"Host key verification needed for {ssh_host}:{ssh_port}")
+                    return {
+                        'success': False,
+                        'output': output_lines,
+                        'return_code': return_code,
+                        'resource': resource_name,
+                        'host_verification_needed': True,
+                        'host': ssh_host,
+                        'port': ssh_port
+                    }
             
             return {
                 'success': success,
