@@ -456,6 +456,11 @@ async function testConnection(syncType) {
             const config = syncConfigCache[syncType];
             const ip = config.ip || SYNC_CONFIG_DEFAULTS[syncType]?.ip;
             const port = config.port || SYNC_CONFIG_DEFAULTS[syncType]?.port;
+            
+            // Result lookup with fallbacks:
+            // 1. Try legacy format "type:ip:port" (e.g., "forge:10.0.78.108:2222")
+            // 2. Try direct sync type key (e.g., "forge") - used when SSHTester returns alias-based results
+            // 3. Fallback to first result in case of unexpected key format
             const hostKey = `${syncType}:${ip}:${port}`;
             const result = data.results[hostKey] || data.results[syncType] || Object.values(data.results)[0];
             
@@ -496,6 +501,8 @@ async function testConnection(syncType) {
 async function handleHostKeyVerification(syncType, host, port, resultDiv) {
     try {
         // Build SSH connection string for the verify-host endpoint
+        // Note: Uses 'root' as the default SSH user, which is standard for VastAI 
+        // and local Docker container sync targets (Forge, Comfy)
         const sshConnection = `ssh -p ${port} root@${host}`;
         
         // First, get the host key fingerprints
@@ -594,47 +601,45 @@ function showHostKeyVerificationModalAndWait(hostKeyError) {
         document.getElementById('hk-fingerprint').textContent = hostKeyError.new_fingerprint || 'Unknown';
         document.getElementById('hk-file').textContent = hostKeyError.known_hosts_file || 'Unknown';
         
-        // Store the resolve function for callbacks
-        window._hostKeyVerificationResolve = resolve;
-        
-        // Override the resolve button click handler
-        const resolveBtn = document.getElementById('resolveHostKeyBtn');
-        const originalOnclick = resolveBtn.onclick;
-        
-        resolveBtn.onclick = () => {
-            document.getElementById('hostKeyErrorOverlay').style.display = 'none';
-            resolveBtn.onclick = originalOnclick;
-            window._hostKeyVerificationResolve = null;
-            resolve(true);
-        };
-        
-        // Override the close button and modal close handlers
         const overlay = document.getElementById('hostKeyErrorOverlay');
+        const resolveBtn = document.getElementById('resolveHostKeyBtn');
         const closeBtn = overlay.querySelector('.close-modal-btn');
         const cancelBtn = overlay.querySelector('.sync-button.secondary');
         
+        // Store original handlers for cleanup
+        const originalResolveOnclick = resolveBtn.onclick;
+        const originalCloseOnclick = closeBtn ? closeBtn.onclick : null;
+        const originalCancelOnclick = cancelBtn ? cancelBtn.onclick : null;
+        
+        // Flag to prevent double resolution
+        let resolved = false;
+        
+        const cleanup = () => {
+            if (resolved) return;
+            resolved = true;
+            
+            // Restore original handlers
+            resolveBtn.onclick = originalResolveOnclick;
+            if (closeBtn) closeBtn.onclick = originalCloseOnclick;
+            if (cancelBtn) cancelBtn.onclick = originalCancelOnclick;
+        };
+        
+        const handleAccept = () => {
+            overlay.style.display = 'none';
+            cleanup();
+            resolve(true);
+        };
+        
         const handleCancel = () => {
             overlay.style.display = 'none';
-            resolveBtn.onclick = originalOnclick;
-            window._hostKeyVerificationResolve = null;
+            cleanup();
             resolve(false);
         };
         
-        if (closeBtn) {
-            const originalCloseOnclick = closeBtn.onclick;
-            closeBtn.onclick = () => {
-                handleCancel();
-                closeBtn.onclick = originalCloseOnclick;
-            };
-        }
-        
-        if (cancelBtn) {
-            const originalCancelOnclick = cancelBtn.onclick;
-            cancelBtn.onclick = () => {
-                handleCancel();
-                cancelBtn.onclick = originalCancelOnclick;
-            };
-        }
+        // Set up event handlers
+        resolveBtn.onclick = handleAccept;
+        if (closeBtn) closeBtn.onclick = handleCancel;
+        if (cancelBtn) cancelBtn.onclick = handleCancel;
         
         // Show the modal
         overlay.style.display = 'flex';

@@ -111,6 +111,10 @@ class SSHTester:
                 }
             else:
                 # Check if the error is due to host key verification failure
+                # Note: This uses string matching which covers common SSH error messages.
+                # These messages are consistent across OpenSSH versions (5.x - 9.x) and
+                # are standardized in the OpenSSH source code. Return code 255 is also
+                # used as a fallback indicator for SSH-level failures.
                 stderr = result.stderr.lower() if result.stderr else ''
                 host_verification_needed = (
                     'host key verification failed' in stderr or
@@ -176,14 +180,15 @@ class SSHTester:
             
             for line in config_content.split('\n'):
                 line = line.strip()
+                parts = line.split()  # Split once and reuse
                 if line.lower().startswith('host '):
-                    current_host = line.split()[1] if len(line.split()) > 1 else None
+                    current_host = parts[1] if len(parts) > 1 else None
                     host_info = {}
                 elif current_host == host_alias:
                     if line.lower().startswith('hostname '):
-                        host_info['host'] = line.split()[1] if len(line.split()) > 1 else None
+                        host_info['host'] = parts[1] if len(parts) > 1 else None
                     elif line.lower().startswith('port '):
-                        host_info['port'] = line.split()[1] if len(line.split()) > 1 else '22'
+                        host_info['port'] = parts[1] if len(parts) > 1 else '22'
             
             if host_info.get('host'):
                 if 'port' not in host_info:
