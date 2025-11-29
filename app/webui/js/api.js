@@ -27,7 +27,8 @@ const api = {
     post: (url, data = {}) => fetchJSON(url, { 
         method: 'POST', 
         body: JSON.stringify(data) 
-    })
+    }),
+    delete: (url) => fetchJSON(url, { method: 'DELETE' })
 };
 
 // Make API client globally available

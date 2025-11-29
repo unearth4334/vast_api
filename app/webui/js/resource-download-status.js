@@ -108,13 +108,15 @@ export class ResourceDownloadStatus {
      * Delete all tasks
      */
     async deleteAllTasks() {
-        if (!this.instanceId) return;
-        
-        const confirmed = confirm('Delete all download tasks for this instance?');
+        const confirmed = confirm('Delete all download tasks?');
         if (!confirmed) return;
         
         try {
-            const jobs = await window.api.get(`/downloads/status?instance_id=${this.instanceId}`);
+            // Fetch current jobs (with or without instance filter)
+            const url = this.instanceId 
+                ? `/downloads/status?instance_id=${this.instanceId}`
+                : '/downloads/status';
+            const jobs = await window.api.get(url);
             
             // Delete each job
             for (const job of jobs) {
