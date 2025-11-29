@@ -458,7 +458,6 @@ export class ResourceDownloadStatus {
             default:
                 return job.status;
         }
-    }   }
     }
 
     /**
