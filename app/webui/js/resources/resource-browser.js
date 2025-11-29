@@ -357,10 +357,12 @@ export class ResourceBrowser {
                     instanceId = this._extractInstanceId(sshInput.value);
                 }
                 
+                // Set instance ID if available (can be null for local downloads)
                 if (instanceId) {
                     this.downloadStatus.setInstanceId(instanceId);
                 } else {
-                    alert('Please provide an SSH connection string first');
+                    // Start polling even without instance ID to show local downloads
+                    this.downloadStatus.startPolling();
                 }
             });
         }

@@ -163,9 +163,13 @@ export class ResourceDownloadStatus {
      * Poll the status endpoint for download progress
      */
     async pollStatus() {
-        if (!this.instanceId || !this.container) return;
+        if (!this.container) return;
         try {
-            const jobs = await window.api.get(`/downloads/status?instance_id=${this.instanceId}`);
+            // Fetch download status, optionally filtered by instance ID
+            const url = this.instanceId 
+                ? `/downloads/status?instance_id=${this.instanceId}`
+                : '/downloads/status';
+            const jobs = await window.api.get(url);
             
             // Check for host verification needed
             const hostVerificationJob = jobs && jobs.find(j => j.status === 'HOST_VERIFICATION_NEEDED');
