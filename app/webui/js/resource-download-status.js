@@ -8,6 +8,125 @@ export class ResourceDownloadStatus {
         this.instanceId = null;
         this.pollInterval = null;
         this.isPolling = false;
+        this.deleteMode = false;
+        this.setupEventListeners();
+    }
+
+    /**
+     * Setup global event listeners for delete mode
+     */
+    setupEventListeners() {
+        // Listen for clicks anywhere to exit delete mode
+        document.addEventListener('click', (e) => {
+            if (!this.deleteMode) return;
+            
+            // Don't exit if clicking delete buttons or task items
+            if (e.target.closest('.download-task-delete-btn') || 
+                e.target.closest('.download-delete-all-btn')) {
+                return;
+            }
+            
+            // Don't exit if clicking a task item to enter delete mode
+            if (e.target.closest('.download-task-item') && !this.deleteMode) {
+                return;
+            }
+            
+            // Exit delete mode
+            this.exitDeleteMode();
+        });
+    }
+
+    /**
+     * Enter delete mode - show delete buttons
+     */
+    enterDeleteMode() {
+        if (!this.container) return;
+        this.deleteMode = true;
+        
+        const wrappers = this.container.querySelectorAll('.download-task-item-wrapper');
+        wrappers.forEach(wrapper => wrapper.classList.add('delete-mode'));
+        
+        const deleteAllBtn = this.container.querySelector('.download-delete-all-btn');
+        if (deleteAllBtn) {
+            deleteAllBtn.classList.add('visible');
+        }
+    }
+
+    /**
+     * Exit delete mode - hide delete buttons
+     */
+    exitDeleteMode() {
+        if (!this.container) return;
+        this.deleteMode = false;
+        
+        const wrappers = this.container.querySelectorAll('.download-task-item-wrapper');
+        wrappers.forEach(wrapper => wrapper.classList.remove('delete-mode'));
+        
+        const deleteAllBtn = this.container.querySelector('.download-delete-all-btn');
+        if (deleteAllBtn) {
+            deleteAllBtn.classList.remove('visible');
+        }
+    }
+
+    /**
+     * Handle task item click
+     */
+    handleTaskItemClick(e) {
+        // Don't toggle if clicking delete button
+        if (e.target.closest('.download-task-delete-btn')) {
+            return;
+        }
+        
+        e.stopPropagation();
+        
+        if (this.deleteMode) {
+            // If already in delete mode and clicking task, exit
+            this.exitDeleteMode();
+        } else {
+            // Enter delete mode
+            this.enterDeleteMode();
+        }
+    }
+
+    /**
+     * Delete a single task
+     */
+    async deleteTask(jobId) {
+        try {
+            await window.api.delete(`/downloads/job/${jobId}`);
+            // Refresh the list
+            await this.pollStatus();
+            // Stay in delete mode
+        } catch (e) {
+            console.error('Error deleting task:', e);
+            alert('Failed to delete task');
+        }
+    }
+
+    /**
+     * Delete all tasks
+     */
+    async deleteAllTasks() {
+        if (!this.instanceId) return;
+        
+        const confirmed = confirm('Delete all download tasks for this instance?');
+        if (!confirmed) return;
+        
+        try {
+            const jobs = await window.api.get(`/downloads/status?instance_id=${this.instanceId}`);
+            
+            // Delete each job
+            for (const job of jobs) {
+                await window.api.delete(`/downloads/job/${job.id}`);
+            }
+            
+            // Refresh and exit delete mode
+            await this.pollStatus();
+            this.exitDeleteMode();
+        } catch (e) {
+            console.error('Error deleting all tasks:', e);
+            alert('Failed to delete all tasks');
+        }
     }
 
     /**
@@ -100,6 +219,7 @@ export class ResourceDownloadStatus {
 
         // Render each job as a task item
         html += '<div class="download-task-list">';
+        html += '<button class="download-delete-all-btn">🗑️ Delete All</button>';
         jobs.forEach(job => {
             html += this.renderTaskItem(job);
         });
@@ -108,6 +228,43 @@ export class ResourceDownloadStatus {
         html += '</div>';
         
         this.container.innerHTML = html;
+        
+        // Attach event listeners
+        this.attachEventListeners();
+    }
+
+    /**
+     * Attach event listeners to task items and buttons
+     */
+    attachEventListeners() {
+        if (!this.container) return;
+        
+        // Task item clicks
+        const taskItems = this.container.querySelectorAll('.download-task-item');
+        taskItems.forEach(item => {
+            item.addEventListener('click', (e) => this.handleTaskItemClick(e));
+        });
+        
+        // Delete button clicks
+        const deleteButtons = this.container.querySelectorAll('.download-task-delete-btn');
+        deleteButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const jobId = btn.dataset.jobId;
+                if (jobId) {
+                    this.deleteTask(jobId);
+                }
+            });
+        });
+        
+        // Delete all button click
+        const deleteAllBtn = this.container.querySelector('.download-delete-all-btn');
+        if (deleteAllBtn) {
+            deleteAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteAllTasks();
+            });
+        }
     }
 
     /**
@@ -176,15 +333,18 @@ export class ResourceDownloadStatus {
         }
 
         return `
-            <div class="download-task-item ${statusClass}" data-job-id="${job.id}">
-                <div class="task-main-row">
-                    <span class="task-icon">${statusIcon}</span>
-                    <span class="task-name">${this.escapeHtml(resourceName)}</span>
-                    <span class="task-status-tag ${statusClass}">${statusTag}</span>
+            <div class="download-task-item-wrapper">
+                <div class="download-task-item ${statusClass}" data-job-id="${job.id}">
+                    <div class="task-main-row">
+                        <span class="task-icon">${statusIcon}</span>
+                        <span class="task-name">${this.escapeHtml(resourceName)}</span>
+                        <span class="task-status-tag ${statusClass}">${statusTag}</span>
+                    </div>
+                    ${progressBar}
+                    ${progressDetails}
+                    ${errorMsg}
                 </div>
-                ${progressBar}
-                ${progressDetails}
-                ${errorMsg}
+                <button class="download-task-delete-btn" data-job-id="${job.id}">🗑️</button>
             </div>
         `;
     }
