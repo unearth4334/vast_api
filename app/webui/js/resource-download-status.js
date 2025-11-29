@@ -284,7 +284,6 @@ export class ResourceDownloadStatus {
                 ${failed.length > 0 ? `<span class="summary-item summary-failed">${failed.length} failed</span>` : ''}
                 ${hostVerification.length > 0 ? `<span class="summary-item summary-host-verification">${hostVerification.length} needs verification</span>` : ''}
             </div>
-        `;  </div>
         `;
 
         // Render each job as a task item
