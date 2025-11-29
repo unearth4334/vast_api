@@ -2096,3 +2096,213 @@ body {
     padding: 10px 16px;
     font-weight: 600;
 }
+
+/* =========================
+   SYNC BUTTON WRAPPER & CONFIG
+   ========================= */
+
+.sync-button-wrapper {
+    display: flex;
+    gap: var(--size-4-2);
+    align-items: stretch;
+}
+
+.sync-button-wrapper .sync-button {
+    flex: 1;
+    border-radius: var(--radius-m) 0 0 var(--radius-m);
+}
+
+.sync-config-btn {
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+    border: none;
+    border-radius: 0 var(--radius-m) var(--radius-m) 0;
+    padding: 0 var(--size-4-3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    font-size: var(--font-ui-medium);
+}
+
+.sync-config-btn:hover {
+    background: var(--interactive-hover);
+    transform: translateY(-1px);
+}
+
+.sync-config-btn:active {
+    transform: translateY(0);
+}
+
+/* Sync Config Modal */
+.sync-config-modal {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    box-shadow: 0 8px 32px var(--background-modifier-box-shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    width: 90vw;
+    max-width: 500px;
+    max-height: 85vh;
+}
+
+.sync-config-content {
+    padding: var(--size-4-4);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.sync-config-loading {
+    text-align: center;
+    color: var(--text-muted);
+    padding: var(--size-4-6);
+    font-style: italic;
+}
+
+.sync-config-section {
+    margin-bottom: var(--size-4-4);
+}
+
+.sync-config-item {
+    margin-bottom: var(--size-4-3);
+}
+
+.sync-config-label {
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--size-4-1);
+}
+
+.sync-config-value {
+    font-size: var(--font-ui-medium);
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    flex-wrap: wrap;
+}
+
+.sync-config-ip {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    background: var(--background-modifier-form-field);
+    padding: var(--size-4-2) var(--size-4-3);
+    border-radius: var(--radius-s);
+    border: 1px solid var(--background-modifier-border);
+}
+
+.sync-status-success {
+    color: var(--text-success);
+    font-weight: 600;
+}
+
+.sync-status-failed {
+    color: var(--text-error);
+    font-weight: 600;
+}
+
+.sync-status-none {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.sync-time {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.sync-config-actions {
+    display: flex;
+    gap: var(--size-4-2);
+    padding-top: var(--size-4-3);
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.sync-config-actions .setup-button {
+    flex: 1;
+}
+
+.sync-config-result {
+    margin-top: var(--size-4-3);
+    padding: var(--size-4-2) var(--size-4-3);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-small);
+    display: none;
+}
+
+.sync-config-result:not(:empty) {
+    display: block;
+}
+
+.sync-config-result-loading {
+    background: rgba(124, 58, 237, 0.1);
+    border: 1px solid var(--color-accent);
+    color: var(--text-normal);
+}
+
+.sync-config-result-success {
+    background: var(--background-success);
+    border: 1px solid var(--text-success);
+    color: var(--text-success);
+}
+
+.sync-config-result-error {
+    background: var(--background-error);
+    border: 1px solid var(--text-error);
+    color: var(--text-error);
+}
+
+/* VastAI instances in sync config */
+.sync-vastai-instances {
+    margin-bottom: var(--size-4-3);
+}
+
+.sync-vastai-instances h4 {
+    margin: 0 0 var(--size-4-2) 0;
+    color: var(--text-normal);
+    font-size: var(--font-ui-medium);
+}
+
+.sync-vastai-instances .instances-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.sync-vastai-instances .instance-item {
+    padding: var(--size-4-2);
+    margin-bottom: var(--size-4-1);
+}
+
+.sync-vastai-instances .instance-details {
+    font-size: var(--font-ui-smaller);
+}
+
+.sync-config-ssh-field input {
+    width: 100%;
+    padding: var(--size-4-3);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-modifier-form-field);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.sync-config-ssh-field input:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+}
+
+.sync-config-hint {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    margin-top: var(--size-4-1);
+    font-style: italic;
+}
