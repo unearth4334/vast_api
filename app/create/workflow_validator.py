@@ -11,6 +11,9 @@ from .workflow_loader import WorkflowConfig, InputConfig
 
 logger = logging.getLogger(__name__)
 
+# Configuration constants
+DEFAULT_MAX_LORA_ITEMS = 5
+
 
 class ValidationResult:
     """Result of input validation"""
@@ -214,8 +217,8 @@ class WorkflowValidator:
             result.add_error(input_id, f'{config.label} must be an array')
             return
         
-        # Check max items
-        max_items = 5  # Default max
+        # Check max items using config or default constant
+        max_items = DEFAULT_MAX_LORA_ITEMS
         if hasattr(config, 'max_items') and config.max_items:
             max_items = config.max_items
         

@@ -124,6 +124,13 @@ class ExecutionTask:
         self.set_status(TaskStatus.CANCELLED)
         logger.info(f"Task {self.task_id} cancelled")
     
+    def _format_datetime(self, dt: Optional[datetime]) -> Optional[str]:
+        """Format datetime to ISO8601 UTC string"""
+        if dt is None:
+            return None
+        # Use strftime for consistent formatting
+        return dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    
     def to_dict(self) -> Dict:
         """Convert to dictionary for API response"""
         return {
@@ -131,8 +138,8 @@ class ExecutionTask:
             'workflow_id': self.workflow_id,
             'status': self.status.value,
             'progress': self.get_progress(),
-            'started_at': self.started_at.isoformat() + 'Z' if self.started_at else None,
-            'completed_at': self.completed_at.isoformat() + 'Z' if self.completed_at else None,
+            'started_at': self._format_datetime(self.started_at),
+            'completed_at': self._format_datetime(self.completed_at),
             'elapsed_seconds': self.get_elapsed_seconds(),
             'estimated_remaining_seconds': self.get_estimated_remaining(),
             'outputs': self.get_outputs(),

@@ -150,9 +150,9 @@ class WorkflowGenerator:
             logger.warning(f"Node {node_id} not found for seed input {config.id}")
             return
         
-        # Handle random seed
+        # Handle random seed - use 2^31 - 1 as max for better compatibility
         if value == -1:
-            value = random.randint(0, 2**63 - 1)
+            value = random.randint(0, 2**31 - 1)
         
         target_field = config.field or 'noise_seed'
         if 'inputs' in workflow[node_id]:

@@ -369,7 +369,7 @@ def generate_workflow():
         metadata = {
             'workflow_id': workflow_id,
             'version': workflow_config.version,
-            'generated_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
             'input_summary': generator.get_input_summary(inputs)
         }
         
