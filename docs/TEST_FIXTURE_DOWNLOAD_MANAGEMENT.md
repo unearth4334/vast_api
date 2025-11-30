@@ -138,6 +138,20 @@ python3 -m pytest test/test_download_management_fixture.py -v
 5. **TestDownloadQueueFixture** - Tests for queue/status file management
 6. **TestDownloadAPIEndpoints** - Tests for Flask API endpoints
 7. **TestIntegration** - End-to-end integration tests
+8. **TestMultipleDownloadsTracking** - Tests for tracking multiple simultaneous downloads
+   - Multiple jobs for the same instance
+   - Job progress transitions
+   - Concurrent status updates
+   - Detailed progress information
+   - Failed job error tracking
+9. **TestDownloadQueueEdgeCases** - Edge case handling tests
+   - Empty queue operations
+   - Non-existent job updates
+   - Jobs with multiple commands
+   - Special characters in paths
+10. **TestProgressParserIntegration** - Parser integration with queue system
+    - Civitdl progress to status flow
+    - Wget progress to status flow
 
 ## Visualization Demo
 
