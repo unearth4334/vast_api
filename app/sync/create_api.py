@@ -169,6 +169,7 @@ def get_workflow_details(workflow_id: str) -> Optional[Dict]:
         'thumbnail': wrapper.get('thumbnail'),
         'vram_estimate': wrapper.get('vram_estimate'),
         'time_estimate': wrapper.get('time_estimate'),
+        'layout': wrapper.get('layout'),  # Section-based layout configuration
         'inputs': wrapper.get('inputs', []),
         'advanced': wrapper.get('advanced', []),
         'outputs': wrapper.get('outputs', []),

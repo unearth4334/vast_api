@@ -58,6 +58,14 @@ except ImportError:
     from ..api import downloads_bp
 app.register_blueprint(downloads_bp)
 
+# Register Models API blueprint
+try:
+    from app.api import models_bp
+except ImportError:
+    from ..api import models_bp
+app.register_blueprint(models_bp)
+logger.info("Registered Models API blueprint")
+
 # Register Create API blueprint
 try:
     from app.sync.create_api import create_bp
@@ -89,6 +97,7 @@ CORS(
         r"/logs/*": {"origins": ALLOWED_ORIGINS},
         r"/resources/*": {"origins": ALLOWED_ORIGINS},
         r"/create/*": {"origins": ALLOWED_ORIGINS},
+        r"/api/*": {"origins": ALLOWED_ORIGINS},
         r"/": {"origins": ALLOWED_ORIGINS},
     },
     supports_credentials=False,
