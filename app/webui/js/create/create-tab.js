@@ -904,11 +904,6 @@ function renderSectionBasedLayout(workflow, container) {
         container.appendChild(otherSection);
     }
     
-    // Requirements info
-    if (workflow.requirements) {
-        container.innerHTML += renderRequirementsInfo(workflow.requirements);
-    }
-    
     container.style.display = 'block';
     
     // Initialize form values with defaults

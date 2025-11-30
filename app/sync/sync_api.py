@@ -68,11 +68,17 @@ logger.info("Registered Models API blueprint")
 
 # Register Create API blueprint
 try:
-    from app.sync.create_api import create_bp
+    from app.api.create import bp as create_bp
 except ImportError:
-    from .create_api import create_bp
-app.register_blueprint(create_bp)
-logger.info("Registered Create API blueprint")
+    try:
+        from ..api.create import bp as create_bp
+    except ImportError:
+        create_bp = None
+        logger.warning("Create API blueprint not available")
+
+if create_bp:
+    app.register_blueprint(create_bp)
+    logger.info("Registered Create API blueprint")
 
 # Cache for VastAI status to prevent excessive API calls from health checks
 _vastai_status_cache = {

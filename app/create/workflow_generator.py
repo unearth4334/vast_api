@@ -1,84 +1,113 @@
-#!/usr/bin/env python3
 """
-Workflow Generator - Generate ComfyUI workflow JSON from user inputs.
-Handles mapping of user inputs to workflow node fields.
+Workflow Generator
+Generates ComfyUI workflow JSON from user inputs
 """
 
 import copy
 import logging
-import random
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, List
 
-from .workflow_loader import WorkflowConfig, InputConfig
+from app.create.workflow_loader import WorkflowConfig, InputConfig
 
 logger = logging.getLogger(__name__)
 
 
 class WorkflowGenerator:
-    """Generate ComfyUI workflow JSON from user inputs"""
+    """Generates ComfyUI workflow JSON from inputs"""
     
-    def __init__(self, config: WorkflowConfig, template: Dict):
+    def __init__(self, config: WorkflowConfig, template: dict):
         """
-        Initialize generator with workflow config and template.
+        Initialize generator
         
         Args:
-            config: WorkflowConfig object with input definitions
-            template: The raw workflow JSON template
+            config: Workflow configuration
+            template: Workflow JSON template
         """
         self.config = config
         self.template = template
     
-    def generate(self, inputs: Dict) -> Dict:
+    def generate(self, inputs: Dict[str, Any]) -> dict:
         """
-        Generate workflow JSON with user inputs merged in.
+        Generate workflow JSON from inputs
         
         Args:
-            inputs: Dictionary of user-provided input values
+            inputs: User input values
             
         Returns:
-            Generated workflow JSON with inputs applied
+            Generated workflow JSON
         """
-        # Deep copy to avoid modifying original template
+        # Deep copy template to avoid modifying original
         workflow = copy.deepcopy(self.template)
         
-        # Apply each input from the config
+        # Apply each input to the workflow
         for input_config in self.config.inputs:
-            self._apply_input(workflow, input_config, inputs)
+            try:
+                # Check if input is conditionally shown
+                if input_config.depends_on:
+                    if not self._check_dependency(inputs, input_config.depends_on):
+                        logger.debug(f"Skipping input {input_config.id} (dependency not met)")
+                        continue
+                
+                # Apply the input based on type
+                self._apply_input(workflow, input_config, inputs)
+                
+            except Exception as e:
+                logger.error(f"Error applying input {input_config.id}: {e}", exc_info=True)
+                # Continue processing other inputs
         
         return workflow
     
-    def _apply_input(self, workflow: Dict, input_config: InputConfig, inputs: Dict):
-        """Apply a single input to the workflow"""
-        input_id = input_config.id
+    def _check_dependency(self, inputs: Dict[str, Any], depends_on: Dict[str, Any]) -> bool:
+        """
+        Check if dependency condition is met
         
-        # Skip if input not provided and not required
-        if input_id not in inputs:
-            # Apply default if exists
-            if input_config.default is not None:
-                value = input_config.default
-            else:
-                return
+        Args:
+            inputs: User inputs
+            depends_on: Dependency configuration
+            
+        Returns:
+            True if dependency is satisfied
+        """
+        field = depends_on.get('field')
+        value = depends_on.get('value')
+        
+        if not field:
+            return True
+        
+        input_value = inputs.get(field)
+        
+        # Check if value matches
+        if isinstance(value, list):
+            return input_value in value
         else:
-            value = inputs[input_id]
+            return input_value == value
+    
+    def _apply_input(self, workflow: dict, input_config: InputConfig, inputs: Dict[str, Any]):
+        """
+        Apply single input to workflow
         
-        # Check depends_on condition
-        if input_config.depends_on:
-            dep_field = input_config.depends_on.get('field')
-            dep_value = input_config.depends_on.get('value')
-            if dep_field and inputs.get(dep_field) != dep_value:
-                return  # Dependency not satisfied
-        
-        # Route to appropriate handler based on input type
+        Args:
+            workflow: Workflow JSON to modify
+            input_config: Input configuration
+            inputs: User input values
+        """
         input_type = input_config.type
         
-        if input_type in ('text', 'textarea'):
+        # Get the input value
+        value = inputs.get(input_config.id)
+        
+        # Skip if no value provided and not required
+        if value is None and not input_config.required:
+            logger.debug(f"No value for optional input: {input_config.id}")
+            return
+        
+        # Apply based on type
+        if input_type in ['text', 'textarea']:
             self._apply_text_input(workflow, input_config, value)
         elif input_type == 'slider':
             self._apply_slider_input(workflow, input_config, value)
-        elif input_type == 'checkbox':
-            self._apply_checkbox_input(workflow, input_config, value)
-        elif input_type == 'seed':
-            self._apply_seed_input(workflow, input_config, value)
+        elif input_type == 'toggle':
+            self._apply_toggle_input(workflow, input_config, value)
         elif input_type == 'image':
             self._apply_image_input(workflow, input_config, value)
         elif input_type == 'high_low_pair_model':
@@ -87,124 +116,145 @@ class WorkflowGenerator:
             self._apply_lora_list(workflow, input_config, value)
         elif input_type == 'single_model':
             self._apply_single_model(workflow, input_config, value)
-        elif input_type == 'select':
-            self._apply_select_input(workflow, input_config, value)
+        elif input_type == 'dropdown':
+            self._apply_dropdown(workflow, input_config, value)
         else:
-            logger.warning(f"Unknown input type '{input_type}' for field '{input_id}'")
-            # Try generic application
-            self._apply_generic_input(workflow, input_config, value)
+            logger.warning(f"Unknown input type: {input_type} for {input_config.id}")
     
-    def _apply_text_input(self, workflow: Dict, config: InputConfig, value: str):
-        """Apply text/textarea input to workflow"""
-        node_id = config.node_id
-        if not node_id or node_id not in workflow:
-            logger.warning(f"Node {node_id} not found for text input {config.id}")
+    def _apply_text_input(self, workflow: dict, config: InputConfig, value: Any):
+        """Apply text input to workflow"""
+        if not config.node_id or not config.field:
+            logger.warning(f"Missing node_id or field for text input: {config.id}")
             return
         
-        target_field = config.field or 'value'
-        if 'inputs' in workflow[node_id]:
-            workflow[node_id]['inputs'][target_field] = value
-    
-    def _apply_slider_input(self, workflow: Dict, config: InputConfig, value: float):
-        """Apply slider input to workflow (may update multiple fields)"""
-        node_id = config.node_id
-        if not node_id or node_id not in workflow:
-            logger.warning(f"Node {node_id} not found for slider input {config.id}")
+        if config.node_id not in workflow:
+            logger.warning(f"Node {config.node_id} not found in workflow")
             return
         
-        if 'inputs' not in workflow[node_id]:
+        workflow[config.node_id]['inputs'][config.field] = str(value) if value else ""
+        logger.debug(f"Applied text input {config.id} to node {config.node_id}.{config.field}")
+    
+    def _apply_slider_input(self, workflow: dict, config: InputConfig, value: Any):
+        """Apply slider input to workflow"""
+        if not config.node_id or not config.field:
+            logger.warning(f"Missing node_id or field for slider input: {config.id}")
             return
         
-        # Handle single field
-        if config.field:
-            workflow[node_id]['inputs'][config.field] = value
-        
-        # Handle multiple fields (e.g., Xi and Xf for mxSlider)
-        if config.fields:
-            for field in config.fields:
-                if field in workflow[node_id]['inputs']:
-                    workflow[node_id]['inputs'][field] = value
-    
-    def _apply_checkbox_input(self, workflow: Dict, config: InputConfig, value: bool):
-        """Apply checkbox input to workflow"""
-        node_id = config.node_id
-        
-        # Single node
-        if node_id and node_id in workflow:
-            target_field = config.field or 'value'
-            if 'inputs' in workflow[node_id]:
-                workflow[node_id]['inputs'][target_field] = value
-        
-        # Multiple nodes (e.g., enable/disable pairs)
-        if config.node_ids:
-            for nid in config.node_ids:
-                if nid in workflow:
-                    target_field = config.field or 'value'
-                    if 'inputs' in workflow[nid]:
-                        workflow[nid]['inputs'][target_field] = value
-    
-    def _apply_seed_input(self, workflow: Dict, config: InputConfig, value: int):
-        """Apply seed input with special handling for random (-1)"""
-        node_id = config.node_id
-        if not node_id or node_id not in workflow:
-            logger.warning(f"Node {node_id} not found for seed input {config.id}")
+        if config.node_id not in workflow:
+            logger.warning(f"Node {config.node_id} not found in workflow")
             return
         
-        # Handle random seed - use 2^31 - 1 as max for better compatibility
-        if value == -1:
-            value = random.randint(0, 2**31 - 1)
+        # Convert to appropriate numeric type
+        numeric_value = float(value) if value is not None else config.default
         
-        target_field = config.field or 'noise_seed'
-        if 'inputs' in workflow[node_id]:
-            workflow[node_id]['inputs'][target_field] = value
+        # Clamp to range if specified
+        if config.min is not None and numeric_value < config.min:
+            numeric_value = config.min
+        if config.max is not None and numeric_value > config.max:
+            numeric_value = config.max
+        
+        workflow[config.node_id]['inputs'][config.field] = numeric_value
+        logger.debug(f"Applied slider input {config.id} to node {config.node_id}.{config.field} = {numeric_value}")
     
-    def _apply_image_input(self, workflow: Dict, config: InputConfig, value: str):
-        """Apply image input (filename/path)"""
-        node_id = config.node_id
-        if not node_id or node_id not in workflow:
-            logger.warning(f"Node {node_id} not found for image input {config.id}")
+    def _apply_toggle_input(self, workflow: dict, config: InputConfig, value: Any):
+        """Apply toggle input to workflow"""
+        if not config.node_id or not config.field:
+            logger.warning(f"Missing node_id or field for toggle input: {config.id}")
             return
         
-        target_field = config.field or 'image'
-        if 'inputs' in workflow[node_id]:
-            workflow[node_id]['inputs'][target_field] = value
+        if config.node_id not in workflow:
+            logger.warning(f"Node {config.node_id} not found in workflow")
+            return
+        
+        bool_value = bool(value) if value is not None else False
+        workflow[config.node_id]['inputs'][config.field] = bool_value
+        logger.debug(f"Applied toggle input {config.id} to node {config.node_id}.{config.field} = {bool_value}")
     
-    def _apply_high_low_model(self, workflow: Dict, config: InputConfig, value: Dict):
-        """Apply high-low noise model pair"""
+    def _apply_image_input(self, workflow: dict, config: InputConfig, value: Any):
+        """Apply image input to workflow"""
+        if not config.node_id or not config.field:
+            logger.warning(f"Missing node_id or field for image input: {config.id}")
+            return
+        
+        if config.node_id not in workflow:
+            logger.warning(f"Node {config.node_id} not found in workflow")
+            return
+        
+        workflow[config.node_id]['inputs'][config.field] = str(value) if value else ""
+        logger.debug(f"Applied image input {config.id} to node {config.node_id}.{config.field}")
+    
+    def _apply_dropdown(self, workflow: dict, config: InputConfig, value: Any):
+        """Apply dropdown input to workflow"""
+        if not config.node_id or not config.field:
+            logger.warning(f"Missing node_id or field for dropdown input: {config.id}")
+            return
+        
+        if config.node_id not in workflow:
+            logger.warning(f"Node {config.node_id} not found in workflow")
+            return
+        
+        workflow[config.node_id]['inputs'][config.field] = str(value) if value else ""
+        logger.debug(f"Applied dropdown input {config.id} to node {config.node_id}.{config.field}")
+    
+    def _apply_high_low_model(self, workflow: dict, config: InputConfig, value: Any):
+        """
+        Apply high-low noise model pair
+        
+        Args:
+            workflow: Workflow JSON
+            config: Input configuration
+            value: Dict with highNoisePath and lowNoisePath
+        """
         if not value or not isinstance(value, dict):
+            logger.warning(f"Invalid high-low model value for {config.id}")
             return
         
         if not config.node_ids or len(config.node_ids) < 2:
-            logger.warning(f"High-low model {config.id} requires exactly 2 node_ids")
+            logger.warning(f"Missing node_ids for high-low model: {config.id}")
             return
         
         high_node_id = config.node_ids[0]
         low_node_id = config.node_ids[1]
+        field_name = config.field or 'unet_name'
         
-        high_path = value.get('highNoisePath')
-        low_path = value.get('lowNoisePath')
+        # Apply high noise model
+        if high_node_id in workflow:
+            high_path = value.get('highNoisePath', '')
+            workflow[high_node_id]['inputs'][field_name] = high_path
+            logger.debug(f"Applied high noise model to node {high_node_id}: {high_path}")
+        else:
+            logger.warning(f"High noise node {high_node_id} not found")
         
-        if high_path and high_node_id in workflow:
-            if 'inputs' in workflow[high_node_id]:
-                workflow[high_node_id]['inputs']['unet_name'] = high_path
-        
-        if low_path and low_node_id in workflow:
-            if 'inputs' in workflow[low_node_id]:
-                workflow[low_node_id]['inputs']['unet_name'] = low_path
+        # Apply low noise model
+        if low_node_id in workflow:
+            low_path = value.get('lowNoisePath', '')
+            workflow[low_node_id]['inputs'][field_name] = low_path
+            logger.debug(f"Applied low noise model to node {low_node_id}: {low_path}")
+        else:
+            logger.warning(f"Low noise node {low_node_id} not found")
     
-    def _apply_lora_list(self, workflow: Dict, config: InputConfig, value: List[Dict]):
-        """Apply LoRA list to Power Lora Loader nodes"""
+    def _apply_lora_list(self, workflow: dict, config: InputConfig, value: Any):
+        """
+        Apply LoRA list to Power Lora Loader nodes
+        
+        Args:
+            workflow: Workflow JSON
+            config: Input configuration
+            value: List of LoRA objects with highNoisePath, lowNoisePath, strength
+        """
         if not value or not isinstance(value, list):
+            logger.debug(f"No LoRAs provided for {config.id}")
             return
         
         if not config.node_ids or len(config.node_ids) < 2:
-            logger.warning(f"LoRA list {config.id} requires exactly 2 node_ids")
+            logger.warning(f"Missing node_ids for LoRA list: {config.id}")
             return
         
         high_node_id = config.node_ids[0]
         low_node_id = config.node_ids[1]
+        field_name = config.field or '➕ Add Lora'
         
-        # Build Power Lora Loader configs
+        # Build Power Lora Loader config
         high_lora_config = {}
         low_lora_config = {}
         
@@ -213,101 +263,80 @@ class WorkflowGenerator:
                 continue
             
             key = f"Lora {idx + 1}"
-            strength = lora.get('strength', 1.0)
-            
-            high_path = lora.get('highNoisePath')
-            low_path = lora.get('lowNoisePath')
-            
-            if high_path:
-                high_lora_config[key] = {
-                    'on': True,
-                    'lora': high_path,
-                    'strength': strength,
-                    'strength_clip': strength
-                }
-            
-            if low_path:
-                low_lora_config[key] = {
-                    'on': True,
-                    'lora': low_path,
-                    'strength': strength,
-                    'strength_clip': strength
-                }
-        
-        # Apply to workflow nodes
-        if high_lora_config and high_node_id in workflow:
-            if 'inputs' in workflow[high_node_id]:
-                workflow[high_node_id]['inputs']['➕ Add Lora'] = high_lora_config
-        
-        if low_lora_config and low_node_id in workflow:
-            if 'inputs' in workflow[low_node_id]:
-                workflow[low_node_id]['inputs']['➕ Add Lora'] = low_lora_config
-    
-    def _apply_single_model(self, workflow: Dict, config: InputConfig, value: Any):
-        """Apply single model selection"""
-        node_id = config.node_id
-        if not node_id or node_id not in workflow:
-            logger.warning(f"Node {node_id} not found for single model {config.id}")
-            return
-        
-        # Handle both string path and dict with 'path' key
-        if isinstance(value, dict):
-            path = value.get('path', '')
-        else:
-            path = str(value)
-        
-        if not path:
-            return
-        
-        target_field = config.field
-        if not target_field:
-            # Try common field names based on model_type
-            model_type = config.model_type
-            field_map = {
-                'text_encoders': 'clip_name',
-                'vae': 'vae_name',
-                'upscale_models': 'model_name',
-                'diffusion_models': 'unet_name',
+            high_lora_config[key] = {
+                'on': True,
+                'lora': lora.get('highNoisePath', ''),
+                'strength': lora.get('strength', 1.0),
+                'strength_clip': lora.get('strength', 1.0)
             }
-            target_field = field_map.get(model_type, 'model_name')
+            low_lora_config[key] = {
+                'on': True,
+                'lora': lora.get('lowNoisePath', ''),
+                'strength': lora.get('strength', 1.0),
+                'strength_clip': lora.get('strength', 1.0)
+            }
         
-        if 'inputs' in workflow[node_id]:
-            workflow[node_id]['inputs'][target_field] = path
+        # Apply to high noise node
+        if high_node_id in workflow:
+            workflow[high_node_id]['inputs'][field_name] = high_lora_config
+            logger.debug(f"Applied {len(high_lora_config)} LoRAs to high noise node {high_node_id}")
+        else:
+            logger.warning(f"High noise LoRA node {high_node_id} not found")
+        
+        # Apply to low noise node
+        if low_node_id in workflow:
+            workflow[low_node_id]['inputs'][field_name] = low_lora_config
+            logger.debug(f"Applied {len(low_lora_config)} LoRAs to low noise node {low_node_id}")
+        else:
+            logger.warning(f"Low noise LoRA node {low_node_id} not found")
     
-    def _apply_select_input(self, workflow: Dict, config: InputConfig, value: str):
-        """Apply select/dropdown input"""
-        node_id = config.node_id
-        if not node_id or node_id not in workflow:
-            logger.warning(f"Node {node_id} not found for select input {config.id}")
+    def _apply_single_model(self, workflow: dict, config: InputConfig, value: Any):
+        """
+        Apply single model selector
+        
+        Args:
+            workflow: Workflow JSON
+            config: Input configuration
+            value: Dict with path key
+        """
+        if not value or not isinstance(value, dict):
+            logger.warning(f"Invalid single model value for {config.id}")
             return
         
-        target_field = config.field or 'value'
-        if 'inputs' in workflow[node_id]:
-            workflow[node_id]['inputs'][target_field] = value
-    
-    def _apply_generic_input(self, workflow: Dict, config: InputConfig, value: Any):
-        """Apply input using generic logic"""
-        node_id = config.node_id
-        if not node_id or node_id not in workflow:
+        if not config.node_id or not config.field:
+            logger.warning(f"Missing node_id or field for single model: {config.id}")
             return
         
-        target_field = config.field or 'value'
-        if 'inputs' in workflow[node_id]:
-            workflow[node_id]['inputs'][target_field] = value
+        if config.node_id not in workflow:
+            logger.warning(f"Node {config.node_id} not found in workflow")
+            return
+        
+        model_path = value.get('path', '')
+        workflow[config.node_id]['inputs'][config.field] = model_path
+        logger.debug(f"Applied single model to node {config.node_id}.{config.field}: {model_path}")
     
-    def get_input_summary(self, inputs: Dict) -> Dict:
-        """Get a summary of inputs for metadata"""
+    def get_input_summary(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get summary of key inputs for metadata
+        
+        Args:
+            inputs: User input values
+            
+        Returns:
+            Dict with key input values
+        """
         summary = {}
         
-        # Include key inputs in summary
-        key_fields = ['positive_prompt', 'duration', 'steps', 'seed', 'cfg']
+        # Include key fields commonly used
+        key_fields = ['positive_prompt', 'negative_prompt', 'duration', 'steps', 'cfg', 'seed']
         
         for field in key_fields:
             if field in inputs:
                 value = inputs[field]
                 # Truncate long strings
                 if isinstance(value, str) and len(value) > 50:
-                    value = value[:47] + '...'
-                summary[field] = value
+                    summary[field] = value[:50] + '...'
+                else:
+                    summary[field] = value
         
         return summary

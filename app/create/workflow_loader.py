@@ -1,133 +1,71 @@
-#!/usr/bin/env python3
 """
-Workflow Loader - Load and parse workflow YAML and JSON files.
-Provides caching for performance optimization.
+Workflow Loader
+Loads and parses workflow YAML and JSON files
 """
 
 import os
-import logging
 import json
-import time
+import yaml
+import logging
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional, Dict, List, Any
-
-try:
-    import yaml
-except ImportError:
-    yaml = None
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass, field, asdict
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-# Cache settings
-CACHE_TTL_SECONDS = 300  # 5 minutes
+
+@dataclass
+class WorkflowMetadata:
+    """Metadata for a workflow"""
+    id: str
+    name: str
+    description: str
+    category: str
+    version: str
+    thumbnail: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    vram_estimate: Optional[str] = None
+    time_estimate: Dict[str, Any] = field(default_factory=dict)
+    
+    def to_dict(self):
+        return asdict(self)
+
+
+@dataclass
+class LayoutConfig:
+    """Layout configuration for workflow UI"""
+    sections: List[Dict[str, Any]] = field(default_factory=list)
+    
+    def to_dict(self):
+        return asdict(self)
 
 
 @dataclass
 class InputConfig:
-    """Configuration for a workflow input field"""
+    """Configuration for a single workflow input"""
     id: str
     section: str
     type: str
     label: str
-    description: str = ""
-    required: bool = False
-    default: Any = None
+    description: str
+    required: bool
     node_id: Optional[str] = None
     node_ids: Optional[List[str]] = None
     field: Optional[str] = None
     fields: Optional[List[str]] = None
+    default: Optional[Any] = None
     min: Optional[float] = None
     max: Optional[float] = None
     step: Optional[float] = None
-    unit: Optional[str] = None
     options: Optional[List[str]] = None
-    depends_on: Optional[Dict] = None
+    depends_on: Optional[Dict[str, Any]] = None
     model_type: Optional[str] = None
     accept: Optional[str] = None
     max_size_mb: Optional[int] = None
-    rows: Optional[int] = None
-    placeholder: Optional[str] = None
-    max_length: Optional[int] = None
-    category: Optional[str] = None
     
-    @classmethod
-    def from_dict(cls, data: Dict) -> 'InputConfig':
-        """Create InputConfig from dictionary"""
-        return cls(
-            id=data.get('id', ''),
-            section=data.get('section', 'basic'),
-            type=data.get('type', 'text'),
-            label=data.get('label', ''),
-            description=data.get('description', ''),
-            required=data.get('required', False),
-            default=data.get('default'),
-            node_id=str(data.get('node_id')) if data.get('node_id') else None,
-            node_ids=[str(n) for n in data.get('node_ids', [])] if data.get('node_ids') else None,
-            field=data.get('field'),
-            fields=data.get('fields'),
-            min=data.get('min'),
-            max=data.get('max'),
-            step=data.get('step'),
-            unit=data.get('unit'),
-            options=data.get('options'),
-            depends_on=data.get('depends_on'),
-            model_type=data.get('model_type'),
-            accept=data.get('accept'),
-            max_size_mb=data.get('max_size_mb'),
-            rows=data.get('rows'),
-            placeholder=data.get('placeholder'),
-            max_length=data.get('max_length'),
-            category=data.get('category'),
-        )
-    
-    def to_dict(self) -> Dict:
-        """Convert to dictionary"""
-        result = {
-            'id': self.id,
-            'section': self.section,
-            'type': self.type,
-            'label': self.label,
-            'description': self.description,
-            'required': self.required,
-        }
-        if self.default is not None:
-            result['default'] = self.default
-        if self.node_id:
-            result['node_id'] = self.node_id
-        if self.node_ids:
-            result['node_ids'] = self.node_ids
-        if self.field:
-            result['field'] = self.field
-        if self.fields:
-            result['fields'] = self.fields
-        if self.min is not None:
-            result['min'] = self.min
-        if self.max is not None:
-            result['max'] = self.max
-        if self.step is not None:
-            result['step'] = self.step
-        if self.unit:
-            result['unit'] = self.unit
-        if self.options:
-            result['options'] = self.options
-        if self.depends_on:
-            result['depends_on'] = self.depends_on
-        if self.model_type:
-            result['model_type'] = self.model_type
-        if self.accept:
-            result['accept'] = self.accept
-        if self.max_size_mb:
-            result['max_size_mb'] = self.max_size_mb
-        if self.rows:
-            result['rows'] = self.rows
-        if self.placeholder:
-            result['placeholder'] = self.placeholder
-        if self.max_length:
-            result['max_length'] = self.max_length
-        if self.category:
-            result['category'] = self.category
-        return result
+    def to_dict(self):
+        return {k: v for k, v in asdict(self).items() if v is not None}
 
 
 @dataclass
@@ -138,57 +76,14 @@ class OutputConfig:
     type: str
     format: str
     label: str
-    description: str = ""
-    depends_on: Optional[Dict] = None
     
-    @classmethod
-    def from_dict(cls, data: Dict) -> 'OutputConfig':
-        """Create OutputConfig from dictionary"""
-        return cls(
-            id=data.get('id', ''),
-            node_id=str(data.get('node_id', '')),
-            type=data.get('type', 'file'),
-            format=data.get('format', ''),
-            label=data.get('label', ''),
-            description=data.get('description', ''),
-            depends_on=data.get('depends_on'),
-        )
-    
-    def to_dict(self) -> Dict:
-        """Convert to dictionary"""
-        result = {
-            'id': self.id,
-            'node_id': self.node_id,
-            'type': self.type,
-            'format': self.format,
-            'label': self.label,
-            'description': self.description,
-        }
-        if self.depends_on:
-            result['depends_on'] = self.depends_on
-        return result
-
-
-@dataclass
-class LayoutConfig:
-    """Configuration for workflow UI layout"""
-    sections: List[Dict] = field(default_factory=list)
-    
-    @classmethod
-    def from_dict(cls, data: Dict) -> 'LayoutConfig':
-        """Create LayoutConfig from dictionary"""
-        return cls(
-            sections=data.get('sections', [])
-        )
-    
-    def to_dict(self) -> Dict:
-        """Convert to dictionary"""
-        return {'sections': self.sections}
+    def to_dict(self):
+        return asdict(self)
 
 
 @dataclass
 class WorkflowConfig:
-    """Full workflow configuration"""
+    """Complete workflow configuration"""
     id: str
     name: str
     description: str
@@ -196,42 +91,14 @@ class WorkflowConfig:
     category: str
     workflow_file: str
     vram_estimate: str
-    time_estimate: Dict
+    time_estimate: Dict[str, Any]
     layout: LayoutConfig
     inputs: List[InputConfig]
     outputs: List[OutputConfig]
-    tags: List[str] = field(default_factory=list)
     thumbnail: Optional[str] = None
-    requirements: Dict = field(default_factory=dict)
-    presets: List[Dict] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
     
-    @classmethod
-    def from_dict(cls, data: Dict, workflow_id: str) -> 'WorkflowConfig':
-        """Create WorkflowConfig from dictionary"""
-        inputs = [InputConfig.from_dict(inp) for inp in data.get('inputs', [])]
-        outputs = [OutputConfig.from_dict(out) for out in data.get('outputs', [])]
-        layout = LayoutConfig.from_dict(data.get('layout', {}))
-        
-        return cls(
-            id=workflow_id,
-            name=data.get('name', workflow_id),
-            description=data.get('description', ''),
-            version=data.get('version', '1.0.0'),
-            category=data.get('category', 'other'),
-            workflow_file=data.get('workflow_file', ''),
-            vram_estimate=data.get('vram_estimate', ''),
-            time_estimate=data.get('time_estimate', {}),
-            layout=layout,
-            inputs=inputs,
-            outputs=outputs,
-            tags=data.get('tags', []),
-            thumbnail=data.get('thumbnail'),
-            requirements=data.get('requirements', {}),
-            presets=data.get('presets', []),
-        )
-    
-    def to_dict(self) -> Dict:
-        """Convert to dictionary for API response"""
+    def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
@@ -241,177 +108,226 @@ class WorkflowConfig:
             'workflow_file': self.workflow_file,
             'vram_estimate': self.vram_estimate,
             'time_estimate': self.time_estimate,
+            'thumbnail': self.thumbnail,
+            'tags': self.tags,
             'layout': self.layout.to_dict(),
             'inputs': [inp.to_dict() for inp in self.inputs],
-            'outputs': [out.to_dict() for out in self.outputs],
-            'tags': self.tags,
-            'thumbnail': self.thumbnail,
-            'requirements': self.requirements,
-            'presets': self.presets,
-        }
-    
-    def to_metadata(self) -> Dict:
-        """Convert to lightweight metadata for list API"""
-        return {
-            'id': self.id,
-            'name': self.name,
-            'description': self.description,
-            'category': self.category,
-            'version': self.version,
-            'thumbnail': self.thumbnail,
-            'tags': self.tags,
-            'vram_estimate': self.vram_estimate,
-            'time_estimate': self.time_estimate,
+            'outputs': [out.to_dict() for out in self.outputs]
         }
 
 
 class WorkflowLoader:
-    """Load and cache workflow configurations"""
+    """Loads and parses workflow files"""
     
-    # Class-level cache for parsed workflows
-    _config_cache: Dict[str, tuple] = {}  # workflow_id -> (config, timestamp)
-    _json_cache: Dict[str, tuple] = {}    # workflow_file -> (json_data, timestamp)
-    _discovery_cache: Optional[tuple] = None  # (workflows_list, timestamp)
+    # Cache for parsed workflows (TTL: 5 minutes)
+    _workflow_cache: Dict[str, tuple[WorkflowConfig, datetime]] = {}
+    _template_cache: Dict[str, tuple[dict, datetime]] = {}
+    _cache_ttl = timedelta(minutes=5)
     
-    def __init__(self, workflows_dir: Optional[str] = None):
-        """Initialize loader with workflows directory"""
-        if workflows_dir:
-            self.workflows_dir = Path(workflows_dir)
-        else:
-            # Default to workflows directory relative to app
-            self.workflows_dir = Path(__file__).parent.parent.parent / 'workflows'
+    @classmethod
+    def get_workflows_dir(cls) -> Path:
+        """Get the workflows directory path"""
+        # Assuming workflows are in the root workflows/ directory
+        base_dir = Path(__file__).parent.parent.parent
+        workflows_dir = base_dir / 'workflows'
+        return workflows_dir
     
-    def discover_workflows(self) -> List[WorkflowConfig]:
-        """Scan workflows directory and return all workflow configs"""
-        # Check cache
-        if WorkflowLoader._discovery_cache:
-            configs, timestamp = WorkflowLoader._discovery_cache
-            if time.time() - timestamp < CACHE_TTL_SECONDS:
-                return configs
+    @classmethod
+    def discover_workflows(cls) -> List[WorkflowMetadata]:
+        """
+        Scan workflows directory and return metadata for all workflows
         
-        configs = []
+        Returns:
+            List of WorkflowMetadata objects
+        """
+        workflows_dir = cls.get_workflows_dir()
         
-        if not self.workflows_dir.exists():
-            logger.warning(f"Workflows directory does not exist: {self.workflows_dir}")
-            return configs
+        if not workflows_dir.exists():
+            logger.warning(f"Workflows directory not found: {workflows_dir}")
+            return []
+        
+        workflows = []
         
         # Find all .webui.yml files
-        for yaml_file in self.workflows_dir.glob("*.webui.yml"):
-            workflow_id = self._normalize_workflow_id(yaml_file.stem.replace('.webui', ''))
+        for yaml_file in workflows_dir.glob('*.webui.yml'):
             try:
-                config = self.load_workflow(workflow_id)
-                if config:
-                    configs.append(config)
+                with open(yaml_file, 'r') as f:
+                    data = yaml.safe_load(f)
+                
+                # Extract workflow ID from filename
+                workflow_id = yaml_file.stem.replace('.webui', '')
+                
+                # Check if corresponding JSON file exists
+                json_file = workflows_dir / f"{workflow_id}.json"
+                if not json_file.exists():
+                    logger.warning(f"JSON file not found for {workflow_id}, skipping")
+                    continue
+                
+                # Create metadata object
+                metadata = WorkflowMetadata(
+                    id=workflow_id,
+                    name=data.get('name', workflow_id),
+                    description=data.get('description', ''),
+                    category=data.get('category', 'general'),
+                    version=data.get('version', '1.0.0'),
+                    thumbnail=data.get('thumbnail'),
+                    tags=data.get('tags', []),
+                    vram_estimate=data.get('vram_estimate'),
+                    time_estimate=data.get('time_estimate', {})
+                )
+                
+                workflows.append(metadata)
+                
             except Exception as e:
-                logger.error(f"Error loading workflow {workflow_id}: {e}")
-        
-        # Also check .webui.yaml files
-        for yaml_file in self.workflows_dir.glob("*.webui.yaml"):
-            workflow_id = self._normalize_workflow_id(yaml_file.stem.replace('.webui', ''))
-            # Avoid duplicates
-            if not any(c.id == workflow_id for c in configs):
-                try:
-                    config = self.load_workflow(workflow_id)
-                    if config:
-                        configs.append(config)
-                except Exception as e:
-                    logger.error(f"Error loading workflow {workflow_id}: {e}")
-        
-        # Update cache
-        WorkflowLoader._discovery_cache = (configs, time.time())
-        
-        return configs
-    
-    def load_workflow(self, workflow_id: str) -> Optional[WorkflowConfig]:
-        """Load and parse .webui.yml file for a workflow"""
-        # Check cache
-        if workflow_id in WorkflowLoader._config_cache:
-            config, timestamp = WorkflowLoader._config_cache[workflow_id]
-            if time.time() - timestamp < CACHE_TTL_SECONDS:
-                return config
-        
-        yaml_data = self._load_yaml_file(workflow_id)
-        if not yaml_data:
-            return None
-        
-        config = WorkflowConfig.from_dict(yaml_data, workflow_id)
-        
-        # Update cache
-        WorkflowLoader._config_cache[workflow_id] = (config, time.time())
-        
-        return config
-    
-    def load_workflow_json(self, workflow_id: str) -> Optional[Dict]:
-        """Load workflow JSON template"""
-        config = self.load_workflow(workflow_id)
-        if not config or not config.workflow_file:
-            return None
-        
-        return self._load_json_file(config.workflow_file)
-    
-    def _load_yaml_file(self, workflow_id: str) -> Optional[Dict]:
-        """Load YAML file for a workflow ID"""
-        if yaml is None:
-            logger.warning("PyYAML not installed, cannot load webui wrappers")
-            return None
-        
-        # Try different naming patterns
-        patterns = [
-            f"{workflow_id}.webui.yml",
-            f"{workflow_id}.webui.yaml",
-            f"{workflow_id.replace('-', '_')}.webui.yml",
-            f"{workflow_id.replace('_', '-')}.webui.yml",
-            f"{workflow_id.replace('_', ' ')}.webui.yml",
-            f"IMG_to_VIDEO.webui.yml" if workflow_id == 'img_to_video' else None,
-        ]
-        
-        for pattern in patterns:
-            if not pattern:
+                logger.error(f"Error parsing workflow {yaml_file}: {e}")
                 continue
-            yaml_path = self.workflows_dir / pattern
-            if yaml_path.exists():
-                try:
-                    with open(yaml_path, 'r', encoding='utf-8') as f:
-                        return yaml.safe_load(f)
-                except Exception as e:
-                    logger.error(f"Error loading webui wrapper {yaml_path}: {e}")
-                    return None
         
-        logger.warning(f"Could not find webui wrapper for workflow: {workflow_id}")
-        return None
+        return workflows
     
-    def _load_json_file(self, workflow_file: str) -> Optional[Dict]:
-        """Load workflow JSON file with caching"""
-        # Check cache
-        if workflow_file in WorkflowLoader._json_cache:
-            json_data, timestamp = WorkflowLoader._json_cache[workflow_file]
-            if time.time() - timestamp < CACHE_TTL_SECONDS:
-                return json_data
+    @classmethod
+    def load_workflow(cls, workflow_id: str) -> WorkflowConfig:
+        """
+        Load and parse workflow configuration from YAML
         
-        json_path = self.workflows_dir / workflow_file
-        if not json_path.exists():
-            logger.warning(f"Workflow JSON file not found: {json_path}")
-            return None
+        Args:
+            workflow_id: Workflow identifier
+            
+        Returns:
+            WorkflowConfig object
+            
+        Raises:
+            FileNotFoundError: If workflow file doesn't exist
+        """
+        # Check cache
+        if workflow_id in cls._workflow_cache:
+            cached_workflow, cached_time = cls._workflow_cache[workflow_id]
+            if datetime.now() - cached_time < cls._cache_ttl:
+                logger.debug(f"Using cached workflow: {workflow_id}")
+                return cached_workflow
+        
+        workflows_dir = cls.get_workflows_dir()
+        yaml_file = workflows_dir / f"{workflow_id}.webui.yml"
+        
+        if not yaml_file.exists():
+            raise FileNotFoundError(f"Workflow not found: {workflow_id}")
         
         try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                json_data = json.load(f)
+            with open(yaml_file, 'r') as f:
+                data = yaml.safe_load(f)
             
-            # Update cache
-            WorkflowLoader._json_cache[workflow_file] = (json_data, time.time())
+            # Parse layout
+            layout_data = data.get('layout', {})
+            layout = LayoutConfig(
+                sections=layout_data.get('sections', [])
+            )
             
-            return json_data
+            # Parse inputs
+            inputs = []
+            for inp_data in data.get('inputs', []):
+                input_config = InputConfig(
+                    id=inp_data['id'],
+                    section=inp_data['section'],
+                    type=inp_data['type'],
+                    label=inp_data['label'],
+                    description=inp_data.get('description', ''),
+                    required=inp_data.get('required', False),
+                    node_id=inp_data.get('node_id'),
+                    node_ids=inp_data.get('node_ids'),
+                    field=inp_data.get('field'),
+                    fields=inp_data.get('fields'),
+                    default=inp_data.get('default'),
+                    min=inp_data.get('min'),
+                    max=inp_data.get('max'),
+                    step=inp_data.get('step'),
+                    options=inp_data.get('options'),
+                    depends_on=inp_data.get('depends_on'),
+                    model_type=inp_data.get('model_type'),
+                    accept=inp_data.get('accept'),
+                    max_size_mb=inp_data.get('max_size_mb')
+                )
+                inputs.append(input_config)
+            
+            # Parse outputs
+            outputs = []
+            for out_data in data.get('outputs', []):
+                output_config = OutputConfig(
+                    id=out_data['id'],
+                    node_id=out_data['node_id'],
+                    type=out_data['type'],
+                    format=out_data['format'],
+                    label=out_data['label']
+                )
+                outputs.append(output_config)
+            
+            # Create workflow config
+            workflow = WorkflowConfig(
+                id=workflow_id,
+                name=data['name'],
+                description=data.get('description', ''),
+                version=data.get('version', '1.0.0'),
+                category=data.get('category', 'general'),
+                workflow_file=data['workflow_file'],
+                vram_estimate=data.get('vram_estimate', 'Unknown'),
+                time_estimate=data.get('time_estimate', {}),
+                thumbnail=data.get('thumbnail'),
+                tags=data.get('tags', []),
+                layout=layout,
+                inputs=inputs,
+                outputs=outputs
+            )
+            
+            # Cache the result
+            cls._workflow_cache[workflow_id] = (workflow, datetime.now())
+            
+            return workflow
+            
         except Exception as e:
-            logger.error(f"Error loading workflow JSON {json_path}: {e}")
-            return None
+            logger.error(f"Error loading workflow {workflow_id}: {e}", exc_info=True)
+            raise
     
-    def _normalize_workflow_id(self, filename_stem: str) -> str:
-        """Normalize a filename stem to a workflow ID"""
-        return filename_stem.replace('.webui', '').replace(' ', '_').lower()
+    @classmethod
+    def load_workflow_json(cls, workflow_id: str) -> dict:
+        """
+        Load workflow JSON template
+        
+        Args:
+            workflow_id: Workflow identifier
+            
+        Returns:
+            Workflow JSON as dict
+            
+        Raises:
+            FileNotFoundError: If workflow JSON doesn't exist
+        """
+        # Check cache
+        if workflow_id in cls._template_cache:
+            cached_template, cached_time = cls._template_cache[workflow_id]
+            if datetime.now() - cached_time < cls._cache_ttl:
+                logger.debug(f"Using cached template: {workflow_id}")
+                return cached_template
+        
+        workflows_dir = cls.get_workflows_dir()
+        json_file = workflows_dir / f"{workflow_id}.json"
+        
+        if not json_file.exists():
+            raise FileNotFoundError(f"Workflow JSON not found: {workflow_id}")
+        
+        try:
+            with open(json_file, 'r') as f:
+                template = json.load(f)
+            
+            # Cache the result
+            cls._template_cache[workflow_id] = (template, datetime.now())
+            
+            return template
+            
+        except Exception as e:
+            logger.error(f"Error loading workflow JSON {workflow_id}: {e}", exc_info=True)
+            raise
     
     @classmethod
     def clear_cache(cls):
-        """Clear all caches"""
-        cls._config_cache.clear()
-        cls._json_cache.clear()
-        cls._discovery_cache = None
+        """Clear the workflow cache"""
+        cls._workflow_cache.clear()
+        cls._template_cache.clear()
+        logger.info("Workflow cache cleared")
