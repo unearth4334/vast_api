@@ -1,6 +1,7 @@
 /**
  * Create Tab - Main Controller
  * Orchestrates workflow selection, form generation, and execution
+ * Supports extensible component architecture driven by *.webui.yml definitions
  */
 
 // Create Tab state
@@ -10,7 +11,11 @@ const CreateTabState = {
     workflowDetails: null,
     formValues: {},
     isExecuting: false,
-    taskId: null
+    taskId: null,
+    // Store component instances for cleanup and value retrieval
+    componentInstances: new Map(),
+    // Current SSH connection
+    sshConnection: null
 };
 
 /**
@@ -97,6 +102,9 @@ async function selectWorkflow(workflowId) {
     
     CreateTabState.selectedWorkflow = workflowId;
     
+    // Clean up previous components
+    cleanupComponents();
+    
     // Show loading state in form container
     const formContainer = document.getElementById('create-form-container');
     if (formContainer) {
@@ -111,7 +119,13 @@ async function selectWorkflow(workflowId) {
         if (data.success && data.workflow) {
             CreateTabState.workflowDetails = data.workflow;
             CreateTabState.formValues = {};
-            renderWorkflowForm(data.workflow);
+            
+            // Use section-based layout if workflow defines it
+            if (data.workflow.layout && data.workflow.layout.sections) {
+                renderWorkflowFormWithSections(data.workflow);
+            } else {
+                renderWorkflowForm(data.workflow);
+            }
             showExecuteSection(true);
         } else {
             if (formContainer) {
@@ -204,14 +218,20 @@ function renderWorkflowForm(workflow) {
 }
 
 /**
- * Render a single form field
- * @param {Object} field - Field definition
- * @returns {string} HTML string
+ * Render a single form field based on type
+ * Supports both simple HTML-rendered fields and complex component-based fields
+ * @param {Object} field - Field definition from webui.yml
+ * @returns {string|HTMLElement} HTML string or DOM element
  */
 function renderFormField(field) {
     const id = `create-field-${field.id}`;
     const requiredClass = field.required ? 'required' : '';
     const description = field.description ? `<div class="field-description">${escapeHtml(field.description)}</div>` : '';
+    
+    // Check for advanced component types that need JavaScript components
+    if (isAdvancedComponentType(field.type)) {
+        return renderAdvancedComponent(field);
+    }
     
     let inputHtml = '';
     
@@ -726,6 +746,311 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// =========================================
+// ADVANCED COMPONENT TYPE SUPPORT
+// =========================================
+
+/**
+ * List of advanced component types that require JavaScript rendering
+ */
+const ADVANCED_COMPONENT_TYPES = [
+    'high_low_pair_model',
+    'high_low_pair_lora_list',
+    'single_model',
+    'feature_toggle_group'
+];
+
+/**
+ * Check if a field type requires advanced component rendering
+ * @param {string} type - Field type
+ * @returns {boolean}
+ */
+function isAdvancedComponentType(type) {
+    return ADVANCED_COMPONENT_TYPES.includes(type);
+}
+
+/**
+ * Render an advanced component based on field type
+ * @param {Object} field - Field definition from webui.yml
+ * @returns {HTMLElement} DOM element for the component
+ */
+function renderAdvancedComponent(field) {
+    const container = document.createElement('div');
+    container.className = 'create-form-field advanced-component';
+    container.dataset.fieldId = field.id;
+    container.dataset.fieldType = field.type;
+
+    let component = null;
+
+    switch (field.type) {
+        case 'high_low_pair_model':
+            if (typeof HighLowPairModelSelector !== 'undefined') {
+                component = new HighLowPairModelSelector(field, (id, value) => {
+                    updateFormValue(id, value);
+                });
+                container.appendChild(component.render());
+                CreateTabState.componentInstances.set(field.id, component);
+            } else {
+                container.innerHTML = `<div class="field-error">Component not loaded: HighLowPairModelSelector</div>`;
+            }
+            break;
+
+        case 'high_low_pair_lora_list':
+            if (typeof HighLowPairLoRASelector !== 'undefined') {
+                component = new HighLowPairLoRASelector(field, (id, value) => {
+                    updateFormValue(id, value);
+                });
+                container.appendChild(component.render());
+                CreateTabState.componentInstances.set(field.id, component);
+            } else {
+                container.innerHTML = `<div class="field-error">Component not loaded: HighLowPairLoRASelector</div>`;
+            }
+            break;
+
+        case 'single_model':
+            if (typeof SingleModelSelector !== 'undefined') {
+                component = new SingleModelSelector(field, (id, value) => {
+                    updateFormValue(id, value);
+                });
+                container.appendChild(component.render());
+                CreateTabState.componentInstances.set(field.id, component);
+            } else {
+                container.innerHTML = `<div class="field-error">Component not loaded: SingleModelSelector</div>`;
+            }
+            break;
+
+        case 'feature_toggle_group':
+            if (typeof FeatureToggleGroup !== 'undefined') {
+                component = new FeatureToggleGroup(field, (id, value) => {
+                    updateFormValue(id, value);
+                });
+                container.appendChild(component.render());
+                CreateTabState.componentInstances.set(field.id, component);
+            } else {
+                container.innerHTML = `<div class="field-error">Component not loaded: FeatureToggleGroup</div>`;
+            }
+            break;
+
+        default:
+            container.innerHTML = `<div class="field-error">Unknown advanced component type: ${field.type}</div>`;
+    }
+
+    return container;
+}
+
+/**
+ * Update SSH connection for all model selector components
+ * @param {string} sshConnection - SSH connection string
+ */
+function updateComponentsSSHConnection(sshConnection) {
+    CreateTabState.sshConnection = sshConnection;
+    
+    for (const [fieldId, component] of CreateTabState.componentInstances) {
+        if (component && typeof component.setSSHConnection === 'function') {
+            component.setSSHConnection(sshConnection);
+        }
+    }
+}
+
+/**
+ * Refresh all model selector components
+ * @param {boolean} forceRefresh - Force refresh bypassing cache
+ */
+async function refreshAllModelSelectors(forceRefresh = false) {
+    const refreshPromises = [];
+    
+    for (const [fieldId, component] of CreateTabState.componentInstances) {
+        if (component && typeof component.refreshModels === 'function') {
+            refreshPromises.push(component.refreshModels(forceRefresh));
+        }
+    }
+    
+    await Promise.allSettled(refreshPromises);
+}
+
+/**
+ * Get current SSH connection string from UI
+ * @returns {string|null} SSH connection string or null
+ */
+function getCurrentSSHConnection() {
+    const sshInput = document.getElementById('createSshConnectionString') || 
+                     document.getElementById('sshConnectionString') ||
+                     document.getElementById('resourcesSshConnectionString');
+    return sshInput?.value?.trim() || null;
+}
+
+/**
+ * Clean up component instances when switching workflows
+ */
+function cleanupComponents() {
+    CreateTabState.componentInstances.clear();
+}
+
+/**
+ * Render workflow form with section-based layout support
+ * @param {Object} workflow - Workflow details with layout config
+ */
+function renderWorkflowFormWithSections(workflow) {
+    const formContainer = document.getElementById('create-form-container');
+    if (!formContainer) return;
+
+    // Clear existing components
+    cleanupComponents();
+
+    // Check if workflow has section-based layout
+    if (workflow.layout && workflow.layout.sections) {
+        renderSectionBasedLayout(workflow, formContainer);
+    } else {
+        // Fall back to standard rendering
+        renderWorkflowForm(workflow);
+    }
+}
+
+/**
+ * Render form using section-based layout from webui.yml
+ * @param {Object} workflow - Workflow configuration
+ * @param {HTMLElement} container - Form container element
+ */
+function renderSectionBasedLayout(workflow, container) {
+    let html = '';
+    
+    // Workflow info header
+    html += `
+        <div class="create-form-section">
+            <h3 style="margin: 0 0 var(--size-4-2) 0;">${escapeHtml(workflow.name)}</h3>
+            <p style="margin: 0; color: var(--text-muted);">${escapeHtml(workflow.description)}</p>
+        </div>
+    `;
+    
+    // Presets (if available)
+    if (workflow.presets && workflow.presets.length > 0) {
+        html += `
+            <div class="create-form-section">
+                <div class="create-form-section-header">
+                    <h4 class="create-form-section-title">⚡ Quick Presets</h4>
+                </div>
+                <div class="presets-container">
+                    ${workflow.presets.map((preset, idx) => `
+                        <button class="preset-button" onclick="applyPreset(${idx})" title="${escapeHtml(preset.description || '')}">
+                            ${escapeHtml(preset.name)}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html;
+
+    // Build sections based on layout
+    const allInputs = [...(workflow.inputs || []), ...(workflow.advanced || [])];
+    const sections = workflow.layout.sections;
+    
+    for (const sectionConfig of sections) {
+        const sectionEl = document.createElement('div');
+        sectionEl.className = 'create-form-section';
+        sectionEl.id = `section-${sectionConfig.id}`;
+        
+        // Section header
+        const headerHtml = `
+            <div class="create-form-section-header">
+                <h4 class="create-form-section-title">${escapeHtml(sectionConfig.title)}</h4>
+                <button class="create-form-section-toggle ${sectionConfig.collapsed ? 'collapsed' : ''}" 
+                        onclick="toggleSection('${sectionConfig.id}')" 
+                        aria-expanded="${!sectionConfig.collapsed}">
+                    ${sectionConfig.collapsed ? '▶' : '▼'}
+                </button>
+            </div>
+        `;
+        sectionEl.innerHTML = headerHtml;
+        
+        // Section content
+        const contentEl = document.createElement('div');
+        contentEl.className = `create-form-section-content ${sectionConfig.collapsed ? 'collapsed' : ''}`;
+        contentEl.id = `section-content-${sectionConfig.id}`;
+        
+        // Add inputs that belong to this section
+        const sectionInputs = allInputs.filter(input => input.section === sectionConfig.id);
+        
+        for (const input of sectionInputs) {
+            const fieldContent = renderFormField(input);
+            if (typeof fieldContent === 'string') {
+                contentEl.innerHTML += fieldContent;
+            } else {
+                contentEl.appendChild(fieldContent);
+            }
+        }
+        
+        sectionEl.appendChild(contentEl);
+        container.appendChild(sectionEl);
+    }
+    
+    // Add any inputs without a section assignment to an "Other" section
+    const unassignedInputs = allInputs.filter(input => 
+        !input.section || !sections.find(s => s.id === input.section)
+    );
+    
+    if (unassignedInputs.length > 0) {
+        const otherSection = document.createElement('div');
+        otherSection.className = 'create-form-section';
+        otherSection.innerHTML = `
+            <div class="create-form-section-header">
+                <h4 class="create-form-section-title">📋 Other Settings</h4>
+            </div>
+        `;
+        
+        const contentEl = document.createElement('div');
+        contentEl.className = 'create-form-section-content';
+        
+        for (const input of unassignedInputs) {
+            const fieldContent = renderFormField(input);
+            if (typeof fieldContent === 'string') {
+                contentEl.innerHTML += fieldContent;
+            } else {
+                contentEl.appendChild(fieldContent);
+            }
+        }
+        
+        otherSection.appendChild(contentEl);
+        container.appendChild(otherSection);
+    }
+    
+    // Requirements info
+    if (workflow.requirements) {
+        container.innerHTML += renderRequirementsInfo(workflow.requirements);
+    }
+    
+    container.style.display = 'block';
+    
+    // Initialize form values with defaults
+    initializeFormDefaults(workflow);
+    
+    // Update SSH connection for components
+    const sshConnection = getCurrentSSHConnection();
+    if (sshConnection) {
+        updateComponentsSSHConnection(sshConnection);
+        // Auto-refresh model selectors
+        refreshAllModelSelectors(false);
+    }
+}
+
+/**
+ * Toggle a section's collapsed state
+ * @param {string} sectionId - Section ID to toggle
+ */
+function toggleSection(sectionId) {
+    const content = document.getElementById(`section-content-${sectionId}`);
+    const button = document.querySelector(`#section-${sectionId} .create-form-section-toggle`);
+    
+    if (!content || !button) return;
+    
+    const isCollapsed = content.classList.contains('collapsed');
+    content.classList.toggle('collapsed');
+    button.classList.toggle('collapsed');
+    button.textContent = isCollapsed ? '▼' : '▶';
+    button.setAttribute('aria-expanded', isCollapsed);
+}
+
 // Export for use in HTML
 window.initCreateTab = initCreateTab;
 window.loadWorkflows = loadWorkflows;
@@ -739,3 +1064,8 @@ window.updateSliderFromInput = updateSliderFromInput;
 window.randomizeSeed = randomizeSeed;
 window.handleImageUpload = handleImageUpload;
 window.clearImageUpload = clearImageUpload;
+// New exports for advanced components
+window.toggleSection = toggleSection;
+window.updateComponentsSSHConnection = updateComponentsSSHConnection;
+window.refreshAllModelSelectors = refreshAllModelSelectors;
+window.renderWorkflowFormWithSections = renderWorkflowFormWithSections;
