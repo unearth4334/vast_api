@@ -152,6 +152,53 @@ class TestModelScanner(unittest.TestCase):
         self.assertIn('base_paths', config)
         self.assertIn('extensions', config)
 
+    def test_validate_path_valid(self):
+        """Test path validation with valid paths"""
+        from app.api.model_scanner import validate_path
+        
+        # Valid paths
+        self.assertTrue(validate_path('models/diffusion_models'))
+        self.assertTrue(validate_path('models/loras'))
+        self.assertTrue(validate_path('models/some-dir/sub_dir'))
+        self.assertTrue(validate_path('models/file.safetensors'))
+
+    def test_validate_path_invalid(self):
+        """Test path validation with invalid/dangerous paths"""
+        from app.api.model_scanner import validate_path
+        
+        # Path traversal attempts
+        self.assertFalse(validate_path('../etc/passwd'))
+        self.assertFalse(validate_path('models/../../../etc/passwd'))
+        self.assertFalse(validate_path('models/..'))
+        
+        # Absolute paths
+        self.assertFalse(validate_path('/etc/passwd'))
+        self.assertFalse(validate_path('/root/.ssh'))
+        
+        # Shell injection attempts
+        self.assertFalse(validate_path('models; rm -rf /'))
+        self.assertFalse(validate_path('models && cat /etc/passwd'))
+        self.assertFalse(validate_path('models | cat /etc/passwd'))
+        self.assertFalse(validate_path('$(cat /etc/passwd)'))
+        self.assertFalse(validate_path('`cat /etc/passwd`'))
+        
+        # Empty path
+        self.assertFalse(validate_path(''))
+        self.assertFalse(validate_path(None))
+
+    def test_sanitize_extension(self):
+        """Test extension sanitization"""
+        from app.api.model_scanner import sanitize_extension
+        
+        # Normal extensions
+        self.assertEqual(sanitize_extension('.safetensors'), '.safetensors')
+        self.assertEqual(sanitize_extension('.ckpt'), '.ckpt')
+        self.assertEqual(sanitize_extension('safetensors'), '.safetensors')
+        
+        # Malicious extensions
+        self.assertEqual(sanitize_extension('.safe; rm -rf /'), '.safermrf')
+        self.assertEqual(sanitize_extension('$(whoami)'), '.whoami')
+
 
 class TestWorkflowWithNewInputTypes(unittest.TestCase):
     """Test that workflow details include new input types"""

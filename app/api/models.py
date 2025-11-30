@@ -5,6 +5,7 @@ Provides endpoints for scanning remote SSH instances for available models.
 
 import logging
 import time
+import threading
 from flask import Blueprint, request, jsonify
 
 from .model_scanner import ModelScanner, get_model_discovery_config
@@ -13,8 +14,9 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('models', __name__, url_prefix='/api/models')
 
-# In-memory cache for model scan results
+# Thread-safe cache for model scan results
 _model_cache = {}
+_cache_lock = threading.Lock()
 
 
 def get_cache_key(ssh_connection: str, model_type: str, search_pattern: str) -> str:
@@ -24,7 +26,7 @@ def get_cache_key(ssh_connection: str, model_type: str, search_pattern: str) -> 
 
 def get_cached_result(cache_key: str, ttl: int = 300) -> dict:
     """
-    Get cached model scan result if still valid.
+    Get cached model scan result if still valid (thread-safe).
     
     Args:
         cache_key: Cache key
@@ -33,19 +35,21 @@ def get_cached_result(cache_key: str, ttl: int = 300) -> dict:
     Returns:
         Cached result or None
     """
-    if cache_key in _model_cache:
-        cached = _model_cache[cache_key]
-        if time.time() - cached['timestamp'] < ttl:
-            return cached
+    with _cache_lock:
+        if cache_key in _model_cache:
+            cached = _model_cache[cache_key]
+            if time.time() - cached['timestamp'] < ttl:
+                return cached
     return None
 
 
 def set_cached_result(cache_key: str, models: list) -> None:
-    """Cache model scan result."""
-    _model_cache[cache_key] = {
-        'data': models,
-        'timestamp': time.time()
-    }
+    """Cache model scan result (thread-safe)."""
+    with _cache_lock:
+        _model_cache[cache_key] = {
+            'data': models,
+            'timestamp': time.time()
+        }
 
 
 @bp.route('/scan', methods=['POST', 'OPTIONS'])
@@ -177,25 +181,26 @@ def invalidate_cache():
         ssh_connection = data.get('ssh_connection')
         model_type = data.get('model_type')
         
-        if not ssh_connection and not model_type:
-            # Clear entire cache
-            _model_cache.clear()
-            return jsonify({
-                'success': True,
-                'message': 'Entire model cache invalidated'
-            })
-        
-        # Selective invalidation
-        keys_to_remove = []
-        for key in _model_cache.keys():
-            if ssh_connection and ssh_connection not in key:
-                continue
-            if model_type and model_type not in key:
-                continue
-            keys_to_remove.append(key)
-        
-        for key in keys_to_remove:
-            del _model_cache[key]
+        with _cache_lock:
+            if not ssh_connection and not model_type:
+                # Clear entire cache
+                _model_cache.clear()
+                return jsonify({
+                    'success': True,
+                    'message': 'Entire model cache invalidated'
+                })
+            
+            # Selective invalidation
+            keys_to_remove = []
+            for key in _model_cache.keys():
+                if ssh_connection and ssh_connection not in key:
+                    continue
+                if model_type and model_type not in key:
+                    continue
+                keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                del _model_cache[key]
         
         return jsonify({
             'success': True,

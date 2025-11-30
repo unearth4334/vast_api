@@ -5,12 +5,61 @@ Supports high-low noise pair models (WAN 2.2 style) and single models.
 
 import os
 import re
+import shlex
 import subprocess
 import logging
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, asdict
 
 logger = logging.getLogger(__name__)
+
+
+# Allowed characters for path validation (alphanumeric, slash, underscore, dash, dot)
+PATH_PATTERN = re.compile(r'^[a-zA-Z0-9/_\-\.]+$')
+
+# Maximum allowed depth for safety
+MAX_ALLOWED_DEPTH = 10
+
+
+def validate_path(path: str) -> bool:
+    """
+    Validate a path to prevent command injection.
+    
+    Args:
+        path: Path string to validate
+        
+    Returns:
+        True if path is safe, False otherwise
+    """
+    if not path:
+        return False
+    
+    # Check for path traversal attempts
+    if '..' in path or path.startswith('/'):
+        return False
+    
+    # Check for allowed characters only
+    if not PATH_PATTERN.match(path):
+        return False
+    
+    return True
+
+
+def sanitize_extension(ext: str) -> str:
+    """
+    Sanitize a file extension.
+    
+    Args:
+        ext: Extension to sanitize
+        
+    Returns:
+        Sanitized extension
+    """
+    # Only allow alphanumeric and dot
+    clean = re.sub(r'[^a-zA-Z0-9.]', '', ext)
+    if not clean.startswith('.'):
+        clean = '.' + clean
+    return clean
 
 
 @dataclass
@@ -134,17 +183,26 @@ class ModelScanner:
         if not pattern_config:
             return []
         
+        # Validate base_path to prevent command injection
+        if not validate_path(base_path):
+            logger.error(f"Invalid base path: {base_path}")
+            return []
+        
         high_suffix = pattern_config.get('high_suffix', '')
         low_suffix = pattern_config.get('low_suffix', '')
         extract_regex = pattern_config.get('extract_name_regex', '')
         
-        max_depth = self.config.get('max_depth', 3)
+        max_depth = min(self.config.get('max_depth', 3), MAX_ALLOWED_DEPTH)
         extensions = self.config.get('extensions', ['.safetensors', '.ckpt', '.pth'])
         
-        # Build find command to get all matching files
-        ext_conditions = ' -o '.join([f'-name "*{ext}"' for ext in extensions])
+        # Sanitize extensions to prevent injection
+        safe_extensions = [sanitize_extension(ext) for ext in extensions]
+        
+        # Build find command with shell-escaped parameters
+        ext_conditions = ' -o '.join([f'-name "*{shlex.quote(ext)}"' for ext in safe_extensions])
+        safe_base_path = shlex.quote(base_path)
         find_cmd = f'''
-            find "$UI_HOME/{base_path}" -maxdepth {max_depth} -type f \
+            find "$UI_HOME"/{safe_base_path} -maxdepth {max_depth} -type f \
             \\( {ext_conditions} \\) \
             -printf "%P|%s\\n" 2>/dev/null || true
         '''
@@ -242,13 +300,22 @@ class ModelScanner:
         Returns:
             List of model dictionaries
         """
-        max_depth = self.config.get('max_depth', 3)
+        # Validate base_path to prevent command injection
+        if not validate_path(base_path):
+            logger.error(f"Invalid base path: {base_path}")
+            return []
+        
+        max_depth = min(self.config.get('max_depth', 3), MAX_ALLOWED_DEPTH)
         extensions = self.config.get('extensions', ['.safetensors', '.ckpt', '.pth'])
         
-        # Build find command
-        ext_conditions = ' -o '.join([f'-name "*{ext}"' for ext in extensions])
+        # Sanitize extensions to prevent injection
+        safe_extensions = [sanitize_extension(ext) for ext in extensions]
+        
+        # Build find command with shell-escaped parameters
+        ext_conditions = ' -o '.join([f'-name "*{shlex.quote(ext)}"' for ext in safe_extensions])
+        safe_base_path = shlex.quote(base_path)
         find_cmd = f'''
-            find "$UI_HOME/{base_path}" -maxdepth {max_depth} -type f \
+            find "$UI_HOME"/{safe_base_path} -maxdepth {max_depth} -type f \
             \\( {ext_conditions} \\) \
             -printf "%P|%s\\n" 2>/dev/null || true
         '''

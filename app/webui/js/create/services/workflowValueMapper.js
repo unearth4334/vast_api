@@ -304,9 +304,11 @@ class WorkflowValueMapper {
         }
 
         // Handle random seed
+        // Use 2^32-1 as max for compatibility with most systems
+        const MAX_SEED = 0xFFFFFFFF;
         let seedValue = value;
         if (value === -1 || value === 'random') {
-            seedValue = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+            seedValue = Math.floor(Math.random() * MAX_SEED);
         }
 
         workflow[nodeId].inputs[field] = seedValue;
