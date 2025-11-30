@@ -878,7 +878,7 @@ class TestMultipleDownloadsTracking(TestCase):
             self.assertEqual(len(status), 3)
             
             # Check each job's status is correctly tracked
-            status_by_id = {s['id']: s for s in status}
+            status_by_id = {status_entry['id']: status_entry for status_entry in status}
             self.assertEqual(status_by_id[jobs[0]['id']]['status'], 'COMPLETE')
             self.assertEqual(status_by_id[jobs[1]['id']]['status'], 'RUNNING')
             self.assertEqual(status_by_id[jobs[2]['id']]['status'], 'PENDING')
@@ -953,8 +953,12 @@ class TestMultipleDownloadsTracking(TestCase):
             all_status = queue_fixture.get_status()
             self.assertEqual(len(all_status), 5)
             
+            # Create lookup for efficient access
+            status_by_id = {status_entry['id']: status_entry for status_entry in all_status}
+            
             for i, job in enumerate(jobs):
-                job_status = next(s for s in all_status if s['id'] == job['id'])
+                job_status = status_by_id.get(job['id'])
+                self.assertIsNotNone(job_status, f"Job {job['id']} not found in status")
                 expected_status = 'RUNNING' if i % 2 == 0 else 'COMPLETE'
                 self.assertEqual(job_status['status'], expected_status)
                 self.assertEqual(job_status['progress']['percent'], i * 20)
