@@ -405,9 +405,14 @@
         <!-- Step 4: Execute -->
         <div id="create-execute-section" class="create-execute-section" style="display: none;">
             <h4 style="margin: 0 0 var(--size-4-3) 0;">▶️ Step 4: Execute</h4>
-            <button id="create-execute-button" class="create-execute-button" onclick="executeWorkflow()">
-                <span>▶️</span> Run Workflow
-            </button>
+            <div style="display: flex; gap: var(--size-4-2);">
+                <button id="create-execute-button" class="create-execute-button" onclick="executeWorkflow()">
+                    <span>▶️</span> Run Workflow
+                </button>
+                <button id="create-export-button" class="create-execute-button secondary" onclick="exportWorkflowJSON()" title="Download the generated workflow JSON file">
+                    <span>💾</span> Export Workflow
+                </button>
+            </div>
             
             <!-- Progress display -->
             <div id="create-progress-container" class="create-progress-container">

@@ -940,13 +940,77 @@ function toggleSection(sectionId) {
     button.setAttribute('aria-expanded', isCollapsed);
 }
 
+/**
+ * Export the generated workflow JSON file
+ */
+async function exportWorkflowJSON() {
+    const workflowId = CreateTabState.selectedWorkflow;
+    if (!workflowId) {
+        showCreateError('Please select a workflow first');
+        return;
+    }
+
+    const workflow = CreateTabState.workflowDetails;
+    if (!workflow) {
+        showCreateError('Workflow details not loaded');
+        return;
+    }
+
+    try {
+        // Generate the workflow JSON with current form values
+        const response = await fetch('/create/generate-workflow', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                workflow_id: workflowId,
+                inputs: CreateTabState.formValues
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.workflow) {
+            // Create a blob from the workflow JSON
+            const blob = new Blob([JSON.stringify(data.workflow, null, 2)], {
+                type: 'application/json'
+            });
+
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Generate filename with timestamp
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `${workflowId}_${timestamp}.json`;
+            
+            // Trigger download
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showCreateSuccess('Workflow JSON exported successfully!');
+        } else {
+            showCreateError(data.message || 'Failed to generate workflow JSON');
+        }
+    } catch (error) {
+        console.error('Error exporting workflow:', error);
+        showCreateError(`Error: ${error.message}`);
+    }
+}
+
 // Export for use in HTML
 window.initCreateTab = initCreateTab;
 window.loadWorkflows = loadWorkflows;
 window.selectWorkflow = selectWorkflow;
-window.applyPreset = applyPreset;
 window.toggleAdvancedSection = toggleAdvancedSection;
 window.executeWorkflow = executeWorkflow;
+window.exportWorkflowJSON = exportWorkflowJSON;
 window.updateFormValue = updateFormValue;
 window.updateSliderValue = updateSliderValue;
 window.updateSliderFromInput = updateSliderFromInput;
