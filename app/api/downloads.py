@@ -88,8 +88,20 @@ def add_to_queue():
     
     instance_id = extract_instance_id_from_ssh(ssh_connection)
     
-    # Get resource details and extract commands
-    all_commands = []
+    # Create separate jobs for each resource
+    created_jobs = []
+    queue = []
+    status = []
+    
+    # Load existing queue and status
+    if QUEUE_PATH.exists():
+        with open(QUEUE_PATH, 'r') as f:
+            queue = json.load(f)
+    
+    if STATUS_PATH.exists():
+        with open(STATUS_PATH, 'r') as f:
+            status = json.load(f)
+    
     for resource_obj in resource_paths:
         # Extract filepath from resource object (can be dict or string)
         resource_path = resource_obj.get('filepath') if isinstance(resource_obj, dict) else resource_obj
@@ -98,57 +110,55 @@ def add_to_queue():
             resource = resource_manager.get_resource(resource_path)
             if resource:
                 commands = extract_commands_from_resource(resource)
-                all_commands.extend(commands)
+                
+                if not commands:
+                    continue  # Skip resources with no commands
+                
+                # Create a separate job for this resource
+                job = {
+                    'id': str(uuid.uuid4()),
+                    'instance_id': instance_id,
+                    'ssh_connection': ssh_connection,
+                    'ui_home': ui_home,
+                    'resource_paths': [resource_path],  # Single resource per job
+                    'commands': commands,
+                    'total_commands': len(commands),
+                    'command_index': 0,
+                    'added_at': datetime.utcnow().isoformat() + 'Z',
+                    'status': 'PENDING',
+                }
+                
+                queue.append(job)
+                created_jobs.append(job)
+                
+                # Initialize status entry
+                status.append({
+                    'id': job['id'],
+                    'instance_id': instance_id,
+                    'added_at': job['added_at'],
+                    'status': 'PENDING',
+                    'total_commands': len(commands),
+                    'command_index': 0,
+                    'progress': {}
+                })
     
-    if not all_commands:
+    if not created_jobs:
         return jsonify({
             'success': False,
             'message': 'No download commands found in selected resources'
         }), 400
     
-    # Create job
-    job = {
-        'id': str(uuid.uuid4()),
-        'instance_id': instance_id,
-        'ssh_connection': ssh_connection,
-        'ui_home': ui_home,
-        'resource_paths': resource_paths,
-        'commands': all_commands,
-        'added_at': datetime.utcnow().isoformat() + 'Z',
-        'status': 'PENDING',
-    }
-    
-    # Add to queue
-    queue = []
-    if QUEUE_PATH.exists():
-        with open(QUEUE_PATH, 'r') as f:
-            queue = json.load(f)
-    
-    queue.append(job)
-    
+    # Save queue and status
     with open(QUEUE_PATH, 'w') as f:
         json.dump(queue, f, indent=2)
-    
-    # Initialize status entry
-    status = []
-    if STATUS_PATH.exists():
-        with open(STATUS_PATH, 'r') as f:
-            status = json.load(f)
-    
-    status.append({
-        'id': job['id'],
-        'instance_id': instance_id,
-        'added_at': job['added_at'],
-        'status': 'PENDING',
-        'progress': {}
-    })
     
     with open(STATUS_PATH, 'w') as f:
         json.dump(status, f, indent=2)
     
     return jsonify({
         'success': True,
-        'job': job
+        'jobs': created_jobs,
+        'count': len(created_jobs)
     })
 
 
