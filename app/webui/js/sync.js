@@ -457,11 +457,39 @@ async function testConnection(syncType) {
             const ip = config.ip || SYNC_CONFIG_DEFAULTS[syncType]?.ip;
             const port = config.port || SYNC_CONFIG_DEFAULTS[syncType]?.port;
             const hostKey = `${syncType}:${ip}:${port}`;
-            const result = data.results[hostKey] || Object.values(data.results)[0];
+            const result = data.results[syncType] || data.results[hostKey] || Object.values(data.results)[0];
             
             if (result && result.success) {
                 resultDiv.className = 'sync-config-result sync-config-result-success';
                 resultDiv.textContent = `✅ Connection successful: ${result.message}`;
+            } else if (result && result.host_verification_needed) {
+                // Show host verification modal
+                resultDiv.className = 'sync-config-result sync-config-result-loading';
+                resultDiv.textContent = '🔐 Host verification required...';
+                
+                try {
+                    // Get the host info for verification
+                    const hostInfo = {
+                        ssh_host: ip,
+                        ssh_port: port,
+                        host_alias: syncType
+                    };
+                    
+                    // Show the host verification modal
+                    const userAccepted = await window.VastAIUI.showSSHHostVerificationModal(hostInfo);
+                    
+                    if (userAccepted) {
+                        resultDiv.className = 'sync-config-result sync-config-result-success';
+                        resultDiv.textContent = '✅ Host key verified and connection successful';
+                    } else {
+                        resultDiv.className = 'sync-config-result sync-config-result-error';
+                        resultDiv.textContent = '❌ Host verification cancelled by user';
+                    }
+                } catch (modalError) {
+                    console.error('Host verification modal error:', modalError);
+                    resultDiv.className = 'sync-config-result sync-config-result-error';
+                    resultDiv.textContent = `❌ Host verification error: ${modalError.message}`;
+                }
             } else {
                 resultDiv.className = 'sync-config-result sync-config-result-error';
                 resultDiv.textContent = `❌ Connection failed: ${result?.message || 'Unknown error'}`;

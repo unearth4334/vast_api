@@ -68,13 +68,14 @@ class SSHTester:
         try:
             logger.info(f"Testing SSH connection to {host_alias}...")
             
+            # Use proper StrictHostKeyChecking to detect host verification issues
             cmd = [
                 'ssh',
                 '-F', self.ssh_config_path,
                 '-o', f'ConnectTimeout={timeout}',
                 '-o', 'BatchMode=yes',
-                '-o', 'UserKnownHostsFile=/dev/null',
-                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
                 host_alias,
                 'echo "ssh-test-success"'
             ]
@@ -95,6 +96,20 @@ class SSHTester:
                     'output': result.stdout.strip()
                 }
             else:
+                # Check for host key verification issues
+                stderr = result.stderr.lower()
+                if 'host key verification failed' in stderr or 'no hostkey alg' in stderr or (result.returncode == 255 and 'connection refused' not in stderr):
+                    logger.warning(f"Host key verification needed for {host_alias}")
+                    return {
+                        'host': host_alias,
+                        'success': False,
+                        'message': 'Host key verification required',
+                        'error': result.stderr.strip(),
+                        'return_code': result.returncode,
+                        'output': result.stdout.strip(),
+                        'host_verification_needed': True
+                    }
+                
                 return {
                     'host': host_alias,
                     'success': False,

@@ -490,8 +490,12 @@ def test_ssh():
         })
     
     try:
+        # Get targets from request body if provided
+        data = request.get_json() if request.is_json else {}
+        targets = data.get('targets', None)
+        
         tester = SSHTester()
-        results = tester.test_all_hosts()
+        results = tester.test_all_hosts(targets=targets)
         
         return jsonify({
             'success': True,
