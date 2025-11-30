@@ -157,10 +157,11 @@ class WorkflowLoader:
                 # Extract workflow ID from filename
                 workflow_id = yaml_file.stem.replace('.webui', '')
                 
-                # Check if corresponding JSON file exists
-                json_file = workflows_dir / f"{workflow_id}.json"
+                # Check if corresponding JSON file exists using workflow_file from YAML
+                workflow_json_name = data.get('workflow_file', f"{workflow_id}.json")
+                json_file = workflows_dir / workflow_json_name
                 if not json_file.exists():
-                    logger.warning(f"JSON file not found for {workflow_id}, skipping")
+                    logger.warning(f"JSON file not found for {workflow_id}: {workflow_json_name}, skipping")
                     continue
                 
                 # Create metadata object
@@ -307,12 +308,22 @@ class WorkflowLoader:
                 return cached_template
         
         workflows_dir = cls.get_workflows_dir()
-        json_file = workflows_dir / f"{workflow_id}.json"
         
-        if not json_file.exists():
-            raise FileNotFoundError(f"Workflow JSON not found: {workflow_id}")
+        # Load YAML to get workflow_file name
+        yaml_file = workflows_dir / f"{workflow_id}.webui.yml"
+        if not yaml_file.exists():
+            raise FileNotFoundError(f"Workflow YAML not found: {workflow_id}")
         
         try:
+            with open(yaml_file, 'r') as f:
+                yaml_data = yaml.safe_load(f)
+            
+            workflow_json_name = yaml_data.get('workflow_file', f"{workflow_id}.json")
+            json_file = workflows_dir / workflow_json_name
+            
+            if not json_file.exists():
+                raise FileNotFoundError(f"Workflow JSON not found: {workflow_json_name}")
+            
             with open(json_file, 'r') as f:
                 template = json.load(f)
             
