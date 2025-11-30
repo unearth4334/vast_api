@@ -158,24 +158,6 @@ function renderWorkflowForm(workflow) {
         </div>
     `;
     
-    // Presets (if available)
-    if (workflow.presets && workflow.presets.length > 0) {
-        html += `
-            <div class="create-form-section">
-                <div class="create-form-section-header">
-                    <h4 class="create-form-section-title">⚡ Quick Presets</h4>
-                </div>
-                <div class="presets-container">
-                    ${workflow.presets.map((preset, idx) => `
-                        <button class="preset-button" onclick="applyPreset(${idx})" title="${escapeHtml(preset.description || '')}">
-                            ${escapeHtml(preset.name)}
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
     // Main inputs
     if (workflow.inputs && workflow.inputs.length > 0) {
         html += `
@@ -203,11 +185,6 @@ function renderWorkflowForm(workflow) {
                 </div>
             </div>
         `;
-    }
-    
-    // Requirements info
-    if (workflow.requirements) {
-        html += renderRequirementsInfo(workflow.requirements);
     }
     
     formContainer.innerHTML = html;
@@ -351,42 +328,6 @@ function renderFormField(field) {
             <label for="${id}" class="${requiredClass}">${escapeHtml(field.label)}</label>
             ${description}
             ${inputHtml}
-        </div>
-    `;
-}
-
-/**
- * Render requirements info section
- * @param {Object} requirements - Requirements object
- * @returns {string} HTML string
- */
-function renderRequirementsInfo(requirements) {
-    let items = [];
-    
-    if (requirements.vram) {
-        items.push(`<span class="workflow-requirement-item"><span class="workflow-requirement-icon">🎮</span> ${escapeHtml(requirements.vram)}</span>`);
-    }
-    
-    if (requirements.compute) {
-        items.push(`<span class="workflow-requirement-item"><span class="workflow-requirement-icon">💻</span> ${escapeHtml(requirements.compute)}</span>`);
-    }
-    
-    if (requirements.models && requirements.models.length > 0) {
-        items.push(`<span class="workflow-requirement-item"><span class="workflow-requirement-icon">📦</span> ${requirements.models.length} model(s) required</span>`);
-    }
-    
-    if (requirements.custom_nodes && requirements.custom_nodes.length > 0) {
-        items.push(`<span class="workflow-requirement-item"><span class="workflow-requirement-icon">🔌</span> ${requirements.custom_nodes.length} custom node(s)</span>`);
-    }
-    
-    if (items.length === 0) return '';
-    
-    return `
-        <div class="workflow-requirements">
-            <div class="workflow-requirements-title">📋 Requirements</div>
-            <div class="workflow-requirements-list">
-                ${items.join('')}
-            </div>
         </div>
     `;
 }
@@ -537,40 +478,6 @@ function clearImageUpload(fieldId) {
  * Apply a preset to the form
  * @param {number} presetIndex - Index of the preset
  */
-function applyPreset(presetIndex) {
-    const workflow = CreateTabState.workflowDetails;
-    if (!workflow || !workflow.presets || !workflow.presets[presetIndex]) return;
-    
-    const preset = workflow.presets[presetIndex];
-    const values = preset.values || {};
-    
-    // Apply each preset value
-    Object.entries(values).forEach(([fieldId, value]) => {
-        updateFormValue(fieldId, value);
-        
-        // Update the UI
-        const input = document.getElementById(`create-field-${fieldId}`);
-        if (input) {
-            if (input.type === 'checkbox') {
-                input.checked = value;
-            } else if (input.type === 'range') {
-                input.value = value;
-                const valueInput = document.getElementById(`create-field-${fieldId}-value`);
-                if (valueInput) valueInput.value = value;
-            } else {
-                input.value = value;
-            }
-        }
-    });
-    
-    // Update preset button states
-    document.querySelectorAll('.preset-button').forEach((btn, idx) => {
-        btn.classList.toggle('active', idx === presetIndex);
-    });
-    
-    console.log(`Applied preset: ${preset.name}`);
-}
-
 /**
  * Toggle advanced section visibility
  * @param {HTMLElement} button - Toggle button element
@@ -921,24 +828,6 @@ function renderSectionBasedLayout(workflow, container) {
             <p style="margin: 0; color: var(--text-muted);">${escapeHtml(workflow.description)}</p>
         </div>
     `;
-    
-    // Presets (if available)
-    if (workflow.presets && workflow.presets.length > 0) {
-        html += `
-            <div class="create-form-section">
-                <div class="create-form-section-header">
-                    <h4 class="create-form-section-title">⚡ Quick Presets</h4>
-                </div>
-                <div class="presets-container">
-                    ${workflow.presets.map((preset, idx) => `
-                        <button class="preset-button" onclick="applyPreset(${idx})" title="${escapeHtml(preset.description || '')}">
-                            ${escapeHtml(preset.name)}
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
     
     container.innerHTML = html;
 
