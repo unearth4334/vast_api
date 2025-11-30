@@ -320,13 +320,12 @@ export function debugTemplateState() {
   
   const sshElement = document.getElementById('sshConnectionString');
   const templateElement = document.getElementById('templateSelector');
-  const resultElement = document.getElementById('setup-result');
+  // setup-result element removed
   const buttonsContainer = document.getElementById('setup-buttons-container');
   
   console.log('📍 Elements:');
   console.log('  - SSH Input:', !!sshElement, sshElement?.value);
   console.log('  - Template Select:', !!templateElement, templateElement?.value);
-  console.log('  - Result Div:', !!resultElement);
   console.log('  - Buttons Container:', !!buttonsContainer);
   
   console.log('📋 State:');

@@ -779,26 +779,7 @@ body {
     flex-wrap: wrap;
 }
 
-.setup-result {
-    margin-top: var(--size-4-3);
-    padding: var(--size-4-3);
-    border-radius: var(--radius-s);
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-modifier-form-field);
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-    font-size: var(--font-ui-small);
-    display: none;
-}
-
-.setup-result.success {
-    border-color: var(--text-success);
-    background: var(--background-success);
-}
-
-.setup-result.error {
-    border-color: var(--text-error);
-    background: var(--background-error);
-}
+/* setup-result styles removed - element no longer used */
 
 /* =========================
    WORKFLOW UI

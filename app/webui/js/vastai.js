@@ -145,13 +145,8 @@ window.normStatus = window.normStatus || function(s) {
 };
 
 window.showSetupResult = window.showSetupResult || function(message, type) {
-  console.log(`📢 showSetupResult: "${message}" (${type})`);
-  const resultDiv = document.getElementById('setup-result');
-  if (!resultDiv) return;
-  
-  resultDiv.className = `setup-result ${type || 'info'}`;
-  resultDiv.textContent = message;
-  resultDiv.style.display = 'block';
+  // Disabled: setup-result element removed as it was distracting during workflow execution
+  // Messages are shown in workflow progress UI instead
 };
 
 console.log('📄 VastAI Legacy Support module loaded');

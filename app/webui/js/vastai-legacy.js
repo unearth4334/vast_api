@@ -208,25 +208,9 @@ function buildSSHString(inst) {
 
 // ---------- UI feedback ----------
 function showSetupResult(message, type) {
-  console.log(`📢 showSetupResult called: "${message}" (${type})`);
-  const resultDiv = document.getElementById('setup-result');
-  console.log(`📍 setup-result element exists:`, !!resultDiv);
-  if (!resultDiv) {
-    console.log(`❌ setup-result element not found!`);
-    return;
-  }
-  resultDiv.textContent = message;
-  resultDiv.className = 'setup-result ' + type;
-  resultDiv.style.display = 'block';
-  console.log(`✅ Result displayed: "${message}"`);  
-
-  if (type === 'info') {
-    setTimeout(() => {
-      if (resultDiv.classList.contains('info')) {
-        resultDiv.style.display = 'none';
-      }
-    }, 5000);
-  }
+  // Disabled: setup-result element removed as it was distracting during workflow execution
+  // Messages are shown in workflow progress UI instead
+  return;
 }
 
 // ---------- VastAI: SSH test, set/get UI_HOME, terminate, install civitdl ----------
