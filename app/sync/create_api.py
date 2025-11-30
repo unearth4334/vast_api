@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Create Tab API - Workflow Management and Execution
-Provides endpoints for listing workflows, getting workflow details, and executing workflows.
+Provides endpoints for listing workflows, getting workflow details, 
+generating workflow JSON, and executing workflows on remote instances.
 """
 
 import os
@@ -11,6 +12,7 @@ import uuid
 import random
 from pathlib import Path
 from typing import Optional, Dict, List, Any
+from datetime import datetime, timezone
 
 try:
     import yaml
@@ -19,6 +21,21 @@ except ImportError:
 
 from flask import Blueprint, jsonify, request
 
+# Import new components
+try:
+    from ..create.workflow_loader import WorkflowLoader
+    from ..create.workflow_generator import WorkflowGenerator
+    from ..create.workflow_validator import WorkflowValidator
+    from ..create.task_manager import TaskManager, TaskStatus
+except ImportError:
+    # Handle both module and direct execution
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from create.workflow_loader import WorkflowLoader
+    from create.workflow_generator import WorkflowGenerator
+    from create.workflow_validator import WorkflowValidator
+    from create.task_manager import TaskManager, TaskStatus
+
 logger = logging.getLogger(__name__)
 
 # Create Blueprint for Create Tab API
@@ -26,6 +43,9 @@ create_bp = Blueprint('create', __name__, url_prefix='/create')
 
 # Path to workflows directory
 WORKFLOWS_DIR = Path(__file__).parent.parent.parent / 'workflows'
+
+# Initialize workflow loader
+workflow_loader = WorkflowLoader(str(WORKFLOWS_DIR))
 
 
 def get_workflow_icon(category: str) -> str:
@@ -296,6 +316,78 @@ def workflow_get(workflow_id: str):
         }), 500
 
 
+@create_bp.route('/generate-workflow', methods=['POST', 'OPTIONS'])
+def generate_workflow():
+    """Generate workflow JSON from user inputs"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        
+        workflow_id = data.get('workflow_id')
+        inputs = data.get('inputs', {})
+        
+        if not workflow_id:
+            return jsonify({
+                'success': False,
+                'message': 'workflow_id is required'
+            }), 400
+        
+        # Load workflow config and template using the new loader
+        workflow_config = workflow_loader.load_workflow(workflow_id)
+        if not workflow_config:
+            return jsonify({
+                'success': False,
+                'message': f'Workflow not found: {workflow_id}'
+            }), 404
+        
+        workflow_template = workflow_loader.load_workflow_json(workflow_id)
+        if not workflow_template:
+            return jsonify({
+                'success': False,
+                'message': f'Workflow JSON template not found for: {workflow_id}'
+            }), 404
+        
+        # Validate inputs
+        validator = WorkflowValidator(workflow_config)
+        validation_result = validator.validate_inputs(inputs)
+        
+        if not validation_result.is_valid:
+            return jsonify({
+                'success': False,
+                'message': 'Input validation failed',
+                'errors': validation_result.errors,
+                'warnings': validation_result.warnings
+            }), 400
+        
+        # Generate workflow JSON
+        generator = WorkflowGenerator(workflow_config, workflow_template)
+        generated_workflow = generator.generate(inputs)
+        
+        # Build metadata
+        metadata = {
+            'workflow_id': workflow_id,
+            'version': workflow_config.version,
+            'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z',
+            'input_summary': generator.get_input_summary(inputs)
+        }
+        
+        return jsonify({
+            'success': True,
+            'workflow': generated_workflow,
+            'metadata': metadata,
+            'warnings': validation_result.warnings if validation_result.warnings else None
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating workflow: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Error generating workflow: {str(e)}'
+        }), 500
+
+
 @create_bp.route('/execute', methods=['POST', 'OPTIONS'])
 def execute_workflow():
     """Execute a workflow on a cloud instance"""
@@ -308,6 +400,7 @@ def execute_workflow():
         ssh_connection = data.get('ssh_connection')
         workflow_id = data.get('workflow_id')
         inputs = data.get('inputs', {})
+        options = data.get('options', {})
         
         if not ssh_connection:
             return jsonify({
@@ -321,31 +414,51 @@ def execute_workflow():
                 'message': 'Workflow ID is required'
             }), 400
         
-        # Get workflow details
-        workflow = get_workflow_details(workflow_id)
-        if not workflow:
+        # Load workflow config and template
+        workflow_config = workflow_loader.load_workflow(workflow_id)
+        if not workflow_config:
             return jsonify({
                 'success': False,
                 'message': f'Workflow not found: {workflow_id}'
             }), 404
         
-        # Generate task ID for tracking
-        task_id = str(uuid.uuid4())
+        workflow_template = workflow_loader.load_workflow_json(workflow_id)
+        if not workflow_template:
+            return jsonify({
+                'success': False,
+                'message': f'Workflow JSON template not found for: {workflow_id}'
+            }), 404
         
-        logger.info(f"Starting workflow execution: {workflow_id}, task_id: {task_id}")
+        # Validate inputs
+        validator = WorkflowValidator(workflow_config)
+        validation_result = validator.validate_inputs(inputs)
         
-        # Fill the workflow JSON with user inputs
-        if workflow.get('workflow_json'):
-            filled_workflow = fill_workflow_json(
-                workflow['workflow_json'],
-                inputs,
-                workflow
-            )
-        else:
-            filled_workflow = None
+        if not validation_result.is_valid:
+            return jsonify({
+                'success': False,
+                'message': 'Input validation failed',
+                'errors': validation_result.errors
+            }), 400
         
-        # For now, return success with task ID
-        # Full execution implementation would:
+        # Generate workflow JSON
+        generator = WorkflowGenerator(workflow_config, workflow_template)
+        generated_workflow = generator.generate(inputs)
+        
+        # Create task for tracking
+        task = TaskManager.create_task(
+            workflow_id=workflow_id,
+            ssh_connection=ssh_connection,
+            options=options,
+            metadata={
+                'input_summary': generator.get_input_summary(inputs),
+                'version': workflow_config.version
+            }
+        )
+        
+        logger.info(f"Created execution task: {task.task_id} for workflow: {workflow_id}")
+        
+        # Return success with task ID
+        # Full execution would:
         # 1. Save filled workflow to temp file
         # 2. SCP to instance
         # 3. Queue via ComfyUI API
@@ -353,10 +466,10 @@ def execute_workflow():
         
         return jsonify({
             'success': True,
-            'task_id': task_id,
+            'task_id': task.task_id,
             'message': 'Workflow queued successfully',
-            'workflow_id': workflow_id,
-            'inputs_received': list(inputs.keys())
+            'estimated_time': workflow_config.time_estimate.get('max', 300) if workflow_config.time_estimate else 300,
+            'status_url': f'/create/status/{task.task_id}'
         })
         
     except Exception as e:
@@ -374,18 +487,31 @@ def get_execution_status(task_id: str):
         return ("", 204)
     
     try:
-        # TODO: Implement actual status tracking
-        # For now, return a placeholder response
+        task = TaskManager.get_task(task_id)
+        
+        if not task:
+            # Return a default pending status for unknown tasks (backward compatibility)
+            return jsonify({
+                'success': True,
+                'task_id': task_id,
+                'status': 'pending',
+                'progress': {
+                    'current_step': 0,
+                    'total_steps': 0,
+                    'percent': 0,
+                    'message': ''
+                },
+                'started_at': None,
+                'elapsed_seconds': 0,
+                'estimated_remaining_seconds': None,
+                'outputs': [],
+                'metadata': {},
+                'error': None
+            })
+        
         return jsonify({
             'success': True,
-            'task_id': task_id,
-            'status': 'pending',
-            'progress': {
-                'current_node': None,
-                'percent': 0,
-                'eta_seconds': None
-            },
-            'outputs': None
+            **task.to_dict()
         })
         
     except Exception as e:
@@ -393,4 +519,50 @@ def get_execution_status(task_id: str):
         return jsonify({
             'success': False,
             'message': f'Error getting status: {str(e)}'
+        }), 500
+
+
+@create_bp.route('/cancel/<task_id>', methods=['POST', 'OPTIONS'])
+def cancel_task(task_id: str):
+    """Cancel a running workflow execution"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        task = TaskManager.get_task(task_id)
+        
+        if not task:
+            return jsonify({
+                'success': False,
+                'message': f'Task not found: {task_id}'
+            }), 404
+        
+        # Check if task can be cancelled
+        if task.status in (TaskStatus.COMPLETE, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            return jsonify({
+                'success': False,
+                'message': f'Cannot cancel task with status: {task.status.value}'
+            }), 400
+        
+        # Cancel the task
+        success = TaskManager.cancel_task(task_id)
+        
+        if success:
+            logger.info(f"Task {task_id} cancelled successfully")
+            return jsonify({
+                'success': True,
+                'task_id': task_id,
+                'message': 'Workflow cancelled successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to cancel task'
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error cancelling task {task_id}: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Error cancelling task: {str(e)}'
         }), 500
