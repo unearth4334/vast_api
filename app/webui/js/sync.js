@@ -419,6 +419,9 @@ async function renderVastAIConfig(content) {
             </div>
         </div>
         <div class="sync-config-actions">
+            <button class="setup-button" onclick="testVastAIConnection()">
+                🔧 Test Connection
+            </button>
             <button class="setup-button" onclick="saveVastAISSHAndClose()">
                 ✓ Save & Close
             </button>
@@ -497,6 +500,66 @@ async function testConnection(syncType) {
         } else {
             resultDiv.className = 'sync-config-result sync-config-result-error';
             resultDiv.textContent = `❌ Test failed: ${data.message || 'Unknown error'}`;
+        }
+    } catch (error) {
+        resultDiv.className = 'sync-config-result sync-config-result-error';
+        resultDiv.textContent = `❌ Request failed: ${error.message}`;
+    }
+}
+
+/**
+ * Test VastAI SSH connection
+ */
+async function testVastAIConnection() {
+    const resultDiv = document.getElementById('syncConfigResult-vastai');
+    const sshInput = document.getElementById('syncSshConnectionString');
+    const sshConnection = sshInput?.value?.trim();
+    
+    if (!sshConnection) {
+        resultDiv.className = 'sync-config-result sync-config-result-error';
+        resultDiv.textContent = '❌ Please enter an SSH connection string first';
+        return;
+    }
+    
+    resultDiv.className = 'sync-config-result sync-config-result-loading';
+    resultDiv.textContent = 'Testing connection...';
+    
+    try {
+        const data = await api.post('/ssh/test', { ssh_connection: sshConnection });
+        
+        if (data.success) {
+            resultDiv.className = 'sync-config-result sync-config-result-success';
+            resultDiv.textContent = `✅ Connection successful: ${data.message}`;
+        } else if (data.host_verification_needed) {
+            // Show host verification modal
+            resultDiv.className = 'sync-config-result sync-config-result-loading';
+            resultDiv.textContent = '🔐 Host verification required...';
+            
+            try {
+                const hostInfo = {
+                    ssh_host: data.ssh_host,
+                    ssh_port: data.ssh_port,
+                    ssh_connection: sshConnection
+                };
+                
+                // Show the host verification modal
+                const userAccepted = await window.VastAIUI.showSSHHostVerificationModal(hostInfo);
+                
+                if (userAccepted) {
+                    resultDiv.className = 'sync-config-result sync-config-result-success';
+                    resultDiv.textContent = '✅ Host key verified and connection successful';
+                } else {
+                    resultDiv.className = 'sync-config-result sync-config-result-error';
+                    resultDiv.textContent = '❌ Host verification cancelled by user';
+                }
+            } catch (modalError) {
+                console.error('Host verification modal error:', modalError);
+                resultDiv.className = 'sync-config-result sync-config-result-error';
+                resultDiv.textContent = `❌ Host verification error: ${modalError.message}`;
+            }
+        } else {
+            resultDiv.className = 'sync-config-result sync-config-result-error';
+            resultDiv.textContent = `❌ Connection failed: ${data.message || 'Unknown error'}`;
         }
     } catch (error) {
         resultDiv.className = 'sync-config-result sync-config-result-error';
