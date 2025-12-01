@@ -249,8 +249,8 @@ if [ -f "$CUSTOM_NODES_CSV" ]; then
     CUSTOM_NODES_PATH="$COMFY_PATH/custom_nodes"
     mkdir -p "$CUSTOM_NODES_PATH"
     
-    # Count total nodes for progress tracking
-    TOTAL_NODES=$(tail -n +2 "$CUSTOM_NODES_CSV" | wc -l)
+    # Count total nodes for progress tracking (exclude empty lines)
+    TOTAL_NODES=$(tail -n +2 "$CUSTOM_NODES_CSV" | grep -v "^[[:space:]]*$" | wc -l)
     CURRENT_NODE=0
     SUCCESSFUL_NODES=0
     FAILED_NODES=0
