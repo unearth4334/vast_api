@@ -410,6 +410,11 @@ export class ResourceDownloadStatus {
         if (job.status === 'RUNNING') {
             const parts = [];
             
+            // Debug: log the progress object
+            if (job.progress && Object.keys(job.progress).length > 0) {
+                console.log('Progress data for job', job.id, ':', job.progress);
+            }
+            
             // Show progress stats if available
             if (job.progress) {
                 // Percent and speed are most important
