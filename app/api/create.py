@@ -81,11 +81,15 @@ def generate_workflow():
     """
     Generate a ComfyUI-compatible workflow JSON file with user inputs merged
     
+    This endpoint processes inputs exactly as they would be for execution,
+    including converting base64 images to filenames for debugging purposes.
+    
     Request JSON:
         {
             "workflow_id": "IMG_to_VIDEO",
             "inputs": {
                 "positive_prompt": "...",
+                "input_image": "data:image/jpeg;base64,...",
                 "main_model": {"highNoisePath": "...", "lowNoisePath": "..."},
                 ...
             }
@@ -110,9 +114,21 @@ def generate_workflow():
         workflow_config = WorkflowLoader.load_workflow(workflow_id)
         workflow_template = WorkflowLoader.load_workflow_json(workflow_id)
         
-        # Validate inputs
+        # Process image inputs - replace base64 with filenames (for debugging)
+        image_fields = [f for f in workflow_config.inputs if f.type == 'image']
+        processed_inputs = inputs.copy()
+        
+        for field in image_fields:
+            field_value = inputs.get(field.id)
+            if field_value and isinstance(field_value, str) and field_value.startswith('data:image/'):
+                # Generate a placeholder filename that would be used during execution
+                filename = _generate_image_filename(field_value)
+                processed_inputs[field.id] = filename
+                logger.debug(f"Replaced base64 image for {field.id} with filename: {filename}")
+        
+        # Validate processed inputs
         validator = WorkflowValidator(workflow_config)
-        validation_result = validator.validate_inputs(inputs)
+        validation_result = validator.validate_inputs(processed_inputs)
         
         if not validation_result.is_valid:
             return jsonify({
@@ -121,16 +137,16 @@ def generate_workflow():
                 'errors': validation_result.errors
             }), 400
         
-        # Generate workflow JSON
+        # Generate workflow JSON with processed inputs
         generator = WorkflowGenerator(workflow_config, workflow_template)
-        generated_workflow = generator.generate(inputs)
+        generated_workflow = generator.generate(processed_inputs)
         
         # Add metadata
         metadata = {
             'workflow_id': workflow_id,
             'version': workflow_config.version,
             'generated_at': datetime.utcnow().isoformat() + 'Z',
-            'input_summary': generator.get_input_summary(inputs)
+            'input_summary': generator.get_input_summary(processed_inputs)
         }
         
         return jsonify({
@@ -259,22 +275,35 @@ def _parse_ssh_connection(ssh_connection):
     return host, port
 
 
+def _generate_image_filename(base64_data):
+    """
+    Generate a filename for an image from base64 data
+    Returns a filename like: upload_abc12345.jpeg
+    """
+    if not base64_data.startswith('data:image/'):
+        raise ValueError("Invalid image data format")
+    
+    # Extract image format
+    header = base64_data.split(',', 1)[0]
+    image_format = header.split('/')[1].split(';')[0]  # e.g., 'jpeg', 'png'
+    
+    # Generate unique filename
+    filename = f"upload_{uuid.uuid4().hex[:8]}.{image_format}"
+    return filename
+
+
 def _upload_image_to_remote(base64_data, ssh_connection, host, port):
     """
     Upload base64 image to remote ComfyUI input directory
     
     Returns: filename of uploaded image
     """
-    # Parse base64 data URL
-    if not base64_data.startswith('data:image/'):
-        raise ValueError("Invalid image data format")
+    # Generate filename using the same logic as export
+    filename = _generate_image_filename(base64_data)
     
-    # Extract image format and data
+    # Extract image data
     header, encoded = base64_data.split(',', 1)
-    image_format = header.split('/')[1].split(';')[0]  # e.g., 'jpeg', 'png'
-    
-    # Generate unique filename
-    filename = f"upload_{uuid.uuid4().hex[:8]}.{image_format}"
+    image_format = header.split('/')[1].split(';')[0]
     
     # Decode base64 to bytes
     image_data = base64.b64decode(encoded)
