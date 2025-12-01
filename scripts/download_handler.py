@@ -284,6 +284,9 @@ def process_job(job: Dict) -> None:
             """Callback for each line of output"""
             parsed = None
             
+            # Debug: print the line
+            print(f"[PROGRESS] {line}")
+            
             # Parse based on command type
             if 'civitdl' in cmd.lower():
                 parsed = CivitdlProgressParser.parse_line(line)
@@ -291,6 +294,7 @@ def process_job(job: Dict) -> None:
                 parsed = WgetProgressParser.parse_line(line)
             
             if parsed:
+                print(f"[PARSED] {parsed}")
                 tracker.update_progress(parsed)
             else:
                 # Even without parsed progress, write status periodically

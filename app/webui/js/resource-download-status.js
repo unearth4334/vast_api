@@ -177,6 +177,13 @@ export class ResourceDownloadStatus {
             const jobs = await window.api.get(url);
             console.log('📊 Received jobs:', jobs);
             
+            // Debug: Log each job's progress in detail
+            if (jobs && jobs.length > 0) {
+                jobs.forEach(job => {
+                    console.log(`📊 Job ${job.id?.slice(0, 8)}: status=${job.status}, progress=`, job.progress);
+                });
+            }
+            
             // Create a hash of the current state to detect changes
             const stateHash = this.calculateStateHash(jobs);
             
