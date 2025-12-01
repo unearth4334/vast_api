@@ -412,7 +412,7 @@
     "inputs": {
       "add_noise": "disable",
       "noise_seed": [
-        "470",
+        "73",
         0
       ],
       "steps": [
@@ -457,7 +457,7 @@
     "inputs": {
       "add_noise": "enable",
       "noise_seed": [
-        "470",
+        "73",
         0
       ],
       "steps": [
@@ -544,19 +544,6 @@
     "class_type": "VAEDecode",
     "_meta": {
       "title": "VAE Decode"
-    }
-  },
-  "470": {
-    "inputs": {
-      "output_type": "int",
-      "*": [
-        "73",
-        0
-      ]
-    },
-    "class_type": "easy convertAnything",
-    "_meta": {
-      "title": "Convert Any"
     }
   },
   "471": {
