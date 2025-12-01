@@ -204,6 +204,12 @@ class WorkflowValidator:
     
     def _validate_high_low_model(self, config: InputConfig, value: Any, result: ValidationResult):
         """Validate high-low noise model pair"""
+        # If value is empty, skip validation unless required
+        if not value or (isinstance(value, dict) and not value.get('highNoisePath') and not value.get('lowNoisePath')):
+            if config.required:
+                result.add_error(config.id, f'{config.label} is required')
+            return
+        
         if not isinstance(value, dict):
             result.add_error(config.id, f'{config.label} must be an object')
             return
@@ -245,6 +251,12 @@ class WorkflowValidator:
     
     def _validate_single_model(self, config: InputConfig, value: Any, result: ValidationResult):
         """Validate single model selector"""
+        # If value is empty dict, null, or empty string, skip validation unless required
+        if not value or (isinstance(value, dict) and not value.get('path')):
+            if config.required:
+                result.add_error(config.id, f'{config.label} is required')
+            return
+        
         if not isinstance(value, dict):
             result.add_error(config.id, f'{config.label} must be an object')
             return
