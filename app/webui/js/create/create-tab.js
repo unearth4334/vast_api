@@ -215,7 +215,7 @@ function renderFormField(field) {
     switch (field.type) {
         case 'image':
             inputHtml = `
-                <div class="image-upload-container" id="${id}-container" onclick="document.getElementById('${id}').click()">
+                <div class="image-upload-container" id="${id}-container">
                     <input type="file" id="${id}" accept="${field.accept || 'image/*'}" onchange="handleImageUpload('${field.id}', this)">
                     <div class="image-upload-icon">📷</div>
                     <div class="image-upload-text">Click or drag to upload image</div>
