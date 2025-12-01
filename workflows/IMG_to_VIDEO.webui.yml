@@ -279,7 +279,7 @@ inputs:
     type: "single_model"
     label: "Upscale Model"
     description: "Super-resolution model for upscaling"
-    required: true
+    required: false
     model_type: "upscale_models"
     default: "RealESRGAN_x4plus.pth"
 
