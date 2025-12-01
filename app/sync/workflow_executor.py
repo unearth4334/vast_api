@@ -958,7 +958,9 @@ class WorkflowExecutor:
                                                 tasks_to_show.append(node_task)
                                             
                                             # Add "# others" for remaining nodes
-                                            remaining = total_nodes_count - processed
+                                            # Calculate based on nodes seen, not processed count
+                                            actual_nodes = [n for n in nodes_seen if n not in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']]
+                                            remaining = total_nodes_count - len(actual_nodes)
                                             if remaining > 0:
                                                 tasks_to_show.append({
                                                     'name': f'{remaining} others',
@@ -1013,7 +1015,9 @@ class WorkflowExecutor:
                                                 tasks_to_show.append(node_task)
                                             
                                             # Add pending "# others" if there are more nodes ahead
-                                            remaining = total_nodes_count - processed
+                                            # Calculate remaining based on actual nodes seen (not processed count)
+                                            # This accounts for nodes that were skipped/failed without being tracked
+                                            remaining = total_nodes_count - len(actual_nodes)
                                             if remaining > 0:
                                                 tasks_to_show.append({
                                                     'name': f'{remaining} others',
