@@ -172,6 +172,14 @@ export class ExecutionQueue {
         const statusClass = `status-${status}`;
         const promptIdShort = item.prompt_id.substring(0, 8);
 
+        // Calculate elapsed time for running items
+        let statusText = status;
+        if (status === 'running' && item.start_time) {
+            const currentTime = Date.now() / 1000;
+            const elapsedTime = currentTime - item.start_time;
+            statusText = `${status} (${this.formatExecutionTime(elapsedTime)})`;
+        }
+
         return `
             <div class="execution-queue-item ${statusClass}">
                 <div class="execution-queue-item-header">
@@ -179,7 +187,7 @@ export class ExecutionQueue {
                     <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
                         ${this.escapeHtml(promptIdShort)}
                     </span>
-                    <span class="execution-queue-item-status">${this.escapeHtml(status)}</span>
+                    <span class="execution-queue-item-status">${this.escapeHtml(statusText)}</span>
                 </div>
             </div>
         `;

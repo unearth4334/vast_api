@@ -12,6 +12,7 @@ import tempfile
 import subprocess
 import re
 from pathlib import Path
+import time
 
 from app.create.workflow_loader import WorkflowLoader
 from app.create.workflow_generator import WorkflowGenerator
@@ -21,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 # Create blueprint
 bp = Blueprint('create', __name__, url_prefix='/create')
+
+# In-memory store for workflow queue timestamps
+# Maps prompt_id -> queue_timestamp
+workflow_queue_times = {}
 
 
 @bp.route('/workflows/list', methods=['GET'])
@@ -243,6 +248,9 @@ def execute_workflow():
         
         # Queue workflow on ComfyUI
         prompt_id = _queue_workflow_on_comfyui(workflow_path, ssh_connection, host, port)
+        
+        # Save queue timestamp
+        workflow_queue_times[prompt_id] = time.time()
         
         # Generate task ID for tracking
         task_id = str(uuid.uuid4())
@@ -671,17 +679,41 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
     running_items = []
     for item in queue_data.get('queue_running', []):
         prompt_id = item[1] if isinstance(item, list) and len(item) > 1 else str(item)
+        
+        # Try to get start time from history if available
+        start_time = None
+        if prompt_id in history_data:
+            status = history_data[prompt_id].get('status', {})
+            messages = status.get('messages', [])
+            for msg in messages:
+                if isinstance(msg, list) and len(msg) >= 2:
+                    msg_type = msg[0]
+                    msg_data = msg[1]
+                    if msg_type == 'execution_start' and 'timestamp' in msg_data:
+                        start_time = msg_data['timestamp'] / 1000
+                        break
+        
+        # Fallback to queue time if no start time from history
+        if not start_time and prompt_id in workflow_queue_times:
+            start_time = workflow_queue_times[prompt_id]
+        
         running_items.append({
             'prompt_id': prompt_id,
-            'status': 'running'
+            'status': 'running',
+            'start_time': start_time
         })
     
     pending_items = []
     for item in queue_data.get('queue_pending', []):
         prompt_id = item[1] if isinstance(item, list) and len(item) > 1 else str(item)
+        
+        # Get queue time for pending items
+        queue_time = workflow_queue_times.get(prompt_id)
+        
         pending_items.append({
             'prompt_id': prompt_id,
-            'status': 'pending'
+            'status': 'pending',
+            'queue_time': queue_time
         })
     
     # Process history items
@@ -717,6 +749,10 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
         execution_time = None
         if start_time and end_time:
             execution_time = end_time - start_time
+        
+        # Clean up queue time for completed workflows
+        if status.get('completed', False) and prompt_id in workflow_queue_times:
+            del workflow_queue_times[prompt_id]
         
         recent_items.append({
             'prompt_id': prompt_id,
