@@ -4,6 +4,8 @@
  * Supports extensible component architecture driven by *.webui.yml definitions
  */
 
+import { ExecutionQueue } from './components/ExecutionQueue.js';
+
 // Create Tab state
 const CreateTabState = {
     workflows: [],
@@ -15,7 +17,9 @@ const CreateTabState = {
     // Store component instances for cleanup and value retrieval
     componentInstances: new Map(),
     // Current SSH connection
-    sshConnection: null
+    sshConnection: null,
+    // Execution queue component
+    executionQueue: null
 };
 
 /**
@@ -23,6 +27,9 @@ const CreateTabState = {
  */
 async function initCreateTab() {
     console.log('🎨 Initializing Create tab...');
+    
+    // Initialize ExecutionQueue component
+    CreateTabState.executionQueue = new ExecutionQueue('execution-queue-content', null);
     
     // Load workflows
     await loadWorkflows();
@@ -645,13 +652,27 @@ function setupCreateTabEventListeners() {
         createSshInput.addEventListener('input', function() {
             if (vastaiSshInput) vastaiSshInput.value = this.value;
             if (resourcesSshInput) resourcesSshInput.value = this.value;
+            
+            // Update SSH connection in state and execution queue
+            CreateTabState.sshConnection = this.value;
+            if (CreateTabState.executionQueue) {
+                CreateTabState.executionQueue.setSshConnection(this.value);
+            }
         });
         
         // Initialize from other tabs if they have values
         if (vastaiSshInput?.value) {
             createSshInput.value = vastaiSshInput.value;
+            CreateTabState.sshConnection = vastaiSshInput.value;
+            if (CreateTabState.executionQueue) {
+                CreateTabState.executionQueue.setSshConnection(vastaiSshInput.value);
+            }
         } else if (resourcesSshInput?.value) {
             createSshInput.value = resourcesSshInput.value;
+            CreateTabState.sshConnection = resourcesSshInput.value;
+            if (CreateTabState.executionQueue) {
+                CreateTabState.executionQueue.setSshConnection(resourcesSshInput.value);
+            }
         }
     }
 }
@@ -1028,6 +1049,15 @@ async function exportWorkflowJSON() {
     }
 }
 
+/**
+ * Refresh execution queue
+ */
+async function refreshExecutionQueue() {
+    if (CreateTabState.executionQueue) {
+        await CreateTabState.executionQueue.refresh();
+    }
+}
+
 // Export for use in HTML
 window.initCreateTab = initCreateTab;
 window.loadWorkflows = loadWorkflows;
@@ -1046,3 +1076,4 @@ window.toggleSection = toggleSection;
 window.updateComponentsSSHConnection = updateComponentsSSHConnection;
 window.refreshAllModelSelectors = refreshAllModelSelectors;
 window.renderWorkflowFormWithSections = renderWorkflowFormWithSections;
+window.refreshExecutionQueue = refreshExecutionQueue;

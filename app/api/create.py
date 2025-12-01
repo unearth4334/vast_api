@@ -379,6 +379,172 @@ def _upload_workflow_to_remote(workflow_json, ssh_connection, host, port):
         Path(tmp_path).unlink(missing_ok=True)
 
 
+@bp.route('/execution-queue', methods=['POST'])
+def get_execution_queue():
+    """
+    Get execution queue status from ComfyUI instance
+    
+    Expected POST body:
+    {
+        "ssh_connection": "ssh -p 40538 root@198.53.64.194"
+    }
+    
+    Returns:
+        JSON with queue status, running workflows, and recent history
+    """
+    data = request.get_json()
+    ssh_connection = data.get('ssh_connection')
+    
+    if not ssh_connection:
+        return jsonify({
+            'success': False,
+            'message': 'ssh_connection is required'
+        }), 400
+    
+    try:
+        # Parse SSH connection details
+        host, port = _parse_ssh_connection(ssh_connection)
+        
+        # Get queue status and history from ComfyUI
+        queue_status = _get_comfyui_queue_status(ssh_connection, host, port)
+        
+        return jsonify({
+            'success': True,
+            'queue': queue_status
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching execution queue: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch execution queue: {str(e)}'
+        }), 500
+
+
+def _get_comfyui_queue_status(ssh_connection, host, port):
+    """
+    Get ComfyUI queue status and recent execution history
+    
+    Returns dict with:
+    - queue_running: list of running workflows
+    - queue_pending: list of pending workflows
+    - recent_history: list of recently completed workflows
+    """
+    import json
+    
+    # Get queue status
+    queue_cmd = [
+        'ssh',
+        '-p', port,
+        '-o', 'StrictHostKeyChecking=yes',
+        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+        f'root@{host}',
+        'curl -s http://localhost:18188/queue'
+    ]
+    
+    result = subprocess.run(queue_cmd, capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to get queue status: {result.stderr}")
+    
+    # Parse queue response
+    lines = result.stdout.split('\n')
+    json_lines = [line for line in lines if line.strip().startswith('{')]
+    
+    if not json_lines:
+        raise ValueError(f"No JSON response found in queue output")
+    
+    queue_data = json.loads(json_lines[0].strip())
+    
+    # Get recent history (last 10 executions)
+    history_cmd = [
+        'ssh',
+        '-p', port,
+        '-o', 'StrictHostKeyChecking=yes',
+        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+        f'root@{host}',
+        'curl -s http://localhost:18188/history?max_items=10'
+    ]
+    
+    result = subprocess.run(history_cmd, capture_output=True, text=True)
+    
+    history_data = {}
+    if result.returncode == 0:
+        lines = result.stdout.split('\n')
+        json_lines = [line for line in lines if line.strip().startswith('{')]
+        if json_lines:
+            history_data = json.loads(json_lines[0].strip())
+    
+    # Process queue items
+    running_items = []
+    for item in queue_data.get('queue_running', []):
+        prompt_id = item[1] if isinstance(item, list) and len(item) > 1 else str(item)
+        running_items.append({
+            'prompt_id': prompt_id,
+            'status': 'running'
+        })
+    
+    pending_items = []
+    for item in queue_data.get('queue_pending', []):
+        prompt_id = item[1] if isinstance(item, list) and len(item) > 1 else str(item)
+        pending_items.append({
+            'prompt_id': prompt_id,
+            'status': 'pending'
+        })
+    
+    # Process history items
+    recent_items = []
+    for prompt_id, history_item in history_data.items():
+        status = history_item.get('status', {})
+        messages = status.get('messages', [])
+        
+        # Extract timestamps
+        start_time = None
+        end_time = None
+        
+        for msg in messages:
+            if isinstance(msg, list) and len(msg) >= 2:
+                msg_type = msg[0]
+                msg_data = msg[1]
+                
+                if msg_type == 'execution_start' and 'timestamp' in msg_data:
+                    start_time = msg_data['timestamp'] / 1000  # Convert to seconds
+                elif msg_type in ['execution_success', 'execution_error'] and 'timestamp' in msg_data:
+                    end_time = msg_data['timestamp'] / 1000
+        
+        # Determine status
+        status_str = status.get('status_str', 'unknown')
+        if status_str == 'success':
+            item_status = 'success'
+        elif status_str == 'error':
+            item_status = 'failed'
+        else:
+            item_status = status_str
+        
+        # Calculate execution time
+        execution_time = None
+        if start_time and end_time:
+            execution_time = end_time - start_time
+        
+        recent_items.append({
+            'prompt_id': prompt_id,
+            'status': item_status,
+            'start_time': start_time,
+            'end_time': end_time,
+            'execution_time': execution_time,
+            'completed': status.get('completed', False)
+        })
+    
+    # Sort recent items by start time (most recent first)
+    recent_items.sort(key=lambda x: x.get('start_time', 0), reverse=True)
+    
+    return {
+        'queue_running': running_items,
+        'queue_pending': pending_items,
+        'recent_history': recent_items[:10]  # Limit to 10 most recent
+    }
+
+
 def _queue_workflow_on_comfyui(workflow_path, ssh_connection, host, port):
     """
     Queue workflow on remote ComfyUI instance via API
