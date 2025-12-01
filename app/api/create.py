@@ -396,7 +396,7 @@ def _queue_workflow_on_comfyui(workflow_path, ssh_connection, host, port):
         '-o', 'StrictHostKeyChecking=yes',
         '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
         f'root@{host}',
-        f'bash -c "{payload_cmd} | curl -s -X POST http://localhost:8188/prompt -H \'Content-Type: application/json\' -d @-"'
+        f'bash -c "{payload_cmd} | curl -s -X POST http://localhost:18188/prompt -H \'Content-Type: application/json\' -d @-"'
     ]
     
     result = subprocess.run(queue_cmd, capture_output=True, text=True)
