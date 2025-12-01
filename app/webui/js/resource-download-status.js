@@ -172,13 +172,17 @@ export class ResourceDownloadStatus {
             const url = this.instanceId 
                 ? `/downloads/status?instance_id=${this.instanceId}`
                 : '/downloads/status';
+            
+            console.log('📊 Polling download status:', url);
             const jobs = await window.api.get(url);
+            console.log('📊 Received jobs:', jobs);
             
             // Create a hash of the current state to detect changes
             const stateHash = this.calculateStateHash(jobs);
             
             // Only re-render if the state has changed
             if (stateHash !== this.previousStateHash) {
+                console.log('📊 State changed, re-rendering');
                 this.previousStateHash = stateHash;
                 
                 // Check for host verification needed

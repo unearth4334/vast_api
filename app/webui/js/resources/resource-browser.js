@@ -994,12 +994,17 @@ export class ResourceBrowser {
             });
             
             if (response.success) {
-                alert(`Successfully queued ${resources.length} resource(s) for installation!\n\nClick the 🔄 Refresh button to monitor progress.`);
+                alert(`Successfully queued ${resources.length} resource(s) for installation!\n\nMonitoring download progress...`);
                 this.clearSelection();
                 
-                // Store instance ID but don't start polling - user must click refresh
+                // Start polling for download progress
                 const instanceId = this._extractInstanceId(sshConnection);
-                if (instanceId) this.downloadStatus.instanceId = instanceId;
+                if (instanceId) {
+                    this.downloadStatus.setInstanceId(instanceId);
+                } else {
+                    // Start polling even without instance ID
+                    this.downloadStatus.startPolling();
+                }
             } else {
                 alert(`Failed to queue downloads: ${response.message}`);
             }
