@@ -31,6 +31,9 @@ async function initCreateTab() {
     // Initialize ExecutionQueue component
     CreateTabState.executionQueue = new ExecutionQueue('execution-queue-content', null);
     
+    // Expose globally for onclick handlers
+    window.executionQueueInstance = CreateTabState.executionQueue;
+    
     // Load workflows
     await loadWorkflows();
     

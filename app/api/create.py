@@ -421,6 +421,198 @@ def get_execution_queue():
         }), 500
 
 
+@bp.route('/execution-outputs/<prompt_id>', methods=['POST'])
+def get_execution_outputs(prompt_id):
+    """
+    Get output files for a specific execution
+    
+    Expected POST body:
+    {
+        "ssh_connection": "ssh -p 40538 root@198.53.64.194"
+    }
+    
+    Returns:
+        JSON with list of output files
+    """
+    data = request.get_json()
+    ssh_connection = data.get('ssh_connection')
+    
+    if not ssh_connection:
+        return jsonify({
+            'success': False,
+            'message': 'ssh_connection is required'
+        }), 400
+    
+    try:
+        # Parse SSH connection details
+        host, port = _parse_ssh_connection(ssh_connection)
+        
+        # Get outputs from ComfyUI history
+        outputs = _get_execution_outputs(prompt_id, ssh_connection, host, port)
+        
+        return jsonify({
+            'success': True,
+            'outputs': outputs
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching execution outputs: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Failed to fetch execution outputs: {str(e)}'
+        }), 500
+
+
+@bp.route('/download-output', methods=['POST'])
+def download_output():
+    """
+    Download an output file from remote instance
+    
+    Expected POST body:
+    {
+        "ssh_connection": "ssh -p 40538 root@198.53.64.194",
+        "file_path": "/workspace/ComfyUI/output/...",
+        "filename": "output_file.mp4"
+    }
+    
+    Returns:
+        File download or JSON error
+    """
+    data = request.get_json()
+    ssh_connection = data.get('ssh_connection')
+    file_path = data.get('file_path')
+    filename = data.get('filename')
+    
+    if not ssh_connection:
+        return jsonify({
+            'success': False,
+            'message': 'ssh_connection is required'
+        }), 400
+    
+    if not file_path or not filename:
+        return jsonify({
+            'success': False,
+            'message': 'file_path and filename are required'
+        }), 400
+    
+    try:
+        # Parse SSH connection details
+        host, port = _parse_ssh_connection(ssh_connection)
+        
+        # Download file from remote
+        local_path = _download_output_file(file_path, filename, ssh_connection, host, port)
+        
+        # Determine MIME type
+        import mimetypes
+        mime_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        
+        # Send file
+        from flask import send_file
+        return send_file(
+            local_path,
+            mimetype=mime_type,
+            as_attachment=False,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"Error downloading output file: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Failed to download output file: {str(e)}'
+        }), 500
+
+
+def _get_execution_outputs(prompt_id, ssh_connection, host, port):
+    """
+    Get output files for a specific execution from ComfyUI history
+    
+    Returns list of output file objects with filename, path, type, etc.
+    """
+    import json
+    
+    # Get history for specific prompt_id
+    history_cmd = [
+        'ssh',
+        '-p', port,
+        '-o', 'StrictHostKeyChecking=yes',
+        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+        f'root@{host}',
+        f'curl -s http://localhost:18188/history/{prompt_id}'
+    ]
+    
+    result = subprocess.run(history_cmd, capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to get execution history: {result.stderr}")
+    
+    # Parse history response
+    lines = result.stdout.split('\n')
+    json_lines = [line for line in lines if line.strip().startswith('{')]
+    
+    if not json_lines:
+        raise ValueError(f"No JSON response found in history output")
+    
+    history_data = json.loads(json_lines[0].strip())
+    
+    # Extract outputs from history
+    outputs = []
+    if prompt_id in history_data:
+        prompt_outputs = history_data[prompt_id].get('outputs', {})
+        
+        for node_id, node_outputs in prompt_outputs.items():
+            # Check for different output types (images, gifs, videos)
+            for output_type in ['images', 'gifs', 'videos']:
+                if output_type in node_outputs:
+                    for output_file in node_outputs[output_type]:
+                        outputs.append({
+                            'node_id': node_id,
+                            'filename': output_file.get('filename'),
+                            'subfolder': output_file.get('subfolder', ''),
+                            'type': output_file.get('type', 'output'),
+                            'format': output_file.get('format', ''),
+                            'fullpath': output_file.get('fullpath', ''),
+                            'output_type': output_type
+                        })
+    
+    return outputs
+
+
+def _download_output_file(file_path, filename, ssh_connection, host, port):
+    """
+    Download an output file from remote instance to local temp directory
+    
+    Returns: local path to downloaded file
+    """
+    import os
+    
+    # Create downloads directory if it doesn't exist
+    downloads_dir = Path('/app/downloads/outputs')
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique local filename to avoid conflicts
+    local_filename = f"{uuid.uuid4().hex[:8]}_{filename}"
+    local_path = downloads_dir / local_filename
+    
+    # Download file via SCP
+    scp_cmd = [
+        'scp',
+        '-P', port,
+        '-o', 'StrictHostKeyChecking=yes',
+        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+        f'root@{host}:{file_path}',
+        str(local_path)
+    ]
+    
+    result = subprocess.run(scp_cmd, capture_output=True, text=True)
+    
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to download file: {result.stderr}")
+    
+    logger.info(f"Downloaded output file: {filename} -> {local_path}")
+    return str(local_path)
+
+
 def _get_comfyui_queue_status(ssh_connection, host, port):
     """
     Get ComfyUI queue status and recent execution history
