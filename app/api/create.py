@@ -385,14 +385,19 @@ def _queue_workflow_on_comfyui(workflow_path, ssh_connection, host, port):
     
     Returns: ComfyUI prompt_id
     """
+    # Create the API payload by wrapping the workflow in a "prompt" key
+    # ComfyUI expects: {"prompt": {...workflow nodes...}, "client_id": "optional"}
+    payload_cmd = f'jq -c \'. | {{prompt: .}}\' {workflow_path}'
+    
     # Execute curl command on remote to queue workflow
+    # Use bash -c to handle the pipeline properly and filter out welcome message
     queue_cmd = [
         'ssh',
         '-p', port,
         '-o', 'StrictHostKeyChecking=yes',
         '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
         f'root@{host}',
-        f'curl -s -X POST http://localhost:8188/prompt -H "Content-Type: application/json" -d @{workflow_path}'
+        f'bash -c "{payload_cmd} | curl -s -X POST http://localhost:8188/prompt -H \'Content-Type: application/json\' -d @-" 2>&1 | grep -v "Welcome to vast.ai" | grep -v "Have fun"'
     ]
     
     result = subprocess.run(queue_cmd, capture_output=True, text=True)
@@ -403,12 +408,19 @@ def _queue_workflow_on_comfyui(workflow_path, ssh_connection, host, port):
     # Parse response to get prompt_id
     import json
     try:
-        response = json.loads(result.stdout)
+        # Filter out any remaining vast.ai messages
+        response_text = result.stdout.strip()
+        # Find the first '{' to get the JSON part
+        json_start = response_text.find('{')
+        if json_start > 0:
+            response_text = response_text[json_start:]
+        
+        response = json.loads(response_text)
         prompt_id = response.get('prompt_id')
         if not prompt_id:
-            raise ValueError("No prompt_id in ComfyUI response")
+            raise ValueError(f"No prompt_id in ComfyUI response: {response}")
         logger.info(f"Queued workflow with prompt_id: {prompt_id}")
         return prompt_id
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, ValueError) as e:
         logger.error(f"Failed to parse ComfyUI response: {result.stdout}")
         raise RuntimeError(f"Invalid response from ComfyUI: {str(e)}")
