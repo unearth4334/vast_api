@@ -164,10 +164,17 @@ class WorkflowValidator:
     def _validate_image(self, config: InputConfig, value: Any, result: ValidationResult):
         """Validate image input"""
         if not isinstance(value, str):
-            result.add_error(config.id, f'{config.label} must be a string (filename)')
+            result.add_error(config.id, f'{config.label} must be a string (filename or base64)')
             return
         
-        # Check if filename has valid extension
+        # Allow base64 data URLs (from web UI uploads)
+        if value.startswith('data:image/'):
+            # Validate it's a proper data URL format
+            if not ';base64,' in value:
+                result.add_error(config.id, f'{config.label} has invalid base64 format')
+            return
+        
+        # Check if filename has valid extension (for file paths)
         if config.accept:
             valid_extensions = [ext.replace('image/', '.') for ext in config.accept.split(',')]
             if not any(value.lower().endswith(ext) for ext in valid_extensions):
