@@ -441,7 +441,8 @@ function handleImageUpload(fieldId, input) {
         clearBtn.className = 'image-upload-clear';
         clearBtn.title = 'Remove';
         clearBtn.textContent = '✕';
-        clearBtn.addEventListener('click', function() {
+        clearBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent triggering container click
             clearImageUpload(fieldId);
         });
         
@@ -449,6 +450,15 @@ function handleImageUpload(fieldId, input) {
         container.appendChild(img);
         container.appendChild(clearBtn);
         container.classList.add('has-image');
+        
+        // Re-add click handler to container to allow changing the image
+        container.onclick = function(e) {
+            // Don't trigger if clicking the clear button
+            if (e.target === clearBtn || e.target.closest('.image-upload-clear')) {
+                return;
+            }
+            fileInput.click();
+        };
         
         // Store base64 data
         updateFormValue(fieldId, e.target.result);
@@ -470,6 +480,11 @@ function clearImageUpload(fieldId) {
         <div class="image-upload-text">Click or drag to upload image</div>
     `;
     container.classList.remove('has-image');
+    
+    // Re-add click handler to container
+    container.onclick = function() {
+        document.getElementById(`create-field-${fieldId}`).click();
+    };
     
     updateFormValue(fieldId, null);
 }
