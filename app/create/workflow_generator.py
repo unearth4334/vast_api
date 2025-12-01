@@ -106,7 +106,7 @@ class WorkflowGenerator:
             self._apply_text_input(workflow, input_config, value)
         elif input_type == 'slider':
             self._apply_slider_input(workflow, input_config, value)
-        elif input_type == 'toggle':
+        elif input_type in ['toggle', 'checkbox']:
             self._apply_toggle_input(workflow, input_config, value)
         elif input_type == 'image':
             self._apply_image_input(workflow, input_config, value)
@@ -167,8 +167,21 @@ class WorkflowGenerator:
             return
         
         bool_value = bool(value) if value is not None else False
-        workflow[config.node_id]['inputs'][config.field] = bool_value
-        logger.debug(f"Applied toggle input {config.id} to node {config.node_id}.{config.field} = {bool_value}")
+        
+        # Special handling for Florence2 captioning (node 451, field string_a)
+        if config.id == 'enable_florence_caption' and config.node_id == '451':
+            if bool_value:
+                # Enable Florence2: connect to node 478 output
+                workflow[config.node_id]['inputs'][config.field] = ["478", 0]
+                logger.debug(f"Enabled Florence2 captioning: connected node 451.string_a to [478, 0]")
+            else:
+                # Disable Florence2: set to empty string
+                workflow[config.node_id]['inputs'][config.field] = ""
+                logger.debug(f"Disabled Florence2 captioning: set node 451.string_a to empty string")
+        else:
+            # Standard boolean toggle
+            workflow[config.node_id]['inputs'][config.field] = bool_value
+            logger.debug(f"Applied toggle input {config.id} to node {config.node_id}.{config.field} = {bool_value}")
     
     def _apply_image_input(self, workflow: dict, config: InputConfig, value: Any):
         """Apply image input to workflow"""

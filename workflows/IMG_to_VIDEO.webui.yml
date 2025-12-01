@@ -60,13 +60,22 @@ inputs:
     accept: "image/png,image/jpeg,image/webp"
     max_size_mb: 10
 
+  - id: "enable_florence_caption"
+    section: "basic"
+    node_id: "451"
+    field: "string_a"
+    type: "checkbox"
+    label: "Auto-Caption from Image"
+    description: "Use Florence2 AI to automatically generate a description of the image"
+    default: false
+
   - id: "positive_prompt"
     section: "basic"
     node_id: "408"
     field: "value"
     type: "textarea"
     label: "Positive Prompt"
-    description: "Describe the motion and style you want in the video"
+    description: "Describe the motion and style you want in the video. If auto-caption is enabled, this will be appended to the generated caption."
     required: true
     default: "The subject moves naturally with smooth cinematic motion, high quality, detailed"
     placeholder: "Describe the desired motion and style..."
@@ -235,8 +244,8 @@ inputs:
     description: "Diffusion model pair for generation. Click refresh to scan instance for available models."
     required: true
     model_type: "diffusion_models"
-    default_high: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors"
-    default_low: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
+    default_high: "Wan-2.2_ComfyUI_repackaged/wan2.2_t2v_high_noise_14B_fp16.safetensors"
+    default_low: "Wan-2.2_ComfyUI_repackaged/wan2.2_t2v_low_noise_14B_fp16.safetensors"
 
   - id: "loras"
     section: "models"
@@ -476,6 +485,10 @@ requirements:
     - name: "ComfyUI-Easy-Use"
       repo: "https://github.com/yolain/ComfyUI-Easy-Use"
       required: true
+    - name: "ComfyUI-Florence2"
+      repo: "https://github.com/kijai/ComfyUI-Florence2"
+      required: false
+      note: "Required only if using auto-caption feature"
 
   vram: "24GB minimum (48GB recommended for longer videos)"
   compute: "NVIDIA GPU with CUDA support"

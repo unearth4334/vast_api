@@ -1,7 +1,7 @@
 {
   "73": {
     "inputs": {
-      "noise_seed": 495100899429947
+      "noise_seed": 913372404583577
     },
     "class_type": "RandomNoise",
     "_meta": {
@@ -46,7 +46,7 @@
   },
   "88": {
     "inputs": {
-      "image": "00262-3870373875.png"
+      "image": "upload_827e9bba.jpeg"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -80,7 +80,7 @@
         0
       ],
       "loop_count": 0,
-      "filename_prefix": "WAN/2025-11-21/134109_OG",
+      "filename_prefix": "WAN/2025-12-01/114657_OG",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -145,7 +145,7 @@
   },
   "408": {
     "inputs": {
-      "value": "cinematic video still of a beautiful young woman, (eyes half-closed:1.3), (soft, hazy, trance-like gaze:1.2), (not fully closed eyes: -0.5), deeply absorbed in slow R&B music, (gentle, soulful sway:1.2), subtle hip and body movements, graceful and fluid arm gestures, (hands expressively reaching or gesturing:1.3), fingers often spread or curved, head lightly tilted, (expression of profound bliss and trance:1.2), (slow cinematic camera push in:1.1), (subtle dolly zoom on the subject:1.2), bathed in soft ambient light, dreamy atmosphere, shallow depth of field, high detail, masterpiece, 8k, best quality."
+      "value": " The young woman turns towards the camera"
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -270,7 +270,7 @@
         0
       ],
       "loop_count": 0,
-      "filename_prefix": "WAN/2025-11-21/134109_IN",
+      "filename_prefix": "WAN/2025-12-01/114657_IN",
       "format": "video/h264-mp4",
       "pix_fmt": "yuv420p",
       "crf": 19,
@@ -677,7 +677,7 @@
   },
   "479": {
     "inputs": {
-      "text": "",
+      "text": "Anime-style video of a cute, young girl with white hair and green eyes, wearing a pink hoodie with a white cat face on the front. She has a pink cat tail and cat ears on her head. She is sitting on the grass, looking at the viewer with a gentle smile. The background is dark with small lights, creating a cozy atmosphere. The girl has a small amount of freckles on her cheeks. The video is highly detailed and vibrant, with a soft, dreamy quality. The young woman turns towards the camera",
       "anything": [
         "451",
         0
@@ -1007,7 +1007,7 @@
   },
   "522": {
     "inputs": {
-      "unet_name": "Wan-2.2_ComfyUI_repackaged/wan2.2_t2v_high_noise_14B_fp16.safetensors",
+      "unet_name": "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -1017,7 +1017,7 @@
   },
   "523": {
     "inputs": {
-      "unet_name": "Wan-2.2_ComfyUI_repackaged/wan2.2_t2v_low_noise_14B_fp16.safetensors",
+      "unet_name": "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
