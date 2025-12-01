@@ -257,8 +257,16 @@ class WorkflowValidator:
                 result.add_error(config.id, f'{config.label} is required')
             return
         
+        # Accept both string (default from YAML) and object (from component selection)
+        if isinstance(value, str):
+            # String value - this is a model path (e.g., from default in YAML)
+            if not value:
+                if config.required:
+                    result.add_error(config.id, f'{config.label} is required')
+            return
+        
         if not isinstance(value, dict):
-            result.add_error(config.id, f'{config.label} must be an object')
+            result.add_error(config.id, f'{config.label} must be an object or string')
             return
         
         if 'path' not in value or not value['path']:
