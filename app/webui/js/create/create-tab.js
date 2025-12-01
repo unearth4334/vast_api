@@ -1008,10 +1008,14 @@ async function exportWorkflowJSON() {
         } else {
             // Log detailed validation errors for debugging
             if (data.errors && Array.isArray(data.errors)) {
-                console.error('Validation errors:', data.errors);
-                const errorMessages = data.errors.map(e => `${e.field}: ${e.message}`).join('\n');
+                console.error('Validation errors:');
+                data.errors.forEach(err => {
+                    console.error(`  - ${err.field}: ${err.message}`);
+                });
+                const errorMessages = data.errors.map(e => `• ${e.field}: ${e.message}`).join('\n');
                 showCreateError(`Validation failed:\n${errorMessages}`);
             } else {
+                console.error('Error response:', data);
                 showCreateError(data.message || 'Failed to generate workflow JSON');
             }
         }
