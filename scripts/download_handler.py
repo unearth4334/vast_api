@@ -226,23 +226,19 @@ def run_command_ssh(ssh_connection: str, command: str, progress_callback) -> tup
         process = subprocess.Popen(
             ssh_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Redirect stderr to stdout so we get all output
             text=True,
             bufsize=1
         )
         
-        stderr_lines = []
-        
-        # Read stdout
+        # Read all output (stdout + stderr merged)
         for line in process.stdout:
             progress_callback(line.rstrip())
         
-        # Read stderr
-        stderr_output = process.stderr.read()
-        
         return_code = process.wait()
         
-        return return_code, stderr_output
+        # Return empty stderr since we merged it with stdout
+        return return_code, ""
     except Exception as e:
         print(f"Error running SSH command: {e}")
         return -1, str(e)
