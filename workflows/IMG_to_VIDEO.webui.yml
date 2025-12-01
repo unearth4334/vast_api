@@ -95,7 +95,10 @@ inputs:
 
   - id: "seed"
     section: "basic"
-    node_id: "73"
+    node_ids:
+      - "73"   # RandomNoise node
+      - "465"  # Sampler low
+      - "466"  # Sampler high
     field: "noise_seed"
     type: "seed"
     label: "Seed"

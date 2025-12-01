@@ -411,10 +411,7 @@
   "465": {
     "inputs": {
       "add_noise": "disable",
-      "noise_seed": [
-        "73",
-        0
-      ],
+      "noise_seed": 495100899429947,
       "steps": [
         "82",
         0
@@ -456,10 +453,7 @@
   "466": {
     "inputs": {
       "add_noise": "enable",
-      "noise_seed": [
-        "73",
-        0
-      ],
+      "noise_seed": 495100899429947,
       "steps": [
         "82",
         0
