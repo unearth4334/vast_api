@@ -390,14 +390,13 @@ def _queue_workflow_on_comfyui(workflow_path, ssh_connection, host, port):
     payload_cmd = f'jq -c \'. | {{prompt: .}}\' {workflow_path}'
     
     # Execute curl command on remote to queue workflow
-    # Use bash -c to handle the pipeline properly and filter out welcome message
     queue_cmd = [
         'ssh',
         '-p', port,
         '-o', 'StrictHostKeyChecking=yes',
         '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
         f'root@{host}',
-        f'bash -c "{payload_cmd} | curl -s -X POST http://localhost:8188/prompt -H \'Content-Type: application/json\' -d @-" 2>&1 | grep -v "Welcome to vast.ai" | grep -v "Have fun"'
+        f'bash -c "{payload_cmd} | curl -s -X POST http://localhost:8188/prompt -H \'Content-Type: application/json\' -d @-"'
     ]
     
     result = subprocess.run(queue_cmd, capture_output=True, text=True)
@@ -408,17 +407,24 @@ def _queue_workflow_on_comfyui(workflow_path, ssh_connection, host, port):
     # Parse response to get prompt_id
     import json
     try:
-        # Filter out any remaining vast.ai messages
-        response_text = result.stdout.strip()
-        # Find the first '{' to get the JSON part
-        json_start = response_text.find('{')
-        if json_start > 0:
-            response_text = response_text[json_start:]
+        # Filter out vast.ai welcome message from stdout
+        lines = result.stdout.split('\n')
+        # Find the JSON response (starts with '{')
+        json_lines = [line for line in lines if line.strip().startswith('{')]
         
+        if not json_lines:
+            raise ValueError(f"No JSON response found in output: {result.stdout}")
+        
+        response_text = json_lines[0].strip()
         response = json.loads(response_text)
+        
         prompt_id = response.get('prompt_id')
         if not prompt_id:
+            # Check if there's an error in the response
+            if 'error' in response:
+                raise ValueError(f"ComfyUI error: {response.get('error')}")
             raise ValueError(f"No prompt_id in ComfyUI response: {response}")
+        
         logger.info(f"Queued workflow with prompt_id: {prompt_id}")
         return prompt_id
     except (json.JSONDecodeError, ValueError) as e:
