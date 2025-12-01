@@ -967,6 +967,9 @@ async function exportWorkflowJSON() {
     }
 
     try {
+        // Log form values for debugging
+        console.log('Form values being sent:', CreateTabState.formValues);
+        
         // Generate the workflow JSON with current form values
         const response = await fetch('/create/generate-workflow', {
             method: 'POST',
