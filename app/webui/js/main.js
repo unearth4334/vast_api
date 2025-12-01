@@ -460,6 +460,8 @@ function useInstanceForCreate(sshConnection, instanceId) {
     
     if (createInput) {
         createInput.value = sshConnection;
+        // Trigger input event to update ExecutionQueue and other listeners
+        createInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     
     // Also sync to other tabs

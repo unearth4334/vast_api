@@ -37,6 +37,15 @@ async function initCreateTab() {
     // Set up event listeners
     setupCreateTabEventListeners();
     
+    // Check if SSH connection already exists and initialize ExecutionQueue
+    const createSshInput = document.getElementById('createSshConnectionString');
+    if (createSshInput?.value) {
+        CreateTabState.sshConnection = createSshInput.value;
+        if (CreateTabState.executionQueue) {
+            CreateTabState.executionQueue.setSshConnection(createSshInput.value);
+        }
+    }
+    
     console.log('✅ Create tab initialized');
 }
 
