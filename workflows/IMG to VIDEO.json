@@ -550,7 +550,7 @@
     "inputs": {
       "output_type": "int",
       "*": [
-        "497",
+        "73",
         0
       ]
     },
@@ -824,23 +824,6 @@
     "class_type": "mxSlider",
     "_meta": {
       "title": "Frame rate"
-    }
-  },
-  "497": {
-    "inputs": {
-      "id": 0,
-      "widget_name": "noise_seed",
-      "return_all": false,
-      "node_title": "",
-      "allowed_float_decimals": 2,
-      "any_input": [
-        "73",
-        0
-      ]
-    },
-    "class_type": "WidgetToString",
-    "_meta": {
-      "title": "Widget To String"
     }
   },
   "500": {
