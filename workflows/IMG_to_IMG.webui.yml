@@ -1,0 +1,497 @@
+# IMG to IMG Workflow - WebUI Wrapper v2.0
+# Image-to-image transformation with face enhancement and upscaling
+# Changes to this file will be reflected when the workflow is reloaded in the Create tab
+
+name: "IMG to IMG"
+description: "Transform images with AI-powered enhancement, face detailing, and intelligent upscaling using Illustrious SDXL"
+version: "2.0.0"
+category: "image"
+tags:
+  - image-to-image
+  - sdxl
+  - illustrious
+  - face-detailing
+  - upscaling
+
+# Workflow JSON file reference (relative to this file)
+workflow_file: "IMG to IMG.json"
+
+# Thumbnail/preview image (optional)
+thumbnail: null
+
+# Estimated VRAM requirement
+vram_estimate: "12GB"
+
+# Estimated generation time (in seconds, approximate)
+time_estimate:
+  min: 30
+  max: 180
+  note: "Varies based on image size and upscale settings"
+
+# UI Layout Configuration - Section-based layout for organized UI
+layout:
+  sections:
+    - id: "basic"
+      title: "📝 Basic Settings"
+      collapsed: false
+      
+    - id: "generation"
+      title: "⚙️ Generation Parameters"
+      collapsed: false
+      
+    - id: "models"
+      title: "🎯 Model Selection"
+      collapsed: false
+      
+    - id: "upscale"
+      title: "🔍 Upscaling Settings"
+      collapsed: false
+      
+    - id: "enhancement"
+      title: "✨ Face Enhancement"
+      collapsed: true
+
+# Input fields organized by section
+inputs:
+  # === BASIC SETTINGS ===
+  - id: "input_image"
+    section: "basic"
+    node_id: "202"
+    field: "image"
+    type: "image"
+    label: "Input Image"
+    description: "Source image to transform. Will be resized to fit the selected dimensions."
+    required: true
+    accept: "image/png,image/jpeg,image/webp"
+    max_size_mb: 10
+
+  - id: "positive_prompt"
+    section: "basic"
+    node_id: "31"
+    field: "string"
+    type: "textarea"
+    label: "Positive Prompt"
+    description: "Describe the desired style, features, and details for the transformation"
+    required: true
+    default: "score_9, score_8_up, score_7_up, BREAK, 1 women, 22 years old beauty, face focus, gothic dress, ribbons, ruffles, blonde, curls, emotional, eye view, lying, roses, from above, Detailed, intimate, clear, personal, highly contrasted, excellent composition, advanced cinematic perfect light, highly color focused, dynamic."
+    placeholder: "Describe the desired style and features..."
+    max_length: 2000
+    rows: 4
+
+  - id: "negative_prompt"
+    section: "basic"
+    node_id: "82"
+    field: "string"
+    type: "textarea"
+    label: "Negative Prompt"
+    description: "What to avoid in the generation"
+    required: false
+    default: "worst quality, bad quality, low quality, anatomical nonsense, bad anatomy, interlocked fingers, extra fingers, text, watermark,"
+    placeholder: "Describe what to avoid..."
+    rows: 2
+
+  - id: "seed"
+    section: "basic"
+    node_id: "47"
+    field: "seed"
+    type: "seed"
+    label: "Seed"
+    description: "Random seed for reproducibility (-1 for random)"
+    randomize_button: true
+    default: -1
+    control_after_generate: "randomize"
+
+  # === GENERATION PARAMETERS ===
+  - id: "image_width"
+    section: "generation"
+    node_id: "32"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Width"
+    description: "Target width in pixels (input will be resized)"
+    min: 512
+    max: 1920
+    step: 64
+    default: 896
+    unit: "px"
+
+  - id: "image_height"
+    section: "generation"
+    node_id: "32"
+    fields:
+      - "Yi"
+      - "Yf"
+    type: "slider"
+    label: "Height"
+    description: "Target height in pixels (input will be resized)"
+    min: 512
+    max: 1920
+    step: 64
+    default: 1152
+    unit: "px"
+
+  - id: "denoise"
+    section: "generation"
+    node_id: "203"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Denoise Strength"
+    description: "How much to change the image. Lower = closer to original, Higher = more creative freedom"
+    min: 0.0
+    max: 1.0
+    step: 0.05
+    default: 0.5
+
+  - id: "steps"
+    section: "generation"
+    node_id: "183"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Steps"
+    description: "Denoising steps. Higher = better quality but slower."
+    min: 20
+    max: 60
+    step: 5
+    default: 40
+
+  - id: "cfg"
+    section: "generation"
+    node_id: "25"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "CFG Scale (Guidance)"
+    description: "Prompt adherence strength. Higher = more prompt influence."
+    min: 1.0
+    max: 15.0
+    step: 0.5
+    default: 5.0
+
+  - id: "sampler"
+    section: "generation"
+    node_id: "177"
+    field: "sampler_name"
+    type: "select"
+    label: "Sampler"
+    description: "Sampling algorithm"
+    required: true
+    default: "dpmpp_2m"
+    options:
+      - value: "euler"
+        label: "Euler"
+      - value: "euler_ancestral"
+        label: "Euler Ancestral"
+      - value: "heun"
+        label: "Heun"
+      - value: "dpm_2"
+        label: "DPM 2"
+      - value: "dpmpp_2m"
+        label: "DPM++ 2M"
+      - value: "dpmpp_sde"
+        label: "DPM++ SDE"
+      - value: "dpmpp_2s_ancestral"
+        label: "DPM++ 2S Ancestral"
+      - value: "uni_pc"
+        label: "UniPC"
+
+  - id: "scheduler"
+    section: "generation"
+    node_id: "181"
+    field: "scheduler"
+    type: "select"
+    label: "Scheduler"
+    description: "Noise schedule"
+    required: true
+    default: "simple"
+    options:
+      - value: "simple"
+        label: "Simple"
+      - value: "normal"
+        label: "Normal"
+      - value: "karras"
+        label: "Karras"
+      - value: "exponential"
+        label: "Exponential"
+      - value: "sgm_uniform"
+        label: "SGM Uniform"
+
+  # === MODEL SELECTION ===
+  - id: "checkpoint"
+    section: "models"
+    node_id: "176"
+    field: "ckpt_name"
+    type: "single_model"
+    label: "Checkpoint Model"
+    description: "Base SDXL model. Click refresh to scan instance for available models."
+    required: true
+    model_type: "checkpoints"
+    default: "WAI-illustrious-SDXL_v15.safetensors"
+
+  - id: "lora"
+    section: "models"
+    node_id: "40"
+    field: "lora_1.lora"
+    type: "single_model"
+    label: "LoRA"
+    description: "Optional LoRA for style control"
+    required: false
+    model_type: "loras"
+    default: "UmeSky_Illustrious.safetensors"
+
+  - id: "lora_strength"
+    section: "models"
+    node_id: "40"
+    field: "lora_1.strength"
+    type: "slider"
+    label: "LoRA Strength"
+    description: "Influence of the LoRA model"
+    min: 0.0
+    max: 1.5
+    step: 0.05
+    default: 0.75
+
+  - id: "upscale_model"
+    section: "models"
+    node_id: "200"
+    field: "model_name"
+    type: "single_model"
+    label: "Upscale Model"
+    description: "Super-resolution model for upscaling"
+    required: true
+    model_type: "upscale_models"
+    default: "4x_NMKD-Siax_200k.pth"
+
+  # === UPSCALING SETTINGS ===
+  - id: "upscale_ratio"
+    section: "upscale"
+    node_id: "55"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Upscale Ratio"
+    description: "Scale factor for final upscaling"
+    min: 1.0
+    max: 4.0
+    step: 0.25
+    default: 2.0
+
+  - id: "upscale_steps"
+    section: "upscale"
+    node_id: "199"
+    field: "steps"
+    type: "slider"
+    label: "Upscale Steps"
+    description: "Denoising steps for upscaling refinement"
+    min: 5
+    max: 30
+    step: 1
+    default: 10
+
+  - id: "upscale_cfg"
+    section: "upscale"
+    node_id: "199"
+    field: "cfg"
+    type: "slider"
+    label: "Upscale CFG"
+    description: "CFG scale for upscaling pass"
+    min: 0.5
+    max: 5.0
+    step: 0.1
+    default: 1.0
+
+  - id: "upscale_denoise"
+    section: "upscale"
+    node_id: "199"
+    field: "denoise"
+    type: "slider"
+    label: "Upscale Denoise"
+    description: "Denoise strength for upscaling refinement"
+    min: 0.1
+    max: 0.6
+    step: 0.05
+    default: 0.35
+
+  # === FACE ENHANCEMENT ===
+  - id: "face_detailer_enabled"
+    section: "enhancement"
+    type: "checkbox"
+    label: "Enable Face Detailing"
+    description: "Automatically detect and enhance faces in the image"
+    default: true
+    note: "Controls whether FaceDetailer node processes the image"
+
+  - id: "face_detection_threshold"
+    section: "enhancement"
+    node_id: "169:166"
+    field: "bbox_threshold"
+    type: "slider"
+    label: "Face Detection Threshold"
+    description: "Sensitivity for face detection (lower = more sensitive)"
+    min: 0.3
+    max: 0.9
+    step: 0.05
+    default: 0.5
+    depends_on:
+      field: "face_detailer_enabled"
+      value: true
+
+  - id: "face_denoise"
+    section: "enhancement"
+    node_id: "169:166"
+    field: "denoise"
+    type: "slider"
+    label: "Face Denoise"
+    description: "Denoise strength for face enhancement"
+    min: 0.3
+    max: 0.9
+    step: 0.05
+    default: 0.65
+    depends_on:
+      field: "face_detailer_enabled"
+      value: true
+
+  - id: "face_detail_steps"
+    section: "enhancement"
+    node_id: "169:166"
+    field: "steps"
+    type: "reference"
+    label: "Face Detail Steps"
+    description: "Uses same steps as main generation"
+    reference: "steps"
+    depends_on:
+      field: "face_detailer_enabled"
+      value: true
+
+# Output configuration
+outputs:
+  - id: "original_output"
+    node_id: "184"
+    type: "image"
+    format: "png"
+    label: "Original Size Output"
+    description: "Enhanced image at target resolution with face detailing"
+
+  - id: "upscaled_output"
+    node_id: "191"
+    type: "image"
+    format: "png"
+    label: "Upscaled Output"
+    description: "Final upscaled and refined image"
+
+  - id: "comparison"
+    node_id: "36"
+    type: "image"
+    format: "comparison"
+    label: "Before/After Comparison"
+    description: "Side-by-side comparison of original and upscaled results"
+
+# Model requirements (for validation and display)
+requirements:
+  models:
+    - type: "checkpoint"
+      name: "WAI Illustrious SDXL"
+      path: "checkpoints/WAI-illustrious-SDXL_v15.safetensors"
+      size_gb: 6.5
+      note: "Illustrious-based SDXL model"
+    - type: "lora"
+      name: "UmeSky Illustrious"
+      path: "loras/UmeSky_Illustrious.safetensors"
+      size_gb: 0.14
+      required: false
+    - type: "upscale"
+      name: "NMKD Siax 4x"
+      path: "upscale_models/4x_NMKD-Siax_200k.pth"
+      size_gb: 0.07
+    - type: "detector"
+      name: "Face YOLO v8"
+      path: "ultralytics/bbox/face_yolov8m.pt"
+      size_gb: 0.05
+    - type: "detector"
+      name: "Person Segmentation YOLO v8"
+      path: "ultralytics/segm/person_yolov8m-seg.pt"
+      size_gb: 0.05
+    - type: "sam"
+      name: "SAM ViT-B"
+      path: "sams/sam_vit_b_01ec64.pth"
+      size_gb: 0.37
+
+  custom_nodes:
+    - name: "ComfyUI-KJNodes"
+      repo: "https://github.com/kijai/ComfyUI-KJNodes"
+      required: true
+      note: "For image resizing"
+    - name: "rgthree-comfy"
+      repo: "https://github.com/rgthree/rgthree-comfy"
+      required: true
+      note: "For Power Lora Loader and Image Comparer"
+    - name: "ComfyUI-mxToolkit"
+      repo: "https://github.com/Intersection98/ComfyUI_mxToolkit"
+      required: true
+      note: "For mxSlider and mxSlider2D nodes"
+    - name: "comfy-image-saver"
+      repo: "https://github.com/girish946/comfy-image-saver"
+      required: true
+      note: "For Image Saver nodes and metadata handling"
+    - name: "ComfyUI-Impact-Pack"
+      repo: "https://github.com/ltdrdata/ComfyUI-Impact-Pack"
+      required: true
+      note: "For FaceDetailer and detection models"
+    - name: "ComfyUI_UltimateSDUpscale"
+      repo: "https://github.com/ssitu/ComfyUI_UltimateSDUpscale"
+      required: true
+      note: "For tiled upscaling"
+
+  vram: "12GB minimum (16GB recommended for high resolutions)"
+  compute: "NVIDIA GPU with CUDA support"
+
+# Presets for quick configuration
+presets:
+  - name: "Quick Enhancement"
+    description: "Fast transformation with minimal changes"
+    values:
+      denoise: 0.3
+      steps: 30
+      cfg: 5.0
+      upscale_ratio: 1.5
+      upscale_steps: 8
+      face_detailer_enabled: true
+
+  - name: "Moderate Transformation"
+    description: "Balanced transformation preserving most features"
+    values:
+      denoise: 0.5
+      steps: 40
+      cfg: 5.0
+      upscale_ratio: 2.0
+      upscale_steps: 10
+      face_detailer_enabled: true
+
+  - name: "Creative Reimagining"
+    description: "Strong transformation with significant changes"
+    values:
+      denoise: 0.75
+      steps: 50
+      cfg: 7.0
+      upscale_ratio: 2.0
+      upscale_steps: 15
+      face_detailer_enabled: true
+
+  - name: "Maximum Quality"
+    description: "Highest quality settings, slower generation"
+    values:
+      denoise: 0.5
+      steps: 60
+      cfg: 6.0
+      upscale_ratio: 3.0
+      upscale_steps: 20
+      upscale_denoise: 0.4
+      face_detailer_enabled: true
+      face_denoise: 0.75
