@@ -373,7 +373,10 @@ export class ExecutionQueue {
             
             return `
                 <div class="execution-queue-output-item ${downloadedClass}" 
-                     onclick="window.executionQueueInstance?.previewOutput('${this.escapeHtml(promptId)}', ${this.escapeHtml(JSON.stringify(output))})">
+                     data-prompt-id="${this.escapeHtml(promptId)}"
+                     data-fullpath="${this.escapeHtml(output.fullpath)}"
+                     data-filename="${this.escapeHtml(output.filename)}"
+                     data-format="${this.escapeHtml(output.format || output.output_type)}">
                     <span class="execution-queue-output-icon">${this.getOutputIcon(output.output_type)}</span>
                     <span class="execution-queue-output-name">${this.escapeHtml(output.filename)}</span>
                     ${isDownloaded ? '<span class="execution-queue-output-viewed">✓</span>' : ''}
@@ -390,6 +393,19 @@ export class ExecutionQueue {
                 ${outputsHtml}
             </div>
         `;
+
+        // Attach click event listeners to output items
+        const outputItems = content.querySelectorAll('.execution-queue-output-item');
+        outputItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const outputData = {
+                    fullpath: item.dataset.fullpath,
+                    filename: item.dataset.filename,
+                    format: item.dataset.format
+                };
+                this.previewOutput(item.dataset.promptId, outputData);
+            });
+        });
     }
 
     /**
