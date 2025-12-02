@@ -39,7 +39,16 @@ async function initCreateTab() {
     }
     
     // Load workflows
-    await loadWorkflows();
+    try {
+        await loadWorkflows();
+        console.log('✅ Workflows loaded successfully');
+    } catch (error) {
+        console.error('❌ Failed to load workflows:', error);
+        const container = document.getElementById('create-workflows-grid');
+        if (container) {
+            container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">❌</div><div class="create-empty-state-title">Initialization Error</div><div class="create-empty-state-description">${error.message}</div></div>`;
+        }
+    }
     
     // Set up event listeners
     setupCreateTabEventListeners();
@@ -60,23 +69,32 @@ async function initCreateTab() {
  * Load available workflows from the API
  */
 async function loadWorkflows() {
+    console.log('📋 Loading workflows from API...');
     const container = document.getElementById('create-workflows-grid');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ create-workflows-grid container not found');
+        return;
+    }
     
     container.innerHTML = '<div class="create-empty-state"><div class="create-empty-state-icon">⏳</div><div class="create-empty-state-description">Loading workflows...</div></div>';
     
     try {
+        console.log('📡 Fetching /create/workflows/list...');
         const response = await fetch('/create/workflows/list');
+        console.log('📡 Response status:', response.status);
         const data = await response.json();
+        console.log('📋 Workflows data:', data);
         
         if (data.success && data.workflows) {
+            console.log(`✅ Loaded ${data.workflows.length} workflow(s)`);
             CreateTabState.workflows = data.workflows;
             renderWorkflowGrid(data.workflows);
         } else {
+            console.error('⚠️ API returned error:', data.message);
             container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">⚠️</div><div class="create-empty-state-title">Error Loading Workflows</div><div class="create-empty-state-description">${data.message || 'Unknown error'}</div></div>`;
         }
     } catch (error) {
-        console.error('Error loading workflows:', error);
+        console.error('❌ Error loading workflows:', error);
         container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">❌</div><div class="create-empty-state-title">Connection Error</div><div class="create-empty-state-description">${error.message}</div></div>`;
     }
 }
