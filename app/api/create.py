@@ -3,7 +3,7 @@ Create Tab API Blueprint
 Handles workflow listing, generation, and execution endpoints
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 import logging
 from datetime import datetime
 import uuid
@@ -13,6 +13,9 @@ import subprocess
 import re
 from pathlib import Path
 import time
+import os
+from PIL import Image
+import io
 
 from app.create.workflow_loader import WorkflowLoader
 from app.create.workflow_generator import WorkflowGenerator
@@ -26,6 +29,14 @@ bp = Blueprint('create', __name__, url_prefix='/create')
 # In-memory store for workflow queue timestamps
 # Maps prompt_id -> queue_timestamp
 workflow_queue_times = {}
+
+# In-memory store for workflow thumbnails
+# Maps prompt_id -> thumbnail_filename
+workflow_thumbnails = {}
+
+# Thumbnail directory
+THUMBNAIL_DIR = Path('/app/downloads/thumbnails')
+THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @bp.route('/workflows/list', methods=['GET'])
@@ -229,6 +240,8 @@ def execute_workflow():
         # Process image inputs - upload to remote and replace with filenames
         image_fields = [f for f in workflow_config.inputs if f.type == 'image']
         processed_inputs = inputs.copy()
+        thumbnail_saved = False
+        thumbnail_filename = None
         
         for field in image_fields:
             field_value = inputs.get(field.id)
@@ -237,6 +250,12 @@ def execute_workflow():
                 filename = _upload_image_to_remote(field_value, ssh_connection, host, port)
                 processed_inputs[field.id] = filename
                 logger.info(f"Uploaded image for {field.id}: {filename}")
+                
+                # Save thumbnail from first image input (typically input_image)
+                if not thumbnail_saved:
+                    thumbnail_filename = _save_thumbnail(field_value)
+                    thumbnail_saved = True
+                    logger.info(f"Saved thumbnail: {thumbnail_filename}")
         
         # Generate workflow JSON with processed inputs
         generator = WorkflowGenerator(workflow_config, workflow_template)
@@ -251,6 +270,10 @@ def execute_workflow():
         
         # Save queue timestamp
         workflow_queue_times[prompt_id] = time.time()
+        
+        # Save thumbnail reference
+        if thumbnail_filename:
+            workflow_thumbnails[prompt_id] = thumbnail_filename
         
         # Generate task ID for tracking
         task_id = str(uuid.uuid4())
@@ -697,10 +720,14 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
         if not start_time and prompt_id in workflow_queue_times:
             start_time = workflow_queue_times[prompt_id]
         
+        # Get thumbnail if available
+        thumbnail = workflow_thumbnails.get(prompt_id)
+        
         running_items.append({
             'prompt_id': prompt_id,
             'status': 'running',
-            'start_time': start_time
+            'start_time': start_time,
+            'thumbnail': thumbnail
         })
     
     pending_items = []
@@ -710,10 +737,14 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
         # Get queue time for pending items
         queue_time = workflow_queue_times.get(prompt_id)
         
+        # Get thumbnail if available
+        thumbnail = workflow_thumbnails.get(prompt_id)
+        
         pending_items.append({
             'prompt_id': prompt_id,
             'status': 'pending',
-            'queue_time': queue_time
+            'queue_time': queue_time,
+            'thumbnail': thumbnail
         })
     
     # Process history items
@@ -754,13 +785,21 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
         if status.get('completed', False) and prompt_id in workflow_queue_times:
             del workflow_queue_times[prompt_id]
         
+        # Get thumbnail if available
+        thumbnail = workflow_thumbnails.get(prompt_id)
+        
+        # Clean up thumbnail for completed workflows (optional - keep for history)
+        # if status.get('completed', False) and prompt_id in workflow_thumbnails:
+        #     del workflow_thumbnails[prompt_id]
+        
         recent_items.append({
             'prompt_id': prompt_id,
             'status': item_status,
             'start_time': start_time,
             'end_time': end_time,
             'execution_time': execution_time,
-            'completed': status.get('completed', False)
+            'completed': status.get('completed', False),
+            'thumbnail': thumbnail
         })
     
     # Sort recent items by start time (most recent first)
@@ -824,3 +863,75 @@ def _queue_workflow_on_comfyui(workflow_path, ssh_connection, host, port):
     except (json.JSONDecodeError, ValueError) as e:
         logger.error(f"Failed to parse ComfyUI response: {result.stdout}")
         raise RuntimeError(f"Invalid response from ComfyUI: {str(e)}")
+
+
+def _save_thumbnail(base64_image):
+    """
+    Save a thumbnail from a base64 encoded image
+    
+    Args:
+        base64_image: Base64 encoded image data (data:image/jpeg;base64,...)
+    
+    Returns:
+        Thumbnail filename
+    """
+    try:
+        # Extract base64 data
+        if ',' in base64_image:
+            base64_data = base64_image.split(',')[1]
+        else:
+            base64_data = base64_image
+        
+        # Decode image
+        image_data = base64.b64decode(base64_data)
+        image = Image.open(io.BytesIO(image_data))
+        
+        # Create thumbnail (max 200x200)
+        image.thumbnail((200, 200), Image.Resampling.LANCZOS)
+        
+        # Generate filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        thumbnail_filename = f"thumb_{timestamp}_{uuid.uuid4().hex[:8]}.jpg"
+        thumbnail_path = THUMBNAIL_DIR / thumbnail_filename
+        
+        # Save as JPEG
+        image.convert('RGB').save(thumbnail_path, 'JPEG', quality=85)
+        
+        logger.info(f"Saved thumbnail: {thumbnail_filename}")
+        return thumbnail_filename
+    except Exception as e:
+        logger.error(f"Error saving thumbnail: {e}", exc_info=True)
+        return None
+
+
+@bp.route('/thumbnail/<filename>', methods=['GET'])
+def get_thumbnail(filename):
+    """
+    Serve a thumbnail image
+    
+    Args:
+        filename: Thumbnail filename
+    
+    Returns:
+        Thumbnail image file
+    """
+    try:
+        thumbnail_path = THUMBNAIL_DIR / filename
+        
+        if not thumbnail_path.exists():
+            return jsonify({
+                'success': False,
+                'message': 'Thumbnail not found'
+            }), 404
+        
+        return send_file(
+            thumbnail_path,
+            mimetype='image/jpeg',
+            as_attachment=False
+        )
+    except Exception as e:
+        logger.error(f"Error serving thumbnail: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Failed to serve thumbnail: {str(e)}'
+        }), 500

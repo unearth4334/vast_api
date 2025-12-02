@@ -1,7 +1,7 @@
 /**
  * ExecutionQueue Component
- * Displays workflow execution queue with status and execution time
- * Similar to ResourceDownloadStatus but simpler - shows status only with manual refresh
+ * Displays workflow execution queue with status, execution time, and thumbnails
+ * Supports compact and detailed view modes
  */
 
 export class ExecutionQueue {
@@ -11,6 +11,55 @@ export class ExecutionQueue {
         this.isLoading = false;
         this.downloadedFiles = new Map(); // Track downloaded files: prompt_id -> Set of filenames
         this.activePopoverId = null; // Track which popover is currently open
+        this.viewMode = 'compact'; // 'compact' or 'detailed'
+        this.initializeViewToggle();
+    }
+
+    /**
+     * Initialize view toggle buttons
+     */
+    initializeViewToggle() {
+        const viewToggle = document.querySelector('.execution-queue-view-toggle');
+        if (!viewToggle) return;
+
+        const buttons = viewToggle.querySelectorAll('.view-btn');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const view = btn.dataset.view;
+                this.setViewMode(view);
+            });
+        });
+    }
+
+    /**
+     * Set view mode
+     */
+    setViewMode(mode) {
+        this.viewMode = mode;
+
+        // Update button states
+        const viewToggle = document.querySelector('.execution-queue-view-toggle');
+        if (viewToggle) {
+            const buttons = viewToggle.querySelectorAll('.view-btn');
+            buttons.forEach(btn => {
+                if (btn.dataset.view === mode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        // Update container class
+        if (this.container) {
+            this.container.classList.toggle('detailed-view', mode === 'detailed');
+        }
+
+        // Re-render if we have data
+        if (!this.isLoading && this.container && this.container.querySelector('.execution-queue-item')) {
+            // Trigger a refresh to update the view
+            this.refresh();
+        }
     }
 
     /**
@@ -180,14 +229,29 @@ export class ExecutionQueue {
             statusText = `${status} (${this.formatExecutionTime(elapsedTime)})`;
         }
 
+        // Render thumbnail if in detailed view and thumbnail exists
+        let thumbnailHtml = '';
+        if (this.viewMode === 'detailed' && item.thumbnail) {
+            thumbnailHtml = `
+                <div class="execution-queue-item-thumbnail">
+                    <img src="/create/thumbnail/${this.escapeHtml(item.thumbnail)}" 
+                         alt="Workflow thumbnail"
+                         onerror="this.parentElement.style.display='none'">
+                </div>
+            `;
+        }
+
         return `
             <div class="execution-queue-item ${statusClass}">
-                <div class="execution-queue-item-header">
-                    <span class="execution-queue-item-icon">${statusIcon}</span>
-                    <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
-                        ${this.escapeHtml(promptIdShort)}
-                    </span>
-                    <span class="execution-queue-item-status">${this.escapeHtml(statusText)}</span>
+                ${thumbnailHtml}
+                <div class="execution-queue-item-content">
+                    <div class="execution-queue-item-header">
+                        <span class="execution-queue-item-icon">${statusIcon}</span>
+                        <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
+                            ${this.escapeHtml(promptIdShort)}
+                        </span>
+                        <span class="execution-queue-item-status">${this.escapeHtml(statusText)}</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -227,21 +291,36 @@ export class ExecutionQueue {
             </button>
         ` : '';
 
+        // Render thumbnail if in detailed view and thumbnail exists
+        let thumbnailHtml = '';
+        if (this.viewMode === 'detailed' && item.thumbnail) {
+            thumbnailHtml = `
+                <div class="execution-queue-item-thumbnail">
+                    <img src="/create/thumbnail/${this.escapeHtml(item.thumbnail)}" 
+                         alt="Workflow thumbnail"
+                         onerror="this.parentElement.style.display='none'">
+                </div>
+            `;
+        }
+
         return `
             <div class="execution-queue-item ${statusClass}" data-prompt-id="${this.escapeHtml(item.prompt_id)}">
-                <div class="execution-queue-item-header">
-                    <span class="execution-queue-item-icon">${statusIcon}</span>
-                    <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
-                        ${this.escapeHtml(promptIdShort)}
-                    </span>
-                    <span class="execution-queue-item-status">${this.escapeHtml(item.status)}</span>
-                </div>
-                ${executionTimeStr || previewButton ? `
-                    <div class="execution-queue-item-footer">
-                        ${executionTimeStr ? `<span class="execution-queue-item-time">⏱️ ${this.escapeHtml(executionTimeStr)}</span>` : ''}
-                        ${previewButton}
+                ${thumbnailHtml}
+                <div class="execution-queue-item-content">
+                    <div class="execution-queue-item-header">
+                        <span class="execution-queue-item-icon">${statusIcon}</span>
+                        <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
+                            ${this.escapeHtml(promptIdShort)}
+                        </span>
+                        <span class="execution-queue-item-status">${this.escapeHtml(item.status)}</span>
                     </div>
-                ` : ''}
+                    ${executionTimeStr || previewButton ? `
+                        <div class="execution-queue-item-footer">
+                            ${executionTimeStr ? `<span class="execution-queue-item-time">⏱️ ${this.escapeHtml(executionTimeStr)}</span>` : ''}
+                            ${previewButton}
+                        </div>
+                    ` : ''}
+                </div>
                 <div class="execution-queue-popover" id="popover-${this.escapeHtml(item.prompt_id)}" style="display: none;">
                     <div class="execution-queue-popover-content">
                         <div class="execution-queue-popover-loading">Loading outputs...</div>
