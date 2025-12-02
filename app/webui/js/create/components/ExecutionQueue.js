@@ -143,12 +143,11 @@ export class ExecutionQueue {
         const viewToggle = document.querySelector('.execution-queue-view-toggle');
         if (!viewToggle) return;
 
-        const buttons = viewToggle.querySelectorAll('.view-btn');
-        buttons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const view = btn.dataset.view;
-                this.setViewMode(view);
-            });
+        // Make entire toggle clickable to switch between modes
+        viewToggle.addEventListener('click', (e) => {
+            // Toggle between compact and detailed
+            const newMode = this.viewMode === 'compact' ? 'detailed' : 'compact';
+            this.setViewMode(newMode);
         });
     }
 
