@@ -43,44 +43,54 @@ def _is_host_key_error(stderr: str, return_code: int) -> bool:
 
 
 class ProgressParser:
-    """Parse civitdl progress output"""
+    """Parse download progress output from civitdl and wget"""
     
     # Regex patterns for civitdl output
-    PROGRESS_PATTERN = re.compile(
+    CIVITDL_PROGRESS_PATTERN = re.compile(
         r'(Images|Model|Cache):\s*(\d+)%\|[█▓▒░\s]*\|\s*([\d.]+[KMGT]?i?B?)/([\d.]+[KMGT]?i?B?)\s*\[([^\]]+)\<([^\]]+),\s*([\d.]+[KMGT]?i?B?/s)\]'
     )
-    STAGE_START = re.compile(r'Now downloading "([^"]+)"')
-    STAGE_COMPLETE = re.compile(r'Download completed for "([^"]+)"')
+    CIVITDL_STAGE_START = re.compile(r'Now downloading "([^"]+)"')
+    CIVITDL_STAGE_COMPLETE = re.compile(r'Download completed for "([^"]+)"')
+    
+    # Regex patterns for wget progress output
+    # Example: "  5% [==>  ] 123,456,789  1.23MB/s  eta 2m 34s"
+    WGET_PROGRESS_PATTERN = re.compile(
+        r'\s*(\d+)%\s+\[[\s=>]*\]\s+([\d,]+)\s+([\d.]+[KMGT]?B/s)(?:\s+eta\s+(.+))?'
+    )
     
     @classmethod
     def parse_line(cls, line: str) -> Optional[Dict]:
         """
-        Parse a single line of civitdl output
+        Parse a single line of download output (civitdl or wget)
         
         Args:
-            line: Output line from civitdl
+            line: Output line from download command
             
         Returns:
             Dictionary with progress info or None if not a progress line
         """
-        # Check for download start
-        match = cls.STAGE_START.search(line)
+        # Try civitdl patterns first
+        
+        # Check for civitdl download start
+        match = cls.CIVITDL_STAGE_START.search(line)
         if match:
             return {
                 'type': 'stage_start',
-                'name': match.group(1)
+                'name': match.group(1),
+                'tool': 'civitdl'
             }
         
-        # Check for download complete
-        match = cls.STAGE_COMPLETE.search(line)
+        # Check for civitdl download complete
+        match = cls.CIVITDL_STAGE_COMPLETE.search(line)
         if match:
             return {
                 'type': 'stage_complete',
-                'name': match.group(1)
+                'name': match.group(1),
+                'tool': 'civitdl'
             }
         
-        # Check for progress bar
-        match = cls.PROGRESS_PATTERN.search(line)
+        # Check for civitdl progress bar
+        match = cls.CIVITDL_PROGRESS_PATTERN.search(line)
         if match:
             stage = match.group(1)  # Images, Model, or Cache
             percent = int(match.group(2))
@@ -98,7 +108,26 @@ class ProgressParser:
                 'total': total,
                 'elapsed': elapsed,
                 'remaining': remaining,
-                'speed': speed
+                'speed': speed,
+                'tool': 'civitdl'
+            }
+        
+        # Try wget patterns
+        match = cls.WGET_PROGRESS_PATTERN.search(line)
+        if match:
+            percent = int(match.group(1))
+            downloaded_bytes = match.group(2).replace(',', '')
+            speed = match.group(3)
+            eta = match.group(4) if match.group(4) else 'unknown'
+            
+            return {
+                'type': 'progress',
+                'stage': 'download',
+                'percent': percent,
+                'downloaded': downloaded_bytes,
+                'speed': speed,
+                'remaining': eta,
+                'tool': 'wget'
             }
         
         return None
