@@ -235,18 +235,6 @@ export class ExecutionQueue {
         }
     }
 
-        // Update container class
-        if (this.container) {
-            this.container.classList.toggle('detailed-view', mode === 'detailed');
-        }
-
-        // Re-render if we have data
-        if (!this.isLoading && this.container && this.container.querySelector('.execution-queue-item')) {
-            // Trigger a refresh to update the view
-            this.refresh();
-        }
-    }
-
     /**
      * Update SSH connection string
      */
