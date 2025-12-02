@@ -174,6 +174,10 @@ class ResourceInstaller:
         # Substitute environment variables
         command = download_command.replace('$UI_HOME', ui_home)
         
+        # Prepend PATH to include venv for civitdl and other tools
+        # Most vast.ai instances have Python packages in /venv/main/bin
+        command_with_path = f'export PATH="/venv/main/bin:$PATH" && cd /tmp && {command}'
+        
         # Wrap in SSH command
         ssh_cmd = [
             'ssh',
@@ -184,7 +188,7 @@ class ResourceInstaller:
             '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
             '-o', 'IdentitiesOnly=yes',
             f'root@{ssh_host}',
-            f'cd /tmp && {command}'
+            command_with_path
         ]
         
         logger.debug(f"Executing SSH command: {' '.join(ssh_cmd)}")
