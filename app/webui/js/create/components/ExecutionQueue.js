@@ -82,9 +82,19 @@ export class ExecutionQueue {
      * Handle queue item click
      */
     handleItemClick(e) {
-        // Don't toggle if clicking delete button, preview button, or popover
+        // Handle preview button click
+        if (e.target.closest('.execution-queue-preview-btn')) {
+            e.stopPropagation();
+            const item = e.target.closest('.execution-queue-item');
+            const promptId = item?.dataset.promptId;
+            if (promptId) {
+                this.showOutputsPopover(promptId);
+            }
+            return;
+        }
+        
+        // Don't toggle if clicking delete button or popover
         if (e.target.closest('.execution-queue-delete-btn') ||
-            e.target.closest('.execution-queue-preview-btn') ||
             e.target.closest('.execution-queue-popover')) {
             return;
         }
@@ -478,7 +488,7 @@ export class ExecutionQueue {
         // Add preview button for successful executions
         const previewButton = item.status === 'success' ? `
             <button class="execution-queue-preview-btn" 
-                    onclick="window.executionQueueInstance?.showOutputsPopover('${this.escapeHtml(item.prompt_id)}')"
+                    data-prompt-id="${this.escapeHtml(item.prompt_id)}"
                     title="Preview outputs">
                 👁️ Preview
             </button>
