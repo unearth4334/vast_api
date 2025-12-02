@@ -2,6 +2,7 @@
  * ExecutionQueue Component
  * Displays workflow execution queue with status, execution time, and thumbnails
  * Supports compact and detailed view modes
+ * Supports hiding items via temporary ignore list
  */
 
 export class ExecutionQueue {
@@ -12,7 +13,127 @@ export class ExecutionQueue {
         this.downloadedFiles = new Map(); // Track downloaded files: prompt_id -> Set of filenames
         this.activePopoverId = null; // Track which popover is currently open
         this.viewMode = 'compact'; // 'compact' or 'detailed'
+        this.deleteMode = false; // Delete/hide mode state
+        this.ignoredItems = new Set(); // Set of ignored prompt_ids
         this.initializeViewToggle();
+        this.setupEventListeners();
+    }
+
+    /**
+     * Setup global event listeners for delete mode
+     */
+    setupEventListeners() {
+        // Listen for clicks anywhere to exit delete mode
+        document.addEventListener('click', (e) => {
+            if (!this.deleteMode) return;
+            
+            // Don't exit if clicking delete buttons or queue items
+            if (e.target.closest('.execution-queue-delete-btn') || 
+                e.target.closest('.execution-queue-delete-all-btn')) {
+                return;
+            }
+            
+            // Don't exit if clicking a queue item to enter delete mode
+            if (e.target.closest('.execution-queue-item') && !this.deleteMode) {
+                return;
+            }
+            
+            // Exit delete mode
+            this.exitDeleteMode();
+        });
+    }
+
+    /**
+     * Enter delete mode - show delete buttons
+     */
+    enterDeleteMode() {
+        if (!this.container) return;
+        this.deleteMode = true;
+        
+        const wrappers = this.container.querySelectorAll('.execution-queue-item-wrapper');
+        wrappers.forEach(wrapper => wrapper.classList.add('delete-mode'));
+        
+        const deleteAllBtn = this.container.querySelector('.execution-queue-delete-all-btn');
+        if (deleteAllBtn) {
+            deleteAllBtn.classList.add('visible');
+        }
+    }
+
+    /**
+     * Exit delete mode - hide delete buttons
+     */
+    exitDeleteMode() {
+        if (!this.container) return;
+        this.deleteMode = false;
+        
+        const wrappers = this.container.querySelectorAll('.execution-queue-item-wrapper');
+        wrappers.forEach(wrapper => wrapper.classList.remove('delete-mode'));
+        
+        const deleteAllBtn = this.container.querySelector('.execution-queue-delete-all-btn');
+        if (deleteAllBtn) {
+            deleteAllBtn.classList.remove('visible');
+        }
+    }
+
+    /**
+     * Handle queue item click
+     */
+    handleItemClick(e) {
+        // Don't toggle if clicking delete button, preview button, or popover
+        if (e.target.closest('.execution-queue-delete-btn') ||
+            e.target.closest('.execution-queue-preview-btn') ||
+            e.target.closest('.execution-queue-popover')) {
+            return;
+        }
+        
+        e.stopPropagation();
+        
+        if (this.deleteMode) {
+            // If already in delete mode and clicking item, exit
+            this.exitDeleteMode();
+        } else {
+            // Enter delete mode
+            this.enterDeleteMode();
+        }
+    }
+
+    /**
+     * Hide/ignore a single queue item
+     */
+    hideItem(promptId) {
+        this.ignoredItems.add(promptId);
+        // Refresh to update the view
+        this.refresh();
+        // Stay in delete mode
+    }
+
+    /**
+     * Hide/ignore all visible queue items
+     */
+    hideAllItems() {
+        const confirmed = confirm('Hide all execution queue items? They will remain hidden until the page is refreshed.');
+        if (!confirmed) return;
+        
+        // Add all visible items to ignore list
+        const items = this.container.querySelectorAll('.execution-queue-item');
+        items.forEach(item => {
+            const promptId = item.dataset.promptId;
+            if (promptId) {
+                this.ignoredItems.add(promptId);
+            }
+        });
+        
+        // Refresh and exit delete mode
+        this.refresh();
+        this.exitDeleteMode();
+    }
+
+    /**
+     * Clear the ignore list
+     */
+    clearIgnoreList() {
+        this.ignoredItems.clear();
+        this.refresh();
     }
 
     /**
@@ -159,8 +280,14 @@ export class ExecutionQueue {
         if (!this.container) return;
 
         const { queue_running = [], queue_pending = [], recent_history = [] } = queueData;
-        const hasActiveItems = queue_running.length > 0 || queue_pending.length > 0;
-        const hasHistory = recent_history.length > 0;
+        
+        // Filter out ignored items
+        const filteredRunning = queue_running.filter(item => !this.ignoredItems.has(item.prompt_id));
+        const filteredPending = queue_pending.filter(item => !this.ignoredItems.has(item.prompt_id));
+        const filteredHistory = recent_history.filter(item => !this.ignoredItems.has(item.prompt_id));
+        
+        const hasActiveItems = filteredRunning.length > 0 || filteredPending.length > 0;
+        const hasHistory = filteredHistory.length > 0;
 
         if (!hasActiveItems && !hasHistory) {
             this.renderEmptyState('No Executions', 'No workflows in queue or recent history');
@@ -168,15 +295,53 @@ export class ExecutionQueue {
         }
 
         let html = '<div class="execution-queue-content">';
+        
+        // Add "Delete All" button (hidden by default, shown in delete mode)
+        html += `<button class="execution-queue-delete-all-btn" onclick="window.executionQueueInstance?.hideAllItems()">🗑️ Hide All</button>`;
 
         // Render active queue (running + pending)
         if (hasActiveItems) {
             html += '<div class="execution-queue-section">';
             html += '<div class="execution-queue-section-header">';
             html += '<span class="execution-queue-section-title">Active Queue</span>';
-            html += `<span class="execution-queue-section-count">${queue_running.length + queue_pending.length}</span>`;
+            html += `<span class="execution-queue-section-count">${filteredRunning.length + filteredPending.length}</span>`;
             html += '</div>';
             html += '<div class="execution-queue-items">';
+
+            // Running items
+            filteredRunning.forEach(item => {
+                html += this.renderQueueItem(item, 'running');
+            });
+
+            // Pending items
+            filteredPending.forEach(item => {
+                html += this.renderQueueItem(item, 'pending');
+            });
+
+            html += '</div>';
+            html += '</div>';
+        }
+
+        // Render recent history
+        if (hasHistory) {
+            html += '<div class="execution-queue-section">';
+            html += '<div class="execution-queue-section-header">';
+            html += '<span class="execution-queue-section-title">Recent History</span>';
+            html += `<span class="execution-queue-section-count">${filteredHistory.length}</span>`;
+            html += '</div>';
+            html += '<div class="execution-queue-items">';
+
+            filteredHistory.forEach(item => {
+                html += this.renderHistoryItem(item);
+            });
+
+            html += '</div>';
+            html += '</div>';
+        }
+
+        html += '</div>';
+        this.container.innerHTML = html;
+    }
 
             // Running items
             queue_running.forEach(item => {
@@ -242,17 +407,20 @@ export class ExecutionQueue {
         }
 
         return `
-            <div class="execution-queue-item ${statusClass}">
-                ${thumbnailHtml}
-                <div class="execution-queue-item-content">
-                    <div class="execution-queue-item-header">
-                        <span class="execution-queue-item-icon">${statusIcon}</span>
-                        <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
-                            ${this.escapeHtml(promptIdShort)}
-                        </span>
-                        <span class="execution-queue-item-status">${this.escapeHtml(statusText)}</span>
+            <div class="execution-queue-item-wrapper" onclick="window.executionQueueInstance?.handleItemClick(event)">
+                <div class="execution-queue-item ${statusClass}" data-prompt-id="${this.escapeHtml(item.prompt_id)}">
+                    ${thumbnailHtml}
+                    <div class="execution-queue-item-content">
+                        <div class="execution-queue-item-header">
+                            <span class="execution-queue-item-icon">${statusIcon}</span>
+                            <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
+                                ${this.escapeHtml(promptIdShort)}
+                            </span>
+                            <span class="execution-queue-item-status">${this.escapeHtml(statusText)}</span>
+                        </div>
                     </div>
                 </div>
+                <button class="execution-queue-delete-btn" onclick="event.stopPropagation(); window.executionQueueInstance?.hideItem('${this.escapeHtml(item.prompt_id)}')">🗑️</button>
             </div>
         `;
     }
@@ -304,28 +472,31 @@ export class ExecutionQueue {
         }
 
         return `
-            <div class="execution-queue-item ${statusClass}" data-prompt-id="${this.escapeHtml(item.prompt_id)}">
-                ${thumbnailHtml}
-                <div class="execution-queue-item-content">
-                    <div class="execution-queue-item-header">
-                        <span class="execution-queue-item-icon">${statusIcon}</span>
-                        <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
-                            ${this.escapeHtml(promptIdShort)}
-                        </span>
-                        <span class="execution-queue-item-status">${this.escapeHtml(item.status)}</span>
-                    </div>
-                    ${executionTimeStr || previewButton ? `
-                        <div class="execution-queue-item-footer">
-                            ${executionTimeStr ? `<span class="execution-queue-item-time">⏱️ ${this.escapeHtml(executionTimeStr)}</span>` : ''}
-                            ${previewButton}
+            <div class="execution-queue-item-wrapper" onclick="window.executionQueueInstance?.handleItemClick(event)">
+                <div class="execution-queue-item ${statusClass}" data-prompt-id="${this.escapeHtml(item.prompt_id)}">
+                    ${thumbnailHtml}
+                    <div class="execution-queue-item-content">
+                        <div class="execution-queue-item-header">
+                            <span class="execution-queue-item-icon">${statusIcon}</span>
+                            <span class="execution-queue-item-id" title="${this.escapeHtml(item.prompt_id)}">
+                                ${this.escapeHtml(promptIdShort)}
+                            </span>
+                            <span class="execution-queue-item-status">${this.escapeHtml(item.status)}</span>
                         </div>
-                    ` : ''}
-                </div>
-                <div class="execution-queue-popover" id="popover-${this.escapeHtml(item.prompt_id)}" style="display: none;">
-                    <div class="execution-queue-popover-content">
-                        <div class="execution-queue-popover-loading">Loading outputs...</div>
+                        ${executionTimeStr || previewButton ? `
+                            <div class="execution-queue-item-footer">
+                                ${executionTimeStr ? `<span class="execution-queue-item-time">⏱️ ${this.escapeHtml(executionTimeStr)}</span>` : ''}
+                                ${previewButton}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="execution-queue-popover" id="popover-${this.escapeHtml(item.prompt_id)}" style="display: none;">
+                        <div class="execution-queue-popover-content">
+                            <div class="execution-queue-popover-loading">Loading outputs...</div>
+                        </div>
                     </div>
                 </div>
+                <button class="execution-queue-delete-btn" onclick="event.stopPropagation(); window.executionQueueInstance?.hideItem('${this.escapeHtml(item.prompt_id)}')">🗑️</button>
             </div>
         `;
     }
