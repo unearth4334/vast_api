@@ -1083,6 +1083,50 @@
     color: var(--text-on-accent);
 }
 
+/* Status Filter for Execution Queue */
+.execution-queue-status-filter {
+    display: flex;
+    background: var(--background-primary);
+    border-radius: 8px;
+    padding: 2px;
+    border: 1px solid var(--background-modifier-border);
+    margin-left: 8px;
+}
+
+.execution-queue-status-filter .filter-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.3s;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.execution-queue-status-filter .filter-btn:hover {
+    color: var(--interactive-accent);
+    background: var(--background-modifier-hover);
+}
+
+.execution-queue-status-filter .filter-btn.active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.execution-queue-status-filter .filter-btn-success.active {
+    background: #10b981;
+}
+
+.execution-queue-status-filter .filter-btn-failed.active {
+    background: #ef4444;
+}
+
 .execution-queue-wrapper {
     min-height: 100px;
     max-height: 500px;

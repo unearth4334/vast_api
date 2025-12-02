@@ -3,6 +3,7 @@
  * Displays workflow execution queue with status, execution time, and thumbnails
  * Supports compact and detailed view modes
  * Supports hiding items via temporary ignore list
+ * Supports status filtering (all, success, failed)
  */
 
 export class ExecutionQueue {
@@ -15,7 +16,9 @@ export class ExecutionQueue {
         this.viewMode = 'compact'; // 'compact' or 'detailed'
         this.deleteMode = false; // Delete/hide mode state
         this.ignoredItems = new Set(); // Set of ignored prompt_ids
+        this.statusFilter = 'all'; // 'all', 'success', or 'failed'
         this.initializeViewToggle();
+        this.initializeStatusFilter();
         this.setupEventListeners();
     }
 
@@ -183,6 +186,68 @@ export class ExecutionQueue {
     }
 
     /**
+     * Initialize status filter toggle
+     */
+    initializeStatusFilter() {
+        const statusFilter = document.querySelector('.execution-queue-status-filter');
+        if (!statusFilter) return;
+
+        // Make entire filter clickable to cycle through modes
+        statusFilter.addEventListener('click', (e) => {
+            // Cycle through: all -> success -> failed -> all
+            if (this.statusFilter === 'all') {
+                this.setStatusFilter('success');
+            } else if (this.statusFilter === 'success') {
+                this.setStatusFilter('failed');
+            } else {
+                this.setStatusFilter('all');
+            }
+        });
+    }
+
+    /**
+     * Set status filter mode
+     */
+    setStatusFilter(filter) {
+        this.statusFilter = filter;
+
+        // Update button states
+        const statusFilter = document.querySelector('.execution-queue-status-filter');
+        if (statusFilter) {
+            const successBtn = statusFilter.querySelector('[data-filter="success"]');
+            const failedBtn = statusFilter.querySelector('[data-filter="failed"]');
+            
+            if (filter === 'all') {
+                successBtn?.classList.add('active');
+                failedBtn?.classList.add('active');
+            } else if (filter === 'success') {
+                successBtn?.classList.add('active');
+                failedBtn?.classList.remove('active');
+            } else if (filter === 'failed') {
+                successBtn?.classList.remove('active');
+                failedBtn?.classList.add('active');
+            }
+        }
+
+        // Re-render if we have data
+        if (!this.isLoading && this.container && this.container.querySelector('.execution-queue-item')) {
+            this.refresh();
+        }
+    }
+
+        // Update container class
+        if (this.container) {
+            this.container.classList.toggle('detailed-view', mode === 'detailed');
+        }
+
+        // Re-render if we have data
+        if (!this.isLoading && this.container && this.container.querySelector('.execution-queue-item')) {
+            // Trigger a refresh to update the view
+            this.refresh();
+        }
+    }
+
+    /**
      * Update SSH connection string
      */
     setSshConnection(sshConnection) {
@@ -283,7 +348,15 @@ export class ExecutionQueue {
         // Filter out ignored items
         const filteredRunning = queue_running.filter(item => !this.ignoredItems.has(item.prompt_id));
         const filteredPending = queue_pending.filter(item => !this.ignoredItems.has(item.prompt_id));
-        const filteredHistory = recent_history.filter(item => !this.ignoredItems.has(item.prompt_id));
+        let filteredHistory = recent_history.filter(item => !this.ignoredItems.has(item.prompt_id));
+        
+        // Apply status filter
+        if (this.statusFilter === 'success') {
+            filteredHistory = filteredHistory.filter(item => item.status === 'success');
+        } else if (this.statusFilter === 'failed') {
+            filteredHistory = filteredHistory.filter(item => item.status === 'failed');
+        }
+        // 'all' shows both success and failed (no additional filtering needed)
         
         const hasActiveItems = filteredRunning.length > 0 || filteredPending.length > 0;
         const hasHistory = filteredHistory.length > 0;
