@@ -20,10 +20,10 @@ image: 1995784@2259006.jpg
 
 ```bash
 # High noise
-civitdl "https://civitai.com/models/1995784?modelVersionId=2260110" "$UI_HOME"/models/checkpoints --api-key 905ad9c17ed7f6ba43fd10c211981d8c
+civitdl "https://civitai.com/models/1995784?modelVersionId=2260110" "$UI_HOME"/models/diffusion_models
 
 # Low noise
-civitdl "https://civitai.com/models/1995784?modelVersionId=2259006" "$UI_HOME"/models/checkpoints --api-key 905ad9c17ed7f6ba43fd10c211981d8c
+civitdl "https://civitai.com/models/1995784?modelVersionId=2259006" "$UI_HOME"/models/diffusion_models
 ```
 
 

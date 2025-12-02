@@ -23,8 +23,8 @@ url: https://civitai.com/models/1307155?modelVersionId=2073605
 
 ```bash
 # High noise
-civitdl "https://civitai.com/models/1307155?modelVersionId=2073605" "$UI_HOME"/models/Lora --api-key 905ad9c17ed7f6ba43fd10c211981d8c
+civitdl "https://civitai.com/models/1307155?modelVersionId=2073605" "$UI_HOME"/models/Lora
 
 # Low noise
-civitdl "https://civitai.com/models/1307155?modelVersionId=2083303" "$UI_HOME"/models/Lora --api-key 905ad9c17ed7f6ba43fd10c211981d8c
+civitdl "https://civitai.com/models/1307155?modelVersionId=2083303" "$UI_HOME"/models/Lora
 ```

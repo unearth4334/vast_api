@@ -248,6 +248,20 @@ def run_command_ssh(ssh_connection: str, command: str, progress_callback) -> tup
         return -1, str(e)
 
 
+def get_civitai_api_key() -> str:
+    """Read CivitAI API key from api_key.txt"""
+    api_key_file = PROJECT_ROOT / 'api_key.txt'
+    if api_key_file.exists():
+        try:
+            with open(api_key_file, 'r') as f:
+                for line in f:
+                    if line.startswith('civitdl:'):
+                        return line.split(':', 1)[1].strip()
+        except Exception as e:
+            print(f"Error reading CivitAI API key: {e}")
+    return ""
+
+
 def process_job(job: Dict) -> None:
     """Process a single download job"""
     job_id = job['id']
@@ -276,9 +290,16 @@ def process_job(job: Dict) -> None:
     
     all_success = True
     
+    # Get CivitAI API key for civitdl commands
+    civitai_api_key = get_civitai_api_key()
+    
     for idx, cmd in enumerate(commands):
         tracker.set_command_info(idx + 1, len(commands))
         tracker.current_progress = {}  # Reset progress for new command
+        
+        # Append API key to civitdl commands if not already present
+        if 'civitdl' in cmd.lower() and '--api-key' not in cmd.lower() and civitai_api_key:
+            cmd = f"{cmd} --api-key {civitai_api_key}"
         
         def progress_cb(line: str):
             """Callback for each line of output"""
