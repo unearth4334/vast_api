@@ -28,11 +28,15 @@ const CreateTabState = {
 async function initCreateTab() {
     console.log('🎨 Initializing Create tab...');
     
-    // Initialize ExecutionQueue component
-    CreateTabState.executionQueue = new ExecutionQueue('execution-queue-content', null);
-    
-    // Expose globally for onclick handlers
-    window.executionQueueInstance = CreateTabState.executionQueue;
+    try {
+        // Initialize ExecutionQueue component
+        CreateTabState.executionQueue = new ExecutionQueue('execution-queue-content', null);
+        
+        // Expose globally for onclick handlers
+        window.executionQueueInstance = CreateTabState.executionQueue;
+    } catch (error) {
+        console.error('Error initializing ExecutionQueue:', error);
+    }
     
     // Load workflows
     await loadWorkflows();
