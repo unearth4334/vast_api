@@ -58,14 +58,6 @@ except ImportError:
     from ..api import downloads_bp
 app.register_blueprint(downloads_bp)
 
-# Start download worker
-try:
-    from app.api.download_worker import start_worker
-    start_worker()
-    logger.info("Download worker started")
-except Exception as e:
-    logger.warning(f"Failed to start download worker: {e}")
-
 # Register Models API blueprint
 try:
     from app.api import models_bp

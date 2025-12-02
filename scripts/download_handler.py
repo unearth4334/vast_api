@@ -209,6 +209,10 @@ def run_command_ssh(ssh_connection: str, command: str, progress_callback) -> tup
         print(f"Could not parse host from SSH connection: {ssh_connection}")
         return -1, "Invalid SSH connection string"
     
+    # Prepend PATH to include venv for civitdl and other tools
+    # Most vast.ai instances have Python packages in /venv/main/bin
+    command_with_path = f'export PATH="/venv/main/bin:$PATH" && cd /tmp && {command}'
+    
     # Build SSH command with our security options
     ssh_cmd = [
         'ssh',
@@ -219,7 +223,7 @@ def run_command_ssh(ssh_connection: str, command: str, progress_callback) -> tup
         '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
         '-o', 'IdentitiesOnly=yes',
         f'root@{host}',
-        command
+        command_with_path
     ]
     
     try:
