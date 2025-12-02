@@ -249,13 +249,19 @@ def sync_vastai():
             })
         
         # Extract SSH connection details
-        ssh_host = running_instance.get('ssh_host')
+        # Always use public_ip as the SSH host (authoritative), not ssh_host
+        ssh_host = (
+            running_instance.get('public_ip') or 
+            running_instance.get('public_ipaddr') or 
+            running_instance.get('ip_address') or
+            running_instance.get('publicIp')
+        )
         ssh_port = str(get_ssh_port(running_instance) or 22)
         
         if not ssh_host:
             return jsonify({
                 'success': False,
-                'message': 'Running VastAI instance found but no SSH host available'
+                'message': 'Running VastAI instance found but no public IP available'
             })
         
         logger.info(f"Found running VastAI instance: {ssh_host}:{ssh_port}")
