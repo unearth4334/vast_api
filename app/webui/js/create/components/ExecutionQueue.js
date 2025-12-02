@@ -428,7 +428,7 @@ export class ExecutionQueue {
     }
 
     /**
-     * Preview an output file
+     * Preview an output file - opens in new browser tab
      */
     async previewOutput(promptId, output) {
         try {
@@ -461,8 +461,8 @@ export class ExecutionQueue {
             downloadedSet.add(output.filename);
             this.downloadedFiles.set(promptId, downloadedSet);
 
-            // Update UI to show downloaded state
-            const outputItem = document.querySelector(`[onclick*="'${promptId}'"][onclick*="${output.filename}"]`);
+            // Update UI to show downloaded state - use data attribute selector
+            const outputItem = document.querySelector(`[data-prompt-id="${promptId}"][data-filename="${output.filename}"]`);
             if (outputItem) {
                 outputItem.classList.add('downloaded');
                 if (!outputItem.querySelector('.execution-queue-output-viewed')) {
@@ -470,66 +470,13 @@ export class ExecutionQueue {
                 }
             }
 
-            // Show in overlay
-            this.showOverlay(output.filename, url, output.format || output.output_type);
+            // Open in new tab
+            window.open(url, '_blank');
 
         } catch (error) {
             console.error('Error previewing output:', error);
             alert(`Error: ${error.message}`);
         }
-    }
-
-    /**
-     * Show file in overlay
-     */
-    showOverlay(filename, url, format) {
-        // Remove existing overlay if any
-        const existingOverlay = document.getElementById('execution-queue-overlay');
-        if (existingOverlay) {
-            existingOverlay.remove();
-        }
-
-        // Create overlay
-        const overlay = document.createElement('div');
-        overlay.id = 'execution-queue-overlay';
-        overlay.className = 'execution-queue-overlay';
-
-        let contentHtml = '';
-        const isVideo = format.includes('video') || format.includes('mp4') || format.includes('webm');
-        const isImage = format.includes('image') || /\\.(jpg|jpeg|png|gif|webp)$/i.test(filename);
-
-        if (isVideo) {
-            contentHtml = `
-                <video controls autoplay loop>
-                    <source src="${url}" type="${format}">
-                    Your browser does not support the video tag.
-                </video>
-            `;
-        } else if (isImage) {
-            contentHtml = `<img src="${url}" alt="${this.escapeHtml(filename)}">`;
-        } else {
-            contentHtml = `
-                <div class="execution-queue-overlay-unsupported">
-                    <p>Preview not supported for this file type</p>
-                    <a href="${url}" download="${filename}" class="execution-queue-download-btn">Download ${this.escapeHtml(filename)}</a>
-                </div>
-            `;
-        }
-
-        overlay.innerHTML = `
-            <div class="execution-queue-overlay-backdrop" onclick="document.getElementById('execution-queue-overlay').remove()"></div>
-            <div class="execution-queue-overlay-content">
-                <div class="execution-queue-overlay-header">
-                    <span class="execution-queue-overlay-title">${this.escapeHtml(filename)}</span>
-                    <button class="execution-queue-overlay-close" onclick="document.getElementById('execution-queue-overlay').remove()">&times;</button>
-                </div>
-                <div class="execution-queue-overlay-body">
-                    ${contentHtml}
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
     }
 
     /**
