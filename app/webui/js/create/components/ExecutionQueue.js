@@ -403,41 +403,6 @@ export class ExecutionQueue {
         this.container.innerHTML = html;
     }
 
-            // Running items
-            queue_running.forEach(item => {
-                html += this.renderQueueItem(item, 'running');
-            });
-
-            // Pending items
-            queue_pending.forEach(item => {
-                html += this.renderQueueItem(item, 'pending');
-            });
-
-            html += '</div>';
-            html += '</div>';
-        }
-
-        // Render recent history
-        if (hasHistory) {
-            html += '<div class="execution-queue-section">';
-            html += '<div class="execution-queue-section-header">';
-            html += '<span class="execution-queue-section-title">Recent History</span>';
-            html += `<span class="execution-queue-section-count">${recent_history.length}</span>`;
-            html += '</div>';
-            html += '<div class="execution-queue-items">';
-
-            recent_history.forEach(item => {
-                html += this.renderHistoryItem(item);
-            });
-
-            html += '</div>';
-            html += '</div>';
-        }
-
-        html += '</div>';
-        this.container.innerHTML = html;
-    }
-
     /**
      * Render a single queue item (running or pending)
      */
