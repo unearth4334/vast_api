@@ -20,14 +20,10 @@ url: https://civitai.com/models/1307155?modelVersionId=2073605
 - Recommended weight: 0.6-0.8 | Higher weights may produce more stylized output
 
 # Download
-```bash
-civitdl "https://civitai.com/models/1678575?modelVersionId=1900322" \
-  "$UI_HOME/models/loras"
-```
-#### High Noise
+
 ```bash
 # High noise
-civitdl "https://civitai.com/models/1307155?modelVersionId=2073605" "$UI_HOME"/models/
+civitdl "https://civitai.com/models/1307155?modelVersionId=2073605" "$UI_HOME"/models/Lora
 
 # Low noise
 civitdl "https://civitai.com/models/1307155?modelVersionId=2083303" "$UI_HOME"/models/Lora
