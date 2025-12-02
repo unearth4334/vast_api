@@ -250,14 +250,23 @@ class ModelScanner:
         Args:
             files: List of (filepath, size) tuples
             extract_regex: Regex to extract base name
-            high_suffix: Suffix for high noise files
-            low_suffix: Suffix for low noise files
+            high_suffix: Suffix for high noise files (can be regex if starts with 'regex:')
+            low_suffix: Suffix for low noise files (can be regex if starts with 'regex:')
             
         Returns:
             List of (base_name, high_file, low_file) tuples
         """
         high_files = {}
         low_files = {}
+        
+        # Check if suffixes are regex patterns
+        high_is_regex = high_suffix.startswith('regex:')
+        low_is_regex = low_suffix.startswith('regex:')
+        
+        if high_is_regex:
+            high_pattern = re.compile(high_suffix[6:])  # Remove 'regex:' prefix
+        if low_is_regex:
+            low_pattern = re.compile(low_suffix[6:])
         
         for filepath, size in files:
             # Get just the filename for matching
@@ -272,9 +281,23 @@ class ModelScanner:
             else:
                 base_name = filename
             
-            if high_suffix and filename.endswith(high_suffix):
+            # Match high noise files
+            is_high = False
+            if high_is_regex:
+                is_high = high_pattern.search(filename) is not None
+            elif high_suffix:
+                is_high = filename.endswith(high_suffix)
+            
+            # Match low noise files
+            is_low = False
+            if low_is_regex:
+                is_low = low_pattern.search(filename) is not None
+            elif low_suffix:
+                is_low = filename.endswith(low_suffix)
+            
+            if is_high:
                 high_files[base_name] = (filepath, size)
-            elif low_suffix and filename.endswith(low_suffix):
+            elif is_low:
                 low_files[base_name] = (filepath, size)
         
         # Create pairs
