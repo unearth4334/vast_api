@@ -62,7 +62,7 @@ ui_home_env: /workspace/ComfyUI
 model_discovery:
   base_paths:
     diffusion_models: "models/diffusion_models"
-    loras: "models/loras"
+    loras: "models/Lora"  # Capital L for ComfyUI compatibility
     text_encoders: "models/text_encoders"
     vae: "models/vae"
     upscale_models: "models/upscale_models"
@@ -75,9 +75,9 @@ model_discovery:
       extract_name_regex: "^(.+?)(?:_high_noise|_low_noise|_i2vHigh-mid|_i2vLow-mid)"
       
     loras:
-      high_suffix: "_high_noise.safetensors"
-      low_suffix: "_low_noise.safetensors"
-      extract_name_regex: "^(.+?)(?:_high_noise|_low_noise)"
+      high_suffix: "regex:(_high_noise\\.safetensors|-H-.*\\.safetensors)$"
+      low_suffix: "regex:(_low_noise\\.safetensors|-L-.*\\.safetensors)$"
+      extract_name_regex: "^(.+?)(?:_high_noise|_low_noise|-H-|-L-)"
   
   # File extensions to scan
   extensions:
