@@ -3551,9 +3551,19 @@ def execute_git_clone(ssh_connection, repository, destination):
             git clone {repository} {destination}
             echo 'Repository cloned successfully to {destination}'
         else
-            echo 'Repository already exists at {destination}'
+            echo 'Repository directory exists at {destination}'
             cd {destination}
-            git pull origin main || git pull origin master || echo 'Repository updated or pull not needed'
+            # Check if it's a valid git repo with commits
+            if git rev-parse HEAD >/dev/null 2>&1; then
+                echo 'Valid git repository found, pulling updates...'
+                git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || echo 'Repository updated or pull not needed'
+            else
+                echo 'Empty or invalid git repository detected, re-cloning...'
+                cd ..
+                rm -rf {destination}
+                git clone {repository} {destination}
+                echo 'Repository re-cloned successfully to {destination}'
+            fi
         fi
         "'''
         
