@@ -286,7 +286,20 @@ if [ -f "$CUSTOM_NODES_CSV" ]; then
                 write_log "Cloning repository: $repo_url" 2
                 write_progress_log "NODE" "$name" "cloning" "Cloning repository"
                 
-                if invoke_and_log git clone "$repo_url" "$NODE_PATH"; then
+                if invoke_and_log git clone --depth 1 "$repo_url" "$NODE_PATH"; then
+                    # Validate the clone - check if it has valid git history
+                    if ! (cd "$NODE_PATH" && git rev-parse HEAD >/dev/null 2>&1); then
+                        write_log "Clone validation failed for $name, repository is empty or invalid. Re-cloning..." 2 "yellow"
+                        rm -rf "$NODE_PATH"
+                        if ! invoke_and_log git clone --depth 1 "$repo_url" "$NODE_PATH"; then
+                            write_log "Failed to re-clone $name" 2 "red"
+                            write_progress_log "NODE" "$name" "failed" "Failed to clone repository"
+                            ((FAILED_NODES++))
+                            write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "failed" "$SUCCESSFUL_NODES" "$FAILED_NODES" false
+                            continue
+                        fi
+                    fi
+                    
                     write_log "Successfully cloned $name" 2 "green"
                     ((SUCCESSFUL_NODES++))
                     
