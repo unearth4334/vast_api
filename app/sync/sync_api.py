@@ -3548,7 +3548,7 @@ def execute_git_clone(ssh_connection, repository, destination):
         set -e
         if [ ! -d '{destination}' ]; then
             echo 'Cloning repository {repository}...'
-            git clone {repository} {destination}
+            git clone --depth 1 {repository} {destination}
             echo 'Repository cloned successfully to {destination}'
         else
             echo 'Repository directory exists at {destination}'
@@ -3561,7 +3561,7 @@ def execute_git_clone(ssh_connection, repository, destination):
                 echo 'Empty or invalid git repository detected, re-cloning...'
                 cd ..
                 rm -rf {destination}
-                git clone {repository} {destination}
+                git clone --depth 1 {repository} {destination}
                 echo 'Repository re-cloned successfully to {destination}'
             fi
         fi
