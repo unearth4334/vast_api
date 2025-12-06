@@ -918,11 +918,11 @@ def ssh_configure_links():
         
         ssh_key = '/root/.ssh/id_ed25519'
         
-        # Configure upscale_models link (remove trailing slash to delete symlink itself, not target)
-        upscale_cmd = f'rm -f "{ui_home}/models/upscale_models" && ln -s "{ui_home}/models/ESRGAN" "{ui_home}/models/upscale_models"'
+        # Configure upscale_models link (handle both directories and symlinks)
+        upscale_cmd = f'[ -e "{ui_home}/models/upscale_models" ] && rm -rf "{ui_home}/models/upscale_models"; ln -s "{ui_home}/models/ESRGAN" "{ui_home}/models/upscale_models"'
         
-        # Configure loras link (remove trailing slash to delete symlink itself, not target)
-        loras_cmd = f'rm -f "{ui_home}/models/loras" && ln -s "{ui_home}/models/Lora" "{ui_home}/models/loras"'
+        # Configure loras link (handle both directories and symlinks)
+        loras_cmd = f'[ -e "{ui_home}/models/loras" ] && rm -rf "{ui_home}/models/loras"; ln -s "{ui_home}/models/Lora" "{ui_home}/models/loras"'
         
         # Combine commands
         combined_cmd = f'{upscale_cmd} && {loras_cmd}'
