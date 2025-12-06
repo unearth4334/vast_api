@@ -58,13 +58,27 @@ except ImportError:
     from ..api import downloads_bp
 app.register_blueprint(downloads_bp)
 
+# Register Models API blueprint
+try:
+    from app.api import models_bp
+except ImportError:
+    from ..api import models_bp
+app.register_blueprint(models_bp)
+logger.info("Registered Models API blueprint")
+
 # Register Create API blueprint
 try:
-    from app.sync.create_api import create_bp
+    from app.api.create import bp as create_bp
 except ImportError:
-    from .create_api import create_bp
-app.register_blueprint(create_bp)
-logger.info("Registered Create API blueprint")
+    try:
+        from ..api.create import bp as create_bp
+    except ImportError:
+        create_bp = None
+        logger.warning("Create API blueprint not available")
+
+if create_bp:
+    app.register_blueprint(create_bp)
+    logger.info("Registered Create API blueprint")
 
 # Cache for VastAI status to prevent excessive API calls from health checks
 _vastai_status_cache = {
@@ -89,6 +103,7 @@ CORS(
         r"/logs/*": {"origins": ALLOWED_ORIGINS},
         r"/resources/*": {"origins": ALLOWED_ORIGINS},
         r"/create/*": {"origins": ALLOWED_ORIGINS},
+        r"/api/*": {"origins": ALLOWED_ORIGINS},
         r"/": {"origins": ALLOWED_ORIGINS},
     },
     supports_credentials=False,
@@ -234,13 +249,19 @@ def sync_vastai():
             })
         
         # Extract SSH connection details
-        ssh_host = running_instance.get('ssh_host')
+        # Always use public_ip as the SSH host (authoritative), not ssh_host
+        ssh_host = (
+            running_instance.get('public_ip') or 
+            running_instance.get('public_ipaddr') or 
+            running_instance.get('ip_address') or
+            running_instance.get('publicIp')
+        )
         ssh_port = str(get_ssh_port(running_instance) or 22)
         
         if not ssh_host:
             return jsonify({
                 'success': False,
-                'message': 'Running VastAI instance found but no SSH host available'
+                'message': 'Running VastAI instance found but no public IP available'
             })
         
         logger.info(f"Found running VastAI instance: {ssh_host}:{ssh_port}")
@@ -897,11 +918,11 @@ def ssh_configure_links():
         
         ssh_key = '/root/.ssh/id_ed25519'
         
-        # Configure upscale_models link
-        upscale_cmd = f'rm -fr "{ui_home}/models/upscale_models/" && ln -s "{ui_home}/models/ESRGAN" "{ui_home}/models/upscale_models"'
+        # Configure upscale_models link (handle both directories and symlinks)
+        upscale_cmd = f'rm -rf "{ui_home}/models/upscale_models" 2>/dev/null || true; ln -s "{ui_home}/models/ESRGAN" "{ui_home}/models/upscale_models"'
         
-        # Configure loras link
-        loras_cmd = f'rm -fr "{ui_home}/models/loras/" && ln -s "{ui_home}/models/Lora" "{ui_home}/models/loras"'
+        # Configure loras link (handle both directories and symlinks)
+        loras_cmd = f'rm -rf "{ui_home}/models/loras" 2>/dev/null || true; ln -s "{ui_home}/models/Lora" "{ui_home}/models/loras"'
         
         # Combine commands
         combined_cmd = f'{upscale_cmd} && {loras_cmd}'
@@ -3527,12 +3548,22 @@ def execute_git_clone(ssh_connection, repository, destination):
         set -e
         if [ ! -d '{destination}' ]; then
             echo 'Cloning repository {repository}...'
-            git clone {repository} {destination}
+            git clone --depth 1 {repository} {destination}
             echo 'Repository cloned successfully to {destination}'
         else
-            echo 'Repository already exists at {destination}'
+            echo 'Repository directory exists at {destination}'
             cd {destination}
-            git pull origin main || git pull origin master || echo 'Repository updated or pull not needed'
+            # Check if it's a valid git repo with commits
+            if git rev-parse HEAD >/dev/null 2>&1; then
+                echo 'Valid git repository found, pulling updates...'
+                git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || echo 'Repository updated or pull not needed'
+            else
+                echo 'Empty or invalid git repository detected, re-cloning...'
+                cd ..
+                rm -rf {destination}
+                git clone --depth 1 {repository} {destination}
+                echo 'Repository re-cloned successfully to {destination}'
+            fi
         fi
         "'''
         

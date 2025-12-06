@@ -209,6 +209,10 @@ def run_command_ssh(ssh_connection: str, command: str, progress_callback) -> tup
         print(f"Could not parse host from SSH connection: {ssh_connection}")
         return -1, "Invalid SSH connection string"
     
+    # Prepend PATH to include venv for civitdl and other tools
+    # Most vast.ai instances have Python packages in /venv/main/bin
+    command_with_path = f'export PATH="/venv/main/bin:$PATH" && cd /tmp && {command}'
+    
     # Build SSH command with our security options
     ssh_cmd = [
         'ssh',
@@ -219,33 +223,43 @@ def run_command_ssh(ssh_connection: str, command: str, progress_callback) -> tup
         '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
         '-o', 'IdentitiesOnly=yes',
         f'root@{host}',
-        command
+        command_with_path
     ]
     
     try:
         process = subprocess.Popen(
             ssh_cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Redirect stderr to stdout so we get all output
             text=True,
             bufsize=1
         )
         
-        stderr_lines = []
-        
-        # Read stdout
+        # Read all output (stdout + stderr merged)
         for line in process.stdout:
             progress_callback(line.rstrip())
         
-        # Read stderr
-        stderr_output = process.stderr.read()
-        
         return_code = process.wait()
         
-        return return_code, stderr_output
+        # Return empty stderr since we merged it with stdout
+        return return_code, ""
     except Exception as e:
         print(f"Error running SSH command: {e}")
         return -1, str(e)
+
+
+def get_civitai_api_key() -> str:
+    """Read CivitAI API key from api_key.txt"""
+    api_key_file = PROJECT_ROOT / 'api_key.txt'
+    if api_key_file.exists():
+        try:
+            with open(api_key_file, 'r') as f:
+                for line in f:
+                    if line.startswith('civitdl:'):
+                        return line.split(':', 1)[1].strip()
+        except Exception as e:
+            print(f"Error reading CivitAI API key: {e}")
+    return ""
 
 
 def process_job(job: Dict) -> None:
@@ -276,13 +290,23 @@ def process_job(job: Dict) -> None:
     
     all_success = True
     
+    # Get CivitAI API key for civitdl commands
+    civitai_api_key = get_civitai_api_key()
+    
     for idx, cmd in enumerate(commands):
         tracker.set_command_info(idx + 1, len(commands))
         tracker.current_progress = {}  # Reset progress for new command
         
+        # Append API key to civitdl commands if not already present
+        if 'civitdl' in cmd.lower() and '--api-key' not in cmd.lower() and civitai_api_key:
+            cmd = f"{cmd} --api-key {civitai_api_key}"
+        
         def progress_cb(line: str):
             """Callback for each line of output"""
             parsed = None
+            
+            # Debug: print the line
+            print(f"[PROGRESS] {line}")
             
             # Parse based on command type
             if 'civitdl' in cmd.lower():
@@ -291,6 +315,7 @@ def process_job(job: Dict) -> None:
                 parsed = WgetProgressParser.parse_line(line)
             
             if parsed:
+                print(f"[PARSED] {parsed}")
                 tracker.update_progress(parsed)
             else:
                 # Even without parsed progress, write status periodically

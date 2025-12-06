@@ -1,17 +1,16 @@
 ---
 tags: [lora, wan, video, style, enhancement]
-title: "Wan 2.1 FusionX LoRA"
-version: "Image2Video"
-published: 2024-11-20
+title: "General NSFW"
+version: "v0.08a"
+published: 2025-08-05
 size: 524288000
 creator: CivitAI Community
 ecosystem: wan
-basemodel: wan2.1
+basemodel: wan2.2
 type: lora
-AIR: "urn:air:wanvideo14b_i2v_720p:lora:civitai:1678575@1900322"
+AIR: "urn:air:wanvideo-22-i2v-a14b:lora:civitai:1307155@2083303"
 image: encoder.jpg
-license: CreativeML Open RAIL-M
-url: https://civitai.com/models/1678575
+url: https://civitai.com/models/1307155?modelVersionId=2073605
 ---
 
 # Description
@@ -21,7 +20,11 @@ url: https://civitai.com/models/1678575
 - Recommended weight: 0.6-0.8 | Higher weights may produce more stylized output
 
 # Download
+
 ```bash
-civitdl "https://civitai.com/models/1678575?modelVersionId=1900322" \
-  "$UI_HOME/models/loras"
+# High noise
+civitdl "https://civitai.com/models/1307155?modelVersionId=2073605" "$UI_HOME"/models/Lora
+
+# Low noise
+civitdl "https://civitai.com/models/1307155?modelVersionId=2083303" "$UI_HOME"/models/Lora
 ```

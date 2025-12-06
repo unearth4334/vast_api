@@ -1,7 +1,10 @@
 /**
  * Create Tab - Main Controller
  * Orchestrates workflow selection, form generation, and execution
+ * Supports extensible component architecture driven by *.webui.yml definitions
  */
+
+import { ExecutionQueue } from './components/ExecutionQueue.js';
 
 // Create Tab state
 const CreateTabState = {
@@ -10,7 +13,13 @@ const CreateTabState = {
     workflowDetails: null,
     formValues: {},
     isExecuting: false,
-    taskId: null
+    taskId: null,
+    // Store component instances for cleanup and value retrieval
+    componentInstances: new Map(),
+    // Current SSH connection
+    sshConnection: null,
+    // Execution queue component
+    executionQueue: null
 };
 
 /**
@@ -19,11 +28,39 @@ const CreateTabState = {
 async function initCreateTab() {
     console.log('🎨 Initializing Create tab...');
     
+    try {
+        // Initialize ExecutionQueue component
+        CreateTabState.executionQueue = new ExecutionQueue('execution-queue-content', null);
+        
+        // Expose globally for onclick handlers
+        window.executionQueueInstance = CreateTabState.executionQueue;
+    } catch (error) {
+        console.error('Error initializing ExecutionQueue:', error);
+    }
+    
     // Load workflows
-    await loadWorkflows();
+    try {
+        await loadWorkflows();
+        console.log('✅ Workflows loaded successfully');
+    } catch (error) {
+        console.error('❌ Failed to load workflows:', error);
+        const container = document.getElementById('create-workflows-grid');
+        if (container) {
+            container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">❌</div><div class="create-empty-state-title">Initialization Error</div><div class="create-empty-state-description">${error.message}</div></div>`;
+        }
+    }
     
     // Set up event listeners
     setupCreateTabEventListeners();
+    
+    // Check if SSH connection already exists and initialize ExecutionQueue
+    const createSshInput = document.getElementById('createSshConnectionString');
+    if (createSshInput?.value) {
+        CreateTabState.sshConnection = createSshInput.value;
+        if (CreateTabState.executionQueue) {
+            CreateTabState.executionQueue.setSshConnection(createSshInput.value);
+        }
+    }
     
     console.log('✅ Create tab initialized');
 }
@@ -32,23 +69,32 @@ async function initCreateTab() {
  * Load available workflows from the API
  */
 async function loadWorkflows() {
+    console.log('📋 Loading workflows from API...');
     const container = document.getElementById('create-workflows-grid');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ create-workflows-grid container not found');
+        return;
+    }
     
     container.innerHTML = '<div class="create-empty-state"><div class="create-empty-state-icon">⏳</div><div class="create-empty-state-description">Loading workflows...</div></div>';
     
     try {
+        console.log('📡 Fetching /create/workflows/list...');
         const response = await fetch('/create/workflows/list');
+        console.log('📡 Response status:', response.status);
         const data = await response.json();
+        console.log('📋 Workflows data:', data);
         
         if (data.success && data.workflows) {
+            console.log(`✅ Loaded ${data.workflows.length} workflow(s)`);
             CreateTabState.workflows = data.workflows;
             renderWorkflowGrid(data.workflows);
         } else {
+            console.error('⚠️ API returned error:', data.message);
             container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">⚠️</div><div class="create-empty-state-title">Error Loading Workflows</div><div class="create-empty-state-description">${data.message || 'Unknown error'}</div></div>`;
         }
     } catch (error) {
-        console.error('Error loading workflows:', error);
+        console.error('❌ Error loading workflows:', error);
         container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">❌</div><div class="create-empty-state-title">Connection Error</div><div class="create-empty-state-description">${error.message}</div></div>`;
     }
 }
@@ -97,6 +143,9 @@ async function selectWorkflow(workflowId) {
     
     CreateTabState.selectedWorkflow = workflowId;
     
+    // Clean up previous components
+    cleanupComponents();
+    
     // Show loading state in form container
     const formContainer = document.getElementById('create-form-container');
     if (formContainer) {
@@ -111,7 +160,13 @@ async function selectWorkflow(workflowId) {
         if (data.success && data.workflow) {
             CreateTabState.workflowDetails = data.workflow;
             CreateTabState.formValues = {};
-            renderWorkflowForm(data.workflow);
+            
+            // Use section-based layout if workflow defines it
+            if (data.workflow.layout && data.workflow.layout.sections) {
+                renderWorkflowFormWithSections(data.workflow);
+            } else {
+                renderWorkflowForm(data.workflow);
+            }
             showExecuteSection(true);
         } else {
             if (formContainer) {
@@ -144,24 +199,6 @@ function renderWorkflowForm(workflow) {
         </div>
     `;
     
-    // Presets (if available)
-    if (workflow.presets && workflow.presets.length > 0) {
-        html += `
-            <div class="create-form-section">
-                <div class="create-form-section-header">
-                    <h4 class="create-form-section-title">⚡ Quick Presets</h4>
-                </div>
-                <div class="presets-container">
-                    ${workflow.presets.map((preset, idx) => `
-                        <button class="preset-button" onclick="applyPreset(${idx})" title="${escapeHtml(preset.description || '')}">
-                            ${escapeHtml(preset.name)}
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
     // Main inputs
     if (workflow.inputs && workflow.inputs.length > 0) {
         html += `
@@ -191,11 +228,6 @@ function renderWorkflowForm(workflow) {
         `;
     }
     
-    // Requirements info
-    if (workflow.requirements) {
-        html += renderRequirementsInfo(workflow.requirements);
-    }
-    
     formContainer.innerHTML = html;
     formContainer.style.display = 'block';
     
@@ -204,21 +236,27 @@ function renderWorkflowForm(workflow) {
 }
 
 /**
- * Render a single form field
- * @param {Object} field - Field definition
- * @returns {string} HTML string
+ * Render a single form field based on type
+ * Supports both simple HTML-rendered fields and complex component-based fields
+ * @param {Object} field - Field definition from webui.yml
+ * @returns {string|HTMLElement} HTML string or DOM element
  */
 function renderFormField(field) {
     const id = `create-field-${field.id}`;
     const requiredClass = field.required ? 'required' : '';
     const description = field.description ? `<div class="field-description">${escapeHtml(field.description)}</div>` : '';
     
+    // Check for advanced component types that need JavaScript components
+    if (isAdvancedComponentType(field.type)) {
+        return renderAdvancedComponent(field);
+    }
+    
     let inputHtml = '';
     
     switch (field.type) {
         case 'image':
             inputHtml = `
-                <div class="image-upload-container" id="${id}-container" onclick="document.getElementById('${id}').click()">
+                <div class="image-upload-container" id="${id}-container">
                     <input type="file" id="${id}" accept="${field.accept || 'image/*'}" onchange="handleImageUpload('${field.id}', this)">
                     <div class="image-upload-icon">📷</div>
                     <div class="image-upload-text">Click or drag to upload image</div>
@@ -336,42 +374,6 @@ function renderFormField(field) {
 }
 
 /**
- * Render requirements info section
- * @param {Object} requirements - Requirements object
- * @returns {string} HTML string
- */
-function renderRequirementsInfo(requirements) {
-    let items = [];
-    
-    if (requirements.vram) {
-        items.push(`<span class="workflow-requirement-item"><span class="workflow-requirement-icon">🎮</span> ${escapeHtml(requirements.vram)}</span>`);
-    }
-    
-    if (requirements.compute) {
-        items.push(`<span class="workflow-requirement-item"><span class="workflow-requirement-icon">💻</span> ${escapeHtml(requirements.compute)}</span>`);
-    }
-    
-    if (requirements.models && requirements.models.length > 0) {
-        items.push(`<span class="workflow-requirement-item"><span class="workflow-requirement-icon">📦</span> ${requirements.models.length} model(s) required</span>`);
-    }
-    
-    if (requirements.custom_nodes && requirements.custom_nodes.length > 0) {
-        items.push(`<span class="workflow-requirement-item"><span class="workflow-requirement-icon">🔌</span> ${requirements.custom_nodes.length} custom node(s)</span>`);
-    }
-    
-    if (items.length === 0) return '';
-    
-    return `
-        <div class="workflow-requirements">
-            <div class="workflow-requirements-title">📋 Requirements</div>
-            <div class="workflow-requirements-list">
-                ${items.join('')}
-            </div>
-        </div>
-    `;
-}
-
-/**
  * Initialize form values with defaults from workflow
  * @param {Object} workflow - Workflow details
  */
@@ -480,7 +482,8 @@ function handleImageUpload(fieldId, input) {
         clearBtn.className = 'image-upload-clear';
         clearBtn.title = 'Remove';
         clearBtn.textContent = '✕';
-        clearBtn.addEventListener('click', function() {
+        clearBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent triggering container click
             clearImageUpload(fieldId);
         });
         
@@ -488,6 +491,15 @@ function handleImageUpload(fieldId, input) {
         container.appendChild(img);
         container.appendChild(clearBtn);
         container.classList.add('has-image');
+        
+        // Re-add click handler to container to allow changing the image
+        container.onclick = function(e) {
+            // Don't trigger if clicking the clear button
+            if (e.target === clearBtn || e.target.closest('.image-upload-clear')) {
+                return;
+            }
+            fileInput.click();
+        };
         
         // Store base64 data
         updateFormValue(fieldId, e.target.result);
@@ -510,6 +522,11 @@ function clearImageUpload(fieldId) {
     `;
     container.classList.remove('has-image');
     
+    // Re-add click handler to container
+    container.onclick = function() {
+        document.getElementById(`create-field-${fieldId}`).click();
+    };
+    
     updateFormValue(fieldId, null);
 }
 
@@ -517,40 +534,6 @@ function clearImageUpload(fieldId) {
  * Apply a preset to the form
  * @param {number} presetIndex - Index of the preset
  */
-function applyPreset(presetIndex) {
-    const workflow = CreateTabState.workflowDetails;
-    if (!workflow || !workflow.presets || !workflow.presets[presetIndex]) return;
-    
-    const preset = workflow.presets[presetIndex];
-    const values = preset.values || {};
-    
-    // Apply each preset value
-    Object.entries(values).forEach(([fieldId, value]) => {
-        updateFormValue(fieldId, value);
-        
-        // Update the UI
-        const input = document.getElementById(`create-field-${fieldId}`);
-        if (input) {
-            if (input.type === 'checkbox') {
-                input.checked = value;
-            } else if (input.type === 'range') {
-                input.value = value;
-                const valueInput = document.getElementById(`create-field-${fieldId}-value`);
-                if (valueInput) valueInput.value = value;
-            } else {
-                input.value = value;
-            }
-        }
-    });
-    
-    // Update preset button states
-    document.querySelectorAll('.preset-button').forEach((btn, idx) => {
-        btn.classList.toggle('active', idx === presetIndex);
-    });
-    
-    console.log(`Applied preset: ${preset.name}`);
-}
-
 /**
  * Toggle advanced section visibility
  * @param {HTMLElement} button - Toggle button element
@@ -703,13 +686,27 @@ function setupCreateTabEventListeners() {
         createSshInput.addEventListener('input', function() {
             if (vastaiSshInput) vastaiSshInput.value = this.value;
             if (resourcesSshInput) resourcesSshInput.value = this.value;
+            
+            // Update SSH connection in state and execution queue
+            CreateTabState.sshConnection = this.value;
+            if (CreateTabState.executionQueue) {
+                CreateTabState.executionQueue.setSshConnection(this.value);
+            }
         });
         
         // Initialize from other tabs if they have values
         if (vastaiSshInput?.value) {
             createSshInput.value = vastaiSshInput.value;
+            CreateTabState.sshConnection = vastaiSshInput.value;
+            if (CreateTabState.executionQueue) {
+                CreateTabState.executionQueue.setSshConnection(vastaiSshInput.value);
+            }
         } else if (resourcesSshInput?.value) {
             createSshInput.value = resourcesSshInput.value;
+            CreateTabState.sshConnection = resourcesSshInput.value;
+            if (CreateTabState.executionQueue) {
+                CreateTabState.executionQueue.setSshConnection(resourcesSshInput.value);
+            }
         }
     }
 }
@@ -726,16 +723,391 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// =========================================
+// ADVANCED COMPONENT TYPE SUPPORT
+// =========================================
+
+/**
+ * List of advanced component types that require JavaScript rendering
+ */
+const ADVANCED_COMPONENT_TYPES = [
+    'high_low_pair_model',
+    'high_low_pair_lora_list',
+    'single_model',
+    'feature_toggle_group'
+];
+
+/**
+ * Check if a field type requires advanced component rendering
+ * @param {string} type - Field type
+ * @returns {boolean}
+ */
+function isAdvancedComponentType(type) {
+    return ADVANCED_COMPONENT_TYPES.includes(type);
+}
+
+/**
+ * Render an advanced component based on field type
+ * @param {Object} field - Field definition from webui.yml
+ * @returns {HTMLElement} DOM element for the component
+ */
+function renderAdvancedComponent(field) {
+    const container = document.createElement('div');
+    container.className = 'create-form-field advanced-component';
+    container.dataset.fieldId = field.id;
+    container.dataset.fieldType = field.type;
+
+    let component = null;
+
+    switch (field.type) {
+        case 'high_low_pair_model':
+            if (typeof HighLowPairModelSelector !== 'undefined') {
+                component = new HighLowPairModelSelector(field, (id, value) => {
+                    updateFormValue(id, value);
+                });
+                container.appendChild(component.render());
+                CreateTabState.componentInstances.set(field.id, component);
+            } else {
+                container.innerHTML = `<div class="field-error">Component not loaded: HighLowPairModelSelector</div>`;
+            }
+            break;
+
+        case 'high_low_pair_lora_list':
+            if (typeof HighLowPairLoRASelector !== 'undefined') {
+                component = new HighLowPairLoRASelector(field, (id, value) => {
+                    updateFormValue(id, value);
+                });
+                container.appendChild(component.render());
+                CreateTabState.componentInstances.set(field.id, component);
+            } else {
+                container.innerHTML = `<div class="field-error">Component not loaded: HighLowPairLoRASelector</div>`;
+            }
+            break;
+
+        case 'single_model':
+            if (typeof SingleModelSelector !== 'undefined') {
+                component = new SingleModelSelector(field, (id, value) => {
+                    updateFormValue(id, value);
+                });
+                container.appendChild(component.render());
+                CreateTabState.componentInstances.set(field.id, component);
+            } else {
+                container.innerHTML = `<div class="field-error">Component not loaded: SingleModelSelector</div>`;
+            }
+            break;
+
+        case 'feature_toggle_group':
+            if (typeof FeatureToggleGroup !== 'undefined') {
+                component = new FeatureToggleGroup(field, (id, value) => {
+                    updateFormValue(id, value);
+                });
+                container.appendChild(component.render());
+                CreateTabState.componentInstances.set(field.id, component);
+            } else {
+                container.innerHTML = `<div class="field-error">Component not loaded: FeatureToggleGroup</div>`;
+            }
+            break;
+
+        default:
+            container.innerHTML = `<div class="field-error">Unknown advanced component type: ${field.type}</div>`;
+    }
+
+    return container;
+}
+
+/**
+ * Update SSH connection for all model selector components
+ * @param {string} sshConnection - SSH connection string
+ */
+function updateComponentsSSHConnection(sshConnection) {
+    CreateTabState.sshConnection = sshConnection;
+    
+    for (const [fieldId, component] of CreateTabState.componentInstances) {
+        if (component && typeof component.setSSHConnection === 'function') {
+            component.setSSHConnection(sshConnection);
+        }
+    }
+}
+
+/**
+ * Refresh all model selector components
+ * @param {boolean} forceRefresh - Force refresh bypassing cache
+ */
+async function refreshAllModelSelectors(forceRefresh = false) {
+    const refreshPromises = [];
+    
+    for (const [fieldId, component] of CreateTabState.componentInstances) {
+        if (component && typeof component.refreshModels === 'function') {
+            refreshPromises.push(component.refreshModels(forceRefresh));
+        }
+    }
+    
+    await Promise.allSettled(refreshPromises);
+}
+
+/**
+ * Get current SSH connection string from UI
+ * @returns {string|null} SSH connection string or null
+ */
+function getCurrentSSHConnection() {
+    const sshInput = document.getElementById('createSshConnectionString') || 
+                     document.getElementById('sshConnectionString') ||
+                     document.getElementById('resourcesSshConnectionString');
+    return sshInput?.value?.trim() || null;
+}
+
+/**
+ * Clean up component instances when switching workflows
+ */
+function cleanupComponents() {
+    CreateTabState.componentInstances.clear();
+}
+
+/**
+ * Render workflow form with section-based layout support
+ * @param {Object} workflow - Workflow details with layout config
+ */
+function renderWorkflowFormWithSections(workflow) {
+    const formContainer = document.getElementById('create-form-container');
+    if (!formContainer) return;
+
+    // Clear existing components
+    cleanupComponents();
+
+    // Check if workflow has section-based layout
+    if (workflow.layout && workflow.layout.sections) {
+        renderSectionBasedLayout(workflow, formContainer);
+    } else {
+        // Fall back to standard rendering
+        renderWorkflowForm(workflow);
+    }
+}
+
+/**
+ * Render form using section-based layout from webui.yml
+ * @param {Object} workflow - Workflow configuration
+ * @param {HTMLElement} container - Form container element
+ */
+function renderSectionBasedLayout(workflow, container) {
+    let html = '';
+    
+    // Workflow info header
+    html += `
+        <div class="create-form-section">
+            <h3 style="margin: 0 0 var(--size-4-2) 0;">${escapeHtml(workflow.name)}</h3>
+            <p style="margin: 0; color: var(--text-muted);">${escapeHtml(workflow.description)}</p>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+
+    // Build sections based on layout
+    const allInputs = [...(workflow.inputs || []), ...(workflow.advanced || [])];
+    const sections = workflow.layout.sections;
+    
+    for (const sectionConfig of sections) {
+        const sectionEl = document.createElement('div');
+        sectionEl.className = 'create-form-section';
+        sectionEl.id = `section-${sectionConfig.id}`;
+        
+        // Section header
+        const headerHtml = `
+            <div class="create-form-section-header">
+                <h4 class="create-form-section-title">${escapeHtml(sectionConfig.title)}</h4>
+                <button class="create-form-section-toggle ${sectionConfig.collapsed ? 'collapsed' : ''}" 
+                        onclick="toggleSection('${sectionConfig.id}')" 
+                        aria-expanded="${!sectionConfig.collapsed}">
+                    ${sectionConfig.collapsed ? '▶' : '▼'}
+                </button>
+            </div>
+        `;
+        sectionEl.innerHTML = headerHtml;
+        
+        // Section content
+        const contentEl = document.createElement('div');
+        contentEl.className = `create-form-section-content ${sectionConfig.collapsed ? 'collapsed' : ''}`;
+        contentEl.id = `section-content-${sectionConfig.id}`;
+        
+        // Add inputs that belong to this section
+        const sectionInputs = allInputs.filter(input => input.section === sectionConfig.id);
+        
+        for (const input of sectionInputs) {
+            const fieldContent = renderFormField(input);
+            if (typeof fieldContent === 'string') {
+                contentEl.innerHTML += fieldContent;
+            } else {
+                contentEl.appendChild(fieldContent);
+            }
+        }
+        
+        sectionEl.appendChild(contentEl);
+        container.appendChild(sectionEl);
+    }
+    
+    // Add any inputs without a section assignment to an "Other" section
+    const unassignedInputs = allInputs.filter(input => 
+        !input.section || !sections.find(s => s.id === input.section)
+    );
+    
+    if (unassignedInputs.length > 0) {
+        const otherSection = document.createElement('div');
+        otherSection.className = 'create-form-section';
+        otherSection.innerHTML = `
+            <div class="create-form-section-header">
+                <h4 class="create-form-section-title">📋 Other Settings</h4>
+            </div>
+        `;
+        
+        const contentEl = document.createElement('div');
+        contentEl.className = 'create-form-section-content';
+        
+        for (const input of unassignedInputs) {
+            const fieldContent = renderFormField(input);
+            if (typeof fieldContent === 'string') {
+                contentEl.innerHTML += fieldContent;
+            } else {
+                contentEl.appendChild(fieldContent);
+            }
+        }
+        
+        otherSection.appendChild(contentEl);
+        container.appendChild(otherSection);
+    }
+    
+    container.style.display = 'block';
+    
+    // Initialize form values with defaults
+    initializeFormDefaults(workflow);
+    
+    // Update SSH connection for components
+    const sshConnection = getCurrentSSHConnection();
+    if (sshConnection) {
+        updateComponentsSSHConnection(sshConnection);
+        // Auto-refresh model selectors
+        refreshAllModelSelectors(false);
+    }
+}
+
+/**
+ * Toggle a section's collapsed state
+ * @param {string} sectionId - Section ID to toggle
+ */
+function toggleSection(sectionId) {
+    const content = document.getElementById(`section-content-${sectionId}`);
+    const button = document.querySelector(`#section-${sectionId} .create-form-section-toggle`);
+    
+    if (!content || !button) return;
+    
+    const isCollapsed = content.classList.contains('collapsed');
+    content.classList.toggle('collapsed');
+    button.classList.toggle('collapsed');
+    button.textContent = isCollapsed ? '▼' : '▶';
+    button.setAttribute('aria-expanded', isCollapsed);
+}
+
+/**
+ * Export the generated workflow JSON file
+ */
+async function exportWorkflowJSON() {
+    const workflowId = CreateTabState.selectedWorkflow;
+    if (!workflowId) {
+        showCreateError('Please select a workflow first');
+        return;
+    }
+
+    const workflow = CreateTabState.workflowDetails;
+    if (!workflow) {
+        showCreateError('Workflow details not loaded');
+        return;
+    }
+
+    try {
+        // Log form values for debugging
+        console.log('Form values being sent:', CreateTabState.formValues);
+        
+        // Generate the workflow JSON with current form values
+        const response = await fetch('/create/generate-workflow', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                workflow_id: workflowId,
+                inputs: CreateTabState.formValues
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.workflow) {
+            // Create a blob from the workflow JSON
+            const blob = new Blob([JSON.stringify(data.workflow, null, 2)], {
+                type: 'application/json'
+            });
+
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Generate filename with timestamp
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `${workflowId}_${timestamp}.json`;
+            
+            // Trigger download
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showCreateSuccess('Workflow JSON exported successfully!');
+        } else {
+            // Log detailed validation errors for debugging
+            if (data.errors && Array.isArray(data.errors)) {
+                console.error('Validation errors:');
+                data.errors.forEach(err => {
+                    console.error(`  - ${err.field}: ${err.message}`);
+                });
+                const errorMessages = data.errors.map(e => `• ${e.field}: ${e.message}`).join('\n');
+                showCreateError(`Validation failed:\n${errorMessages}`);
+            } else {
+                console.error('Error response:', data);
+                showCreateError(data.message || 'Failed to generate workflow JSON');
+            }
+        }
+    } catch (error) {
+        console.error('Error exporting workflow:', error);
+        showCreateError(`Error: ${error.message}`);
+    }
+}
+
+/**
+ * Refresh execution queue
+ */
+async function refreshExecutionQueue() {
+    if (CreateTabState.executionQueue) {
+        await CreateTabState.executionQueue.refresh();
+    }
+}
+
 // Export for use in HTML
 window.initCreateTab = initCreateTab;
 window.loadWorkflows = loadWorkflows;
 window.selectWorkflow = selectWorkflow;
-window.applyPreset = applyPreset;
 window.toggleAdvancedSection = toggleAdvancedSection;
 window.executeWorkflow = executeWorkflow;
+window.exportWorkflowJSON = exportWorkflowJSON;
 window.updateFormValue = updateFormValue;
 window.updateSliderValue = updateSliderValue;
 window.updateSliderFromInput = updateSliderFromInput;
 window.randomizeSeed = randomizeSeed;
 window.handleImageUpload = handleImageUpload;
 window.clearImageUpload = clearImageUpload;
+// New exports for advanced components
+window.toggleSection = toggleSection;
+window.updateComponentsSSHConnection = updateComponentsSSHConnection;
+window.refreshAllModelSelectors = refreshAllModelSelectors;
+window.renderWorkflowFormWithSections = renderWorkflowFormWithSections;
+window.refreshExecutionQueue = refreshExecutionQueue;

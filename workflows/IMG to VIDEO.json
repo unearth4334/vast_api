@@ -304,7 +304,10 @@
   },
   "451": {
     "inputs": {
-      "string_a": "",
+      "string_a": [
+        "478",
+        0
+      ],
       "string_b": [
         "408",
         0
@@ -408,10 +411,7 @@
   "465": {
     "inputs": {
       "add_noise": "disable",
-      "noise_seed": [
-        "470",
-        0
-      ],
+      "noise_seed": 495100899429947,
       "steps": [
         "82",
         0
@@ -453,10 +453,7 @@
   "466": {
     "inputs": {
       "add_noise": "enable",
-      "noise_seed": [
-        "470",
-        0
-      ],
+      "noise_seed": 495100899429947,
       "steps": [
         "82",
         0
@@ -543,19 +540,6 @@
       "title": "VAE Decode"
     }
   },
-  "470": {
-    "inputs": {
-      "output_type": "int",
-      "*": [
-        "497",
-        0
-      ]
-    },
-    "class_type": "easy convertAnything",
-    "_meta": {
-      "title": "Convert Any"
-    }
-  },
   "471": {
     "inputs": {
       "PowerLoraLoaderHeaderWidget": {
@@ -574,6 +558,140 @@
     "class_type": "Power Lora Loader (rgthree)",
     "_meta": {
       "title": "LoRA - Low noise"
+    }
+  },
+  "472": {
+    "inputs": {
+      "find": "illustration",
+      "replace": "video",
+      "text": [
+        "476",
+        0
+      ]
+    },
+    "class_type": "Text Find and Replace",
+    "_meta": {
+      "title": "Find and Replace"
+    }
+  },
+  "473": {
+    "inputs": {
+      "model": "MiaoshouAI/Florence-2-base-PromptGen-v2.0",
+      "precision": "fp16",
+      "attention": "sdpa",
+      "convert_to_safetensors": false
+    },
+    "class_type": "DownloadAndLoadFlorence2Model",
+    "_meta": {
+      "title": "Florence Model"
+    }
+  },
+  "474": {
+    "inputs": {
+      "find": "photo",
+      "replace": "video",
+      "text": [
+        "480",
+        2
+      ]
+    },
+    "class_type": "Text Find and Replace",
+    "_meta": {
+      "title": "Find and Replace"
+    }
+  },
+  "475": {
+    "inputs": {
+      "find": "image",
+      "replace": "video",
+      "text": [
+        "474",
+        0
+      ]
+    },
+    "class_type": "Text Find and Replace",
+    "_meta": {
+      "title": "Find and Replace"
+    }
+  },
+  "476": {
+    "inputs": {
+      "find": "painting",
+      "replace": "video",
+      "text": [
+        "475",
+        0
+      ]
+    },
+    "class_type": "Text Find and Replace",
+    "_meta": {
+      "title": "Find and Replace"
+    }
+  },
+  "477": {
+    "inputs": {
+      "find": "drawing",
+      "replace": "video",
+      "text": [
+        "472",
+        0
+      ]
+    },
+    "class_type": "Text Find and Replace",
+    "_meta": {
+      "title": "Find and Replace"
+    }
+  },
+  "478": {
+    "inputs": {
+      "find": "portrait",
+      "replace": "video",
+      "text": [
+        "477",
+        0
+      ]
+    },
+    "class_type": "Text Find and Replace",
+    "_meta": {
+      "title": "Find and Replace"
+    }
+  },
+  "479": {
+    "inputs": {
+      "text": "",
+      "anything": [
+        "451",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Final prompt preview"
+    }
+  },
+  "480": {
+    "inputs": {
+      "text_input": "",
+      "task": "detailed_caption",
+      "fill_mask": true,
+      "keep_model_loaded": false,
+      "max_new_tokens": 1024,
+      "num_beams": 3,
+      "do_sample": true,
+      "output_mask_select": "",
+      "seed": 777777777777777,
+      "image": [
+        "401",
+        0
+      ],
+      "florence2_model": [
+        "473",
+        0
+      ]
+    },
+    "class_type": "Florence2Run",
+    "_meta": {
+      "title": "Florence2Run"
     }
   },
   "481": {
@@ -687,23 +805,6 @@
     "class_type": "mxSlider",
     "_meta": {
       "title": "Frame rate"
-    }
-  },
-  "497": {
-    "inputs": {
-      "id": 0,
-      "widget_name": "noise_seed",
-      "return_all": false,
-      "node_title": "",
-      "allowed_float_decimals": 2,
-      "any_input": [
-        "73",
-        0
-      ]
-    },
-    "class_type": "WidgetToString",
-    "_meta": {
-      "title": "Widget To String"
     }
   },
   "500": {

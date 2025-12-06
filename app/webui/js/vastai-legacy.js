@@ -122,7 +122,11 @@ function normalizeInstance(raw) {
   const i = { ...raw };
 
   const id = i.id ?? i.instance_id ?? i.vast_id ?? i._id;
-  const status = normStatus(i.actual_status ?? i.status ?? i.state ?? i.instance_status ?? i.cur_state);
+  // Use actual_status if it exists (even if null), otherwise fall back to other fields
+  const statusValue = ('actual_status' in i) 
+    ? i.actual_status 
+    : (i.status ?? i.state ?? i.instance_status ?? i.cur_state);
+  const status = normStatus(statusValue ?? 'unknown');
 
   // GPU fields
   const gpuName =
@@ -204,25 +208,9 @@ function buildSSHString(inst) {
 
 // ---------- UI feedback ----------
 function showSetupResult(message, type) {
-  console.log(`📢 showSetupResult called: "${message}" (${type})`);
-  const resultDiv = document.getElementById('setup-result');
-  console.log(`📍 setup-result element exists:`, !!resultDiv);
-  if (!resultDiv) {
-    console.log(`❌ setup-result element not found!`);
-    return;
-  }
-  resultDiv.textContent = message;
-  resultDiv.className = 'setup-result ' + type;
-  resultDiv.style.display = 'block';
-  console.log(`✅ Result displayed: "${message}"`);  
-
-  if (type === 'info') {
-    setTimeout(() => {
-      if (resultDiv.classList.contains('info')) {
-        resultDiv.style.display = 'none';
-      }
-    }, 5000);
-  }
+  // Disabled: setup-result element removed as it was distracting during workflow execution
+  // Messages are shown in workflow progress UI instead
+  return;
 }
 
 // ---------- VastAI: SSH test, set/get UI_HOME, terminate, install civitdl ----------
@@ -450,7 +438,11 @@ async function refreshInstanceCard(instanceId) {
     
     // Use the same SSH port resolution logic as resolveSSH()
     const { port: sshPort } = resolveSSH(inst);
-    const state = normStatus(inst.actual_status || inst.cur_state || inst.status || 'unknown');
+    // Use actual_status if it exists (even if null), otherwise fall back to other fields
+    const statusValue = ('actual_status' in inst) 
+      ? inst.actual_status 
+      : (inst.cur_state || inst.status);
+    const state = normStatus(statusValue || 'unknown');
 
     const sshConnection = (sshHost && sshPort)
       ? `ssh -p ${sshPort} root@${sshHost} -L 8080:localhost:8080`

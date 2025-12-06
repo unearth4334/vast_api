@@ -30,7 +30,7 @@ except Exception as e:
 
 
 def extract_commands_from_resource(resource):
-    """Extract bash commands from resource's download_command field"""
+    """Extract bash commands from resource's download_command field with associated comments"""
     # The ResourceParser already extracted the download_command
     download_command = resource.get('download_command', '')
     
@@ -41,22 +41,42 @@ def extract_commands_from_resource(resource):
     lines = download_command.split('\n')
     commands = []
     current_command = []
+    current_comment = None
     
     for line in lines:
         line = line.strip()
-        if not line or line.startswith('#'):
+        if not line:
             continue
         
+        # Check if this is a comment line
+        if line.startswith('#'):
+            # Store the comment for the next command
+            comment_text = line[1:].strip()
+            if comment_text:  # Only store non-empty comments
+                current_comment = comment_text
+            continue
+        
+        # This is a command line
         if line.endswith('\\'):
             current_command.append(line[:-1].strip())
         else:
             current_command.append(line)
-            commands.append(' '.join(current_command))
+            full_command = ' '.join(current_command)
+            # Store command with its associated comment
+            commands.append({
+                'command': full_command,
+                'comment': current_comment
+            })
             current_command = []
+            current_comment = None  # Reset comment after use
     
     # Handle any remaining command
     if current_command:
-        commands.append(' '.join(current_command))
+        full_command = ' '.join(current_command)
+        commands.append({
+            'command': full_command,
+            'comment': current_comment
+        })
     
     return commands
 
@@ -88,8 +108,20 @@ def add_to_queue():
     
     instance_id = extract_instance_id_from_ssh(ssh_connection)
     
-    # Get resource details and extract commands
-    all_commands = []
+    # Create separate jobs for each resource
+    created_jobs = []
+    queue = []
+    status = []
+    
+    # Load existing queue and status
+    if QUEUE_PATH.exists():
+        with open(QUEUE_PATH, 'r') as f:
+            queue = json.load(f)
+    
+    if STATUS_PATH.exists():
+        with open(STATUS_PATH, 'r') as f:
+            status = json.load(f)
+    
     for resource_obj in resource_paths:
         # Extract filepath from resource object (can be dict or string)
         resource_path = resource_obj.get('filepath') if isinstance(resource_obj, dict) else resource_obj
@@ -97,58 +129,80 @@ def add_to_queue():
         if resource_manager:
             resource = resource_manager.get_resource(resource_path)
             if resource:
-                commands = extract_commands_from_resource(resource)
-                all_commands.extend(commands)
+                commands_with_comments = extract_commands_from_resource(resource)
+                
+                if not commands_with_comments:
+                    continue  # Skip resources with no commands
+                
+                # If there are multiple commands, create separate jobs for each
+                # This is important for checkpoints with high/low noise variants
+                for cmd_obj in commands_with_comments:
+                    command = cmd_obj['command']
+                    comment = cmd_obj.get('comment')
+                    
+                    # Determine the display name and variant tag
+                    display_name = resource_path
+                    variant_tag = None
+                    
+                    if comment:
+                        # Check for common variant patterns in comments
+                        comment_lower = comment.lower()
+                        if 'high noise' in comment_lower or 'high-noise' in comment_lower:
+                            variant_tag = 'high-noise'
+                            display_name = f"{resource_path} (High Noise)"
+                        elif 'low noise' in comment_lower or 'low-noise' in comment_lower:
+                            variant_tag = 'low-noise'
+                            display_name = f"{resource_path} (Low Noise)"
+                    
+                    # Create a separate job for this command
+                    job = {
+                        'id': str(uuid.uuid4()),
+                        'instance_id': instance_id,
+                        'ssh_connection': ssh_connection,
+                        'ui_home': ui_home,
+                        'resource_paths': [resource_path],
+                        'display_name': display_name,
+                        'variant_tag': variant_tag,
+                        'commands': [command],  # Single command per job
+                        'total_commands': 1,
+                        'command_index': 0,
+                        'added_at': datetime.utcnow().isoformat() + 'Z',
+                        'status': 'PENDING',
+                    }
+                    
+                    queue.append(job)
+                    created_jobs.append(job)
+                    
+                    # Initialize status entry
+                    status.append({
+                        'id': job['id'],
+                        'instance_id': instance_id,
+                        'added_at': job['added_at'],
+                        'status': 'PENDING',
+                        'display_name': display_name,
+                        'variant_tag': variant_tag,
+                        'total_commands': 1,
+                        'command_index': 0,
+                        'progress': {}
+                    })
     
-    if not all_commands:
+    if not created_jobs:
         return jsonify({
             'success': False,
             'message': 'No download commands found in selected resources'
         }), 400
     
-    # Create job
-    job = {
-        'id': str(uuid.uuid4()),
-        'instance_id': instance_id,
-        'ssh_connection': ssh_connection,
-        'ui_home': ui_home,
-        'resource_paths': resource_paths,
-        'commands': all_commands,
-        'added_at': datetime.utcnow().isoformat() + 'Z',
-        'status': 'PENDING',
-    }
-    
-    # Add to queue
-    queue = []
-    if QUEUE_PATH.exists():
-        with open(QUEUE_PATH, 'r') as f:
-            queue = json.load(f)
-    
-    queue.append(job)
-    
+    # Save queue and status
     with open(QUEUE_PATH, 'w') as f:
         json.dump(queue, f, indent=2)
-    
-    # Initialize status entry
-    status = []
-    if STATUS_PATH.exists():
-        with open(STATUS_PATH, 'r') as f:
-            status = json.load(f)
-    
-    status.append({
-        'id': job['id'],
-        'instance_id': instance_id,
-        'added_at': job['added_at'],
-        'status': 'PENDING',
-        'progress': {}
-    })
     
     with open(STATUS_PATH, 'w') as f:
         json.dump(status, f, indent=2)
     
     return jsonify({
         'success': True,
-        'job': job
+        'jobs': created_jobs,
+        'count': len(created_jobs)
     })
 
 

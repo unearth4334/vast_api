@@ -132,7 +132,15 @@ class TestCreateAPI(unittest.TestCase):
                                     'workflow_id': 'img_to_video',
                                     'inputs': {
                                         'positive_prompt': 'test prompt',
-                                        'duration': 5
+                                        'duration': 5,
+                                        'input_image': 'test_image.png',
+                                        'main_model': {
+                                            'highNoisePath': 'test/high_noise.safetensors',
+                                            'lowNoisePath': 'test/low_noise.safetensors'
+                                        },
+                                        'clip_model': 'test/clip_model.safetensors',
+                                        'vae_model': 'test/vae_model.safetensors',
+                                        'upscale_model': 'test/upscale_model.pth'
                                     }
                                 },
                                 content_type='application/json')
@@ -173,6 +181,246 @@ class TestCreateAPI(unittest.TestCase):
         """Test OPTIONS request for execute endpoint"""
         response = self.app.options('/create/execute')
         self.assertEqual(response.status_code, 204)
+
+    # --- New tests for generate-workflow endpoint ---
+    
+    def test_generate_workflow_missing_workflow_id(self):
+        """Test generate-workflow endpoint with missing workflow_id"""
+        response = self.app.post('/create/generate-workflow',
+                                json={'inputs': {}},
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('workflow_id is required', data['message'])
+
+    def test_generate_workflow_nonexistent_workflow(self):
+        """Test generate-workflow endpoint with non-existent workflow"""
+        response = self.app.post('/create/generate-workflow',
+                                json={'workflow_id': 'nonexistent'},
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 404)
+        
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+
+    def test_generate_workflow_validation_failure(self):
+        """Test generate-workflow endpoint with validation failure"""
+        response = self.app.post('/create/generate-workflow',
+                                json={
+                                    'workflow_id': 'img_to_video',
+                                    'inputs': {
+                                        'duration': 5
+                                        # Missing required fields
+                                    }
+                                },
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('errors', data)
+        self.assertIsInstance(data['errors'], list)
+        self.assertGreater(len(data['errors']), 0)
+
+    def test_generate_workflow_valid_request(self):
+        """Test generate-workflow endpoint with valid request"""
+        response = self.app.post('/create/generate-workflow',
+                                json={
+                                    'workflow_id': 'img_to_video',
+                                    'inputs': {
+                                        'positive_prompt': 'test prompt',
+                                        'duration': 5,
+                                        'input_image': 'test_image.png',
+                                        'main_model': {
+                                            'highNoisePath': 'test/high_noise.safetensors',
+                                            'lowNoisePath': 'test/low_noise.safetensors'
+                                        },
+                                        'clip_model': 'test/clip_model.safetensors',
+                                        'vae_model': 'test/vae_model.safetensors',
+                                        'upscale_model': 'test/upscale_model.pth'
+                                    }
+                                },
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertTrue(data['success'])
+        self.assertIn('workflow', data)
+        self.assertIn('metadata', data)
+        self.assertIsInstance(data['workflow'], dict)
+        self.assertIn('workflow_id', data['metadata'])
+        self.assertIn('generated_at', data['metadata'])
+
+    def test_generate_workflow_applies_inputs(self):
+        """Test that generate-workflow actually applies input values"""
+        response = self.app.post('/create/generate-workflow',
+                                json={
+                                    'workflow_id': 'img_to_video',
+                                    'inputs': {
+                                        'positive_prompt': 'test prompt for verification',
+                                        'duration': 7.5,
+                                        'steps': 25,
+                                        'input_image': 'test_image.png',
+                                        'main_model': {
+                                            'highNoisePath': 'test/high_noise.safetensors',
+                                            'lowNoisePath': 'test/low_noise.safetensors'
+                                        },
+                                        'clip_model': 'test/clip_model.safetensors',
+                                        'vae_model': 'test/vae_model.safetensors',
+                                        'upscale_model': 'test/upscale_model.pth'
+                                    }
+                                },
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        workflow = data['workflow']
+        
+        # Check that duration was applied (node 426, field Xi)
+        self.assertEqual(workflow['426']['inputs']['Xi'], 7.5)
+        
+        # Check that steps were applied (node 82, fields Xi and Xf)
+        self.assertEqual(workflow['82']['inputs']['Xi'], 25)
+        self.assertEqual(workflow['82']['inputs']['Xf'], 25)
+        
+        # Check that image was applied (node 88, field image)
+        self.assertEqual(workflow['88']['inputs']['image'], 'test_image.png')
+
+    def test_options_request_generate_workflow(self):
+        """Test OPTIONS request for generate-workflow endpoint"""
+        response = self.app.options('/create/generate-workflow')
+        self.assertEqual(response.status_code, 204)
+
+    # --- New tests for cancel endpoint ---
+
+    def test_cancel_nonexistent_task(self):
+        """Test cancel endpoint with non-existent task"""
+        response = self.app.post('/create/cancel/nonexistent-task-id',
+                                content_type='application/json')
+        self.assertEqual(response.status_code, 404)
+        
+        data = json.loads(response.data)
+        self.assertFalse(data['success'])
+        self.assertIn('Task not found', data['message'])
+
+    def test_cancel_valid_task(self):
+        """Test cancel endpoint with a valid task"""
+        # First, create a task by executing a workflow
+        execute_response = self.app.post('/create/execute',
+                                json={
+                                    'ssh_connection': 'ssh -p 2838 root@test',
+                                    'workflow_id': 'img_to_video',
+                                    'inputs': {
+                                        'positive_prompt': 'test prompt',
+                                        'duration': 5,
+                                        'input_image': 'test_image.png',
+                                        'main_model': {
+                                            'highNoisePath': 'test/high_noise.safetensors',
+                                            'lowNoisePath': 'test/low_noise.safetensors'
+                                        },
+                                        'clip_model': 'test/clip_model.safetensors',
+                                        'vae_model': 'test/vae_model.safetensors',
+                                        'upscale_model': 'test/upscale_model.pth'
+                                    }
+                                },
+                                content_type='application/json')
+        
+        execute_data = json.loads(execute_response.data)
+        task_id = execute_data['task_id']
+        
+        # Now cancel it
+        cancel_response = self.app.post(f'/create/cancel/{task_id}',
+                                content_type='application/json')
+        self.assertEqual(cancel_response.status_code, 200)
+        
+        cancel_data = json.loads(cancel_response.data)
+        self.assertTrue(cancel_data['success'])
+        self.assertEqual(cancel_data['task_id'], task_id)
+        self.assertIn('cancelled successfully', cancel_data['message'])
+
+    def test_cancel_already_cancelled_task(self):
+        """Test cancel endpoint with already cancelled task"""
+        # First, create and cancel a task
+        execute_response = self.app.post('/create/execute',
+                                json={
+                                    'ssh_connection': 'ssh -p 2838 root@test',
+                                    'workflow_id': 'img_to_video',
+                                    'inputs': {
+                                        'positive_prompt': 'test prompt',
+                                        'duration': 5,
+                                        'input_image': 'test_image.png',
+                                        'main_model': {
+                                            'highNoisePath': 'test/high_noise.safetensors',
+                                            'lowNoisePath': 'test/low_noise.safetensors'
+                                        },
+                                        'clip_model': 'test/clip_model.safetensors',
+                                        'vae_model': 'test/vae_model.safetensors',
+                                        'upscale_model': 'test/upscale_model.pth'
+                                    }
+                                },
+                                content_type='application/json')
+        
+        execute_data = json.loads(execute_response.data)
+        task_id = execute_data['task_id']
+        
+        # Cancel it first time
+        self.app.post(f'/create/cancel/{task_id}', content_type='application/json')
+        
+        # Try to cancel again
+        cancel_response = self.app.post(f'/create/cancel/{task_id}',
+                                content_type='application/json')
+        self.assertEqual(cancel_response.status_code, 400)
+        
+        cancel_data = json.loads(cancel_response.data)
+        self.assertFalse(cancel_data['success'])
+        self.assertIn('Cannot cancel task with status', cancel_data['message'])
+
+    def test_options_request_cancel(self):
+        """Test OPTIONS request for cancel endpoint"""
+        response = self.app.options('/create/cancel/test-task-id')
+        self.assertEqual(response.status_code, 204)
+
+    # --- Tests for enhanced status endpoint ---
+
+    def test_status_returns_task_details(self):
+        """Test status endpoint returns full task details for registered task"""
+        # First, create a task
+        execute_response = self.app.post('/create/execute',
+                                json={
+                                    'ssh_connection': 'ssh -p 2838 root@test',
+                                    'workflow_id': 'img_to_video',
+                                    'inputs': {
+                                        'positive_prompt': 'test prompt',
+                                        'duration': 5,
+                                        'input_image': 'test_image.png',
+                                        'main_model': {
+                                            'highNoisePath': 'test/high_noise.safetensors',
+                                            'lowNoisePath': 'test/low_noise.safetensors'
+                                        },
+                                        'clip_model': 'test/clip_model.safetensors',
+                                        'vae_model': 'test/vae_model.safetensors',
+                                        'upscale_model': 'test/upscale_model.pth'
+                                    }
+                                },
+                                content_type='application/json')
+        
+        execute_data = json.loads(execute_response.data)
+        task_id = execute_data['task_id']
+        
+        # Get status
+        status_response = self.app.get(f'/create/status/{task_id}')
+        self.assertEqual(status_response.status_code, 200)
+        
+        status_data = json.loads(status_response.data)
+        self.assertTrue(status_data['success'])
+        self.assertEqual(status_data['task_id'], task_id)
+        self.assertEqual(status_data['workflow_id'], 'img_to_video')
+        self.assertIn('status', status_data)
+        self.assertIn('progress', status_data)
+        self.assertIn('started_at', status_data)
+        self.assertIn('elapsed_seconds', status_data)
 
 
 if __name__ == '__main__':

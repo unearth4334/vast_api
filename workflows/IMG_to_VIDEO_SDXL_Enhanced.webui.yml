@@ -1,0 +1,645 @@
+# SDXL Enhanced IMG to VIDEO Workflow - WebUI Wrapper v2.0
+# Generate video from image using WAN 2.2, then enhance each frame with SDXL
+# Two-stage pipeline: WAN video generation → SDXL frame-by-frame enhancement
+# Changes to this file will be reflected when the workflow is reloaded in the Create tab
+
+name: "IMG to VIDEO (SDXL Enhanced)"
+description: "Generate video from image using WAN 2.2 I2V, then enhance every frame with SDXL img2img refinement and face detailing for superior quality"
+version: "2.0.0"
+category: "video"
+tags:
+  - image-to-video
+  - wan-2.2
+  - sdxl
+  - illustrious
+  - frame-enhancement
+  - video-generation
+  - 14B-model
+  - hybrid
+
+# Workflow JSON file reference (relative to this file)
+workflow_file: "IMG_to_VIDEO_SDXL_Enhanced.json"
+
+# Thumbnail/preview image (optional)
+thumbnail: null
+
+# Estimated VRAM requirement
+vram_estimate: "48GB"
+
+# Estimated generation time (in seconds, approximate)
+time_estimate:
+  min: 300
+  max: 1800
+  note: "Much longer than standard IMG to VIDEO due to per-frame SDXL processing. Duration scales with frame count."
+
+# UI Layout Configuration - Section-based layout for organized UI
+layout:
+  sections:
+    - id: "basic"
+      title: "📝 Basic Settings"
+      collapsed: false
+      
+    - id: "video_generation"
+      title: "🎬 Video Generation (WAN 2.2)"
+      collapsed: false
+      
+    - id: "sdxl_enhancement"
+      title: "✨ SDXL Frame Enhancement"
+      collapsed: false
+      
+    - id: "models"
+      title: "🎯 Model Selection"
+      collapsed: false
+      
+    - id: "features"
+      title: "🔧 Advanced Features"
+      collapsed: true
+
+# Input fields organized by section
+inputs:
+  # === BASIC SETTINGS ===
+  - id: "input_image"
+    section: "basic"
+    node_id: "88"
+    field: "image"
+    type: "image"
+    label: "Input Image"
+    description: "Source image to animate and enhance. Will be resized to fit the selected output size."
+    required: true
+    accept: "image/png,image/jpeg,image/webp"
+    max_size_mb: 10
+
+  - id: "duration"
+    section: "basic"
+    node_id: "426"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Duration"
+    description: "Video length in seconds. Longer videos take significantly more time to enhance."
+    min: 1.0
+    max: 5.0
+    step: 0.5
+    default: 3.0
+    unit: "seconds"
+
+  - id: "frame_rate"
+    section: "basic"
+    node_id: "490"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Frame Rate"
+    description: "Output frames per second. Higher FPS = more frames to enhance = longer processing."
+    min: 8.0
+    max: 16.0
+    step: 2.0
+    default: 16.0
+    unit: "FPS"
+
+  - id: "size_x"
+    section: "basic"
+    node_id: "83"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Width"
+    description: "Output width in pixels"
+    min: 512
+    max: 1920
+    step: 64
+    default: 896
+    unit: "px"
+
+  - id: "size_y"
+    section: "basic"
+    node_id: "83"
+    fields:
+      - "Yi"
+      - "Yf"
+    type: "slider"
+    label: "Height"
+    description: "Output height in pixels"
+    min: 512
+    max: 1920
+    step: 64
+    default: 1120
+    unit: "px"
+
+  # === VIDEO GENERATION (WAN 2.2) ===
+  - id: "video_prompt"
+    section: "video_generation"
+    node_id: "408"
+    field: "value"
+    type: "textarea"
+    label: "Video Prompt"
+    description: "Describe the motion and style for the video generation"
+    required: true
+    default: "The subject moves naturally with smooth cinematic motion, high quality, detailed"
+    placeholder: "Describe the desired motion..."
+    max_length: 2000
+    rows: 3
+
+  - id: "video_negative"
+    section: "video_generation"
+    node_id: "409"
+    field: "value"
+    type: "textarea"
+    label: "Video Negative Prompt"
+    description: "What to avoid in video generation"
+    required: false
+    default: "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量"
+    rows: 2
+
+  - id: "video_seed"
+    section: "video_generation"
+    node_ids:
+      - "73"
+      - "465"
+      - "466"
+    field: "noise_seed"
+    type: "seed"
+    label: "Video Generation Seed"
+    description: "Random seed for video generation (-1 for random)"
+    randomize_button: true
+    default: -1
+    control_after_generate: "randomize"
+
+  - id: "video_steps"
+    section: "video_generation"
+    node_id: "82"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Video Steps"
+    description: "Denoising steps for WAN video generation"
+    min: 10
+    max: 40
+    step: 1
+    default: 20
+
+  - id: "video_cfg"
+    section: "video_generation"
+    node_id: "85"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Video CFG"
+    description: "Prompt adherence for video generation"
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    default: 3.5
+
+  - id: "speed"
+    section: "video_generation"
+    node_id: "157"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Sampling Speed"
+    description: "ModelSamplingSD3 shift parameter"
+    min: 1.0
+    max: 15.0
+    step: 0.5
+    default: 7.0
+
+  # === SDXL FRAME ENHANCEMENT ===
+  - id: "sdxl_prompt"
+    section: "sdxl_enhancement"
+    node_id: "1004"
+    field: "string"
+    type: "textarea"
+    label: "SDXL Enhancement Prompt"
+    description: "Describe quality enhancements to apply to each frame. This is applied ON TOP of the video generation."
+    required: true
+    default: "score_9, score_8_up, score_7_up, BREAK, high quality, detailed, sharp, cinematic, enhanced, refined"
+    placeholder: "Describe quality improvements..."
+    max_length: 2000
+    rows: 3
+
+  - id: "sdxl_negative"
+    section: "sdxl_enhancement"
+    node_id: "1005"
+    field: "string"
+    type: "textarea"
+    label: "SDXL Negative Prompt"
+    description: "What to avoid in frame enhancement"
+    required: false
+    default: "worst quality, bad quality, low quality, blurry, artifacts, noise"
+    rows: 2
+
+  - id: "sdxl_seed"
+    section: "sdxl_enhancement"
+    node_id: "1003"
+    field: "seed"
+    type: "seed"
+    label: "SDXL Enhancement Seed"
+    description: "Random seed for SDXL frame enhancement (-1 for random)"
+    randomize_button: true
+    default: -1
+    control_after_generate: "randomize"
+
+  - id: "sdxl_steps"
+    section: "sdxl_enhancement"
+    node_id: "1000"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Enhancement Steps"
+    description: "Denoising steps for SDXL enhancement per frame. Higher = better but much slower."
+    min: 15
+    max: 50
+    step: 5
+    default: 30
+
+  - id: "sdxl_cfg"
+    section: "sdxl_enhancement"
+    node_id: "1001"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Enhancement CFG"
+    description: "CFG scale for SDXL frame enhancement"
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    default: 5.0
+
+  - id: "sdxl_denoise"
+    section: "sdxl_enhancement"
+    node_id: "1002"
+    fields:
+      - "Xi"
+      - "Xf"
+    type: "slider"
+    label: "Enhancement Strength"
+    description: "How much SDXL modifies each frame. Lower = preserve video, Higher = more refinement"
+    min: 0.0
+    max: 0.6
+    step: 0.05
+    default: 0.35
+
+  - id: "enable_face_detailing"
+    section: "sdxl_enhancement"
+    type: "checkbox"
+    label: "Enable Face Detailing"
+    description: "Automatically detect and enhance faces in each frame"
+    default: true
+
+  - id: "face_threshold"
+    section: "sdxl_enhancement"
+    node_id: "1016"
+    field: "bbox_threshold"
+    type: "slider"
+    label: "Face Detection Threshold"
+    description: "Sensitivity for face detection"
+    min: 0.3
+    max: 0.9
+    step: 0.05
+    default: 0.5
+    depends_on:
+      field: "enable_face_detailing"
+      value: true
+
+  # === MODEL SELECTION ===
+  - id: "wan_model"
+    section: "models"
+    node_ids:
+      - "522"
+      - "523"
+    type: "high_low_pair_model"
+    label: "WAN Model (High/Low Noise Pair)"
+    description: "Diffusion model pair for video generation"
+    required: true
+    model_type: "diffusion_models"
+    default_high: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors"
+    default_low: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
+
+  - id: "sdxl_checkpoint"
+    section: "models"
+    node_id: "1006"
+    field: "ckpt_name"
+    type: "single_model"
+    label: "SDXL Checkpoint"
+    description: "SDXL model for frame enhancement"
+    required: true
+    model_type: "checkpoints"
+    default: "WAI-illustrious-SDXL_v15.safetensors"
+
+  - id: "sdxl_lora"
+    section: "models"
+    node_id: "1007"
+    field: "lora_1.lora"
+    type: "single_model"
+    label: "SDXL LoRA"
+    description: "Optional LoRA for SDXL enhancement style"
+    required: false
+    model_type: "loras"
+    default: "UmeSky_Illustrious.safetensors"
+
+  - id: "sdxl_lora_strength"
+    section: "models"
+    node_id: "1007"
+    field: "lora_1.strength"
+    type: "slider"
+    label: "LoRA Strength"
+    description: "Influence of the SDXL LoRA"
+    min: 0.0
+    max: 1.5
+    step: 0.05
+    default: 0.5
+
+  - id: "clip_model"
+    section: "models"
+    node_id: "460"
+    field: "clip_name"
+    type: "single_model"
+    label: "CLIP Model (WAN)"
+    description: "Text encoder for WAN"
+    required: true
+    model_type: "text_encoders"
+    default: "Wan-2.2/umt5_xxl_fp16.safetensors"
+
+  - id: "vae_wan"
+    section: "models"
+    node_id: "461"
+    field: "vae_name"
+    type: "single_model"
+    label: "VAE (WAN)"
+    description: "Variational autoencoder for WAN"
+    required: true
+    model_type: "vae"
+    default: "Wan-2.1/wan_2.1_vae.safetensors"
+
+  - id: "upscale_model"
+    section: "models"
+    node_id: "384"
+    field: "model_name"
+    type: "single_model"
+    label: "Upscale Model"
+    description: "Super-resolution model (optional)"
+    required: false
+    model_type: "upscale_models"
+    default: "RealESRGAN_x4plus.pth"
+
+  # === ADVANCED FEATURES ===
+  - id: "enable_interpolation"
+    section: "features"
+    category: "Video Output"
+    type: "checkbox"
+    label: "Enable Frame Interpolation"
+    description: "Use RIFE to interpolate frames after SDXL enhancement (doubles frame rate)"
+    default: false
+
+  - id: "enable_speed_regulation"
+    section: "features"
+    category: "Performance"
+    node_ids:
+      - "467"
+      - "468"
+    type: "checkbox"
+    label: "Speed Regulation"
+    description: "ModelSamplingSD3 speed control for WAN"
+    default: true
+
+  - id: "enable_magcache"
+    section: "features"
+    category: "Performance"
+    node_ids:
+      - "505"
+      - "506"
+    type: "checkbox"
+    label: "MagCache"
+    description: "Memory optimization via caching"
+    default: true
+
+  - id: "enable_blockswap"
+    section: "features"
+    category: "Performance"
+    node_ids:
+      - "500"
+      - "501"
+    type: "checkbox"
+    label: "BlockSwap"
+    description: "VRAM reduction via model offloading"
+    default: true
+
+  - id: "sampler_sdxl"
+    section: "features"
+    category: "Advanced"
+    node_id: "1010"
+    field: "sampler_name"
+    type: "select"
+    label: "SDXL Sampler"
+    description: "Sampling algorithm for SDXL enhancement"
+    required: true
+    default: "dpmpp_2m"
+    options:
+      - value: "euler"
+        label: "Euler"
+      - value: "euler_ancestral"
+        label: "Euler Ancestral"
+      - value: "dpmpp_2m"
+        label: "DPM++ 2M"
+      - value: "dpmpp_sde"
+        label: "DPM++ SDE"
+      - value: "uni_pc"
+        label: "UniPC"
+
+  - id: "scheduler_sdxl"
+    section: "features"
+    category: "Advanced"
+    node_id: "1011"
+    field: "scheduler"
+    type: "select"
+    label: "SDXL Scheduler"
+    description: "Noise schedule for SDXL"
+    required: true
+    default: "karras"
+    options:
+      - value: "simple"
+        label: "Simple"
+      - value: "normal"
+        label: "Normal"
+      - value: "karras"
+        label: "Karras"
+      - value: "exponential"
+        label: "Exponential"
+
+# Output configuration
+outputs:
+  - id: "enhanced_video"
+    node_id: "1020"
+    type: "video"
+    format: "mp4"
+    label: "SDXL Enhanced Video"
+    description: "Video with every frame enhanced by SDXL and face detailing"
+
+  - id: "enhanced_interpolated"
+    node_id: "1023"
+    type: "video"
+    format: "mp4"
+    label: "Enhanced + Interpolated Video"
+    description: "SDXL enhanced video with RIFE frame interpolation (2x frame rate)"
+    depends_on:
+      field: "enable_interpolation"
+      value: true
+
+# Model requirements (for validation and display)
+requirements:
+  models:
+    - type: "unet"
+      name: "WAN 2.2 I2V High Noise 14B"
+      path: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors"
+      size_gb: 27.8
+    - type: "unet"
+      name: "WAN 2.2 I2V Low Noise 14B"
+      path: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
+      size_gb: 27.8
+    - type: "checkpoint"
+      name: "WAI Illustrious SDXL"
+      path: "checkpoints/WAI-illustrious-SDXL_v15.safetensors"
+      size_gb: 6.5
+    - type: "clip"
+      name: "UMT5 XXL"
+      path: "Wan-2.2/umt5_xxl_fp16.safetensors"
+      size_gb: 9.8
+    - type: "vae"
+      name: "WAN 2.1 VAE"
+      path: "Wan-2.1/wan_2.1_vae.safetensors"
+      size_gb: 0.2
+    - type: "lora"
+      name: "UmeSky Illustrious"
+      path: "loras/UmeSky_Illustrious.safetensors"
+      size_gb: 0.14
+      required: false
+    - type: "detector"
+      name: "Face YOLO v8"
+      path: "ultralytics/bbox/face_yolov8m.pt"
+      size_gb: 0.05
+    - type: "detector"
+      name: "Person Segmentation YOLO v8"
+      path: "ultralytics/segm/person_yolov8m-seg.pt"
+      size_gb: 0.05
+    - type: "sam"
+      name: "SAM ViT-B"
+      path: "sams/sam_vit_b_01ec64.pth"
+      size_gb: 0.37
+    - type: "upscale"
+      name: "RealESRGAN x4 Plus"
+      path: "upscale_models/RealESRGAN_x4plus.pth"
+      size_gb: 0.06
+      required: false
+    - type: "rife"
+      name: "RIFE 4.7"
+      path: "rife/rife47.pth"
+      size_gb: 0.1
+      required: false
+
+  custom_nodes:
+    - name: "ComfyUI-WanVideoWrapper"
+      repo: "https://github.com/kijai/ComfyUI-WanVideoWrapper"
+      required: true
+      note: "For WAN 2.2 video generation"
+    - name: "ComfyUI-VideoHelperSuite"
+      repo: "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
+      required: true
+      note: "For video encoding/decoding"
+    - name: "ComfyUI-KJNodes"
+      repo: "https://github.com/kijai/ComfyUI-KJNodes"
+      required: true
+      note: "For image processing utilities"
+    - name: "rgthree-comfy"
+      repo: "https://github.com/rgthree/rgthree-comfy"
+      required: true
+      note: "For Power Lora Loader"
+    - name: "ComfyUI-mxToolkit"
+      repo: "https://github.com/Intersection98/ComfyUI_mxToolkit"
+      required: true
+      note: "For mxSlider nodes"
+    - name: "ComfyUI-Easy-Use"
+      repo: "https://github.com/yolain/ComfyUI-Easy-Use"
+      required: true
+      note: "For utility nodes"
+    - name: "comfy-image-saver"
+      repo: "https://github.com/girish946/comfy-image-saver"
+      required: true
+      note: "For Image Saver nodes"
+    - name: "ComfyUI-Impact-Pack"
+      repo: "https://github.com/ltdrdata/ComfyUI-Impact-Pack"
+      required: true
+      note: "For FaceDetailer"
+    - name: "ComfyUI-Frame-Interpolation"
+      repo: "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation"
+      required: false
+      note: "Required only for frame interpolation"
+
+  vram: "48GB minimum (both WAN 14B models + SDXL need to be loaded). 80GB recommended for comfortable headroom."
+  compute: "NVIDIA GPU with CUDA support. H100 or A100 strongly recommended due to processing time."
+
+# Presets for quick configuration
+presets:
+  - name: "Quick Test"
+    description: "Fast preview - minimal enhancement"
+    values:
+      duration: 2
+      frame_rate: 8
+      video_steps: 15
+      sdxl_steps: 20
+      sdxl_denoise: 0.25
+      enable_face_detailing: false
+      enable_interpolation: false
+
+  - name: "Balanced Quality"
+    description: "Good balance of quality and speed"
+    values:
+      duration: 3
+      frame_rate: 12
+      video_steps: 20
+      sdxl_steps: 30
+      sdxl_denoise: 0.35
+      enable_face_detailing: true
+      enable_interpolation: false
+
+  - name: "High Quality"
+    description: "Maximum quality - very slow"
+    values:
+      duration: 3
+      frame_rate: 16
+      video_steps: 30
+      sdxl_steps: 40
+      sdxl_denoise: 0.4
+      sdxl_cfg: 6.0
+      enable_face_detailing: true
+      enable_interpolation: true
+
+  - name: "Cinematic"
+    description: "Film-like quality with interpolation"
+    values:
+      duration: 5
+      frame_rate: 12
+      video_steps: 25
+      sdxl_steps: 35
+      sdxl_denoise: 0.35
+      enable_face_detailing: true
+      enable_interpolation: true
+      sdxl_lora_strength: 0.7
+
+# Important notes for users
+notes:
+  - "⚠️ **Processing Time Warning**: This workflow is SIGNIFICANTLY slower than standard IMG to VIDEO because it applies SDXL img2img + face detailing to EVERY frame individually."
+  - "📊 **Example**: A 3-second video at 16 FPS = 48 frames. Each frame takes ~5-30 seconds to enhance = 4-24 minutes total for SDXL processing alone."
+  - "💾 **VRAM Usage**: Both WAN 14B models AND SDXL must be loaded simultaneously. Requires 48GB minimum, 80GB recommended."
+  - "✨ **Quality Trade-off**: The extra time investment produces cinema-quality videos with SDXL's superior detail, sharpness, and face quality."
+  - "🎯 **Best Use Cases**: High-quality final renders, character close-ups, professional work. Use standard IMG to VIDEO for previews/testing."
+  - "⚡ **Performance Tips**: Lower frame rate, shorter duration, and lower SDXL steps for faster processing. Disable face detailing if not needed."
+  - "🔄 **Workflow**: Input → WAN generates video → SDXL enhances each frame → Face detailing → Optional interpolation → Output"

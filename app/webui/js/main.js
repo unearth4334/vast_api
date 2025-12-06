@@ -41,8 +41,21 @@ function showTab(tabName, event) {
     // Initialize Create tab when shown
     if (tabName === 'create' && !window.createTabInitialized) {
         if (typeof initCreateTab === 'function') {
+            console.log('🎨 Calling initCreateTab()...');
             initCreateTab();
             window.createTabInitialized = true;
+        } else {
+            console.warn('⚠️ initCreateTab function not available yet. Retrying...');
+            // Retry after a short delay to allow module to load
+            setTimeout(() => {
+                if (typeof initCreateTab === 'function') {
+                    console.log('🎨 Calling initCreateTab() after retry...');
+                    initCreateTab();
+                    window.createTabInitialized = true;
+                } else {
+                    console.error('❌ initCreateTab function still not available after retry');
+                }
+            }, 100);
         }
     }
     
@@ -460,6 +473,8 @@ function useInstanceForCreate(sshConnection, instanceId) {
     
     if (createInput) {
         createInput.value = sshConnection;
+        // Trigger input event to update ExecutionQueue and other listeners
+        createInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     
     // Also sync to other tabs

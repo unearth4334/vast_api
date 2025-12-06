@@ -22,7 +22,11 @@ export function normalizeInstance(raw) {
     null;
 
   // Status normalization - prioritize actual_status
-  const status = normStatus(i.actual_status || i.cur_state || i.status || i.state || "unknown");
+  // Use actual_status if it exists (even if null), otherwise fall back to other fields
+  const statusValue = ('actual_status' in i) 
+    ? i.actual_status 
+    : (i.cur_state || i.status || i.state);
+  const status = normStatus(statusValue || "unknown");
 
   // GPU info
   const gpuName = 
@@ -930,7 +934,11 @@ export async function refreshInstanceCard(instanceId) {
     
     // Use the same SSH port resolution logic as resolveSSH()
     const { port: sshPort } = resolveSSH(inst);
-    const state = normStatus(inst.actual_status || inst.cur_state || inst.status || 'unknown');
+    // Use actual_status if it exists (even if null), otherwise fall back to other fields
+    const statusValue = ('actual_status' in inst) 
+      ? inst.actual_status 
+      : (inst.cur_state || inst.status);
+    const state = normStatus(statusValue || 'unknown');
 
     const sshConnection = (sshHost && sshPort)
       ? `ssh -p ${sshPort} root@${sshHost} -L 8080:localhost:8080`

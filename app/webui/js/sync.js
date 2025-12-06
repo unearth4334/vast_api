@@ -595,9 +595,12 @@ async function loadVastaiInstancesForSync() {
                 return window.VastAIInstances.normalizeInstance(inst);
             }
             // Fallback basic normalization
+            const statusValue = ('actual_status' in inst) 
+                ? inst.actual_status 
+                : inst.status;
             return {
                 id: inst.id || inst.instance_id,
-                status: inst.actual_status || inst.status || 'unknown',
+                status: statusValue || 'unknown',
                 gpu: inst.gpu_name || inst.gpu || 'Unknown GPU',
                 gpu_count: inst.num_gpus || 1,
                 geolocation: inst.geolocation || 'N/A',

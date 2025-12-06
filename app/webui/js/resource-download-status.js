@@ -172,13 +172,24 @@ export class ResourceDownloadStatus {
             const url = this.instanceId 
                 ? `/downloads/status?instance_id=${this.instanceId}`
                 : '/downloads/status';
+            
+            console.log('📊 Polling download status:', url);
             const jobs = await window.api.get(url);
+            console.log('📊 Received jobs:', jobs);
+            
+            // Debug: Log each job's progress in detail
+            if (jobs && jobs.length > 0) {
+                jobs.forEach(job => {
+                    console.log(`📊 Job ${job.id?.slice(0, 8)}: status=${job.status}, progress=`, job.progress);
+                });
+            }
             
             // Create a hash of the current state to detect changes
             const stateHash = this.calculateStateHash(jobs);
             
             // Only re-render if the state has changed
             if (stateHash !== this.previousStateHash) {
+                console.log('📊 State changed, re-rendering');
                 this.previousStateHash = stateHash;
                 
                 // Check for host verification needed
@@ -410,19 +421,16 @@ export class ResourceDownloadStatus {
         if (job.status === 'RUNNING') {
             const parts = [];
             
+            // Debug: log the progress object
+            if (job.progress && Object.keys(job.progress).length > 0) {
+                console.log('Progress data for job', job.id, ':', job.progress);
+            }
+            
             // Show progress stats if available
             if (job.progress) {
-                if (job.progress.percent !== undefined) {
-                    parts.push(`${job.progress.percent}%`);
-                }
+                // Percent and speed are most important
                 if (job.progress.speed) {
                     parts.push(job.progress.speed);
-                }
-                if (job.progress.stage) {
-                    parts.push(job.progress.stage);
-                }
-                if (job.progress.name) {
-                    parts.push(`"${job.progress.name}"`);
                 }
                 if (job.progress.downloaded) {
                     parts.push(job.progress.downloaded);
@@ -430,16 +438,28 @@ export class ResourceDownloadStatus {
                 if (job.progress.eta) {
                     parts.push(`ETA: ${job.progress.eta}`);
                 }
+                if (job.progress.stage && job.progress.stage !== 'download') {
+                    parts.push(job.progress.stage);
+                }
+                if (job.progress.name) {
+                    parts.push(`"${job.progress.name}"`);
+                }
+                if (job.progress.filename && !job.progress.name) {
+                    parts.push(job.progress.filename);
+                }
             }
             
-            // Show command progress if no detailed stats
-            if (parts.length === 0 && job.command_index && job.total_commands) {
+            // Always show command progress for multi-command jobs
+            if (job.total_commands > 1 && job.command_index) {
                 parts.push(`Command ${job.command_index}/${job.total_commands}`);
             }
             
-            if (parts.length > 0) {
-                progressDetails = `<div class="task-progress-details">${parts.join(' • ')}</div>`;
+            // Always show SOMETHING for running jobs
+            if (parts.length === 0) {
+                parts.push('Downloading...');
             }
+            
+            progressDetails = `<div class="task-progress-details">${parts.join(' • ')}</div>`;
         }
         
         // Error message for failed jobs
@@ -511,7 +531,12 @@ export class ResourceDownloadStatus {
      * Extract a human-readable resource name from job data
      */
     extractResourceName(job) {
-        // Try resource_paths first
+        // First check if there's a display_name field (used for multi-command resources)
+        if (job.display_name) {
+            return job.display_name;
+        }
+        
+        // Try resource_paths
         if (job.resource_paths && job.resource_paths.length > 0) {
             const path = job.resource_paths[0];
             // Handle both string paths and object with filepath
@@ -519,7 +544,14 @@ export class ResourceDownloadStatus {
             if (filepath) {
                 // Extract filename from path, e.g., "loras/my_lora.md" -> "my_lora"
                 const filename = filepath.split('/').pop();
-                return filename.replace('.md', '').replace(/_/g, ' ');
+                let baseName = filename.replace('.md', '').replace(/_/g, ' ');
+                
+                // Add variant tag if present
+                if (job.variant_tag) {
+                    baseName += ` (${job.variant_tag})`;
+                }
+                
+                return baseName;
             }
         }
         

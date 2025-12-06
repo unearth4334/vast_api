@@ -958,7 +958,9 @@ class WorkflowExecutor:
                                                 tasks_to_show.append(node_task)
                                             
                                             # Add "# others" for remaining nodes
-                                            remaining = total_nodes_count - processed
+                                            # Calculate based on nodes seen, not processed count
+                                            actual_nodes = [n for n in nodes_seen if n not in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']]
+                                            remaining = total_nodes_count - len(actual_nodes)
                                             if remaining > 0:
                                                 tasks_to_show.append({
                                                     'name': f'{remaining} others',
@@ -1013,7 +1015,9 @@ class WorkflowExecutor:
                                                 tasks_to_show.append(node_task)
                                             
                                             # Add pending "# others" if there are more nodes ahead
-                                            remaining = total_nodes_count - processed
+                                            # Calculate remaining based on actual nodes seen (not processed count)
+                                            # This accounts for nodes that were skipped/failed without being tracked
+                                            remaining = total_nodes_count - len(actual_nodes)
                                             if remaining > 0:
                                                 tasks_to_show.append({
                                                     'name': f'{remaining} others',
@@ -1064,6 +1068,13 @@ class WorkflowExecutor:
             
             logger.info(f"Custom nodes installation completed: {successful_count}/{total_nodes_count} successful, {failed_count} failed")
             
+            # Set completion note with node count (not including setup tasks)
+            if failed_count > 0:
+                completion_msg = f"Installed {successful_count}/{total_nodes_count} custom nodes ({failed_count} failed)"
+            else:
+                completion_msg = f"Successfully installed {successful_count}/{total_nodes_count} custom nodes"
+            self._set_completion_note(state_manager, workflow_id, step_index, completion_msg)
+            
             # Final tasklist update - add "Verify Dependencies" task
             state = state_manager.load_state()
             if state:
@@ -1108,7 +1119,23 @@ class WorkflowExecutor:
                         self._update_task_status(state_manager, workflow_id, step_index, f"  └─ {remaining} more dependencies", 'success')
                 
                 self._update_task_status(state_manager, workflow_id, step_index, 'Verify Dependencies', 'success')
-                self._set_completion_note(state_manager, workflow_id, step_index, "Custom nodes and dependencies installed successfully")
+                
+                # Build final completion note with node count
+                state = state_manager.load_state()
+                if state:
+                    current_note = state['steps'][step_index].get('completion_note', '')
+                    # If we already have a note with node count, append dependency info
+                    if current_note and 'custom nodes' in current_note.lower():
+                        if installed_deps:
+                            final_note = f"{current_note} + {len(installed_deps)} dependencies"
+                        else:
+                            final_note = f"{current_note} (all dependencies verified)"
+                        self._set_completion_note(state_manager, workflow_id, step_index, final_note)
+                    else:
+                        self._set_completion_note(state_manager, workflow_id, step_index, "Custom nodes and dependencies installed successfully")
+                else:
+                    self._set_completion_note(state_manager, workflow_id, step_index, "Custom nodes and dependencies installed successfully")
+                
                 return True, None
             else:
                 error_msg = result.get('message', 'Unknown error')

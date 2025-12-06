@@ -9,25 +9,8 @@
  * @param {string} type - Type of message ('success', 'error', 'info', 'warning')
  */
 export function showSetupResult(message, type) {
-  console.log(`📢 showSetupResult called: "${message}" (${type})`);
-  const resultDiv = document.getElementById('setup-result');
-  console.log(`📍 setup-result element exists:`, !!resultDiv);
-  if (!resultDiv) {
-    console.error('setup-result element not found');
-    return;
-  }
-  resultDiv.textContent = message;
-  resultDiv.className = 'setup-result ' + type;
-  resultDiv.style.display = 'block';
-  console.log(`✅ Result displayed: "${message}"`);  
-
-  if (type === 'info') {
-    setTimeout(() => {
-      if (resultDiv.textContent === message) {
-        resultDiv.style.display = 'none';
-      }
-    }, 5000);
-  }
+  // Disabled: setup-result element removed as it was distracting during workflow execution
+  // Messages are shown in workflow progress UI instead
 }
 
 /**

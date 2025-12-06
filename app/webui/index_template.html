@@ -175,10 +175,6 @@
                 </div>
             </div>
             
-            <div id="setup-result" class="setup-result">
-                <!-- Results will be displayed here -->
-            </div>
-            
             <!-- VastAI Logs Section -->
             <div class="vastai-logs-section">
                 <h4>📋 VastAI Logs</h4>
@@ -395,19 +391,20 @@
                 <div id="create-form-container" class="create-form-container" style="display: none;">
                     <!-- Form will be dynamically generated here -->
                 </div>
-                <div id="create-form-empty" class="create-empty-state">
-                    <div class="create-empty-state-icon">👆</div>
-                    <div class="create-empty-state-description">Select a workflow above to configure inputs</div>
-                </div>
             </div>
         </div>
         
         <!-- Step 4: Execute -->
         <div id="create-execute-section" class="create-execute-section" style="display: none;">
             <h4 style="margin: 0 0 var(--size-4-3) 0;">▶️ Step 4: Execute</h4>
-            <button id="create-execute-button" class="create-execute-button" onclick="executeWorkflow()">
-                <span>▶️</span> Run Workflow
-            </button>
+            <div style="display: flex; gap: var(--size-4-2);">
+                <button id="create-execute-button" class="create-execute-button" onclick="executeWorkflow()">
+                    <span>▶️</span> Run Workflow
+                </button>
+                <button id="create-export-button" class="create-execute-button secondary" onclick="exportWorkflowJSON()" title="Download the generated workflow JSON file">
+                    <span>💾</span> Export Workflow
+                </button>
+            </div>
             
             <!-- Progress display -->
             <div id="create-progress-container" class="create-progress-container">
@@ -419,6 +416,44 @@
                     <div class="create-progress-fill" id="create-progress-fill" style="width: 0%;"></div>
                 </div>
                 <div class="create-progress-details" id="create-progress-details"></div>
+            </div>
+            
+            <!-- Execution Queue -->
+            <div class="execution-queue-container">
+                <div class="execution-queue-header">
+                    <span class="execution-queue-title">📋 Execution Queue</span>
+                    <div class="execution-queue-controls">
+                        <div class="view-toggle execution-queue-view-toggle">
+                            <button class="view-btn view-btn-compact active" data-view="compact" title="Compact View">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <rect x="1" y="2" width="14" height="3" rx="1"/>
+                                    <rect x="1" y="7" width="14" height="3" rx="1"/>
+                                    <rect x="1" y="12" width="14" height="3" rx="1"/>
+                                </svg>
+                            </button>
+                            <button class="view-btn view-btn-detailed" data-view="detailed" title="Detailed View with Thumbnails">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <rect x="1" y="1" width="6" height="6" rx="1"/>
+                                    <rect x="9" y="1" width="6" height="2" rx="1"/>
+                                    <rect x="9" y="5" width="6" height="2" rx="1"/>
+                                    <rect x="1" y="9" width="6" height="6" rx="1"/>
+                                    <rect x="9" y="9" width="6" height="2" rx="1"/>
+                                    <rect x="9" y="13" width="6" height="2" rx="1"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="status-filter execution-queue-status-filter">
+                            <button class="filter-btn filter-btn-success active" data-filter="success" title="Show Successful Executions">✓</button>
+                            <button class="filter-btn filter-btn-failed active" data-filter="failed" title="Show Failed Executions">✕</button>
+                        </div>
+                        <button id="execution-queue-refresh-button" class="execution-queue-refresh-button" onclick="refreshExecutionQueue()" title="Refresh execution queue status">
+                            <span>🔄</span> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="execution-queue-content" class="execution-queue-wrapper">
+                    <!-- Queue content will be displayed here -->
+                </div>
             </div>
             
             <!-- Output preview -->
@@ -518,13 +553,25 @@
     <!-- Resource Manager -->
     <script src="js/resources/resource-browser.js?v=20251118-v1" type="module"></script>
     
+    <!-- Create Tab Services -->
+    <script src="js/create/services/modelScannerService.js?v=20251129-v1"></script>
+    <script src="js/create/services/workflowValueMapper.js?v=20251129-v1"></script>
+    
+    <!-- Create Tab Components -->
+    <script src="js/create/components/SectionContainer.js?v=20251129-v1"></script>
+    <script src="js/create/components/FeatureToggleGroup.js?v=20251129-v1"></script>
+    <script src="js/create/components/SingleModelSelector.js?v=20251129-v1"></script>
+    <script src="js/create/components/HighLowPairModelSelector.js?v=20251129-v1"></script>
+    <script src="js/create/components/HighLowPairLoRASelector.js?v=20251129-v1"></script>
+    <script src="js/create/components/ExecutionQueue.js?v=20251201-v3" type="module"></script>
+    
     <!-- Create Tab -->
-    <script src="js/create/create-tab.js?v=20251127-v1"></script>
+    <script src="js/create/create-tab.js?v=20251201-v2" type="module"></script>
     
     <!-- Legacy Support (temporary) -->
     <script src="js/vastai.js?v=20251116-v2"></script>
     
     <!-- Main application -->
-    <script src="js/main.js?v=20251127-v1"></script>
+    <script src="js/main.js?v=20251201-v1"></script>
 </body>
 </html>
