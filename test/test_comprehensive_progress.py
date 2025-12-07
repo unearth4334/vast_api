@@ -96,6 +96,7 @@ class TestComprehensiveProgressReadouts(unittest.TestCase):
         )
         
         # Verify single line is reasonable length (< 150 chars for typical terminal)
+        # Most terminals support 80-200 chars; 150 provides good margin for readability
         self.assertLess(len(single_line), 150)
         
         # Verify it contains all key information
