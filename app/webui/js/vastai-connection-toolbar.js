@@ -164,7 +164,7 @@ class VastAIConnectionToolbar {
         const toolbarHTML = `
             <div class="vastai-connection-toolbar" id="vastai-connection-toolbar">
                 <button class="toolbar-btn toolbar-search-btn" id="toolbar-search-btn">
-                    <span>🔍</span> Search Offers
+                    <span>🔍</span><span class="toolbar-btn-text"> Search Offers</span>
                 </button>
                 
                 <div class="toolbar-dropdown-container">

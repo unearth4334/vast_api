@@ -300,6 +300,11 @@
         flex: 1;
     }
     
+    /* Hide button text on mobile, show only emoji */
+    .toolbar-search-btn .toolbar-btn-text {
+        display: none;
+    }
+    
     .toolbar-instance-tile {
         flex-direction: column;
     }
