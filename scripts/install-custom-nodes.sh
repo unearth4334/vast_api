@@ -191,10 +191,10 @@ clone_with_progress() {
     local successful="$6"
     local failed="$7"
     
-    # Regex patterns for parsing git clone output
-    local PROGRESS_PATTERN='Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)%'
-    local DATA_RATE_PATTERN='([0-9.]+[[:space:]]*(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]*(KiB|MiB|GiB)/s)'
-    local DATA_ONLY_PATTERN='([0-9.]+[[:space:]]*(KiB|MiB|GiB))'
+    # Patterns for parsing git clone output
+    local progress_pattern='Receiving objects:[[:space:]]*([0-9]+)%'
+    local data_rate_pattern='([0-9.]+[[:space:]]+(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]+(KiB|MiB|GiB)/s)'
+    local data_only_pattern='([0-9.]+[[:space:]]+(KiB|MiB|GiB))'
     
     # Run git clone with progress output
     git clone --progress --depth 1 "$repo_url" "$target_path" 2>&1 | while IFS= read -r line; do
@@ -203,16 +203,16 @@ clone_with_progress() {
         local download_rate=""
         local data_received=""
         
-        # Extract percentage
-        if [[ "$line" =~ $PROGRESS_PATTERN ]]; then
+        # Extract percentage (e.g., "Receiving objects: 45%")
+        if [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)% ]]; then
             progress="${BASH_REMATCH[1]}"
         fi
         
-        # Extract data received and download rate
-        if [[ "$line" =~ $DATA_RATE_PATTERN ]]; then
+        # Extract data and rate (e.g., "2.5 MiB | 1.2 MiB/s")
+        if [[ "$line" =~ ([0-9.]+[[:space:]]+(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]+(KiB|MiB|GiB)/s) ]]; then
             data_received="${BASH_REMATCH[1]}"
-            download_rate="${BASH_REMATCH[3]}"
-        elif [[ "$line" =~ $DATA_ONLY_PATTERN ]]; then
+            download_rate="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}"
+        elif [[ "$line" =~ ([0-9.]+[[:space:]]+(KiB|MiB|GiB)) ]] && [[ ! "$line" =~ /s ]]; then
             # Just data received, no rate yet
             data_received="${BASH_REMATCH[1]}"
         fi
@@ -299,6 +299,43 @@ invoke_and_log() {
         rm -f "$temp_log_file"
         return $exit_code
     fi
+}
+
+# Function to install pip requirements with progress tracking
+install_requirements_with_progress() {
+    local python_bin="$1"
+    local requirements_file="$2"
+    local node_name="$3"
+    local total_nodes="$4"
+    local current_node="$5"
+    local successful="$6"
+    local failed="$7"
+    
+    write_log "Executing: $python_bin -m pip install -r $requirements_file" 3
+    
+    # Run pip install with progress output
+    "$python_bin" -m pip install -r "$requirements_file" 2>&1 | while IFS= read -r line; do
+        # Log the output
+        echo "$line" >> "$LOG_FILE"
+        
+        # Parse pip output for package being installed
+        # Pip outputs like: "Collecting package-name", "Downloading package (size)", "Installing collected packages: ..."
+        local current_package=""
+        local download_progress=""
+        
+        if [[ "$line" =~ Collecting[[:space:]]+([^[:space:]]+) ]]; then
+            current_package="${BASH_REMATCH[1]}"
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (collecting $current_package)" "" "" ""
+        elif [[ "$line" =~ Downloading[[:space:]]+.*\(([^)]+)\) ]]; then
+            download_progress="${BASH_REMATCH[1]}"
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (downloading)" "" "" "$download_progress"
+        elif [[ "$line" =~ Installing[[:space:]]+collected[[:space:]]+packages ]]; then
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (installing)" "" "" ""
+        fi
+    done
+    
+    # Return the exit code of pip install
+    return ${PIPESTATUS[0]}
 }
 
 #===========================================================================
@@ -412,7 +449,7 @@ if [ -f "$CUSTOM_NODES_CSV" ]; then
                         # Update JSON progress to show requirements installation
                         write_json_progress true "$TOTAL_NODES" "$CURRENT_NODE" "$name" "running" "$SUCCESSFUL_NODES" "$FAILED_NODES" true "running"
                         
-                        if invoke_and_log "$VENV_PYTHON" -m pip install -r "$NODE_PATH/$requirements_file"; then
+                        if install_requirements_with_progress "$VENV_PYTHON" "$NODE_PATH/$requirements_file" "$name" "$TOTAL_NODES" "$CURRENT_NODE" "$SUCCESSFUL_NODES" "$FAILED_NODES"; then
                             write_log "Successfully installed requirements for $name" 2 "green"
                             write_progress_log "NODE" "$name" "success" "Installed successfully"
                             
