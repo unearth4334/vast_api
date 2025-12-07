@@ -39,6 +39,22 @@ class VastAIConnectionToolbar {
         // Default
         return 22;
     }
+
+    _escapeAttr(str = '') {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/'/g, '&#39;');
+    }
+
+    _buildSSHConnectionString(instance) {
+        const publicIp = instance.public_ipaddr || instance.public_ip || instance.ip_address;
+        const sshPort = this._resolveSshPort(instance);
+        if (!publicIp || !sshPort) return null;
+        return `ssh -p ${sshPort} root@${publicIp} -L 8080:localhost:8080`;
+    }
     
     /**
      * Initialize the toolbar
@@ -295,9 +311,13 @@ class VastAIConnectionToolbar {
         const publicIp = instance.public_ipaddr || instance.public_ip || instance.ip_address || 'N/A';
         const sshPort = this._resolveSshPort(instance);
         const costPerHr = instance.dph_total || instance.cost_per_hour || 0;
+        const sshConnection = this._buildSSHConnectionString(instance);
         
         const isSelected = this.state.selected_instance_id === instanceId;
         const isRunning = status === 'running';
+        const obTokenHtml = (sshConnection && isRunning)
+            ? `<a href="#" class="toolbar-fetch-token" data-action="fetch-token" data-instance-id="${instanceId}" data-ssh="${this._escapeAttr(sshConnection)}">fetch</a>`
+            : 'N/A';
         
         return `
             <div class="toolbar-instance-tile ${isSelected ? 'selected' : ''}" data-instance-id="${instanceId}">
@@ -312,6 +332,7 @@ class VastAIConnectionToolbar {
                     <div class="toolbar-instance-details">
                         <div>📡 ${publicIp}:${sshPort}</div>
                         <div>💰 $${costPerHr.toFixed(3)}/hr</div>
+                        <div>🔑 OB Token: <span class="ob-token-value">${obTokenHtml}</span></div>
                     </div>
                 </div>
                 <div class="toolbar-instance-actions">
@@ -368,6 +389,17 @@ class VastAIConnectionToolbar {
      * Setup event listeners for instance action buttons
      */
     setupInstanceActionListeners() {
+        // OB token fetch links
+        document.querySelectorAll('.toolbar-fetch-token').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const instanceId = parseInt(link.dataset.instanceId, 10);
+                const sshConnection = link.dataset.ssh;
+                this.fetchOpenButtonToken(instanceId, sshConnection);
+            });
+        });
+
         // Connect buttons
         document.querySelectorAll('.toolbar-connect-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -563,6 +595,148 @@ class VastAIConnectionToolbar {
             });
             
             this.updateToolbarDisplay();
+        }
+    }
+
+    async fetchOpenButtonToken(instanceId, sshConnection) {
+        const tokenSpan = document.querySelector(`.toolbar-instance-tile[data-instance-id="${instanceId}"] .ob-token-value`);
+        if (!tokenSpan) return;
+
+        if (!sshConnection) {
+            tokenSpan.innerHTML = '<span style="color: #e74c3c;">missing ssh</span>';
+            return;
+        }
+
+        tokenSpan.innerHTML = '<span style="color: #888;">fetching...</span>';
+
+        try {
+            const response = await fetch(`/vastai/instances/${instanceId}/open-button-token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ssh_connection: sshConnection })
+            });
+
+            const data = await response.json();
+
+            if (data.require_verification || data.host_verification_needed) {
+                const verified = await this._verifyHostForToken(data, sshConnection);
+                if (verified) {
+                    return this.fetchOpenButtonToken(instanceId, sshConnection);
+                }
+
+                tokenSpan.innerHTML = `<a href="#" class="toolbar-fetch-token" data-action="fetch-token" data-instance-id="${instanceId}" data-ssh="${this._escapeAttr(sshConnection)}">fetch</a>`;
+                this.setupInstanceActionListeners();
+                return;
+            }
+
+            if (data.success && data.token) {
+                const fullToken = data.token;
+                const truncated = `${fullToken.substring(0, 4)}...`;
+
+                tokenSpan.innerHTML = `
+                    <span class="token-display">${truncated}</span>
+                    <button class="copy-token-btn" data-action="copy-token" data-instance-id="${instanceId}" data-token="${this._escapeAttr(fullToken)}">📋 Copy</button>
+                `;
+
+                const copyBtn = tokenSpan.querySelector('.copy-token-btn');
+                if (copyBtn) {
+                    copyBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.copyObTokenToClipboard(fullToken, instanceId);
+                    });
+                }
+                return;
+            }
+
+            tokenSpan.innerHTML = '<span style="color: #e74c3c;">failed</span>';
+        } catch (error) {
+            console.error('Error fetching OPEN_BUTTON_TOKEN:', error);
+            tokenSpan.innerHTML = `<a href="#" class="toolbar-fetch-token" data-action="fetch-token" data-instance-id="${instanceId}" data-ssh="${this._escapeAttr(sshConnection)}">fetch</a>`;
+            this.setupInstanceActionListeners();
+        }
+    }
+
+    async _verifyHostForToken(data, sshConnection) {
+        const modalData = {
+            host: data.host,
+            port: data.port,
+            fingerprints: data.fingerprint ? [data.fingerprint] : [],
+            ssh_connection: sshConnection,
+            host_verification_needed: true
+        };
+
+        const accepted = await this._showHostVerificationModal(modalData);
+        if (!accepted) return false;
+
+        try {
+            const verifyResp = await fetch('/ssh/verify-host', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ssh_connection: sshConnection, accept: true })
+            });
+            const verifyData = await verifyResp.json();
+            return !!verifyData.success;
+        } catch (err) {
+            console.error('Host verification error:', err);
+            return false;
+        }
+    }
+
+    async _showHostVerificationModal(modalData) {
+        try {
+            if (window.VastAIUI && typeof window.VastAIUI.showSSHHostVerificationModal === 'function') {
+                return await window.VastAIUI.showSSHHostVerificationModal(modalData);
+            }
+            if (typeof showHostKeyVerificationModal === 'function') {
+                const result = showHostKeyVerificationModal(modalData);
+                if (result && typeof result.then === 'function') {
+                    return await result;
+                }
+                return result !== false;
+            }
+        } catch (error) {
+            console.error('Host verification modal error:', error);
+        }
+
+        alert('Host key verification required. Please verify the host key.');
+        return false;
+    }
+
+    async copyObTokenToClipboard(token, instanceId) {
+        const copyBtn = document.querySelector(`.toolbar-instance-tile[data-instance-id="${instanceId}"] .copy-token-btn`);
+        const resetLabel = () => {
+            if (copyBtn) {
+                setTimeout(() => {
+                    copyBtn.textContent = '📋 Copy';
+                }, 1500);
+            }
+        };
+
+        try {
+            await navigator.clipboard.writeText(token);
+            if (copyBtn) {
+                copyBtn.textContent = 'Copied';
+                resetLabel();
+            }
+        } catch (error) {
+            console.error('Clipboard API failed, using fallback:', error);
+            const textarea = document.createElement('textarea');
+            textarea.value = token;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                if (copyBtn) {
+                    copyBtn.textContent = 'Copied';
+                    resetLabel();
+                }
+            } catch (fallbackError) {
+                console.error('Fallback copy failed:', fallbackError);
+            }
+            document.body.removeChild(textarea);
         }
     }
     
