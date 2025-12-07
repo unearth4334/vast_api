@@ -809,17 +809,20 @@ class WorkflowExecutor:
                         progress = progress_response.json()
                         logger.debug(f"Progress poll response: {progress}")
                         
+                        # Extract progress data from response
+                        progress_data = progress.get('progress', {})
+                        
                         # Check if installation completed
-                        if progress.get('completed'):
+                        if progress_data.get('completed'):
                             installation_completed = True
-                            installation_success = progress.get('success', False)
+                            installation_success = progress_data.get('success', False)
                             logger.info(f"Installation completed. Success: {installation_success}")
                             
                             # Get final stats
-                            total_nodes_count = progress.get('total_nodes', 0)
-                            successful_count = progress.get('successful_clones', 0)
-                            failed_count = progress.get('failed_clones', 0)
-                            processed = progress.get('processed', 0)
+                            total_nodes_count = progress_data.get('total_nodes', 0)
+                            successful_count = progress_data.get('successful_clones', 0)
+                            failed_count = progress_data.get('failed_clones', 0)
+                            processed = progress_data.get('processed', 0)
                             
                             # Final task list update - show all nodes as completed
                             state = state_manager.load_state()
@@ -873,22 +876,22 @@ class WorkflowExecutor:
                             break
                         
                         # Check for error
-                        if progress.get('error'):
-                            error_msg = progress.get('error')
+                        if progress_data.get('error'):
+                            error_msg = progress_data.get('error')
                             logger.error(f"Installation error: {error_msg}")
                             self._set_completion_note(state_manager, workflow_id, step_index, f"Installation error: {error_msg}")
                             return False, error_msg
                         
-                        if progress.get('in_progress'):
-                            total_nodes_count = progress.get('total_nodes', 0)
-                            current_node = progress.get('current_node')
-                            node_status = progress.get('current_status', 'running')
-                            processed = progress.get('processed', 0)
-                            successful_count = progress.get('successful', 0)
-                            failed_count = progress.get('failed', 0)
-                            has_requirements = progress.get('has_requirements', False)
-                            requirements_status = progress.get('requirements_status')
-                            clone_progress = progress.get('clone_progress')
+                        if progress_data.get('in_progress'):
+                            total_nodes_count = progress_data.get('total_nodes', 0)
+                            current_node = progress_data.get('current_node')
+                            node_status = progress_data.get('current_status', 'running')
+                            processed = progress_data.get('processed', 0)
+                            successful_count = progress_data.get('successful', 0)
+                            failed_count = progress_data.get('failed', 0)
+                            has_requirements = progress_data.get('has_requirements', False)
+                            requirements_status = progress_data.get('requirements_status')
+                            clone_progress = progress_data.get('clone_progress')
                             
                             logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}, clone: {clone_progress}%")
                             
