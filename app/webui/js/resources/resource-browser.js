@@ -196,6 +196,19 @@ export class ResourceBrowser {
         
         // Attach event listeners
         this._attachEventListeners();
+
+        // Seed SSH connection from VastAI toolbar if available
+        const toolbarConn = window.VastAIConnectionToolbar?.getSSHConnectionString?.();
+        if (toolbarConn) {
+            const sshInput = document.getElementById('resourcesSshConnectionString');
+            if (sshInput && !sshInput.value) {
+                sshInput.value = toolbarConn;
+            }
+            const instanceId = this._extractInstanceId(toolbarConn);
+            if (instanceId) {
+                this.downloadStatus.instanceId = instanceId;
+            }
+        }
         
         // Load filter options and resources
         await this._loadFilterOptions();
@@ -968,11 +981,11 @@ export class ResourceBrowser {
             return;
         }
         
-        // Get SSH connection string (should come from UI state)
-        const sshConnection = document.getElementById('resourcesSshConnectionString')?.value;
+        // Get SSH connection string (prefer toolbar, fallback to legacy input)
+        const sshConnection = this._getSSHConnection();
         
         if (!sshConnection) {
-            alert('Please provide an SSH connection string first');
+            alert('Please select a VastAI instance in the connection toolbar first.');
             return;
         }
         
@@ -1015,6 +1028,28 @@ export class ResourceBrowser {
             installBtn.disabled = false;
             installBtn.textContent = originalText;
         }
+    }
+
+    /**
+     * Resolve SSH connection string from toolbar (new) or legacy input (fallback)
+     */
+    _getSSHConnection() {
+        // Prefer the new VastAI connection toolbar
+        if (window.VastAIConnectionToolbar && typeof window.VastAIConnectionToolbar.getSSHConnectionString === 'function') {
+            const fromToolbar = window.VastAIConnectionToolbar.getSSHConnectionString();
+            if (fromToolbar) {
+                // Keep download status in sync when we have a connection
+                const instanceId = this._extractInstanceId(fromToolbar);
+                if (instanceId) {
+                    this.downloadStatus.instanceId = instanceId;
+                }
+                return fromToolbar;
+            }
+        }
+        
+        // Fallback to legacy resources input if present
+        const sshInput = document.getElementById('resourcesSshConnectionString');
+        return sshInput?.value || '';
     }
     
     /**
