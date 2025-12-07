@@ -8,8 +8,8 @@
    ========================= */
 
 .step-progress-indicator {
-    margin-top: var(--size-4-2);
-    padding: var(--size-4-3);
+    margin-top: var(--size-4-1);
+    padding: var(--size-4-2) var(--size-4-3);
     background: rgba(124, 58, 237, 0.05);
     border-radius: var(--radius-s);
     border-left: 3px solid var(--interactive-accent);
@@ -28,19 +28,19 @@
 /* Multi-phase progress indicator layout */
 .step-progress-indicator.multi-phase {
     flex-direction: column;
-    gap: var(--size-4-1);
+    gap: 2px;
 }
 
 /* Git clone specific layout */
 .step-progress-indicator.git-clone {
     flex-direction: column;
-    gap: var(--size-4-2);
+    gap: var(--size-4-1);
 }
 
 /* Sync operation specific layout */
 .step-progress-indicator.sync {
     flex-direction: column;
-    gap: var(--size-4-2);
+    gap: var(--size-4-1);
 }
 
 /* =========================
@@ -105,7 +105,7 @@
 .progress-phases {
     display: flex;
     flex-direction: column;
-    gap: var(--size-4-1);
+    gap: 2px;
     width: 100%;
 }
 
@@ -113,7 +113,7 @@
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: var(--size-4-1) 0;
+    padding: 2px 0;
 }
 
 .phase.active .phase-label {
@@ -186,7 +186,7 @@
 .progress-checklist {
     display: flex;
     flex-direction: column;
-    gap: var(--size-4-1);
+    gap: 2px;
     flex: 1;
 }
 
@@ -194,7 +194,7 @@
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: var(--size-4-1) 0;
+    padding: 2px 0;
 }
 
 .check-item.active {
@@ -229,7 +229,7 @@
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: var(--size-4-2) 0;
+    padding: var(--size-4-1) 0;
     margin-top: var(--size-4-1);
     border-top: 1px solid var(--background-modifier-border);
     font-size: var(--font-ui-smaller);
@@ -294,7 +294,7 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: var(--size-4-1);
+    gap: 2px;
 }
 
 .git-status {
@@ -370,7 +370,7 @@
 .sync-folders {
     display: flex;
     flex-direction: column;
-    gap: var(--size-4-1);
+    gap: 2px;
     width: 100%;
     margin: var(--size-4-1) 0;
 }
@@ -379,7 +379,7 @@
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: var(--size-4-1);
+    padding: 2px var(--size-4-1);
     border-radius: var(--radius-s);
     background: var(--background-secondary);
 }
@@ -461,8 +461,8 @@
    ========================= */
 
 .step-completion-indicator {
-    margin-top: var(--size-4-2);
-    padding: var(--size-4-3);
+    margin-top: var(--size-4-1);
+    padding: var(--size-4-2) var(--size-4-3);
     border-radius: var(--radius-s);
     border-left: 3px solid;
     font-size: var(--font-ui-small);
@@ -509,7 +509,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .completion-text {
@@ -559,7 +559,7 @@
     display: flex;
     gap: var(--size-4-2);
     flex-wrap: wrap;
-    margin-top: var(--size-4-2);
+    margin-top: var(--size-4-1);
 }
 
 .retry-btn,
@@ -630,14 +630,14 @@
 
 .completion-breakdown {
     width: 100%;
-    margin-top: var(--size-4-2);
+    margin-top: var(--size-4-1);
 }
 
 .sync-summary,
 .error-summary {
     display: flex;
     flex-direction: column;
-    gap: var(--size-4-1);
+    gap: 2px;
 }
 
 .summary-item,
@@ -645,7 +645,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--size-4-1);
+    padding: 2px var(--size-4-1);
     background: var(--background-primary);
     border-radius: var(--radius-s);
     font-size: var(--font-ui-smaller);
@@ -661,7 +661,7 @@
 }
 
 .summary-more {
-    padding: var(--size-4-1);
+    padding: 2px var(--size-4-1);
     text-align: center;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -757,7 +757,7 @@
 @media (max-width: 560px) {
     .step-progress-indicator,
     .step-completion-indicator {
-        padding: var(--size-4-2);
+        padding: var(--size-4-1) var(--size-4-2);
         font-size: var(--font-ui-smaller);
     }
     
@@ -766,7 +766,7 @@
     .completion-stats {
         flex-direction: column;
         align-items: flex-start;
-        gap: var(--size-4-1);
+        gap: 2px;
     }
     
     .completion-action {
