@@ -326,9 +326,9 @@ install_requirements_with_progress() {
         if [[ "$line" =~ Collecting[[:space:]]+([^[:space:]]+) ]]; then
             current_package="${BASH_REMATCH[1]}"
             write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (collecting $current_package)" "" "" ""
-        elif [[ "$line" =~ Downloading.*\(([^)]+)\) ]]; then
-            download_progress="${BASH_REMATCH[1]}"
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (downloading)" "" "" "$download_progress"
+        elif [[ "$line" =~ ^Downloading ]]; then
+            # Just indicate downloading without parsing size
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (downloading)" "" "" ""
         elif [[ "$line" =~ Installing[[:space:]]+collected[[:space:]]+packages ]]; then
             write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (installing)" "" "" ""
         fi
