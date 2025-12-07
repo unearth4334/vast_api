@@ -318,6 +318,23 @@
         flex: 1;
         min-width: calc(50% - var(--size-4-1));
     }
+
+    /* Full-width dropdown on mobile */
+    .toolbar-dropdown {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: calc(var(--size-4-6) + 56px);
+        width: 100vw;
+        max-width: none;
+        border-radius: 0;
+        max-height: calc(100vh - (var(--size-4-6) + 56px));
+        z-index: 2000;
+    }
+
+    .toolbar-dropdown-content {
+        padding: var(--size-4-4);
+    }
 }
 
 /* Mobile Textfield Overlay (for editing SSH connection string) */
