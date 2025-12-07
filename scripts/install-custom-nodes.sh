@@ -122,11 +122,61 @@ write_json_progress() {
   "current_status": "$current_status",
   "successful": $successful,
   "failed": $failed,
-  "successful_clones": $successful,
-  "failed_clones": $failed,
   "has_requirements": $has_requirements$([ -n "$requirements_status" ] && echo ",
   \"requirements_status\": \"$requirements_status\"" || echo "")$([ -n "$clone_progress" ] && echo ",
   \"clone_progress\": $clone_progress" || echo "")
+}
+EOF
+}
+
+# Write JSON progress file with download statistics
+write_json_progress_with_stats() {
+    local in_progress="$1"
+    local total_nodes="$2"
+    local processed="$3"
+    local current_node="$4"
+    local current_status="$5"
+    local successful="${6:-0}"
+    local failed="${7:-0}"
+    local has_requirements="${8:-false}"
+    local requirements_status="${9:-}"
+    local clone_progress="${10:-}"
+    local download_rate="${11:-}"
+    local data_received="${12:-}"
+    
+    # Escape node name and strings for JSON (replace quotes with escaped quotes)
+    local escaped_node=$(echo "$current_node" | sed 's/"/\\"/g')
+    local escaped_rate=$(echo "$download_rate" | sed 's/"/\\"/g')
+    local escaped_data=$(echo "$data_received" | sed 's/"/\\"/g')
+    
+    # Determine completion status
+    local completed="false"
+    local success_status="true"
+    if [ "$in_progress" = "false" ]; then
+        completed="true"
+        # Installation is successful if we have no failed nodes, or at least some successful ones
+        if [ "$failed" -gt 0 ] && [ "$successful" -eq 0 ]; then
+            success_status="false"
+        fi
+    fi
+    
+    # Build JSON object with completed and success fields
+    cat > "$PROGRESS_JSON" <<EOF
+{
+  "in_progress": $in_progress,
+  "completed": $completed,
+  "success": $success_status,
+  "total_nodes": $total_nodes,
+  "processed": $processed,
+  "current_node": "$escaped_node",
+  "current_status": "$current_status",
+  "successful": $successful,
+  "failed": $failed,
+  "has_requirements": $has_requirements$([ -n "$requirements_status" ] && echo ",
+  \"requirements_status\": \"$requirements_status\"" || echo "")$([ -n "$clone_progress" ] && echo ",
+  \"clone_progress\": $clone_progress" || echo "")$([ -n "$download_rate" ] && echo ",
+  \"download_rate\": \"$escaped_rate\"" || echo "")$([ -n "$data_received" ] && echo ",
+  \"data_received\": \"$escaped_data\"" || echo "")
 }
 EOF
 }
@@ -141,14 +191,37 @@ clone_with_progress() {
     local successful="$6"
     local failed="$7"
     
+    # Regex patterns for parsing git clone output
+    local PROGRESS_PATTERN='Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)%'
+    local DATA_RATE_PATTERN='([0-9.]+[[:space:]]*(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]*(KiB|MiB|GiB)/s)'
+    local DATA_ONLY_PATTERN='([0-9.]+[[:space:]]*(KiB|MiB|GiB))'
+    
     # Run git clone with progress output
     git clone --progress --depth 1 "$repo_url" "$target_path" 2>&1 | while IFS= read -r line; do
-        # Git outputs progress like: "Receiving objects: 45% (123/456)"
-        if [[ "$line" =~ Receiving\ objects:[[:space:]]*([0-9]+)% ]]; then
-            local progress="${BASH_REMATCH[1]}"
-            # Update JSON progress with clone percentage
-            write_json_progress true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" false "" "$progress"
+        # Git outputs progress like: "Receiving objects: 45% (123/456), 2.5 MiB | 1.2 MiB/s"
+        local progress=""
+        local download_rate=""
+        local data_received=""
+        
+        # Extract percentage
+        if [[ "$line" =~ $PROGRESS_PATTERN ]]; then
+            progress="${BASH_REMATCH[1]}"
         fi
+        
+        # Extract data received and download rate
+        if [[ "$line" =~ $DATA_RATE_PATTERN ]]; then
+            data_received="${BASH_REMATCH[1]}"
+            download_rate="${BASH_REMATCH[3]}"
+        elif [[ "$line" =~ $DATA_ONLY_PATTERN ]]; then
+            # Just data received, no rate yet
+            data_received="${BASH_REMATCH[1]}"
+        fi
+        
+        # Update JSON progress with clone statistics
+        if [ -n "$progress" ] || [ -n "$download_rate" ] || [ -n "$data_received" ]; then
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" false "" "$progress" "$download_rate" "$data_received"
+        fi
+        
         # Log the output
         echo "$line" >> "$LOG_FILE"
     done

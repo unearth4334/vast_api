@@ -1540,7 +1540,7 @@ export async function installCustomNodes() {
                 state = 'pending';
             }
             
-            return { label, state };
+            return { label, state, node };
           });
           
           // Limit visible items to 10 most recent/active
@@ -1585,7 +1585,20 @@ export async function installCustomNodes() {
             }
           }
           
-          window.progressIndicators.showChecklistProgress(stepElement, visibleItems);
+          // Extract download statistics from the active node
+          let downloadStats = null;
+          if (activeIndex !== -1) {
+            const activeNode = checklistItems[activeIndex].node;
+            if (activeNode && (activeNode.download_rate || activeNode.data_received)) {
+              downloadStats = {
+                download_rate: activeNode.download_rate,
+                data_received: activeNode.data_received,
+                eta: activeNode.eta  // ETA can be calculated from progress if needed
+              };
+            }
+          }
+          
+          window.progressIndicators.showChecklistProgress(stepElement, visibleItems, downloadStats);
         }
         
         // Check if installation is complete

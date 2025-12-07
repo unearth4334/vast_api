@@ -133,9 +133,111 @@ def _get_progress_file_path(task_id: str) -> str:
     return PROGRESS_FILE_TEMPLATE.format(task_id=task_id)
 
 
+def _parse_progress_log(log_content: str, current_progress: dict) -> list:
+    """
+    Parse progress log to build nodes array with current state of each node.
+    Log format: [TIMESTAMP] EVENT_TYPE|NODE_NAME|STATUS|MESSAGE
+    Returns: List of node objects with name, status, message, and stats
+    """
+    nodes_dict = {}  # Use dict to track latest state of each node
+    
+    if not log_content:
+        return []
+    
+    for line in log_content.strip().split('\n'):
+        if not line or not line.startswith('['):
+            continue
+            
+        try:
+            # Parse log line: [TIMESTAMP] EVENT_TYPE|NODE_NAME|STATUS|MESSAGE
+            parts = line.split('] ', 1)
+            if len(parts) < 2:
+                continue
+                
+            timestamp = parts[0][1:]  # Remove leading [
+            rest = parts[1]
+            
+            pipe_parts = rest.split('|')
+            if len(pipe_parts) < 3:
+                continue
+                
+            event_type = pipe_parts[0]
+            node_name = pipe_parts[1]
+            status = pipe_parts[2]
+            message = pipe_parts[3] if len(pipe_parts) > 3 else ''
+            
+            # Skip non-node events
+            if event_type not in ['NODE', 'START', 'INFO', 'COMPLETE']:
+                continue
+            
+            # Skip system messages
+            if node_name in ['installer', 'Initializing', 'Starting installation']:
+                continue
+            
+            # Update or create node entry
+            if node_name not in nodes_dict:
+                nodes_dict[node_name] = {
+                    'name': node_name,
+                    'status': status,
+                    'message': message,
+                    'clone_progress': None,
+                    'download_rate': None,
+                    'data_received': None
+                }
+            else:
+                # Update existing node
+                nodes_dict[node_name]['status'] = status
+                if message:
+                    nodes_dict[node_name]['message'] = message
+                    
+        except (IndexError, ValueError) as e:
+            logger.debug(f"Error parsing log line structure: {line} - {e}")
+            continue
+        except Exception as e:
+            logger.warning(f"Unexpected error parsing log line: {line} - {e}")
+            continue
+    
+    # Convert dict to list
+    nodes_list = list(nodes_dict.values())
+    
+    # Add current progress info from JSON to the active node
+    if current_progress:
+        current_node_name = current_progress.get('current_node')
+        current_status = current_progress.get('current_status', 'running')
+        clone_progress = current_progress.get('clone_progress')
+        download_rate = current_progress.get('download_rate')
+        data_received = current_progress.get('data_received')
+        
+        # Find and update the current node with real-time stats
+        for node in nodes_list:
+            if node['name'] == current_node_name:
+                node['status'] = current_status
+                if clone_progress is not None:
+                    node['clone_progress'] = clone_progress
+                if download_rate:
+                    node['download_rate'] = download_rate
+                if data_received:
+                    node['data_received'] = data_received
+                break
+        else:
+            # Current node not in list yet, add it
+            if current_node_name and current_node_name not in ['Initializing', 'Starting installation']:
+                nodes_list.append({
+                    'name': current_node_name,
+                    'status': current_status,
+                    'message': '',
+                    'clone_progress': clone_progress,
+                    'download_rate': download_rate,
+                    'data_received': data_received
+                })
+    
+    return nodes_list
+
+
 def _extract_host_port(ssh_connection):
     """Helper function to extract host and port from SSH connection string"""
     return parse_host_port(ssh_connection)
+
 
 
 def _get_cached_vastai_status():
@@ -1618,25 +1720,19 @@ def ssh_install_custom_nodes():
 
 @app.route('/ssh/install-custom-nodes/progress', methods=['POST', 'OPTIONS'])
 def ssh_install_custom_nodes_progress():
-    """Get real-time progress of custom nodes installation by task_id"""
+    """Get real-time progress of custom nodes installation"""
     if request.method == 'OPTIONS':
         return handle_cors_preflight()
     
     try:
         data = request.get_json()
         ssh_connection = data.get('ssh_connection')
-        task_id = data.get('task_id')
+        task_id = data.get('task_id')  # Optional - if not provided, use default
         
         if not ssh_connection:
             return jsonify({
                 'success': False,
                 'message': 'Missing ssh_connection parameter'
-            }), 400
-        
-        if not task_id:
-            return jsonify({
-                'success': False,
-                'message': 'Missing task_id parameter'
             }), 400
         
         # Parse SSH connection using the same helper function
@@ -1651,11 +1747,18 @@ def ssh_install_custom_nodes_progress():
         # SSH key path
         ssh_key = '/root/.ssh/id_ed25519'
         
-        # Read the progress file for this specific task_id
-        progress_file = _get_progress_file_path(task_id)
+        # Determine progress file path
+        if task_id:
+            progress_file = _get_progress_file_path(task_id)
+        else:
+            # Use default progress file if no task_id provided (fallback for older code)
+            progress_file = '/tmp/custom_nodes_progress.json'
+        
+        # Also read the progress log file
+        progress_log_file = '/tmp/custom_nodes_install.log'
         
         try:
-            # Use subprocess SSH like all other operations in this file
+            # Read progress JSON file
             cmd = [
                 'ssh',
                 '-i', ssh_key,
@@ -1676,26 +1779,56 @@ def ssh_install_custom_nodes_progress():
             
             progress_json = result.stdout.strip()
             
-            logger.debug(f"Progress file content for task {task_id}: {progress_json}")
+            logger.debug(f"Progress file content: {progress_json}")
             
             if not progress_json or progress_json == '{}':
-                logger.debug(f"No progress found for task {task_id}")
+                logger.debug(f"No progress found")
                 return jsonify({
                     'success': True,
                     'in_progress': False,
-                    'task_id': task_id,
-                    'message': 'No progress available for this task'
+                    'message': 'No progress available'
                 })
             
             progress_data = json.loads(progress_json)
-            logger.info(f"Returning progress for task {task_id}: {progress_data.get('current_node')} - {progress_data.get('processed')}/{progress_data.get('total_nodes')}")
-            return jsonify({
+            
+            # Read and parse progress log to build nodes array
+            log_cmd = [
+                'ssh',
+                '-i', ssh_key,
+                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                '-o', 'IdentitiesOnly=yes',
+                '-p', str(ssh_port),
+                f'root@{ssh_host}',
+                f"cat {progress_log_file} 2>/dev/null || echo ''"
+            ]
+            
+            log_result = subprocess.run(
+                log_cmd,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            progress_log = log_result.stdout
+            
+            # Parse progress log to build nodes array
+            nodes = _parse_progress_log(progress_log, progress_data)
+            
+            # Add nodes array to progress data
+            progress_data['nodes'] = nodes
+            
+            # Wrap in progress field for frontend compatibility
+            response = {
                 'success': True,
-                **progress_data
-            })
+                'progress': progress_data
+            }
+            
+            logger.info(f"Returning progress: {progress_data.get('current_node')} - {progress_data.get('processed')}/{progress_data.get('total_nodes')} with {len(nodes)} nodes")
+            return jsonify(response)
             
         except Exception as e:
-            logger.error(f"Error reading progress for task {task_id}: {str(e)}")
+            logger.error(f"Error reading progress: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': f'Error reading progress: {str(e)}'

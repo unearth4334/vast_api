@@ -144,8 +144,9 @@ class ProgressIndicatorManager {
    * Show checklist progress indicator
    * @param {HTMLElement} stepElement - The workflow step element
    * @param {Array<{label: string, state: 'pending'|'active'|'completed'}>} items - Checklist items
+   * @param {Object} stats - Optional download statistics {download_rate: string, data_received: string, eta: string}
    */
-  showChecklistProgress(stepElement, items) {
+  showChecklistProgress(stepElement, items, stats = null) {
     this.clearIndicators(stepElement);
     const container = this.getIndicatorContainer(stepElement);
     const action = stepElement.dataset.action;
@@ -176,10 +177,38 @@ class ProgressIndicatorManager {
       `;
     }).join('');
     
+    // Add download statistics footer if stats are provided
+    const statsHTML = stats && (stats.download_rate || stats.data_received) ? `
+      <div class="checklist-download-stats">
+        <div class="download-stats-spinner"></div>
+        <div class="download-stats-content">
+          ${stats.data_received ? `
+            <span class="download-stat">
+              <span class="download-stat-label">Downloaded:</span>
+              <span class="download-stat-value">${this.escapeHtml(stats.data_received)}</span>
+            </span>
+          ` : ''}
+          ${stats.download_rate ? `
+            <span class="download-stat">
+              <span class="download-stat-label">Rate:</span>
+              <span class="download-stat-value">${this.escapeHtml(stats.download_rate)}</span>
+            </span>
+          ` : ''}
+          ${stats.eta ? `
+            <span class="download-stat">
+              <span class="download-stat-label">ETA:</span>
+              <span class="download-stat-value">${this.escapeHtml(stats.eta)}</span>
+            </span>
+          ` : ''}
+        </div>
+      </div>
+    ` : '';
+    
     indicator.innerHTML = `
       <div class="progress-checklist">
         ${itemsHTML}
       </div>
+      ${statsHTML}
       <div class="progress-timer">0s</div>
     `;
     
