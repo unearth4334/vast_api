@@ -509,8 +509,8 @@ class VastAIConnectionToolbar {
                 });
                 
                 console.log('✅ SSH connection successful');
-            } else if (data.require_verification) {
-                // Host key verification required
+            } else if (data.host_verification_needed || data.require_verification) {
+                // Host key verification required (API returns host_verification_needed)
                 console.log('⚠️ Host key verification required');
                 
                 await this.updateState({
@@ -518,12 +518,20 @@ class VastAIConnectionToolbar {
                     connection_tested: true
                 });
                 
-                // Show host key verification modal
+                const modalPayload = {
+                    host: data.host,
+                    port: data.port,
+                    error: data.error,
+                    host_verification_needed: true
+                };
+                
+                // Show host key verification modal (new or legacy)
                 if (typeof window.VastAIUI !== 'undefined' && typeof window.VastAIUI.showSSHHostVerificationModal === 'function') {
-                    window.VastAIUI.showSSHHostVerificationModal(data);
+                    window.VastAIUI.showSSHHostVerificationModal(modalPayload);
                 } else if (typeof showHostKeyVerificationModal === 'function') {
-                    // Fallback to legacy function
-                    showHostKeyVerificationModal(data);
+                    showHostKeyVerificationModal(modalPayload);
+                } else {
+                    alert('Host key verification required. Please verify the host key.');
                 }
             } else {
                 // Connection failed
