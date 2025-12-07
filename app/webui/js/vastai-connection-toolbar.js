@@ -166,6 +166,14 @@ class VastAIConnectionToolbar {
                     last_refresh: Date.now()
                 });
                 
+                // Auto-select if exactly one instance and no instance currently selected
+                if (this.instancesData.length === 1 && !this.state.selected_instance_id) {
+                    const instance = this.instancesData[0];
+                    const instanceId = instance.id || instance.instance_id || instance.instanceId;
+                    console.log(`🎯 Auto-selecting single instance #${instanceId}`);
+                    await this.selectInstance(instanceId);
+                }
+                
                 // Re-render dropdown if open
                 if (this.dropdownOpen) {
                     this.renderDropdown();
@@ -271,6 +279,10 @@ class VastAIConnectionToolbar {
             } else {
                 connectionIcon.style.display = 'none';
             }
+        } else if (this.state.selected_instance_id && this.state.ssh_host) {
+            // Instance selected but not yet connected - show grey icon
+            connectionIcon.className = 'toolbar-connection-icon connection-pending';
+            connectionIcon.style.display = 'inline-block';
         } else {
             connectionIcon.style.display = 'none';
         }
@@ -473,10 +485,10 @@ class VastAIConnectionToolbar {
     }
     
     /**
-     * Connect to an instance
+     * Select an instance without connecting (just populates SSH details)
      */
-    async connectToInstance(instanceId) {
-        console.log(`🔗 Connecting to instance ${instanceId}...`);
+    async selectInstance(instanceId) {
+        console.log(`📌 Selecting instance ${instanceId}...`);
         
         // Find instance data
         const instance = this.instancesData.find(i => 
@@ -493,20 +505,34 @@ class VastAIConnectionToolbar {
         const sshPort = this._resolveSshPort(instance);
         const sshConnectionString = `ssh -p ${sshPort} root@${publicIp} -L 8080:localhost:8080`;
         
-        // Update state
+        // Update state (no connection testing)
         await this.updateState({
             selected_instance_id: parseInt(instanceId, 10),
             ssh_connection_string: sshConnectionString,
             ssh_host: publicIp,
             ssh_port: sshPort,
-            instance_status: instance.actual_status || instance.status
+            instance_status: instance.actual_status || instance.status,
+            connection_tested: false,
+            connection_status: null
         });
-        
-        // Test SSH connection
-        await this.testSSHConnection(sshConnectionString);
         
         // Update display
         this.updateToolbarDisplay();
+        
+        console.log('✅ Instance selected');
+    }
+    
+    /**
+     * Connect to an instance (select + test connection)
+     */
+    async connectToInstance(instanceId) {
+        console.log(`🔗 Connecting to instance ${instanceId}...`);
+        
+        // First select the instance
+        await this.selectInstance(instanceId);
+        
+        // Then test SSH connection
+        await this.testSSHConnection(this.state.ssh_connection_string);
         
         // Close dropdown
         this.dropdownOpen = false;

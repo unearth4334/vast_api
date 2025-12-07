@@ -640,9 +640,21 @@ function renderTasklist(stepElement, stepData) {
         statusClass = 'success';
       }
       
+      // Build progress info string if available
+      let progressInfo = '';
+      if (task.clone_progress) {
+        progressInfo += ` ${task.clone_progress}%`;
+      }
+      if (task.download_rate) {
+        progressInfo += ` @ ${escapeHtml(task.download_rate)}`;
+      }
+      if (task.data_received && !task.download_rate) {
+        progressInfo += ` (${escapeHtml(task.data_received)})`;
+      }
+      
       tasklistHTML += `<li class="${taskItemClass}">
         <span class="task-name">${escapeHtml(taskName)}</span>
-        <span class="task-status ${statusClass}">${escapeHtml(statusDisplay)}</span>
+        <span class="task-status ${statusClass}">${escapeHtml(statusDisplay)}${progressInfo}</span>
       </li>`;
       
       // Render sub-tasks if they exist

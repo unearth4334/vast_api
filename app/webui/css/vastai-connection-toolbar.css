@@ -133,6 +133,11 @@
     animation: pulse-red 2s infinite;
 }
 
+.toolbar-connection-icon.connection-pending {
+    background-color: #6b7280;
+    box-shadow: 0 0 4px #6b7280;
+}
+
 @keyframes pulse-green {
     0%, 100% {
         opacity: 1;

@@ -892,6 +892,8 @@ class WorkflowExecutor:
                             has_requirements = progress_data.get('has_requirements', False)
                             requirements_status = progress_data.get('requirements_status')
                             clone_progress = progress_data.get('clone_progress')
+                            download_rate = progress_data.get('download_rate')
+                            data_received = progress_data.get('data_received')
                             
                             logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}, clone: {clone_progress}%")
                             
@@ -1013,9 +1015,14 @@ class WorkflowExecutor:
                                                 
                                                 node_task = {'name': node, 'status': status}
                                                 
-                                                # Add clone progress if this is the current node and it's cloning
-                                                if node == current_node and clone_progress is not None:
-                                                    node_task['clone_progress'] = clone_progress
+                                                # Add progress stats if this is the current node
+                                                if node == current_node:
+                                                    if clone_progress is not None:
+                                                        node_task['clone_progress'] = clone_progress
+                                                    if download_rate:
+                                                        node_task['download_rate'] = download_rate
+                                                    if data_received:
+                                                        node_task['data_received'] = data_received
                                                 
                                                 # Add sub-task for requirements if this node has them
                                                 if node == current_node and has_requirements and requirements_status:
@@ -1045,9 +1052,14 @@ class WorkflowExecutor:
                                                 status = node_statuses.get(node, 'success')
                                                 node_task = {'name': node, 'status': status}
                                                 
-                                                # Add clone progress if this is the current node and it's cloning
-                                                if node == current_node and clone_progress is not None:
-                                                    node_task['clone_progress'] = clone_progress
+                                                # Add progress stats if this is the current node
+                                                if node == current_node:
+                                                    if clone_progress is not None:
+                                                        node_task['clone_progress'] = clone_progress
+                                                    if download_rate:
+                                                        node_task['download_rate'] = download_rate
+                                                    if data_received:
+                                                        node_task['data_received'] = data_received
                                                 
                                                 # Add sub-task for requirements if this node has them
                                                 if node == current_node and has_requirements and requirements_status:
