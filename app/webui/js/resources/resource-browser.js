@@ -67,7 +67,7 @@ export class ResourceBrowser {
             <div class="resource-browser">
                 <div class="resource-header">
                     <h2>Resource Manager</h2>
-                    <p>Browse and install workflows, models, and other assets</p>
+                    <p>Browse and install models and encoders</p>
                 </div>
                 
                 <!-- Tile Viewer Filter Bar -->
