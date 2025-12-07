@@ -63,6 +63,17 @@
     max-width: 500px;
 }
 
+.toolbar-instance-row {
+    display: flex;
+    gap: var(--size-4-2);
+    align-items: stretch;
+}
+
+.toolbar-instance-row .toolbar-refresh-btn {
+    padding-left: var(--size-4-2);
+    padding-right: var(--size-4-2);
+}
+
 .toolbar-instance-btn {
     width: 100%;
     justify-content: space-between;
@@ -294,10 +305,18 @@
         width: 100%;
         order: 3;
     }
+
+    .toolbar-instance-row {
+        gap: var(--size-4-1);
+    }
     
     .toolbar-search-btn,
     .toolbar-refresh-btn {
-        flex: 1;
+        flex: 0 0 auto;
+        min-width: 36px;
+        max-width: 36px;
+        padding: 8px;
+        justify-content: center;
     }
     
     /* Hide button text on mobile, show only emoji */

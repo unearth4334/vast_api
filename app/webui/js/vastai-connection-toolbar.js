@@ -207,11 +207,16 @@ class VastAIConnectionToolbar {
                 </button>
                 
                 <div class="toolbar-dropdown-container">
-                    <button class="toolbar-btn toolbar-instance-btn" id="toolbar-instance-btn">
-                        <span class="toolbar-instance-text" id="toolbar-instance-text">No instance.</span>
-                        <span class="toolbar-status-icon" id="toolbar-status-icon"></span>
-                        <span class="toolbar-connection-icon" id="toolbar-connection-icon"></span>
-                    </button>
+                    <div class="toolbar-instance-row">
+                        <button class="toolbar-btn toolbar-instance-btn" id="toolbar-instance-btn">
+                            <span class="toolbar-instance-text" id="toolbar-instance-text">No instance.</span>
+                            <span class="toolbar-status-icon" id="toolbar-status-icon"></span>
+                            <span class="toolbar-connection-icon" id="toolbar-connection-icon"></span>
+                        </button>
+                        <button class="toolbar-btn toolbar-refresh-btn" id="toolbar-refresh-btn" title="Refresh instances">
+                            <span>🔄</span>
+                        </button>
+                    </div>
                     
                     <div class="toolbar-dropdown" id="toolbar-dropdown" style="display: none;">
                         <div class="toolbar-dropdown-content" id="toolbar-dropdown-content">
@@ -219,10 +224,6 @@ class VastAIConnectionToolbar {
                         </div>
                     </div>
                 </div>
-                
-                <button class="toolbar-btn toolbar-refresh-btn" id="toolbar-refresh-btn" title="Refresh instances">
-                    <span>🔄</span>
-                </button>
             </div>
         `;
         
