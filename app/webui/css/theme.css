@@ -51,6 +51,9 @@
     --size-4-8: 32px;
     --size-4-12: 48px;
     
+    /* Compact spacing for dense layouts */
+    --size-compact: 2px;
+    
     /* Border radius scale */
     --radius-s: 6px;
     --radius-m: 8px;
