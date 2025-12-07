@@ -1517,7 +1517,12 @@ export async function installCustomNodes() {
               case 'cloning':
               case 'installing_requirements':
                 state = 'active';
-                label = `${node.name} - ${node.message || 'Processing...'}`;
+                // Show clone progress percentage if available (for cloning operations only)
+                if (node.clone_progress !== undefined && node.clone_progress !== null && node.status !== 'installing_requirements') {
+                  label = `${node.name} - ${node.message || 'Cloning...'} (${node.clone_progress}%)`;
+                } else {
+                  label = `${node.name} - ${node.message || 'Processing...'}`;
+                }
                 break;
               case 'success':
                 state = 'completed';

@@ -888,8 +888,9 @@ class WorkflowExecutor:
                             failed_count = progress.get('failed', 0)
                             has_requirements = progress.get('has_requirements', False)
                             requirements_status = progress.get('requirements_status')
+                            clone_progress = progress.get('clone_progress')
                             
-                            logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}")
+                            logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}, clone: {clone_progress}%")
                             
                             # Mark all previously seen nodes as success (they're completed if we've moved past them)
                             for prev_node in nodes_seen:
@@ -948,6 +949,10 @@ class WorkflowExecutor:
                                                 status = node_statuses.get(node, 'success')
                                                 node_task = {'name': node, 'status': status}
                                                 
+                                                # Add clone progress if this is the current node and it's cloning
+                                                if node == current_node and clone_progress is not None:
+                                                    node_task['clone_progress'] = clone_progress
+                                                
                                                 # Add sub-task for requirements if this node has them
                                                 if node == current_node and has_requirements and requirements_status:
                                                     node_task['subtasks'] = [{
@@ -1005,6 +1010,10 @@ class WorkflowExecutor:
                                                 
                                                 node_task = {'name': node, 'status': status}
                                                 
+                                                # Add clone progress if this is the current node and it's cloning
+                                                if node == current_node and clone_progress is not None:
+                                                    node_task['clone_progress'] = clone_progress
+                                                
                                                 # Add sub-task for requirements if this node has them
                                                 if node == current_node and has_requirements and requirements_status:
                                                     node_task['subtasks'] = [{
@@ -1025,24 +1034,26 @@ class WorkflowExecutor:
                                                 })
                                     else:
                                         # 4 or fewer nodes total - show all (except initialization nodes)
-                                        for node in nodes_seen:
-                                            # Skip initialization nodes
-                                            if node in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']:
-                                                continue
+                                            for node in nodes_seen:
+                                                # Skip initialization nodes
+                                                if node in ['Initializing', 'Cloning Auto-installer', 'Configure venv path', 'Starting installation']:
+                                                    continue
+                                                    
+                                                status = node_statuses.get(node, 'success')
+                                                node_task = {'name': node, 'status': status}
                                                 
-                                            status = node_statuses.get(node, 'success')
-                                            node_task = {'name': node, 'status': status}
-                                            
-                                            # Add sub-task for requirements if this node has them
-                                            if node == current_node and has_requirements and requirements_status:
-                                                node_task['subtasks'] = [{
-                                                    'name': 'Install dependencies',
-                                                    'status': requirements_status
-                                                }]
-                                            
-                                            tasks_to_show.append(node_task)
-                                
-                                # Only update if tasks changed
+                                                # Add clone progress if this is the current node and it's cloning
+                                                if node == current_node and clone_progress is not None:
+                                                    node_task['clone_progress'] = clone_progress
+                                                
+                                                # Add sub-task for requirements if this node has them
+                                                if node == current_node and has_requirements and requirements_status:
+                                                    node_task['subtasks'] = [{
+                                                        'name': 'Install dependencies',
+                                                        'status': requirements_status
+                                                    }]
+                                                
+                                                tasks_to_show.append(node_task)                                # Only update if tasks changed
                                 update_hash = str(tasks_to_show)
                                 if update_hash != last_update_hash:
                                     logger.info(f"Updating task list with {len(tasks_to_show)} tasks: {[t['name'] for t in tasks_to_show]}")

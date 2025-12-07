@@ -94,6 +94,7 @@ write_json_progress() {
     local failed="${7:-0}"
     local has_requirements="${8:-false}"
     local requirements_status="${9:-}"
+    local clone_progress="${10:-}"
     
     # Escape node name for JSON (replace quotes with escaped quotes)
     local escaped_node=$(echo "$current_node" | sed 's/"/\\"/g')
@@ -124,9 +125,36 @@ write_json_progress() {
   "successful_clones": $successful,
   "failed_clones": $failed,
   "has_requirements": $has_requirements$([ -n "$requirements_status" ] && echo ",
-  \"requirements_status\": \"$requirements_status\"" || echo "")
+  \"requirements_status\": \"$requirements_status\"" || echo "")$([ -n "$clone_progress" ] && echo ",
+  \"clone_progress\": $clone_progress" || echo "")
 }
 EOF
+}
+
+# Function to clone repository with progress updates
+clone_with_progress() {
+    local repo_url="$1"
+    local target_path="$2"
+    local node_name="$3"
+    local total_nodes="$4"
+    local current_node="$5"
+    local successful="$6"
+    local failed="$7"
+    
+    # Run git clone with progress output
+    git clone --progress --depth 1 "$repo_url" "$target_path" 2>&1 | while IFS= read -r line; do
+        # Git outputs progress like: "Receiving objects: 45% (123/456)"
+        if [[ "$line" =~ Receiving\ objects:[[:space:]]*([0-9]+)% ]]; then
+            local progress="${BASH_REMATCH[1]}"
+            # Update JSON progress with clone percentage
+            write_json_progress true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" false "" "$progress"
+        fi
+        # Log the output
+        echo "$line" >> "$LOG_FILE"
+    done
+    
+    # Return the exit code of git clone (from PIPESTATUS)
+    return ${PIPESTATUS[0]}
 }
 
 # Function to write log messages
@@ -286,12 +314,12 @@ if [ -f "$CUSTOM_NODES_CSV" ]; then
                 write_log "Cloning repository: $repo_url" 2
                 write_progress_log "NODE" "$name" "cloning" "Cloning repository"
                 
-                if invoke_and_log git clone --depth 1 "$repo_url" "$NODE_PATH"; then
+                if clone_with_progress "$repo_url" "$NODE_PATH" "$name" "$TOTAL_NODES" "$CURRENT_NODE" "$SUCCESSFUL_NODES" "$FAILED_NODES"; then
                     # Validate the clone - check if it has valid git history
                     if ! (cd "$NODE_PATH" && git rev-parse HEAD >/dev/null 2>&1); then
                         write_log "Clone validation failed for $name, repository is empty or invalid. Re-cloning..." 2 "yellow"
                         rm -rf "$NODE_PATH"
-                        if ! invoke_and_log git clone --depth 1 "$repo_url" "$NODE_PATH"; then
+                        if ! clone_with_progress "$repo_url" "$NODE_PATH" "$name" "$TOTAL_NODES" "$CURRENT_NODE" "$SUCCESSFUL_NODES" "$FAILED_NODES"; then
                             write_log "Failed to re-clone $name" 2 "red"
                             write_progress_log "NODE" "$name" "failed" "Failed to clone repository"
                             ((FAILED_NODES++))
