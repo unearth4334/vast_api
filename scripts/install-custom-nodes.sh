@@ -488,7 +488,7 @@ if [ -f "$CUSTOM_NODES_CSV" ]; then
         else
             write_log "Skipping invalid entry: name='$name', repo_url='$repo_url'" 2 "yellow"
             if [ -n "$name" ]; then
-                write_progress_log "NODE" "$name" "failed" "Invalid configuration"
+                write_progress_log "NODE" "$name" "failed" "Invalid configuration" 
                 ((FAILED_NODES++))
                 ((CURRENT_NODE++))
                 
