@@ -243,6 +243,15 @@
     flex-wrap: wrap;
 }
 
+/* OB token fetch link */
+.toolbar-instance-details .toolbar-fetch-token {
+    color: white;
+}
+
+.toolbar-instance-details .toolbar-fetch-token:hover {
+    color: white;
+}
+
 /* Instance Actions */
 .toolbar-instance-actions {
     display: flex;
