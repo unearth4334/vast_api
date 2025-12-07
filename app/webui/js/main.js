@@ -92,7 +92,7 @@ function syncSshConnectionStrings() {
     // Otherwise, get the first non-empty value from legacy inputs
     const value = vastaiInput?.value || resourcesInput?.value || createInput?.value || '';
     
-    // Sync to all inputs
+    // Sync to all inputs (avoid wiping toolbar-derived value)
     if (vastaiInput && !vastaiInput.value && value) vastaiInput.value = value;
     if (resourcesInput && !resourcesInput.value && value) resourcesInput.value = value;
     if (createInput && !createInput.value && value) createInput.value = value;

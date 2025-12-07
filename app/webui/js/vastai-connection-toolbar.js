@@ -432,9 +432,23 @@ class VastAIConnectionToolbar {
             return;
         }
         
-        // Build SSH connection string
+        // Build SSH connection string using the actual host port mapped to 22/tcp
         const publicIp = instance.public_ipaddr || instance.public_ip || instance.ip_address;
-        const sshPort = instance.ssh_port || instance.port_forwarded || 22;
+
+        let sshPort = 22;
+
+        // 1) Preferred: ports['22/tcp'][0].HostPort (matches Vast AI port mapping)
+        if (instance.ports && instance.ports['22/tcp'] && instance.ports['22/tcp'].length > 0) {
+            sshPort = parseInt(instance.ports['22/tcp'][0].HostPort, 10) || 22;
+        }
+        // 2) Fallback: direct_port_start (start of direct port range)
+        else if (instance.direct_port_start) {
+            sshPort = parseInt(instance.direct_port_start, 10) || 22;
+        }
+        // 3) Legacy: ssh_port / port_forwarded (may point to a proxy, use only if nothing else)
+        else if (instance.ssh_port || instance.port_forwarded) {
+            sshPort = parseInt(instance.port_forwarded || instance.ssh_port, 10) || 22;
+        }
         const sshConnectionString = `ssh -p ${sshPort} root@${publicIp} -L 8080:localhost:8080`;
         
         // Update state
