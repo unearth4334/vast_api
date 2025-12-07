@@ -147,7 +147,14 @@ async function runWorkflow() {
   
   // Get all enabled workflow steps
   const workflowStepsContainer = document.getElementById('workflow-steps');
-  const stepElements = workflowStepsContainer.querySelectorAll('.workflow-step:not(.disabled)');
+  let stepElements = workflowStepsContainer.querySelectorAll('.workflow-step:not(.disabled)');
+
+  // If no steps are present (e.g., template not loaded yet), fall back to defaults
+  if (stepElements.length === 0) {
+    console.warn('⚠️ No workflow steps found in DOM; rebuilding defaults before start');
+    resetWorkflowSteps();
+    stepElements = workflowStepsContainer.querySelectorAll('.workflow-step:not(.disabled)');
+  }
   
   if (stepElements.length === 0) {
     showSetupResult('No steps are enabled. Please enable at least one step.', 'error');
