@@ -290,18 +290,28 @@ clone_with_progress() {
     # Get the actual size of the cloned repository
     if [ -d "$target_path" ]; then
         # Get size in bytes and convert to human-readable with consistent units (MiB, KiB, GiB)
+        # Using pure bash arithmetic for consistency (no bc or awk dependencies)
         local repo_size_bytes=$(du -sb "$target_path" 2>/dev/null | cut -f1)
         local repo_size=""
         if [ -n "$repo_size_bytes" ]; then
             if [ "$repo_size_bytes" -ge 1073741824 ]; then
-                # GiB
-                repo_size=$(echo "scale=1; $repo_size_bytes / 1073741824" | awk '{printf "%.1f GiB", $1}')
+                # GiB - multiply by 10 for one decimal place, then divide
+                local size_gib_x10=$(( (repo_size_bytes * 10) / 1073741824 ))
+                local size_int=$((size_gib_x10 / 10))
+                local size_dec=$((size_gib_x10 % 10))
+                repo_size="${size_int}.${size_dec} GiB"
             elif [ "$repo_size_bytes" -ge 1048576 ]; then
-                # MiB
-                repo_size=$(echo "scale=1; $repo_size_bytes / 1048576" | awk '{printf "%.1f MiB", $1}')
+                # MiB - multiply by 10 for one decimal place, then divide
+                local size_mib_x10=$(( (repo_size_bytes * 10) / 1048576 ))
+                local size_int=$((size_mib_x10 / 10))
+                local size_dec=$((size_mib_x10 % 10))
+                repo_size="${size_int}.${size_dec} MiB"
             else
-                # KiB
-                repo_size=$(echo "scale=1; $repo_size_bytes / 1024" | awk '{printf "%.1f KiB", $1}')
+                # KiB - multiply by 10 for one decimal place, then divide
+                local size_kib_x10=$(( (repo_size_bytes * 10) / 1024 ))
+                local size_int=$((size_kib_x10 / 10))
+                local size_dec=$((size_kib_x10 % 10))
+                repo_size="${size_int}.${size_dec} KiB"
             fi
         fi
         # Write final completion status with size
