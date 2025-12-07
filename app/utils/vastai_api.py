@@ -824,6 +824,119 @@ def get_running_instance(api_key):
         return None
 
 
+def start_instance(api_key, instance_id):
+    """
+    Start a stopped VastAI instance using the official VastAI API.
+    Mirrors `vastai start instance <id>` CLI behavior.
+    """
+    context = create_enhanced_context("start_instance", instance_id=instance_id)
+    start_time = time.time()
+    endpoint = f"/instances/start/{instance_id}/"
+    method = "PUT"
+
+    headers = create_headers(api_key)
+
+    enhanced_logger.log_operation(
+        message=f"Starting VastAI instance {instance_id}",
+        operation="start_instance",
+        context=context,
+        extra_data={"instance_id": instance_id, "endpoint": endpoint}
+    )
+
+    try:
+        response = requests.put(f"{VAST_API_BASE_URL}{endpoint}", headers=headers)
+        response.raise_for_status()
+        response_data = response.json()
+        duration_ms = (time.time() - start_time) * 1000
+
+        enhanced_logger.log_api(
+            message=f"Start requested for VastAI instance {instance_id}",
+            status_code=response.status_code,
+            context=context,
+            extra_data={"instance_id": instance_id, "response_time_ms": duration_ms, "response_data": response_data}
+        )
+
+        enhanced_logger.log_api_interaction(
+            method=method,
+            endpoint=endpoint,
+            context=context,
+            request_data={"instance_id": instance_id},
+            response_data=response_data,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            headers=headers,
+            url=f"{VAST_API_BASE_URL}{endpoint}"
+        )
+
+        return response_data
+
+    except requests.RequestException as e:
+        duration_ms = (time.time() - start_time) * 1000
+        enhanced_logger.log_error(
+            message=f"Failed to start VastAI instance {instance_id}: {str(e)}",
+            error_type="instance_start_error",
+            context=context,
+            extra_data={"instance_id": instance_id, "response_time_ms": duration_ms}
+        )
+        raise VastAIAPIError(f"Failed to start instance {instance_id}: {str(e)}")
+
+
+def stop_instance(api_key, instance_id):
+    """
+    Stop a running VastAI instance using the official VastAI API.
+    Mirrors `vastai stop instance <id>` CLI behavior.
+    """
+    context = create_enhanced_context("stop_instance", instance_id=instance_id)
+    start_time = time.time()
+    endpoint = f"/instances/stop/{instance_id}/"
+    method = "PUT"
+
+    headers = create_headers(api_key)
+
+    enhanced_logger.log_operation(
+        message=f"Stopping VastAI instance {instance_id}",
+        operation="stop_instance",
+        context=context,
+        extra_data={"instance_id": instance_id, "endpoint": endpoint}
+    )
+
+    try:
+        response = requests.put(f"{VAST_API_BASE_URL}{endpoint}", headers=headers)
+        response.raise_for_status()
+        response_data = response.json()
+        duration_ms = (time.time() - start_time) * 1000
+
+        enhanced_logger.log_api(
+            message=f"Stop requested for VastAI instance {instance_id}",
+            status_code=response.status_code,
+            context=context,
+            extra_data={"instance_id": instance_id, "response_time_ms": duration_ms, "response_data": response_data}
+        )
+
+        enhanced_logger.log_api_interaction(
+            method=method,
+            endpoint=endpoint,
+            context=context,
+            request_data={"instance_id": instance_id},
+            response_data=response_data,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+            headers=headers,
+            url=f"{VAST_API_BASE_URL}{endpoint}"
+        )
+
+        return response_data
+
+    except requests.RequestException as e:
+        duration_ms = (time.time() - start_time) * 1000
+        enhanced_logger.log_error(
+            message=f"Failed to stop VastAI instance {instance_id}: {str(e)}",
+            error_type="instance_stop_error",
+            context=context,
+            extra_data={"instance_id": instance_id, "response_time_ms": duration_ms}
+        )
+        raise VastAIAPIError(f"Failed to stop instance {instance_id}: {str(e)}")
+
 def reboot_instance(api_key, instance_id):
     """
     Reboot a VastAI instance with enhanced logging.

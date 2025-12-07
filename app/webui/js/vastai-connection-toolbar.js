@@ -759,12 +759,45 @@ class VastAIConnectionToolbar {
      */
     async powerAction(instanceId, action) {
         console.log(`⚡ ${action} instance ${instanceId}...`);
-        
-        // TODO: Implement start/stop functionality
-        // This would call the VastAI API to start or stop the instance
-        
-        // Reload instances after action
-        setTimeout(() => this.loadInstances(), 2000);
+
+        const endpoint = action === 'start'
+            ? `/vastai/instances/${instanceId}/start`
+            : `/vastai/instances/${instanceId}/stop`;
+
+        // Optimistically mark status
+        await this.updateState({ connection_status: 'testing' });
+        this.updateToolbarDisplay();
+
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                alert(`Failed to ${action} instance: ${data.message || 'Unknown error'}`);
+            } else {
+                if (action === 'stop' && this.state.selected_instance_id === instanceId) {
+                    // Clear selection if we stopped the selected instance
+                    await this.updateState({
+                        selected_instance_id: null,
+                        ssh_connection_string: '',
+                        ssh_host: null,
+                        ssh_port: null,
+                        connection_status: 'disconnected',
+                        connection_tested: false,
+                        instance_status: null
+                    });
+                }
+            }
+        } catch (error) {
+            console.error(`❌ Error performing ${action} on instance ${instanceId}:`, error);
+            alert(`Error performing ${action}: ${error.message}`);
+        }
+
+        // Refresh instance list to reflect new status
+        await this.loadInstances();
     }
     
     /**

@@ -2643,6 +2643,84 @@ def get_vastai_instance_details(instance_id):
             'success': False,
             'message': f'Error getting VastAI instance {instance_id}: {str(e)}'
         })
+
+
+@app.route('/vastai/instances/<int:instance_id>/start', methods=['POST', 'OPTIONS'])
+def start_vastai_instance(instance_id):
+    """Start a stopped VastAI instance (maps to vastai start instance)."""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+
+    try:
+        from ..utils.vastai_api import start_instance, VastAIAPIError
+
+        api_key = read_api_key_from_file()
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found. Please check api_key.txt file.'
+            })
+
+        logger.info(f"Starting VastAI instance {instance_id}")
+        result = start_instance(api_key, instance_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Instance {instance_id} start requested',
+            'result': result
+        })
+
+    except VastAIAPIError as e:
+        logger.error(f"VastAI API error starting instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'VastAI API error: {str(e)}'
+        })
+    except Exception as e:
+        logger.error(f"Error starting VastAI instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error starting instance: {str(e)}'
+        })
+
+
+@app.route('/vastai/instances/<int:instance_id>/stop', methods=['POST', 'OPTIONS'])
+def stop_vastai_instance(instance_id):
+    """Stop a running VastAI instance (maps to vastai stop instance)."""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+
+    try:
+        from ..utils.vastai_api import stop_instance, VastAIAPIError
+
+        api_key = read_api_key_from_file()
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'message': 'VastAI API key not found. Please check api_key.txt file.'
+            })
+
+        logger.info(f"Stopping VastAI instance {instance_id}")
+        result = stop_instance(api_key, instance_id)
+
+        return jsonify({
+            'success': True,
+            'message': f'Instance {instance_id} stop requested',
+            'result': result
+        })
+
+    except VastAIAPIError as e:
+        logger.error(f"VastAI API error stopping instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'VastAI API error: {str(e)}'
+        })
+    except Exception as e:
+        logger.error(f"Error stopping VastAI instance {instance_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error stopping instance: {str(e)}'
+        })
 @app.route('/vastai/instances/<int:instance_id>/open-button-token', methods=['POST', 'OPTIONS'])
 def get_open_button_token(instance_id):
     """Get OPEN_BUTTON_TOKEN from a VastAI instance via SSH"""
