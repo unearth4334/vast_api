@@ -161,10 +161,17 @@ async function runWorkflow() {
     return;
   }
   
-  // Validate SSH connection
-  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  // Get SSH connection from toolbar or fallback to input field
+  let sshConnectionString = '';
+  if (window.VastAIConnectionToolbar && typeof window.VastAIConnectionToolbar.getSSHConnectionString === 'function') {
+    sshConnectionString = window.VastAIConnectionToolbar.getSSHConnectionString();
+  }
   if (!sshConnectionString) {
-    showSetupResult('Please enter an SSH connection string first.', 'error');
+    sshConnectionString = document.getElementById('sshConnectionString')?.value.trim() || '';
+  }
+  
+  if (!sshConnectionString) {
+    showSetupResult('Please connect to an instance first using the toolbar above.', 'error');
     return;
   }
   

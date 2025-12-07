@@ -4514,10 +4514,14 @@ def workflow_start():
     if request.method == 'OPTIONS':
         return ("", 204)
     
+    logger.info("📥 Received workflow/start request")
+    
     try:
         from .workflow_executor import get_workflow_executor
         
         data = request.get_json() if request.is_json else {}
+        logger.info(f"📦 Request data: {data}")
+        
         workflow_id = data.get('workflow_id') or str(uuid.uuid4())
         steps = data.get('steps', [])
         ssh_connection = data.get('ssh_connection')
