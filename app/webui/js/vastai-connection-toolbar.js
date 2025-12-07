@@ -519,7 +519,7 @@ class VastAIConnectionToolbar {
     /**
      * Test SSH connection
      */
-    async testSSHConnection(sshConnectionString) {
+    async testSSHConnection(sshConnectionString, hasRetried = false) {
         console.log('🔧 Testing SSH connection...');
         
         // Update state to show testing
@@ -531,7 +531,7 @@ class VastAIConnectionToolbar {
         this.updateToolbarDisplay();
         
         try {
-            const response = await fetch('/test/ssh', {
+            const response = await fetch('/ssh/test', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -544,36 +544,26 @@ class VastAIConnectionToolbar {
             const data = await response.json();
             
             if (data.success) {
-                // Connection successful
+                // Connection successful (remote command like echo hello succeeds)
                 await this.updateState({
                     connection_status: 'connected',
                     connection_tested: true
                 });
                 
                 console.log('✅ SSH connection successful');
-            } else if (data.host_verification_needed || data.require_verification) {
-                // Host key verification required (API returns host_verification_needed)
+            } else if ((data.host_verification_needed || data.require_verification) && !hasRetried) {
+                // Host key verification required; fetch fingerprint, prompt user, and retry once
                 console.log('⚠️ Host key verification required');
-                
+
                 await this.updateState({
                     connection_status: 'failed',
                     connection_tested: true
                 });
-                
-                const modalPayload = {
-                    host: data.host,
-                    port: data.port,
-                    error: data.error,
-                    host_verification_needed: true
-                };
-                
-                // Show host key verification modal (new or legacy)
-                if (typeof window.VastAIUI !== 'undefined' && typeof window.VastAIUI.showSSHHostVerificationModal === 'function') {
-                    window.VastAIUI.showSSHHostVerificationModal(modalPayload);
-                } else if (typeof showHostKeyVerificationModal === 'function') {
-                    showHostKeyVerificationModal(modalPayload);
-                } else {
-                    alert('Host key verification required. Please verify the host key.');
+                this.updateToolbarDisplay();
+
+                const verified = await this._verifyHostForSSH(sshConnectionString, data);
+                if (verified) {
+                    return this.testSSHConnection(sshConnectionString, true);
                 }
             } else {
                 // Connection failed
@@ -597,6 +587,52 @@ class VastAIConnectionToolbar {
             
             this.updateToolbarDisplay();
         }
+    }
+
+    async _verifyHostForSSH(sshConnection, fallbackData = {}) {
+        const fingerprintData = await this._fetchHostFingerprints(sshConnection, fallbackData);
+        const modalData = {
+            host: fingerprintData.host || fallbackData.host,
+            port: fingerprintData.port || fallbackData.port,
+            fingerprints: fingerprintData.fingerprints || (fallbackData.fingerprint ? [fallbackData.fingerprint] : []),
+            ssh_connection: sshConnection,
+            host_verification_needed: true
+        };
+
+        const accepted = await this._showHostVerificationModal(modalData);
+        if (!accepted) return false;
+
+        try {
+            const verifyResp = await fetch('/ssh/verify-host', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ssh_connection: sshConnection, accept: true })
+            });
+            const verifyData = await verifyResp.json();
+            return !!verifyData.success;
+        } catch (error) {
+            console.error('Host verification confirm failed:', error);
+            return false;
+        }
+    }
+
+    async _fetchHostFingerprints(sshConnection, fallbackData = {}) {
+        try {
+            const resp = await fetch('/ssh/verify-host', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ssh_connection: sshConnection, accept: false })
+            });
+            const data = await resp.json();
+            if (data.success) return data;
+        } catch (error) {
+            console.error('Host fingerprint fetch failed:', error);
+        }
+        return {
+            host: fallbackData.host,
+            port: fallbackData.port,
+            fingerprints: fallbackData.fingerprint ? [fallbackData.fingerprint] : []
+        };
     }
 
     async fetchOpenButtonToken(instanceId, sshConnection) {
