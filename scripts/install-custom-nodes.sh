@@ -122,8 +122,6 @@ write_json_progress() {
   "current_status": "$current_status",
   "successful": $successful,
   "failed": $failed,
-  "successful_clones": $successful,
-  "failed_clones": $failed,
   "has_requirements": $has_requirements$([ -n "$requirements_status" ] && echo ",
   \"requirements_status\": \"$requirements_status\"" || echo "")$([ -n "$clone_progress" ] && echo ",
   \"clone_progress\": $clone_progress" || echo "")
@@ -174,8 +172,6 @@ write_json_progress_with_stats() {
   "current_status": "$current_status",
   "successful": $successful,
   "failed": $failed,
-  "successful_clones": $successful,
-  "failed_clones": $failed,
   "has_requirements": $has_requirements$([ -n "$requirements_status" ] && echo ",
   \"requirements_status\": \"$requirements_status\"" || echo "")$([ -n "$clone_progress" ] && echo ",
   \"clone_progress\": $clone_progress" || echo "")$([ -n "$download_rate" ] && echo ",
@@ -195,6 +191,11 @@ clone_with_progress() {
     local successful="$6"
     local failed="$7"
     
+    # Regex patterns for parsing git clone output
+    local PROGRESS_PATTERN='Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)%'
+    local DATA_RATE_PATTERN='([0-9.]+[[:space:]]*(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]*(KiB|MiB|GiB)/s)'
+    local DATA_ONLY_PATTERN='([0-9.]+[[:space:]]*(KiB|MiB|GiB))'
+    
     # Run git clone with progress output
     git clone --progress --depth 1 "$repo_url" "$target_path" 2>&1 | while IFS= read -r line; do
         # Git outputs progress like: "Receiving objects: 45% (123/456), 2.5 MiB | 1.2 MiB/s"
@@ -203,16 +204,15 @@ clone_with_progress() {
         local data_received=""
         
         # Extract percentage
-        if [[ "$line" =~ Receiving\ objects:[[:space:]]*([0-9]+)% ]]; then
+        if [[ "$line" =~ $PROGRESS_PATTERN ]]; then
             progress="${BASH_REMATCH[1]}"
         fi
         
         # Extract data received and download rate
-        # Format: "Receiving objects: 45% (123/456), 2.5 MiB | 1.2 MiB/s"
-        if [[ "$line" =~ ([0-9.]+[[:space:]]*(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]*(KiB|MiB|GiB)/s) ]]; then
+        if [[ "$line" =~ $DATA_RATE_PATTERN ]]; then
             data_received="${BASH_REMATCH[1]}"
             download_rate="${BASH_REMATCH[3]}"
-        elif [[ "$line" =~ ([0-9.]+[[:space:]]*(KiB|MiB|GiB)) ]]; then
+        elif [[ "$line" =~ $DATA_ONLY_PATTERN ]]; then
             # Just data received, no rate yet
             data_received="${BASH_REMATCH[1]}"
         fi

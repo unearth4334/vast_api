@@ -187,8 +187,11 @@ def _parse_progress_log(log_content: str, current_progress: dict) -> list:
                 if message:
                     nodes_dict[node_name]['message'] = message
                     
+        except (IndexError, ValueError) as e:
+            logger.debug(f"Error parsing log line structure: {line} - {e}")
+            continue
         except Exception as e:
-            logger.debug(f"Error parsing log line: {line} - {e}")
+            logger.warning(f"Unexpected error parsing log line: {line} - {e}")
             continue
     
     # Convert dict to list

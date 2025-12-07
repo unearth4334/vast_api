@@ -243,7 +243,6 @@
     color: var(--interactive-accent);
     font-size: 14px;
     line-height: 1;
-    animation: swirl 0.8s linear infinite;
 }
 
 .download-stats-content {
@@ -269,7 +268,12 @@
     font-weight: 500;
 }
 
-/* Swirling animation for loading icon */
+/* Swirling animation for loading icon using Braille patterns */
+.download-stats-spinner::before {
+    content: '⣾';
+    animation: swirl 0.8s steps(8) infinite;
+}
+
 @keyframes swirl {
     0% { content: '⣾'; }
     12.5% { content: '⣽'; }
@@ -280,11 +284,6 @@
     75% { content: '⣯'; }
     87.5% { content: '⣷'; }
     100% { content: '⣾'; }
-}
-
-.download-stats-spinner::before {
-    content: '⣾';
-    animation: swirl 0.8s steps(8) infinite;
 }
 
 /* =========================
