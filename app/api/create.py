@@ -35,7 +35,9 @@ workflow_queue_times = {}
 workflow_thumbnails = {}
 
 # Thumbnail directory
-THUMBNAIL_DIR = Path('/app/downloads/thumbnails')
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+THUMBNAIL_DIR = Path(os.path.join(BASE_DIR, 'downloads', 'thumbnails'))
 THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
 
 

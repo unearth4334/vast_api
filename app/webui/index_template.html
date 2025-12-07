@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="css/progress-indicators.css">
     <link rel="stylesheet" href="css/resources.css">
     <link rel="stylesheet" href="css/create.css">
+    <link rel="stylesheet" href="css/vastai-connection-toolbar.css">
 </head>
 <body>
     <div class="container">
@@ -77,38 +78,6 @@
         <div id="vastai-setup-tab" class="tab-content">
             <h3>VastAI SSH Connection Setup</h3>
             <p>Configure your VastAI SSH connection and manage UI_HOME settings.</p>
-            
-            <!-- VastAI Instances Section -->
-            <div class="vastai-instances-section">
-                <h4>🖥️ Active VastAI Instances</h4>
-                <div class="instances-buttons">
-                    <button class="setup-button secondary" onclick="loadVastaiInstances()">
-                        🔄 Load Instances
-                    </button>
-                    <button class="setup-button" onclick="openSearchOffersModal()">
-                        Search Offers
-                    </button>
-                </div>
-                <div id="vastai-instances-list" class="instances-list">
-                    <!-- Instances will be displayed here -->
-                    <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances</div>
-                </div>
-            </div>
-            
-            <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
-            
-            <!-- Step 1: SSH Connection -->
-            <div class="workflow-tile">
-                <h4 class="tile-header">🔌 Step 1: SSH Connection</h4>
-                <div class="tile-content">
-                    <div class="setup-field">
-                        <label for="sshConnectionString">SSH Connection String:</label>
-                        <input type="text" id="sshConnectionString" 
-                               placeholder="ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
-                               title="Enter the SSH connection string from your VastAI instance">
-                    </div>
-                </div>
-            </div>
             
             <!-- Step 2: Template Selection -->
             <div class="workflow-tile">
@@ -281,40 +250,6 @@
     
     <!-- Resources Tab -->
     <div id="resources-tab" class="tab-content">
-        <!-- VastAI Instances Section -->
-        <div class="vastai-instances-section">
-            <h4>🖥️ Active VastAI Instances</h4>
-            <div class="instances-buttons">
-                <button class="setup-button secondary" onclick="loadVastaiInstancesForResources()">
-                    🔄 Load Instances
-                </button>
-                <button class="setup-button" onclick="openSearchOffersModal()">
-                    Search Offers
-                </button>
-            </div>
-            <div id="resources-vastai-instances-list" class="instances-list">
-                <!-- Instances will be displayed here -->
-                <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances</div>
-            </div>
-        </div>
-        
-        <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
-        
-        <!-- Step 1: SSH Connection -->
-        <div class="workflow-tile">
-            <h4 class="tile-header">🔌 Step 1: SSH Connection</h4>
-            <div class="tile-content">
-                <div class="setup-field">
-                    <label for="resourcesSshConnectionString">SSH Connection String:</label>
-                    <input type="text" id="resourcesSshConnectionString" 
-                           placeholder="ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
-                           title="Enter the SSH connection string from your VastAI instance">
-                </div>
-            </div>
-        </div>
-        
-        <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
-        
         <div id="resource-manager-container">
             <!-- Resource manager will be initialized here by JavaScript -->
         </div>
@@ -335,40 +270,6 @@
     <div id="create-tab" class="tab-content">
         <h3>🎨 Create with ComfyUI Workflows</h3>
         <p>Select a workflow, configure inputs, and execute on your cloud instance.</p>
-        
-        <!-- VastAI Instances Section (same as other tabs) -->
-        <div class="vastai-instances-section">
-            <h4>🖥️ Active VastAI Instances</h4>
-            <div class="instances-buttons">
-                <button class="setup-button secondary" onclick="loadVastaiInstancesForCreate()">
-                    🔄 Load Instances
-                </button>
-                <button class="setup-button" onclick="openSearchOffersModal()">
-                    Search Offers
-                </button>
-            </div>
-            <div id="create-vastai-instances-list" class="instances-list">
-                <!-- Instances will be displayed here -->
-                <div class="no-instances-message">Click "Load Instances" to see your active VastAI instances</div>
-            </div>
-        </div>
-        
-        <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
-        
-        <!-- Step 1: SSH Connection -->
-        <div class="workflow-tile">
-            <h4 class="tile-header">🔌 Step 1: SSH Connection</h4>
-            <div class="tile-content">
-                <div class="setup-field">
-                    <label for="createSshConnectionString">SSH Connection String:</label>
-                    <input type="text" id="createSshConnectionString" 
-                           placeholder="ssh -p 2838 root@104.189.178.116 -L 8080:localhost:8080"
-                           title="Enter the SSH connection string from your VastAI instance">
-                </div>
-            </div>
-        </div>
-        
-        <hr style="margin: 20px 0; border: 1px solid var(--background-modifier-border);">
         
         <!-- Step 2: Workflow Selection -->
         <div class="workflow-tile">
@@ -549,6 +450,9 @@
     
     <!-- VastAI Modular System -->
     <script src="js/vastai-modular.js?v=20251117-v6" type="module"></script>
+    
+    <!-- VastAI Connection Toolbar (after vastai-modular) -->
+    <script src="js/vastai-connection-toolbar.js?v=20251207-v1"></script>
     
     <!-- Resource Manager -->
     <script src="js/resources/resource-browser.js?v=20251118-v1" type="module"></script>

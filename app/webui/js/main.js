@@ -63,16 +63,36 @@ function showTab(tabName, event) {
     syncSshConnectionStrings();
 }
 
-// Sync SSH connection strings between all tabs
+// Get SSH connection string from toolbar
+function getToolbarSSHConnection() {
+    if (window.VastAIConnectionToolbar) {
+        return window.VastAIConnectionToolbar.getSSHConnectionString();
+    }
+    return '';
+}
+
+// Sync SSH connection strings between all tabs (legacy support)
 function syncSshConnectionStrings() {
+    // Get value from toolbar if available
+    const toolbarValue = getToolbarSSHConnection();
+    
+    // Legacy inputs (may not exist anymore, but keep for backward compatibility)
     const vastaiInput = document.getElementById('sshConnectionString');
     const resourcesInput = document.getElementById('resourcesSshConnectionString');
     const createInput = document.getElementById('createSshConnectionString');
     
-    // Get the first non-empty value
+    // If we have a toolbar value, that takes precedence
+    if (toolbarValue) {
+        if (vastaiInput) vastaiInput.value = toolbarValue;
+        if (resourcesInput) resourcesInput.value = toolbarValue;
+        if (createInput) createInput.value = toolbarValue;
+        return;
+    }
+    
+    // Otherwise, get the first non-empty value from legacy inputs
     const value = vastaiInput?.value || resourcesInput?.value || createInput?.value || '';
     
-    // Sync to all inputs
+    // Sync to all inputs (avoid wiping toolbar-derived value)
     if (vastaiInput && !vastaiInput.value && value) vastaiInput.value = value;
     if (resourcesInput && !resourcesInput.value && value) resourcesInput.value = value;
     if (createInput && !createInput.value && value) createInput.value = value;
