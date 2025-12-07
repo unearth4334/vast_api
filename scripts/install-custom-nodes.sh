@@ -204,6 +204,8 @@ clone_with_progress() {
     local start_time=$(date +%s)
     local last_progress=0
     local last_update_time=$start_time
+    local last_eta_calc_time=$start_time
+    local ETA_UPDATE_INTERVAL=3  # Update ETA calculation every 3 seconds to reduce overhead
     
     # Run git clone with progress output
     git clone --progress --depth 1 "$repo_url" "$target_path" 2>&1 | while IFS= read -r line; do
@@ -247,9 +249,11 @@ clone_with_progress() {
         local eta_str=""
         
         # Calculate ETA based on progress using bash arithmetic (avoid bc dependency)
+        # Rate-limit ETA calculation to every few seconds to reduce overhead
         if [ -n "$progress" ] && [ "$progress" -gt 0 ] && [ "$progress" -lt 100 ]; then
-            # Only calculate ETA if we have meaningful progress and it's not the first update
-            if [ "$progress" -gt "$last_progress" ]; then
+            # Only calculate ETA if we have meaningful progress and enough time has passed
+            local time_since_last_eta=$((current_time - last_eta_calc_time))
+            if [ "$time_since_last_eta" -ge "$ETA_UPDATE_INTERVAL" ] && [ "$progress" -gt "$last_progress" ]; then
                 local time_diff=$((current_time - last_update_time))
                 # Safeguard against division by zero
                 if [ "$time_diff" -gt 0 ]; then
@@ -269,6 +273,7 @@ clone_with_progress() {
                     fi
                     last_progress=$progress
                     last_update_time=$current_time
+                    last_eta_calc_time=$current_time
                 fi
             fi
         fi
@@ -293,7 +298,8 @@ clone_with_progress() {
         # Using pure bash arithmetic for consistency (no bc or awk dependencies)
         local repo_size_bytes=$(du -sb "$target_path" 2>/dev/null | cut -f1)
         local repo_size=""
-        if [ -n "$repo_size_bytes" ]; then
+        # Validate that we got a valid number
+        if [ -n "$repo_size_bytes" ] && [[ "$repo_size_bytes" =~ ^[0-9]+$ ]]; then
             if [ "$repo_size_bytes" -ge 1073741824 ]; then
                 # GiB - multiply by 10 for one decimal place, then divide
                 local size_gib_x10=$(( (repo_size_bytes * 10) / 1073741824 ))
@@ -315,6 +321,8 @@ clone_with_progress() {
             fi
         fi
         # Write final completion status with size
+        # Note: Using repo_size for both total_size and data_received as final status
+        # During cloning, data_received shows transfer progress; at completion, shows final size
         write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "success" "$successful" "$failed" false "" "100" "" "$repo_size" "$repo_size" "$elapsed_str" "00:00"
     fi
     
