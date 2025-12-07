@@ -482,8 +482,18 @@ case "$1" in
         shift
         full_deploy "$@"
         ;;
-    "help"|"--help"|"-h"|"")
+    "help"|"--help"|"-h")
         show_help
+        ;;
+    "")
+        # No arguments: default to full deploy of current branch with clean & build
+        CURRENT_BRANCH=$(git branch --show-current 2>/dev/null)
+        if [[ -z "$CURRENT_BRANCH" ]]; then
+            log_warning "Could not determine current git branch; defaulting to 'main'"
+            CURRENT_BRANCH="main"
+        fi
+        log_info "No arguments provided. Running: deploy --branch $CURRENT_BRANCH --clean --build"
+        full_deploy --branch "$CURRENT_BRANCH" --clean --build
         ;;
     *)
         log_error "Unknown command: $1"
