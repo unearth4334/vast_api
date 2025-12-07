@@ -224,6 +224,69 @@
     font-size: var(--font-ui-small);
 }
 
+/* Checklist download statistics footer */
+.checklist-download-stats {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-4-2) 0;
+    margin-top: var(--size-4-1);
+    border-top: 1px solid var(--background-modifier-border);
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+
+.download-stats-spinner {
+    width: 14px;
+    height: 14px;
+    min-width: 14px;
+    color: var(--interactive-accent);
+    font-size: 14px;
+    line-height: 1;
+    animation: swirl 0.8s linear infinite;
+}
+
+.download-stats-content {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-3);
+    flex: 1;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+}
+
+.download-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.download-stat-label {
+    color: var(--text-faint);
+}
+
+.download-stat-value {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Swirling animation for loading icon */
+@keyframes swirl {
+    0% { content: '⣾'; }
+    12.5% { content: '⣽'; }
+    25% { content: '⣻'; }
+    37.5% { content: '⢿'; }
+    50% { content: '⡿'; }
+    62.5% { content: '⣟'; }
+    75% { content: '⣯'; }
+    87.5% { content: '⣷'; }
+    100% { content: '⣾'; }
+}
+
+.download-stats-spinner::before {
+    content: '⣾';
+    animation: swirl 0.8s steps(8) infinite;
+}
+
 /* =========================
    GIT CLONE PROGRESS
    ========================= */
