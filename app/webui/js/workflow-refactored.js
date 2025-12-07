@@ -202,6 +202,7 @@ async function runWorkflow() {
   
   // Clear previous state
   resetWorkflowVisualization();
+  primeWorkflowVisualization(stepElements);
   
   try {
     // Start workflow on server
@@ -241,6 +242,19 @@ async function runWorkflow() {
     // Reset button state
     runButton.textContent = '▶️ Run Workflow';
     runButton.classList.remove('cancel');
+  }
+}
+
+/**
+ * Optimistically mark the first step as in-progress so the UI shows activity immediately
+ */
+function primeWorkflowVisualization(stepElements) {
+  if (!stepElements || stepElements.length === 0) return;
+  const firstStep = stepElements[0];
+  firstStep.classList.add('in-progress');
+  const firstArrow = firstStep.nextElementSibling;
+  if (firstArrow && firstArrow.classList.contains('workflow-arrow')) {
+    firstArrow.classList.add('loading');
   }
 }
 
@@ -411,6 +425,7 @@ async function updateWorkflowVisualization() {
     const response = await fetch('/workflow/state');
     if (!response.ok) {
       console.warn('No workflow state available');
+      showSetupResult('Waiting for workflow state from server...', 'info');
       return;
     }
     
@@ -418,6 +433,7 @@ async function updateWorkflowVisualization() {
     
     if (!result.success || !result.state) {
       console.warn('No workflow state in response');
+      showSetupResult('Waiting for workflow state from server...', 'info');
       return;
     }
     
