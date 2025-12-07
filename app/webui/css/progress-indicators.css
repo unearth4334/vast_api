@@ -28,7 +28,7 @@
 /* Multi-phase progress indicator layout */
 .step-progress-indicator.multi-phase {
     flex-direction: column;
-    gap: 2px;
+    gap: var(--size-compact);
 }
 
 /* Git clone specific layout */
@@ -105,7 +105,7 @@
 .progress-phases {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--size-compact);
     width: 100%;
 }
 
@@ -113,7 +113,7 @@
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: 2px 0;
+    padding: var(--size-compact) 0;
 }
 
 .phase.active .phase-label {
@@ -186,7 +186,7 @@
 .progress-checklist {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--size-compact);
     flex: 1;
 }
 
@@ -194,7 +194,7 @@
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: 2px 0;
+    padding: var(--size-compact) 0;
 }
 
 .check-item.active {
@@ -294,7 +294,7 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--size-compact);
 }
 
 .git-status {
@@ -370,7 +370,7 @@
 .sync-folders {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--size-compact);
     width: 100%;
     margin: var(--size-4-1) 0;
 }
@@ -379,7 +379,7 @@
     display: flex;
     align-items: center;
     gap: var(--size-4-2);
-    padding: 2px var(--size-4-1);
+    padding: var(--size-compact) var(--size-4-1);
     border-radius: var(--radius-s);
     background: var(--background-secondary);
 }
@@ -509,7 +509,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--size-compact);
 }
 
 .completion-text {
@@ -637,7 +637,7 @@
 .error-summary {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--size-compact);
 }
 
 .summary-item,
@@ -645,7 +645,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 2px var(--size-4-1);
+    padding: var(--size-compact) var(--size-4-1);
     background: var(--background-primary);
     border-radius: var(--radius-s);
     font-size: var(--font-ui-smaller);
@@ -661,7 +661,7 @@
 }
 
 .summary-more {
-    padding: 2px var(--size-4-1);
+    padding: var(--size-compact) var(--size-4-1);
     text-align: center;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
@@ -766,7 +766,7 @@
     .completion-stats {
         flex-direction: column;
         align-items: flex-start;
-        gap: 2px;
+        gap: var(--size-compact);
     }
     
     .completion-action {
