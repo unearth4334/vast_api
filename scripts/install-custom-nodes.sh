@@ -225,6 +225,7 @@ clone_with_progress() {
         fi
         
         # Extract data and rate with better precision
+        # Note: Git uses binary units (KiB, MiB, GiB) which are consistent with our display format
         # Pattern 1: "2.5 MiB | 1.2 MiB/s" (includes both data and rate)
         if [[ "$line" =~ ([0-9.]+)[[:space:]]+(KiB|MiB|GiB)[[:space:]]*\|[[:space:]]*([0-9.]+)[[:space:]]+(KiB|MiB|GiB)/s ]]; then
             data_received="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
@@ -250,16 +251,20 @@ clone_with_progress() {
             # Only calculate ETA if we have meaningful progress and it's not the first update
             if [ "$progress" -gt "$last_progress" ]; then
                 local time_diff=$((current_time - last_update_time))
+                # Safeguard against division by zero
                 if [ "$time_diff" -gt 0 ]; then
                     local progress_diff=$((progress - last_progress))
-                    # Use bash integer arithmetic: rate = (progress_diff * 100) / time_diff (in hundredths per second)
-                    local rate_per_sec_x100=$(( (progress_diff * 100) / time_diff ))
-                    if [ "$rate_per_sec_x100" -gt 0 ]; then
-                        local remaining_progress=$((100 - progress))
-                        # eta_seconds = (remaining * 100) / rate_per_sec_x100
-                        local eta_seconds=$(( (remaining_progress * 100) / rate_per_sec_x100 ))
-                        if [ "$eta_seconds" -gt 0 ]; then
-                            eta_str=$(printf "%02d:%02d" $((eta_seconds / 60)) $((eta_seconds % 60)))
+                    # Safeguard: ensure progress_diff is positive
+                    if [ "$progress_diff" -gt 0 ]; then
+                        # Use bash integer arithmetic: rate = (progress_diff * 100) / time_diff (in hundredths per second)
+                        local rate_per_sec_x100=$(( (progress_diff * 100) / time_diff ))
+                        if [ "$rate_per_sec_x100" -gt 0 ]; then
+                            local remaining_progress=$((100 - progress))
+                            # eta_seconds = (remaining * 100) / rate_per_sec_x100
+                            local eta_seconds=$(( (remaining_progress * 100) / rate_per_sec_x100 ))
+                            if [ "$eta_seconds" -gt 0 ]; then
+                                eta_str=$(printf "%02d:%02d" $((eta_seconds / 60)) $((eta_seconds % 60)))
+                            fi
                         fi
                     fi
                     last_progress=$progress
@@ -284,7 +289,21 @@ clone_with_progress() {
     
     # Get the actual size of the cloned repository
     if [ -d "$target_path" ]; then
-        local repo_size=$(du -sh "$target_path" 2>/dev/null | cut -f1)
+        # Get size in bytes and convert to human-readable with consistent units (MiB, KiB, GiB)
+        local repo_size_bytes=$(du -sb "$target_path" 2>/dev/null | cut -f1)
+        local repo_size=""
+        if [ -n "$repo_size_bytes" ]; then
+            if [ "$repo_size_bytes" -ge 1073741824 ]; then
+                # GiB
+                repo_size=$(echo "scale=1; $repo_size_bytes / 1073741824" | awk '{printf "%.1f GiB", $1}')
+            elif [ "$repo_size_bytes" -ge 1048576 ]; then
+                # MiB
+                repo_size=$(echo "scale=1; $repo_size_bytes / 1048576" | awk '{printf "%.1f MiB", $1}')
+            else
+                # KiB
+                repo_size=$(echo "scale=1; $repo_size_bytes / 1024" | awk '{printf "%.1f KiB", $1}')
+            fi
+        fi
         # Write final completion status with size
         write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "success" "$successful" "$failed" false "" "100" "" "$repo_size" "$repo_size" "$elapsed_str" "00:00"
     fi
@@ -387,6 +406,8 @@ install_requirements_with_progress() {
         echo "$line" >> "$LOG_FILE"
         
         # Parse pip output for package being installed
+        # Note: pip uses decimal units (kB, MB, GB) while git uses binary units (KiB, MiB, GiB)
+        # This is intentional as we preserve the original units from each tool
         local current_package=""
         local download_size=""
         local download_rate=""
