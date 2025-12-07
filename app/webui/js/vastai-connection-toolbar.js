@@ -322,23 +322,23 @@ class VastAIConnectionToolbar {
         // Search offers button
         const searchBtn = document.getElementById('toolbar-search-btn');
         if (searchBtn) {
-            searchBtn.addEventListener('click', this.openSearchOffers);
+            searchBtn.addEventListener('click', () => this.openSearchOffers());
         }
         
         // Instance dropdown button
         const instanceBtn = document.getElementById('toolbar-instance-btn');
         if (instanceBtn) {
-            instanceBtn.addEventListener('click', this.toggleDropdown);
+            instanceBtn.addEventListener('click', (e) => this.toggleDropdown(e));
         }
         
         // Refresh button
         const refreshBtn = document.getElementById('toolbar-refresh-btn');
         if (refreshBtn) {
-            refreshBtn.addEventListener('click', this.loadInstances);
+            refreshBtn.addEventListener('click', () => this.loadInstances());
         }
         
         // Click outside to close dropdown
-        document.addEventListener('click', this.handleClickOutside);
+        document.addEventListener('click', (e) => this.handleClickOutside(e));
     }
     
     /**
@@ -424,7 +424,7 @@ class VastAIConnectionToolbar {
         
         // Find instance data
         const instance = this.instancesData.find(i => 
-            (i.id || i.instance_id || i.instanceId) === instanceId
+            (i.id || i.instance_id || i.instanceId) === parseInt(instanceId, 10)
         );
         
         if (!instance) {
@@ -439,7 +439,7 @@ class VastAIConnectionToolbar {
         
         // Update state
         await this.updateState({
-            selected_instance_id: instanceId,
+            selected_instance_id: parseInt(instanceId, 10),
             ssh_connection_string: sshConnectionString,
             ssh_host: publicIp,
             ssh_port: sshPort,
@@ -505,7 +505,10 @@ class VastAIConnectionToolbar {
                 });
                 
                 // Show host key verification modal
-                if (typeof showHostKeyVerificationModal === 'function') {
+                if (typeof window.VastAIUI !== 'undefined' && typeof window.VastAIUI.showSSHHostVerificationModal === 'function') {
+                    window.VastAIUI.showSSHHostVerificationModal(data);
+                } else if (typeof showHostKeyVerificationModal === 'function') {
+                    // Fallback to legacy function
                     showHostKeyVerificationModal(data);
                 }
             } else {
@@ -540,7 +543,7 @@ class VastAIConnectionToolbar {
         
         // Use existing showInstanceDetails function if available
         if (typeof window.showInstanceDetails === 'function') {
-            window.showInstanceDetails(instanceId);
+            window.showInstanceDetails(parseInt(instanceId, 10));
         } else {
             console.warn('⚠️ showInstanceDetails function not available');
         }
@@ -563,14 +566,16 @@ class VastAIConnectionToolbar {
      * Destroy an instance
      */
     async destroyInstance(instanceId) {
-        if (!confirm(`Are you sure you want to destroy instance #${instanceId}? This cannot be undone.`)) {
+        // Use a better confirmation approach if possible
+        const confirmed = window.confirm(`Are you sure you want to destroy instance #${instanceId}? This cannot be undone.`);
+        if (!confirmed) {
             return;
         }
         
         console.log(`🗑️ Destroying instance ${instanceId}...`);
         
         try {
-            const response = await fetch(`/vastai/instances/${instanceId}`, {
+            const response = await fetch(`/vastai/instances/${parseInt(instanceId, 10)}`, {
                 method: 'DELETE'
             });
             
@@ -580,7 +585,7 @@ class VastAIConnectionToolbar {
                 console.log('✅ Instance destroyed');
                 
                 // If this was the selected instance, clear selection
-                if (this.state.selected_instance_id === instanceId) {
+                if (this.state.selected_instance_id === parseInt(instanceId, 10)) {
                     await this.updateState({
                         selected_instance_id: null,
                         ssh_connection_string: '',
