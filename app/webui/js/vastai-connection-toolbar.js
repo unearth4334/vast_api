@@ -16,6 +16,29 @@ class VastAIConnectionToolbar {
         this.dropdownOpen = false;
         this.connectionTester = null;
     }
+
+    /**
+     * Resolve the host port mapped to SSH (22/tcp) with sensible fallbacks.
+     */
+    _resolveSshPort(instance) {
+        // 1) Preferred: ports['22/tcp'][0].HostPort (Vast AI mapping)
+        if (instance?.ports && instance.ports['22/tcp'] && instance.ports['22/tcp'].length > 0) {
+            const mapped = parseInt(instance.ports['22/tcp'][0].HostPort, 10);
+            if (!Number.isNaN(mapped)) return mapped;
+        }
+        // 2) Fallback: direct_port_start (start of direct port range)
+        if (instance?.direct_port_start) {
+            const direct = parseInt(instance.direct_port_start, 10);
+            if (!Number.isNaN(direct)) return direct;
+        }
+        // 3) Legacy: ssh_port / port_forwarded
+        if (instance?.ssh_port || instance?.port_forwarded) {
+            const legacy = parseInt(instance.port_forwarded || instance.ssh_port, 10);
+            if (!Number.isNaN(legacy)) return legacy;
+        }
+        // Default
+        return 22;
+    }
     
     /**
      * Initialize the toolbar
@@ -270,7 +293,7 @@ class VastAIConnectionToolbar {
         const gpuName = instance.gpu_name || instance.gpu || 'Unknown GPU';
         const gpuCount = instance.num_gpus || 1;
         const publicIp = instance.public_ipaddr || instance.public_ip || instance.ip_address || 'N/A';
-        const sshPort = instance.ssh_port || instance.port_forwarded || 22;
+        const sshPort = this._resolveSshPort(instance);
         const costPerHr = instance.dph_total || instance.cost_per_hour || 0;
         
         const isSelected = this.state.selected_instance_id === instanceId;
@@ -432,23 +455,9 @@ class VastAIConnectionToolbar {
             return;
         }
         
-        // Build SSH connection string using the actual host port mapped to 22/tcp
+        // Build SSH connection string using the resolved host port mapped to 22/tcp
         const publicIp = instance.public_ipaddr || instance.public_ip || instance.ip_address;
-
-        let sshPort = 22;
-
-        // 1) Preferred: ports['22/tcp'][0].HostPort (matches Vast AI port mapping)
-        if (instance.ports && instance.ports['22/tcp'] && instance.ports['22/tcp'].length > 0) {
-            sshPort = parseInt(instance.ports['22/tcp'][0].HostPort, 10) || 22;
-        }
-        // 2) Fallback: direct_port_start (start of direct port range)
-        else if (instance.direct_port_start) {
-            sshPort = parseInt(instance.direct_port_start, 10) || 22;
-        }
-        // 3) Legacy: ssh_port / port_forwarded (may point to a proxy, use only if nothing else)
-        else if (instance.ssh_port || instance.port_forwarded) {
-            sshPort = parseInt(instance.port_forwarded || instance.ssh_port, 10) || 22;
-        }
+        const sshPort = this._resolveSshPort(instance);
         const sshConnectionString = `ssh -p ${sshPort} root@${publicIp} -L 8080:localhost:8080`;
         
         // Update state
