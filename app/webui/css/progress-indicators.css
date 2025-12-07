@@ -271,7 +271,7 @@
 /* Swirling animation for loading icon using Braille patterns */
 .download-stats-spinner::before {
     content: '⣾';
-    animation: swirl 0.8s steps(8) infinite;
+    animation: swirl 0.8s steps(8, end) infinite;
 }
 
 @keyframes swirl {
