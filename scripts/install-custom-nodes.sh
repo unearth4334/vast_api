@@ -143,11 +143,17 @@ write_json_progress_with_stats() {
     local clone_progress="${10:-}"
     local download_rate="${11:-}"
     local data_received="${12:-}"
+    local total_size="${13:-}"
+    local elapsed_time="${14:-}"
+    local eta="${15:-}"
     
     # Escape node name and strings for JSON (replace quotes with escaped quotes)
     local escaped_node=$(echo "$current_node" | sed 's/"/\\"/g')
     local escaped_rate=$(echo "$download_rate" | sed 's/"/\\"/g')
     local escaped_data=$(echo "$data_received" | sed 's/"/\\"/g')
+    local escaped_total_size=$(echo "$total_size" | sed 's/"/\\"/g')
+    local escaped_elapsed=$(echo "$elapsed_time" | sed 's/"/\\"/g')
+    local escaped_eta=$(echo "$eta" | sed 's/"/\\"/g')
     
     # Determine completion status
     local completed="false"
@@ -176,7 +182,10 @@ write_json_progress_with_stats() {
   \"requirements_status\": \"$requirements_status\"" || echo "")$([ -n "$clone_progress" ] && echo ",
   \"clone_progress\": $clone_progress" || echo "")$([ -n "$download_rate" ] && echo ",
   \"download_rate\": \"$escaped_rate\"" || echo "")$([ -n "$data_received" ] && echo ",
-  \"data_received\": \"$escaped_data\"" || echo "")
+  \"data_received\": \"$escaped_data\"" || echo "")$([ -n "$total_size" ] && echo ",
+  \"total_size\": \"$escaped_total_size\"" || echo "")$([ -n "$elapsed_time" ] && echo ",
+  \"elapsed_time\": \"$escaped_elapsed\"" || echo "")$([ -n "$eta" ] && echo ",
+  \"eta\": \"$escaped_eta\"" || echo "")
 }
 EOF
 }
@@ -191,10 +200,10 @@ clone_with_progress() {
     local successful="$6"
     local failed="$7"
     
-    # Patterns for parsing git clone output
-    local progress_pattern='Receiving objects:[[:space:]]*([0-9]+)%'
-    local data_rate_pattern='([0-9.]+[[:space:]]+(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]+(KiB|MiB|GiB)/s)'
-    local data_only_pattern='([0-9.]+[[:space:]]+(KiB|MiB|GiB))'
+    # Track start time for elapsed time and ETA calculation
+    local start_time=$(date +%s)
+    local last_progress=0
+    local last_update_time=$start_time
     
     # Run git clone with progress output
     git clone --progress --depth 1 "$repo_url" "$target_path" 2>&1 | while IFS= read -r line; do
@@ -202,29 +211,81 @@ clone_with_progress() {
         local progress=""
         local download_rate=""
         local data_received=""
+        local total_size=""
+        local object_count=""
+        local total_objects=""
         
-        # Extract percentage (e.g., "Receiving objects: 45%")
-        if [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)% ]]; then
+        # Extract percentage and object counts (e.g., "Receiving objects: 45% (123/456)")
+        if [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)%[[:space:]]*\(([0-9]+)/([0-9]+)\) ]]; then
+            progress="${BASH_REMATCH[1]}"
+            object_count="${BASH_REMATCH[2]}"
+            total_objects="${BASH_REMATCH[3]}"
+        elif [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)% ]]; then
             progress="${BASH_REMATCH[1]}"
         fi
         
-        # Extract data and rate (e.g., "2.5 MiB | 1.2 MiB/s")
-        if [[ "$line" =~ ([0-9.]+[[:space:]]+(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]+(KiB|MiB|GiB)/s) ]]; then
-            data_received="${BASH_REMATCH[1]}"
-            download_rate="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}"
-        elif [[ "$line" =~ ([0-9.]+[[:space:]]+(KiB|MiB|GiB)) ]] && [[ ! "$line" =~ /s ]]; then
-            # Just data received, no rate yet
-            data_received="${BASH_REMATCH[1]}"
+        # Extract data and rate with better precision
+        # Pattern 1: "2.5 MiB | 1.2 MiB/s" (includes both data and rate)
+        if [[ "$line" =~ ([0-9.]+)[[:space:]]+(KiB|MiB|GiB)[[:space:]]*\|[[:space:]]*([0-9.]+)[[:space:]]+(KiB|MiB|GiB)/s ]]; then
+            data_received="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+            download_rate="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}/s"
+        # Pattern 2: Just data received (no rate yet)
+        elif [[ "$line" =~ ([0-9.]+)[[:space:]]+(KiB|MiB|GiB) ]] && [[ ! "$line" =~ /s ]]; then
+            data_received="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
         fi
         
-        # Update JSON progress with clone statistics
+        # Extract total size if present (e.g., "done. Total 456 (delta 123), reused 234 (delta 45), pack-reused 0, pack size 5.2 MiB")
+        if [[ "$line" =~ pack[[:space:]]*size[[:space:]]+([0-9.]+)[[:space:]]+(KiB|MiB|GiB) ]]; then
+            total_size="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+        fi
+        
+        # Calculate elapsed time and ETA
+        local current_time=$(date +%s)
+        local elapsed=$((current_time - start_time))
+        local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+        local eta_str=""
+        
+        # Calculate ETA based on progress
+        if [ -n "$progress" ] && [ "$progress" -gt 0 ] && [ "$progress" -lt 100 ]; then
+            # Only calculate ETA if we have meaningful progress and it's not the first update
+            if [ "$progress" -gt "$last_progress" ]; then
+                local time_diff=$((current_time - last_update_time))
+                if [ "$time_diff" -gt 0 ]; then
+                    local progress_diff=$((progress - last_progress))
+                    local rate_per_sec=$(echo "scale=2; $progress_diff / $time_diff" | bc 2>/dev/null || echo "0")
+                    if [ "$(echo "$rate_per_sec > 0" | bc 2>/dev/null || echo "0")" = "1" ]; then
+                        local remaining_progress=$((100 - progress))
+                        local eta_seconds=$(echo "scale=0; $remaining_progress / $rate_per_sec" | bc 2>/dev/null || echo "0")
+                        if [ "$eta_seconds" -gt 0 ]; then
+                            eta_str=$(printf "%02d:%02d" $((eta_seconds / 60)) $((eta_seconds % 60)))
+                        fi
+                    fi
+                    last_progress=$progress
+                    last_update_time=$current_time
+                fi
+            fi
+        fi
+        
+        # Update JSON progress with comprehensive clone statistics
         if [ -n "$progress" ] || [ -n "$download_rate" ] || [ -n "$data_received" ]; then
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" false "" "$progress" "$download_rate" "$data_received"
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" false "" "$progress" "$download_rate" "$data_received" "$total_size" "$elapsed_str" "$eta_str"
         fi
         
         # Log the output
         echo "$line" >> "$LOG_FILE"
     done
+    
+    # Calculate final elapsed time
+    local end_time=$(date +%s)
+    local total_elapsed=$((end_time - start_time))
+    local elapsed_str=$(printf "%02d:%02d" $((total_elapsed / 60)) $((total_elapsed % 60)))
+    
+    # Get the actual size of the cloned repository
+    if [ -d "$target_path" ]; then
+        local repo_size=$(du -sh "$target_path" 2>/dev/null | cut -f1)
+        # Write final completion status with size
+        write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "success" "$successful" "$failed" false "" "100" "" "$repo_size" "$repo_size" "$elapsed_str" "00:00"
+    fi
     
     # Return the exit code of git clone (from PIPESTATUS)
     return ${PIPESTATUS[0]}
@@ -313,26 +374,71 @@ install_requirements_with_progress() {
     
     write_log "Executing: $python_bin -m pip install -r $requirements_file" 3
     
+    # Track start time for elapsed time calculation
+    local start_time=$(date +%s)
+    local package_count=0
+    local total_packages=$(grep -v "^#" "$requirements_file" | grep -v "^$" | wc -l)
+    
     # Run pip install with progress output
     "$python_bin" -m pip install -r "$requirements_file" 2>&1 | while IFS= read -r line; do
         # Log the output
         echo "$line" >> "$LOG_FILE"
         
         # Parse pip output for package being installed
-        # Pip outputs like: "Collecting package-name", "Downloading package (size)", "Installing collected packages: ..."
         local current_package=""
-        local download_progress=""
+        local download_size=""
+        local download_rate=""
         
+        # Extract package name from "Collecting package-name"
         if [[ "$line" =~ Collecting[[:space:]]+([^[:space:]]+) ]]; then
             current_package="${BASH_REMATCH[1]}"
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (collecting $current_package)" "" "" ""
-        elif [[ "$line" =~ ^Downloading ]]; then
-            # Just indicate downloading without parsing size
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (downloading)" "" "" ""
+            ((package_count++))
+            local progress_pct=$((package_count * 100 / total_packages))
+            
+            # Calculate elapsed time
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+            
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "collecting ($package_count/$total_packages): $current_package" "$progress_pct" "" "" "" "$elapsed_str" ""
+        # Extract download size and rate from "Downloading package (1.2 MB 3.4 MB/s)"
+        elif [[ "$line" =~ Downloading.*\(([0-9.]+)[[:space:]]+(kB|MB|GB).*([0-9.]+)[[:space:]]+(kB|MB|GB)/s\) ]]; then
+            download_size="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+            download_rate="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}/s"
+            local progress_pct=$((package_count * 100 / total_packages))
+            
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+            
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "downloading ($package_count/$total_packages)" "$progress_pct" "$download_rate" "$download_size" "" "$elapsed_str" ""
+        elif [[ "$line" =~ Downloading.*\(([0-9.]+)[[:space:]]+(kB|MB|GB)\) ]]; then
+            download_size="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+            local progress_pct=$((package_count * 100 / total_packages))
+            
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+            
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "downloading ($package_count/$total_packages)" "$progress_pct" "" "$download_size" "" "$elapsed_str" ""
         elif [[ "$line" =~ Installing[[:space:]]+collected[[:space:]]+packages ]]; then
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (installing)" "" "" ""
+            local progress_pct=$((package_count * 100 / total_packages))
+            
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+            
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "installing ($package_count/$total_packages packages)" "$progress_pct" "" "" "" "$elapsed_str" ""
         fi
     done
+    
+    # Calculate final elapsed time
+    local end_time=$(date +%s)
+    local total_elapsed=$((end_time - start_time))
+    local elapsed_str=$(printf "%02d:%02d" $((total_elapsed / 60)) $((total_elapsed % 60)))
+    
+    # Write final status with elapsed time
+    write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "success" "$successful" "$failed" true "installed ($package_count packages)" "100" "" "" "" "$elapsed_str" ""
     
     # Return the exit code of pip install
     return ${PIPESTATUS[0]}

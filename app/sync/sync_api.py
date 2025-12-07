@@ -182,7 +182,10 @@ def _parse_progress_log(log_content: str, current_progress: dict) -> list:
                     'message': message,
                     'clone_progress': None,
                     'download_rate': None,
-                    'data_received': None
+                    'data_received': None,
+                    'total_size': None,
+                    'elapsed_time': None,
+                    'eta': None
                 }
             else:
                 # Update existing node
@@ -207,6 +210,9 @@ def _parse_progress_log(log_content: str, current_progress: dict) -> list:
         clone_progress = current_progress.get('clone_progress')
         download_rate = current_progress.get('download_rate')
         data_received = current_progress.get('data_received')
+        total_size = current_progress.get('total_size')
+        elapsed_time = current_progress.get('elapsed_time')
+        eta = current_progress.get('eta')
         
         # Find and update the current node with real-time stats
         for node in nodes_list:
@@ -218,6 +224,12 @@ def _parse_progress_log(log_content: str, current_progress: dict) -> list:
                     node['download_rate'] = download_rate
                 if data_received:
                     node['data_received'] = data_received
+                if total_size:
+                    node['total_size'] = total_size
+                if elapsed_time:
+                    node['elapsed_time'] = elapsed_time
+                if eta:
+                    node['eta'] = eta
                 break
         else:
             # Current node not in list yet, add it
@@ -228,7 +240,10 @@ def _parse_progress_log(log_content: str, current_progress: dict) -> list:
                     'message': '',
                     'clone_progress': clone_progress,
                     'download_rate': download_rate,
-                    'data_received': data_received
+                    'data_received': data_received,
+                    'total_size': total_size,
+                    'elapsed_time': elapsed_time,
+                    'eta': eta
                 })
     
     return nodes_list
