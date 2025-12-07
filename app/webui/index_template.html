@@ -76,26 +76,18 @@
         </div>
         
         <div id="vastai-setup-tab" class="tab-content">
-            <h3>VastAI SSH Connection Setup</h3>
-            <p>Configure your VastAI SSH connection and manage UI_HOME settings.</p>
+            <!-- Template Selection -->
+            <div class="setup-field">
+                <label for="templateSelector">Setup Template:</label>
+                <select id="templateSelector" onchange="onTemplateChange()" 
+                        title="Select a setup template for your VastAI instance">
+                    <option value="">Loading templates...</option>
+                </select>
+            </div>
             
-            <!-- Step 2: Template Selection -->
-            <div class="workflow-tile">
-                <h4 class="tile-header">📋 Step 2: Template Selection</h4>
-                <div class="tile-content">
-                    <div class="setup-field">
-                        <label for="templateSelector">Setup Template:</label>
-                        <select id="templateSelector" onchange="onTemplateChange()" 
-                                title="Select a setup template for your VastAI instance">
-                            <option value="">Loading templates...</option>
-                        </select>
-                    </div>
-                    
-                    <div id="template-info" class="template-info" style="display: none;">
-                        <h4 id="template-title">Template: <span id="template-name"></span></h4>
-                        <p id="template-description"></p>
-                    </div>
-                </div>
+            <div id="template-info" class="template-info" style="display: none;">
+                <h4 id="template-title">Template: <span id="template-name"></span></h4>
+                <p id="template-description"></p>
             </div>
             
             <!-- Step 3: Workflow Execution -->
