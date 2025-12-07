@@ -5,8 +5,8 @@
  * Maintains state server-side for persistence across page refreshes and tab switches.
  */
 
-import { VastAIInstances } from './vastai/instances.js';
-import { VastAIUI } from './vastai/ui.js';
+// Import VastAI modules (these should already be loaded by vastai-modular.js)
+// We'll access them via window.VastAI* after the page loads
 
 class VastAIConnectionToolbar {
     constructor() {
@@ -15,20 +15,6 @@ class VastAIConnectionToolbar {
         this.instancesData = [];
         this.dropdownOpen = false;
         this.connectionTester = null;
-        
-        // Bind methods
-        this.init = this.init.bind(this);
-        this.loadState = this.loadState.bind(this);
-        this.saveState = this.saveState.bind(this);
-        this.updateState = this.updateState.bind(this);
-        this.loadInstances = this.loadInstances.bind(this);
-        this.renderToolbar = this.renderToolbar.bind(this);
-        this.toggleDropdown = this.toggleDropdown.bind(this);
-        this.selectInstance = this.selectInstance.bind(this);
-        this.connectToInstance = this.connectToInstance.bind(this);
-        this.testSSHConnection = this.testSSHConnection.bind(this);
-        this.openSearchOffers = this.openSearchOffers.bind(this);
-        this.handleClickOutside = this.handleClickOutside.bind(this);
     }
     
     /**
@@ -660,15 +646,13 @@ class VastAIConnectionToolbar {
 // Create and export singleton instance
 const toolbarInstance = new VastAIConnectionToolbar();
 
-// Export for use in other modules
-export { toolbarInstance as VastAIConnectionToolbar };
-
-// Also expose globally for legacy compatibility
+// Expose globally
 window.VastAIConnectionToolbar = toolbarInstance;
 
 // Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => toolbarInstance.init());
 } else {
+    // DOM already loaded, initialize now
     toolbarInstance.init();
 }
