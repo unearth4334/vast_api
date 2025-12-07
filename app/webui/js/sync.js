@@ -774,22 +774,36 @@ function saveVastAISSHAndClose() {
  * Sync VastAI with SSH connection string check
  */
 async function syncVastAI() {
-    // Check if SSH connection string is set
-    const vastaiInput = document.getElementById('sshConnectionString');
-    const resourcesInput = document.getElementById('resourcesSshConnectionString');
-    const createInput = document.getElementById('createSshConnectionString');
-    const sshConnection = vastaiInput?.value?.trim() || resourcesInput?.value?.trim() || createInput?.value?.trim() || syncConfigCache.vastai.sshConnection;
+    // Get SSH connection from toolbar first
+    let sshConnection = '';
+    if (window.VastAIConnectionToolbar) {
+        sshConnection = window.VastAIConnectionToolbar.getSSHConnectionString();
+        console.log('📡 Got SSH connection from toolbar:', sshConnection);
+    }
+    
+    // Fallback to legacy inputs if toolbar not available
+    if (!sshConnection) {
+        const vastaiInput = document.getElementById('sshConnectionString');
+        const resourcesInput = document.getElementById('resourcesSshConnectionString');
+        const createInput = document.getElementById('createSshConnectionString');
+        sshConnection = vastaiInput?.value?.trim() || resourcesInput?.value?.trim() || createInput?.value?.trim() || syncConfigCache.vastai.sshConnection;
+    }
     
     if (!sshConnection) {
         // Show error and open config overlay
         const resultDiv = document.getElementById('result');
         resultDiv.className = 'result-panel error';
         resultDiv.style.display = 'block';
-        resultDiv.innerHTML = `<h3>⚠️ SSH Connection Required</h3><p>Please configure the SSH Connection String before syncing VastAI.</p><p>Click the ⚙️ button next to "Sync VastAI" to configure.</p>`;
-        
-        // Open the config overlay
-        setTimeout(() => openSyncConfigOverlay('vastai'), 500);
+        resultDiv.innerHTML = `<h3>⚠️ SSH Connection Required</h3><p>Please select an instance from the toolbar or configure the SSH Connection String.</p>`;
         return;
+    }
+    
+    // Check if connected (if toolbar is available)
+    if (window.VastAIConnectionToolbar && !window.VastAIConnectionToolbar.isConnected()) {
+        const proceed = confirm('The SSH connection has not been tested yet. Do you want to proceed anyway?');
+        if (!proceed) {
+            return;
+        }
     }
     
     // Proceed with normal sync

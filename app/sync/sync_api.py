@@ -27,6 +27,7 @@ try:
     from .ssh_test import SSHTester
     from .background_tasks import get_task_manager
     from .ssh_host_key_manager import SSHHostKeyManager
+    from .toolbar_state import ToolbarStateManager
 except ImportError:
     # Handle imports for both module and direct execution
     import sys
@@ -42,8 +43,10 @@ except ImportError:
     try:
         from ssh_host_key_manager import SSHHostKeyManager
         from ssh_test import SSHTester
+        from toolbar_state import ToolbarStateManager
     except ImportError:
         SSHTester = None
+        ToolbarStateManager = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -2082,6 +2085,92 @@ def status():
         },
         'vastai': vastai_status
     })
+
+
+# --- Toolbar State API Routes ---
+
+@app.route('/api/toolbar/state', methods=['GET', 'OPTIONS'])
+def get_toolbar_state():
+    """Get toolbar state for current session"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # Get or create session ID
+        provided_session_id = request.args.get('session_id')
+        session_id = ToolbarStateManager.get_or_create_session_id(provided_session_id)
+        
+        # Get state
+        state = ToolbarStateManager.get_state(session_id)
+        
+        return jsonify({
+            'success': True,
+            'state': state
+        })
+    except Exception as e:
+        logger.error(f"Error getting toolbar state: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error getting toolbar state: {str(e)}'
+        })
+
+
+@app.route('/api/toolbar/state', methods=['POST'])
+def update_toolbar_state():
+    """Update toolbar state for current session"""
+    try:
+        data = request.get_json() if request.is_json else {}
+        session_id = data.get('session_id')
+        
+        if not session_id:
+            return jsonify({
+                'success': False,
+                'message': 'Session ID is required'
+            })
+        
+        # Get updates (exclude session_id from updates)
+        updates = {k: v for k, v in data.items() if k != 'session_id'}
+        
+        # Update state
+        state = ToolbarStateManager.update_state(session_id, updates)
+        
+        return jsonify({
+            'success': True,
+            'state': state
+        })
+    except Exception as e:
+        logger.error(f"Error updating toolbar state: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error updating toolbar state: {str(e)}'
+        })
+
+
+@app.route('/api/toolbar/state', methods=['DELETE'])
+def delete_toolbar_state():
+    """Delete toolbar state for current session"""
+    try:
+        session_id = request.args.get('session_id')
+        
+        if not session_id:
+            return jsonify({
+                'success': False,
+                'message': 'Session ID is required'
+            })
+        
+        # Delete state
+        success = ToolbarStateManager.delete_state(session_id)
+        
+        return jsonify({
+            'success': success,
+            'message': 'State deleted' if success else 'Failed to delete state'
+        })
+    except Exception as e:
+        logger.error(f"Error deleting toolbar state: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error deleting toolbar state: {str(e)}'
+        })
 
 
 # --- VastAI Management Routes ---
