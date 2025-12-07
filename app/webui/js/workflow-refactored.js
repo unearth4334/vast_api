@@ -686,7 +686,57 @@ function renderTasklist(stepElement, stepData) {
     tasklistHTML += `<div class="completion-note">${escapeHtml(completionNote)}</div>`;
   }
   
+  // Add progress text for install_custom_nodes action
+  if (stepData.action === 'install_custom_nodes') {
+    const progressText = buildProgressText(tasks, stepData);
+    if (progressText) {
+      tasklistHTML += `<div class="step-progress-text">${escapeHtml(progressText)}</div>`;
+    }
+  }
+  
   tasklistElement.innerHTML = tasklistHTML;
+}
+
+/**
+ * Build progress text from task data for install_custom_nodes step
+ * @param {Array} tasks - Task list
+ * @param {object} stepData - Step data
+ * @returns {string} - Progress text
+ */
+function buildProgressText(tasks, stepData) {
+  if (!tasks || tasks.length === 0) return '';
+  
+  // Find the currently running task
+  const runningTask = tasks.find(t => t.status === 'running');
+  if (!runningTask) return '';
+  
+  // Skip standard tasks
+  if (runningTask.name === 'Clone Auto-installer' || runningTask.name === 'Configure venv path') {
+    return '';
+  }
+  
+  // Build progress text from task data
+  let parts = [];
+  
+  // Add node name
+  parts.push(runningTask.name);
+  
+  // Add clone progress percentage
+  if (runningTask.clone_progress) {
+    parts.push(`${runningTask.clone_progress}%`);
+  }
+  
+  // Add download rate
+  if (runningTask.download_rate) {
+    parts.push(`@ ${runningTask.download_rate}`);
+  }
+  
+  // Add data received if no rate
+  if (runningTask.data_received && !runningTask.download_rate) {
+    parts.push(`(${runningTask.data_received})`);
+  }
+  
+  return parts.join(' ');
 }
 
 /**
