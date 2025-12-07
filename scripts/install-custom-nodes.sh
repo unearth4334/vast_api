@@ -245,17 +245,19 @@ clone_with_progress() {
         local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
         local eta_str=""
         
-        # Calculate ETA based on progress
+        # Calculate ETA based on progress using bash arithmetic (avoid bc dependency)
         if [ -n "$progress" ] && [ "$progress" -gt 0 ] && [ "$progress" -lt 100 ]; then
             # Only calculate ETA if we have meaningful progress and it's not the first update
             if [ "$progress" -gt "$last_progress" ]; then
                 local time_diff=$((current_time - last_update_time))
                 if [ "$time_diff" -gt 0 ]; then
                     local progress_diff=$((progress - last_progress))
-                    local rate_per_sec=$(echo "scale=2; $progress_diff / $time_diff" | bc 2>/dev/null || echo "0")
-                    if [ "$(echo "$rate_per_sec > 0" | bc 2>/dev/null || echo "0")" = "1" ]; then
+                    # Use bash integer arithmetic: rate = (progress_diff * 100) / time_diff (in hundredths per second)
+                    local rate_per_sec_x100=$(( (progress_diff * 100) / time_diff ))
+                    if [ "$rate_per_sec_x100" -gt 0 ]; then
                         local remaining_progress=$((100 - progress))
-                        local eta_seconds=$(echo "scale=0; $remaining_progress / $rate_per_sec" | bc 2>/dev/null || echo "0")
+                        # eta_seconds = (remaining * 100) / rate_per_sec_x100
+                        local eta_seconds=$(( (remaining_progress * 100) / rate_per_sec_x100 ))
                         if [ "$eta_seconds" -gt 0 ]; then
                             eta_str=$(printf "%02d:%02d" $((eta_seconds / 60)) $((eta_seconds % 60)))
                         fi
