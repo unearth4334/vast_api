@@ -247,13 +247,17 @@ class WorkflowValueMapper {
             }
             this._log(`Toggled ${input.node_ids.length} nodes for ${input.id}: ${value}`);
         } else if (input.node_id) {
-            // Single node checkbox
+            // Single node checkbox - handle multiple fields or single field
             const nodeId = String(input.node_id);
-            const field = input.field || 'value';
+            const fields = input.fields || [input.field || 'value'];
 
             if (workflow[nodeId] && workflow[nodeId].inputs) {
-                workflow[nodeId].inputs[field] = value;
-                this._log(`Set checkbox: ${value} in node ${nodeId}.${field}`);
+                for (const field of fields) {
+                    if (field) {
+                        workflow[nodeId].inputs[field] = value;
+                        this._log(`Set checkbox: ${value} in node ${nodeId}.${field}`);
+                    }
+                }
             }
         }
     }
@@ -291,17 +295,7 @@ class WorkflowValueMapper {
      * @private
      */
     _mapSeed(workflow, input, value) {
-        const nodeId = String(input.node_id);
         const field = input.field || 'noise_seed';
-
-        if (!workflow[nodeId]) {
-            this._log(`Node ${nodeId} not found for seed: ${input.id}`);
-            return;
-        }
-
-        if (!workflow[nodeId].inputs) {
-            workflow[nodeId].inputs = {};
-        }
 
         // Handle random seed
         // Use 2^32-1 as max for compatibility with most systems
@@ -311,8 +305,30 @@ class WorkflowValueMapper {
             seedValue = Math.floor(Math.random() * MAX_SEED);
         }
 
-        workflow[nodeId].inputs[field] = seedValue;
-        this._log(`Set seed: ${seedValue} in node ${nodeId}.${field}`);
+        // Seed can have either node_id (single) or node_ids (multiple)
+        const nodeIds = input.node_ids || (input.node_id ? [input.node_id] : []);
+        
+        if (nodeIds.length === 0) {
+            this._log(`No node_id or node_ids found for seed: ${input.id}`);
+            return;
+        }
+
+        // Apply seed to all specified nodes
+        for (const nodeId of nodeIds) {
+            const nodeIdStr = String(nodeId);
+            
+            if (!workflow[nodeIdStr]) {
+                this._log(`Node ${nodeIdStr} not found for seed: ${input.id}`);
+                continue;
+            }
+
+            if (!workflow[nodeIdStr].inputs) {
+                workflow[nodeIdStr].inputs = {};
+            }
+
+            workflow[nodeIdStr].inputs[field] = seedValue;
+            this._log(`Set seed: ${seedValue} in node ${nodeIdStr}.${field}`);
+        }
     }
 
     /**
@@ -321,7 +337,6 @@ class WorkflowValueMapper {
      */
     _mapText(workflow, input, value) {
         const nodeId = String(input.node_id);
-        const field = input.field || 'value';
 
         if (!workflow[nodeId]) {
             this._log(`Node ${nodeId} not found for text: ${input.id}`);
@@ -332,8 +347,15 @@ class WorkflowValueMapper {
             workflow[nodeId].inputs = {};
         }
 
-        workflow[nodeId].inputs[field] = value;
-        this._log(`Set text in node ${nodeId}.${field}: ${value.substring(0, 50)}...`);
+        // Handle multiple fields or single field
+        const fields = input.fields || [input.field || 'value'];
+        
+        for (const field of fields) {
+            if (field) {
+                workflow[nodeId].inputs[field] = value;
+                this._log(`Set text in node ${nodeId}.${field}: ${value.substring(0, 50)}...`);
+            }
+        }
     }
 
     /**
@@ -342,7 +364,6 @@ class WorkflowValueMapper {
      */
     _mapImage(workflow, input, value) {
         const nodeId = String(input.node_id);
-        const field = input.field || 'image';
 
         if (!workflow[nodeId]) {
             this._log(`Node ${nodeId} not found for image: ${input.id}`);
@@ -353,9 +374,16 @@ class WorkflowValueMapper {
             workflow[nodeId].inputs = {};
         }
 
+        // Handle multiple fields or single field
+        const fields = input.fields || [input.field || 'image'];
+        
         // Value is the uploaded filename or base64 data
-        workflow[nodeId].inputs[field] = value;
-        this._log(`Set image in node ${nodeId}.${field}`);
+        for (const field of fields) {
+            if (field) {
+                workflow[nodeId].inputs[field] = value;
+                this._log(`Set image in node ${nodeId}.${field}`);
+            }
+        }
     }
 
     /**
@@ -364,7 +392,6 @@ class WorkflowValueMapper {
      */
     _mapSelect(workflow, input, value) {
         const nodeId = String(input.node_id);
-        const field = input.field || 'value';
 
         if (!workflow[nodeId]) {
             this._log(`Node ${nodeId} not found for select: ${input.id}`);
@@ -375,8 +402,15 @@ class WorkflowValueMapper {
             workflow[nodeId].inputs = {};
         }
 
-        workflow[nodeId].inputs[field] = value;
-        this._log(`Set select: ${value} in node ${nodeId}.${field}`);
+        // Handle multiple fields or single field
+        const fields = input.fields || [input.field || 'value'];
+        
+        for (const field of fields) {
+            if (field) {
+                workflow[nodeId].inputs[field] = value;
+                this._log(`Set select in node ${nodeId}.${field}: ${value}`);
+            }
+        }
     }
 
     /**

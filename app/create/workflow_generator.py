@@ -5,6 +5,7 @@ Generates ComfyUI workflow JSON from user inputs
 
 import copy
 import logging
+from datetime import datetime
 from typing import Dict, Any, List
 
 from app.create.workflow_loader import WorkflowConfig, InputConfig
@@ -25,7 +26,6 @@ class WorkflowGenerator:
         """
         self.config = config
         self.template = template
-    
     def generate(self, inputs: Dict[str, Any]) -> dict:
         """
         Generate workflow JSON from inputs
@@ -38,6 +38,10 @@ class WorkflowGenerator:
         """
         # Deep copy template to avoid modifying original
         workflow = copy.deepcopy(self.template)
+        
+        # Generate timestamp for filename_prefix
+        now = datetime.now()
+        timestamp = now.strftime("%Y-%m-%d/%H%M%S")
         
         # Apply each input to the workflow
         for input_config in self.config.inputs:
@@ -54,6 +58,9 @@ class WorkflowGenerator:
             except Exception as e:
                 logger.error(f"Error applying input {input_config.id}: {e}", exc_info=True)
                 # Continue processing other inputs
+        
+        # Update filename_prefix in all nodes with timestamp
+        self._update_filename_prefixes(workflow, timestamp)
         
         return workflow
     
@@ -106,6 +113,8 @@ class WorkflowGenerator:
             self._apply_text_input(workflow, input_config, value)
         elif input_type == 'slider':
             self._apply_slider_input(workflow, input_config, value)
+        elif input_type == 'seed':
+            self._apply_seed_input(workflow, input_config, value)
         elif input_type in ['toggle', 'checkbox']:
             self._apply_toggle_input(workflow, input_config, value)
         elif input_type == 'image':
@@ -123,21 +132,39 @@ class WorkflowGenerator:
     
     def _apply_text_input(self, workflow: dict, config: InputConfig, value: Any):
         """Apply text input to workflow"""
-        if not config.node_id or not config.field:
-            logger.warning(f"Missing node_id or field for text input: {config.id}")
+        if not config.node_id:
+            logger.warning(f"Missing node_id for text input: {config.id}")
+            return
+        
+        if not config.field and not config.fields:
+            logger.warning(f"Missing field or fields for text input: {config.id}")
             return
         
         if config.node_id not in workflow:
             logger.warning(f"Node {config.node_id} not found in workflow")
             return
         
-        workflow[config.node_id]['inputs'][config.field] = str(value) if value else ""
-        logger.debug(f"Applied text input {config.id} to node {config.node_id}.{config.field}")
+        text_value = str(value) if value else ""
+        
+        # Handle multiple fields
+        if config.fields:
+            for field_name in config.fields:
+                workflow[config.node_id]['inputs'][field_name] = text_value
+                logger.debug(f"Applied text input {config.id} to node {config.node_id}.{field_name}")
+        else:
+            # Single field
+            workflow[config.node_id]['inputs'][config.field] = text_value
+            logger.debug(f"Applied text input {config.id} to node {config.node_id}.{config.field}")
     
     def _apply_slider_input(self, workflow: dict, config: InputConfig, value: Any):
         """Apply slider input to workflow"""
-        if not config.node_id or not config.field:
-            logger.warning(f"Missing node_id or field for slider input: {config.id}")
+        # Check if we have node_id and at least one field
+        if not config.node_id:
+            logger.warning(f"Missing node_id for slider input: {config.id}")
+            return
+        
+        if not config.field and not config.fields:
+            logger.warning(f"Missing field or fields for slider input: {config.id}")
             return
         
         if config.node_id not in workflow:
@@ -153,13 +180,52 @@ class WorkflowGenerator:
         if config.max is not None and numeric_value > config.max:
             numeric_value = config.max
         
-        workflow[config.node_id]['inputs'][config.field] = numeric_value
-        logger.debug(f"Applied slider input {config.id} to node {config.node_id}.{config.field} = {numeric_value}")
+        # Handle multiple fields (e.g., seed that updates multiple nodes)
+        if config.fields:
+            for field_name in config.fields:
+                workflow[config.node_id]['inputs'][field_name] = numeric_value
+                logger.debug(f"Applied slider input {config.id} to node {config.node_id}.{field_name} = {numeric_value}")
+        else:
+            # Single field
+            workflow[config.node_id]['inputs'][config.field] = numeric_value
+            logger.debug(f"Applied slider input {config.id} to node {config.node_id}.{config.field} = {numeric_value}")
+    
+    def _apply_seed_input(self, workflow: dict, config: InputConfig, value: Any):
+        """Apply seed input to workflow - handles multiple node_ids"""
+        if not config.field:
+            logger.warning(f"Missing field for seed input: {config.id}")
+            return
+        
+        # Seed can have either node_id (single) or node_ids (multiple)
+        node_ids = []
+        if config.node_ids:
+            node_ids = config.node_ids
+        elif config.node_id:
+            node_ids = [config.node_id]
+        else:
+            logger.warning(f"Missing node_id or node_ids for seed input: {config.id}")
+            return
+        
+        # Convert to integer
+        seed_value = int(value) if value is not None else -1
+        
+        # Apply to all specified nodes
+        for node_id in node_ids:
+            if node_id not in workflow:
+                logger.warning(f"Node {node_id} not found in workflow for seed {config.id}")
+                continue
+            
+            workflow[node_id]['inputs'][config.field] = seed_value
+            logger.debug(f"Applied seed {config.id} to node {node_id}.{config.field} = {seed_value}")
     
     def _apply_toggle_input(self, workflow: dict, config: InputConfig, value: Any):
         """Apply toggle input to workflow"""
-        if not config.node_id or not config.field:
-            logger.warning(f"Missing node_id or field for toggle input: {config.id}")
+        if not config.node_id:
+            logger.warning(f"Missing node_id for toggle input: {config.id}")
+            return
+        
+        if not config.field and not config.fields:
+            logger.warning(f"Missing field or fields for toggle input: {config.id}")
             return
         
         if config.node_id not in workflow:
@@ -179,35 +245,64 @@ class WorkflowGenerator:
                 workflow[config.node_id]['inputs'][config.field] = ""
                 logger.debug(f"Disabled Florence2 captioning: set node 451.string_a to empty string")
         else:
-            # Standard boolean toggle
-            workflow[config.node_id]['inputs'][config.field] = bool_value
-            logger.debug(f"Applied toggle input {config.id} to node {config.node_id}.{config.field} = {bool_value}")
+            # Standard boolean toggle - handle multiple fields
+            if config.fields:
+                for field_name in config.fields:
+                    workflow[config.node_id]['inputs'][field_name] = bool_value
+                    logger.debug(f"Applied toggle input {config.id} to node {config.node_id}.{field_name} = {bool_value}")
+            else:
+                workflow[config.node_id]['inputs'][config.field] = bool_value
+                logger.debug(f"Applied toggle input {config.id} to node {config.node_id}.{config.field} = {bool_value}")
     
     def _apply_image_input(self, workflow: dict, config: InputConfig, value: Any):
         """Apply image input to workflow"""
-        if not config.node_id or not config.field:
-            logger.warning(f"Missing node_id or field for image input: {config.id}")
+        if not config.node_id:
+            logger.warning(f"Missing node_id for image input: {config.id}")
+            return
+        
+        if not config.field and not config.fields:
+            logger.warning(f"Missing field or fields for image input: {config.id}")
             return
         
         if config.node_id not in workflow:
             logger.warning(f"Node {config.node_id} not found in workflow")
             return
         
-        workflow[config.node_id]['inputs'][config.field] = str(value) if value else ""
-        logger.debug(f"Applied image input {config.id} to node {config.node_id}.{config.field}")
+        image_value = str(value) if value else ""
+        
+        # Handle multiple fields
+        if config.fields:
+            for field_name in config.fields:
+                workflow[config.node_id]['inputs'][field_name] = image_value
+                logger.debug(f"Applied image input {config.id} to node {config.node_id}.{field_name}")
+        else:
+            workflow[config.node_id]['inputs'][config.field] = image_value
+            logger.debug(f"Applied image input {config.id} to node {config.node_id}.{config.field}")
     
     def _apply_dropdown(self, workflow: dict, config: InputConfig, value: Any):
         """Apply dropdown input to workflow"""
-        if not config.node_id or not config.field:
-            logger.warning(f"Missing node_id or field for dropdown input: {config.id}")
+        if not config.node_id:
+            logger.warning(f"Missing node_id for dropdown input: {config.id}")
+            return
+        
+        if not config.field and not config.fields:
+            logger.warning(f"Missing field or fields for dropdown input: {config.id}")
             return
         
         if config.node_id not in workflow:
             logger.warning(f"Node {config.node_id} not found in workflow")
             return
         
-        workflow[config.node_id]['inputs'][config.field] = str(value) if value else ""
-        logger.debug(f"Applied dropdown input {config.id} to node {config.node_id}.{config.field}")
+        dropdown_value = str(value) if value else ""
+        
+        # Handle multiple fields
+        if config.fields:
+            for field_name in config.fields:
+                workflow[config.node_id]['inputs'][field_name] = dropdown_value
+                logger.debug(f"Applied dropdown input {config.id} to node {config.node_id}.{field_name}")
+        else:
+            workflow[config.node_id]['inputs'][config.field] = dropdown_value
+            logger.debug(f"Applied dropdown input {config.id} to node {config.node_id}.{config.field}")
     
     def _apply_high_low_model(self, workflow: dict, config: InputConfig, value: Any):
         """
@@ -327,6 +422,31 @@ class WorkflowGenerator:
         model_path = value.get('path', '')
         workflow[config.node_id]['inputs'][config.field] = model_path
         logger.debug(f"Applied single model to node {config.node_id}.{config.field}: {model_path}")
+    
+    def _update_filename_prefixes(self, workflow: dict, timestamp: str):
+        """
+        Update filename_prefix in all nodes to include timestamp
+        
+        Format: WAN/YYYY-MM-DD/HHMMSS_xx where xx is a suffix based on node purpose
+        
+        Args:
+            workflow: Workflow JSON to modify
+            timestamp: Timestamp string in format YYYY-MM-DD/HHMMSS
+        """
+        # Map of node IDs to their filename suffix
+        # These are the VHS_VideoCombine nodes that save videos
+        filename_suffix_map = {
+            '398': 'OG',  # Original/Output node
+            '433': 'IN',  # Interpolated node
+        }
+        
+        for node_id, suffix in filename_suffix_map.items():
+            if node_id in workflow:
+                node = workflow[node_id]
+                if 'inputs' in node and 'filename_prefix' in node['inputs']:
+                    # Update filename_prefix with timestamp
+                    node['inputs']['filename_prefix'] = f"WAN/{timestamp}_{suffix}"
+                    logger.debug(f"Updated filename_prefix for node {node_id}: WAN/{timestamp}_{suffix}")
     
     def get_input_summary(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
