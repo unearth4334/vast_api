@@ -34,6 +34,10 @@ workflow_queue_times = {}
 # Maps prompt_id -> thumbnail_filename
 workflow_thumbnails = {}
 
+# In-memory store for workflow metadata
+# Maps prompt_id -> {'workflow_id': str, 'min_time': int}
+workflow_metadata = {}
+
 # Thumbnail directory
 import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -276,6 +280,13 @@ def execute_workflow():
         # Save thumbnail reference
         if thumbnail_filename:
             workflow_thumbnails[prompt_id] = thumbnail_filename
+        
+        # Save workflow metadata for validation
+        min_expected_time = workflow_config.time_estimate.get('min', 60) if workflow_config.time_estimate else 60
+        workflow_metadata[prompt_id] = {
+            'workflow_id': workflow_id,
+            'min_time': min_expected_time
+        }
         
         # Generate task ID for tracking
         task_id = str(uuid.uuid4())
@@ -783,9 +794,29 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
         if start_time and end_time:
             execution_time = end_time - start_time
         
+        # Detect suspiciously fast completion (likely cached/not actually executed)
+        cached_execution_detected = False
+        if item_status == 'success' and execution_time is not None:
+            # Check if workflow has expected minimum time
+            if prompt_id in workflow_metadata:
+                min_expected_time = workflow_metadata[prompt_id]['min_time']
+                # If execution was less than 10% of expected minimum time, flag it
+                if execution_time < (min_expected_time * 0.1):
+                    logger.warning(
+                        f"Workflow {prompt_id} completed suspiciously fast: "
+                        f"{execution_time:.1f}s (expected min: {min_expected_time}s). "
+                        f"Likely cached/not executed."
+                    )
+                    item_status = 'failed'
+                    cached_execution_detected = True
+        
         # Clean up queue time for completed workflows
         if status.get('completed', False) and prompt_id in workflow_queue_times:
             del workflow_queue_times[prompt_id]
+        
+        # Clean up metadata for completed workflows
+        if status.get('completed', False) and prompt_id in workflow_metadata:
+            del workflow_metadata[prompt_id]
         
         # Get thumbnail if available
         thumbnail = workflow_thumbnails.get(prompt_id)
@@ -801,7 +832,8 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
             'end_time': end_time,
             'execution_time': execution_time,
             'completed': status.get('completed', False),
-            'thumbnail': thumbnail
+            'thumbnail': thumbnail,
+            'cached_execution': cached_execution_detected
         })
     
     # Sort recent items by start time (most recent first)

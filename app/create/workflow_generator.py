@@ -5,6 +5,7 @@ Generates ComfyUI workflow JSON from user inputs
 
 import copy
 import logging
+import random
 from datetime import datetime
 from typing import Dict, Any, List
 
@@ -208,6 +209,12 @@ class WorkflowGenerator:
         
         # Convert to integer
         seed_value = int(value) if value is not None else -1
+        
+        # If seed is -1 (random), generate a random seed
+        # Use a large range that's compatible with most systems (32-bit signed int max)
+        if seed_value == -1:
+            seed_value = random.randint(0, 2147483647)
+            logger.info(f"Generated random seed: {seed_value}")
         
         # Apply to all specified nodes
         for node_id in node_ids:
