@@ -446,6 +446,28 @@ async function updateWorkflowVisualization() {
     
     const state = result.state;
     
+    console.log('[VERBOSE] Received workflow state:', {
+      status: state.status,
+      current_step: state.current_step,
+      total_steps: state.steps?.length,
+      has_tasks: state.steps?.[state.current_step]?.tasks?.length > 0
+    });
+    
+    // Log current step tasks if available
+    if (state.steps?.[state.current_step]?.tasks) {
+      const currentStepTasks = state.steps[state.current_step].tasks;
+      console.log('[VERBOSE] Current step tasks:', currentStepTasks.map(t => ({
+        name: t.name,
+        status: t.status,
+        clone_progress: t.clone_progress,
+        download_rate: t.download_rate,
+        data_received: t.data_received,
+        total_size: t.total_size,
+        elapsed_time: t.elapsed_time,
+        eta: t.eta
+      })));
+    }
+    
     // Update visualization based on state
     renderWorkflowState(state);
     
@@ -651,6 +673,19 @@ function renderTasklist(stepElement, stepData) {
       if (task.data_received && !task.download_rate) {
         progressInfo += ` (${escapeHtml(task.data_received)})`;
       }
+      if (task.total_size) {
+        progressInfo += ` [${escapeHtml(task.total_size)}]`;
+      }
+      if (task.elapsed_time) {
+        progressInfo += ` ⏱${escapeHtml(task.elapsed_time)}`;
+      }
+      if (task.eta) {
+        progressInfo += ` ⏳${escapeHtml(task.eta)}`;
+      }
+      
+      if (progressInfo) {
+        console.log('[VERBOSE] Task progress info for', taskName, ':', progressInfo.trim());
+      }
       
       tasklistHTML += `<li class="${taskItemClass}">
         <span class="task-name">${escapeHtml(taskName)}</span>
@@ -715,6 +750,15 @@ function buildProgressText(tasks, stepData) {
     return '';
   }
   
+  console.log('[VERBOSE] Building progress text for task:', runningTask.name, {
+    clone_progress: runningTask.clone_progress,
+    download_rate: runningTask.download_rate,
+    data_received: runningTask.data_received,
+    total_size: runningTask.total_size,
+    elapsed_time: runningTask.elapsed_time,
+    eta: runningTask.eta
+  });
+  
   // Build progress text from task data
   let parts = [];
   
@@ -736,7 +780,20 @@ function buildProgressText(tasks, stepData) {
     parts.push(`(${runningTask.data_received})`);
   }
   
-  return parts.join(' ');
+  // Add elapsed time if available
+  if (runningTask.elapsed_time) {
+    parts.push(`[${runningTask.elapsed_time}]`);
+  }
+  
+  // Add ETA if available
+  if (runningTask.eta) {
+    parts.push(`ETA: ${runningTask.eta}`);
+  }
+  
+  const progressText = parts.join(' ');
+  console.log('[VERBOSE] Built progress text:', progressText);
+  
+  return progressText;
 }
 
 /**

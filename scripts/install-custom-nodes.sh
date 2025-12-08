@@ -5,6 +5,14 @@
 # DESCRIPTION
 #     This script installs custom nodes for an existing ComfyUI installation.
 #     It expects ComfyUI to already be installed with a virtual environment.
+#
+# USAGE
+#     ./install-custom-nodes.sh <comfy_path> [--venv-path <path>] [--progress-file <path>] [--verbose]
+#
+# OPTIONS
+#     --venv-path <path>      Path to custom Python virtual environment
+#     --progress-file <path>  Path to custom progress JSON file
+#     --verbose               Enable verbose logging for debugging progress statistics
 
 #===========================================================================
 # SECTION 1: SCRIPT CONFIGURATION & HELPER FUNCTIONS
@@ -19,6 +27,7 @@ fi
 COMFY_PATH="$1"
 CUSTOM_VENV_PATH=""
 CUSTOM_PROGRESS_FILE=""
+VERBOSE=false
 
 # Check for optional venv-path argument
 if [ $# -ge 3 ] && [ "$2" = "--venv-path" ]; then
@@ -28,6 +37,11 @@ fi
 # Check for optional progress-file argument
 if [ $# -ge 5 ] && [ "$4" = "--progress-file" ]; then
     CUSTOM_PROGRESS_FILE="$5"
+fi
+
+# Check for optional verbose flag
+if [[ " $* " =~ " --verbose " ]]; then
+    VERBOSE=true
 fi
 
 # Derive other paths from ComfyUI root and script location
@@ -71,6 +85,15 @@ fi
 # Create logs directory if it doesn't exist
 mkdir -p "$LOG_PATH"
 
+# Verbose logging function
+verbose_log() {
+    if [ "$VERBOSE" = true ]; then
+        local timestamp=$(date "+%Y-%m-%d %H:%M:%S.%3N")
+        echo "[VERBOSE $timestamp] $*" >&2
+        echo "[VERBOSE $timestamp] $*" >> "$LOG_FILE"
+    fi
+}
+
 # Write a structured log entry for progress parsing
 write_progress_log() {
     local event_type="$1"
@@ -81,6 +104,8 @@ write_progress_log() {
     
     # Format: [TIMESTAMP] EVENT_TYPE|NODE_NAME|STATUS|MESSAGE
     echo "[$timestamp] $event_type|$node_name|$status|$message" >> "$PROGRESS_LOG"
+    
+    verbose_log "Progress log: event=$event_type, node=$node_name, status=$status, message=$message"
 }
 
 # Write JSON progress file for real-time tracking
@@ -146,6 +171,8 @@ write_json_progress_with_stats() {
     local total_size="${13:-}"
     local elapsed_time="${14:-}"
     local eta="${15:-}"
+    
+    verbose_log "Writing progress JSON: node='$current_node', status='$current_status', progress=$clone_progress%, rate='$download_rate', received='$data_received', size='$total_size', elapsed='$elapsed_time', eta='$eta'"
     
     # Escape node name and strings for JSON (replace quotes with escaped quotes)
     local escaped_node=$(echo "$current_node" | sed 's/"/\\"/g')
@@ -222,8 +249,10 @@ clone_with_progress() {
             progress="${BASH_REMATCH[1]}"
             object_count="${BASH_REMATCH[2]}"
             total_objects="${BASH_REMATCH[3]}"
+            verbose_log "Parsed git progress: $progress% ($object_count/$total_objects objects)"
         elif [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)% ]]; then
             progress="${BASH_REMATCH[1]}"
+            verbose_log "Parsed git progress: $progress%"
         fi
         
         # Extract data and rate with better precision
@@ -232,6 +261,7 @@ clone_with_progress() {
         if [[ "$line" =~ ([0-9.]+)[[:space:]]+(KiB|MiB|GiB)[[:space:]]*\|[[:space:]]*([0-9.]+)[[:space:]]+(KiB|MiB|GiB)/s ]]; then
             data_received="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
             download_rate="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}/s"
+            verbose_log "Parsed git data: received=$data_received, rate=$download_rate"
         # Pattern 2: Just data received (no rate yet)
         elif [[ "$line" =~ ([0-9.]+)[[:space:]]+(KiB|MiB|GiB) ]] && [[ ! "$line" =~ /s ]]; then
             data_received="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
@@ -268,6 +298,7 @@ clone_with_progress() {
                             local eta_seconds=$(( (remaining_progress * 100) / rate_per_sec_x100 ))
                             if [ "$eta_seconds" -gt 0 ]; then
                                 eta_str=$(printf "%02d:%02d" $((eta_seconds / 60)) $((eta_seconds % 60)))
+                                verbose_log "ETA calculated: progress_diff=$progress_diff, time_diff=$time_diff, rate_x100=$rate_per_sec_x100, eta=$eta_str"
                             fi
                         fi
                     fi
