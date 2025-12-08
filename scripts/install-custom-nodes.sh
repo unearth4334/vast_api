@@ -245,23 +245,42 @@ clone_with_progress() {
     
     # Run git clone with progress output
     git clone --progress --depth 1 "$repo_url" "$target_path" 2>&1 | while IFS= read -r line; do
-        # Git outputs progress like: "Receiving objects: 45% (123/456), 2.5 MiB | 1.2 MiB/s"
+        # Git outputs progress in multiple phases:
+        # 1. "Receiving objects: X% (a/b)" - downloading data (0-50% of total)
+        # 2. "Resolving deltas: X% (a/b)" - processing deltas (50-100% of total)
+        # We'll combine these phases into a single 0-100% progress
         local progress=""
         local download_rate=""
         local data_received=""
         local total_size=""
         local object_count=""
         local total_objects=""
+        local phase_progress=""
         
-        # Extract percentage and object counts (e.g., "Receiving objects: 45% (123/456)")
+        # Extract percentage from "Receiving objects" phase (maps to 0-50%)
         if [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)%[[:space:]]*\(([0-9]+)/([0-9]+)\) ]]; then
-            progress="${BASH_REMATCH[1]}"
+            phase_progress="${BASH_REMATCH[1]}"
             object_count="${BASH_REMATCH[2]}"
             total_objects="${BASH_REMATCH[3]}"
-            verbose_log "Parsed git progress: $progress% ($object_count/$total_objects objects)"
+            # Map 0-100% of receiving phase to 0-50% overall progress
+            progress=$((phase_progress / 2))
+            verbose_log "Parsed git progress (receiving): ${phase_progress}% -> overall ${progress}% ($object_count/$total_objects objects)"
         elif [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)% ]]; then
-            progress="${BASH_REMATCH[1]}"
-            verbose_log "Parsed git progress: $progress%"
+            phase_progress="${BASH_REMATCH[1]}"
+            progress=$((phase_progress / 2))
+            verbose_log "Parsed git progress (receiving): ${phase_progress}% -> overall ${progress}%"
+        # Extract percentage from "Resolving deltas" phase (maps to 50-100%)
+        elif [[ "$line" =~ Resolving[[:space:]]+deltas:[[:space:]]*([0-9]+)%[[:space:]]*\(([0-9]+)/([0-9]+)\) ]]; then
+            phase_progress="${BASH_REMATCH[1]}"
+            local delta_count="${BASH_REMATCH[2]}"
+            local total_deltas="${BASH_REMATCH[3]}"
+            # Map 0-100% of resolving phase to 50-100% overall progress
+            progress=$((50 + phase_progress / 2))
+            verbose_log "Parsed git progress (resolving): ${phase_progress}% -> overall ${progress}% ($delta_count/$total_deltas deltas)"
+        elif [[ "$line" =~ Resolving[[:space:]]+deltas:[[:space:]]*([0-9]+)% ]]; then
+            phase_progress="${BASH_REMATCH[1]}"
+            progress=$((50 + phase_progress / 2))
+            verbose_log "Parsed git progress (resolving): ${phase_progress}% -> overall ${progress}%"
         fi
         
         # Extract data and rate with better precision
