@@ -716,9 +716,13 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
     for item in queue_data.get('queue_running', []):
         prompt_id = item[1] if isinstance(item, list) and len(item) > 1 else str(item)
         
-        # Try to get start time from history if available
+        # Prefer queue time (when we submitted) over history timestamp
+        # History may contain stale data from previous executions
         start_time = None
-        if prompt_id in history_data:
+        if prompt_id in workflow_queue_times:
+            start_time = workflow_queue_times[prompt_id]
+        elif prompt_id in history_data:
+            # Fallback to history only if we don't have queue time
             status = history_data[prompt_id].get('status', {})
             messages = status.get('messages', [])
             for msg in messages:
@@ -728,10 +732,6 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
                     if msg_type == 'execution_start' and 'timestamp' in msg_data:
                         start_time = msg_data['timestamp'] / 1000
                         break
-        
-        # Fallback to queue time if no start time from history
-        if not start_time and prompt_id in workflow_queue_times:
-            start_time = workflow_queue_times[prompt_id]
         
         # Get thumbnail if available
         thumbnail = workflow_thumbnails.get(prompt_id)
