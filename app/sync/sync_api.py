@@ -1573,7 +1573,7 @@ def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str
             '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
             '-o', 'IdentitiesOnly=yes',
             f'root@{ssh_host}',
-            f'source /etc/environment 2>/dev/null; cd /workspace/ComfyUI-Auto_installer/scripts && ./install-custom-nodes.sh {ui_home} --venv-path /venv/main/bin/python --progress-file {progress_file} 2>&1'
+            f'source /etc/environment 2>/dev/null; cd /workspace/ComfyUI-Auto_installer/scripts && ./install-custom-nodes.sh {ui_home} --venv-path /venv/main/bin/python --progress-file {progress_file} --verbose 2>&1'
         ]
         
         # Use Popen for real-time output streaming
