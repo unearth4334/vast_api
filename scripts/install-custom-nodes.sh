@@ -90,8 +90,13 @@ verbose_log() {
     if [ "$VERBOSE" = true ]; then
         # Portable timestamp with milliseconds (use nanoseconds and truncate)
         local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-        local nanos=$(date "+%N" 2>/dev/null || echo "000")
-        local millis=${nanos:0:3}
+        local nanos=$(date "+%N" 2>/dev/null || echo "000000000")
+        # Validate nanos is at least 3 chars and extract first 3 digits
+        if [ ${#nanos} -ge 3 ]; then
+            local millis=${nanos:0:3}
+        else
+            local millis="000"
+        fi
         timestamp="${timestamp}.${millis}"
         echo "[VERBOSE $timestamp] $*" >&2
         echo "[VERBOSE $timestamp] $*" >> "$LOG_FILE"
