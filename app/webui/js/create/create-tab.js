@@ -255,11 +255,27 @@ function renderFormField(field) {
     
     switch (field.type) {
         case 'image':
+            // Add max image size slider below the upload area
             inputHtml = `
                 <div class="image-upload-container" id="${id}-container">
                     <input type="file" id="${id}" accept="${field.accept || 'image/*'}" onchange="handleImageUpload('${field.id}', this)">
                     <div class="image-upload-icon">📷</div>
                     <div class="image-upload-text">Click or drag to upload image</div>
+                </div>
+                <div class="slider-container" style="margin-top: 12px;">
+                    <label for="${id}-max-size" style="display: block; margin-bottom: 4px; font-size: 13px; color: var(--text-primary);">
+                        Max Image Size: <span class="slider-value" id="${id}-max-size-value">1</span> <span class="slider-unit">MP</span>
+                    </label>
+                    <input 
+                        type="range" 
+                        id="${id}-max-size" 
+                        class="slider-input"
+                        min="0.5"
+                        max="8"
+                        step="0.5"
+                        value="1"
+                        oninput="document.getElementById('${id}-max-size-value').textContent = this.value"
+                    >
                 </div>
             `;
             break;
@@ -438,6 +454,46 @@ function randomizeSeed(fieldId) {
 }
 
 /**
+ * Scale image to fit within max megapixels
+ * @param {string} dataUrl - Base64 data URL of image
+ * @param {number} maxMegapixels - Maximum size in megapixels
+ * @returns {Promise<string>} - Scaled image data URL
+ */
+async function scaleImageToMaxSize(dataUrl, maxMegapixels) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            const currentMegapixels = (img.width * img.height) / 1000000;
+            
+            // If image is already within limit, return as-is
+            if (currentMegapixels <= maxMegapixels) {
+                resolve(dataUrl);
+                return;
+            }
+            
+            // Calculate new dimensions
+            const scaleFactor = Math.sqrt(maxMegapixels / currentMegapixels);
+            const newWidth = Math.round(img.width * scaleFactor);
+            const newHeight = Math.round(img.height * scaleFactor);
+            
+            console.log(`Scaling image from ${img.width}x${img.height} (${currentMegapixels.toFixed(2)}MP) to ${newWidth}x${newHeight} (${maxMegapixels}MP)`);
+            
+            // Create canvas and scale
+            const canvas = document.createElement('canvas');
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, newWidth, newHeight);
+            
+            // Convert to data URL
+            resolve(canvas.toDataURL('image/jpeg', 0.92));
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
+}
+
+/**
  * Handle image upload
  * @param {string} fieldId - Field ID
  * @param {HTMLInputElement} input - File input element
@@ -455,54 +511,66 @@ function handleImageUpload(fieldId, input) {
     const container = document.getElementById(`create-field-${fieldId}-container`);
     if (!container) return;
     
+    // Get max size from slider
+    const maxSizeSlider = document.getElementById(`create-field-${fieldId}-max-size`);
+    const maxMegapixels = maxSizeSlider ? parseFloat(maxSizeSlider.value) : 1.0;
+    
     // Show preview using DOM methods for security
     const reader = new FileReader();
-    reader.onload = function(e) {
-        // Clear container safely
-        container.innerHTML = '';
-        
-        // Create file input
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.id = `create-field-${fieldId}`;
-        fileInput.accept = input.accept || 'image/*';
-        fileInput.addEventListener('change', function() {
-            handleImageUpload(fieldId, this);
-        });
-        
-        // Create preview image
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.className = 'image-upload-preview';
-        img.alt = 'Preview';
-        
-        // Create clear button
-        const clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'image-upload-clear';
-        clearBtn.title = 'Remove';
-        clearBtn.textContent = '✕';
-        clearBtn.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent triggering container click
-            clearImageUpload(fieldId);
-        });
-        
-        container.appendChild(fileInput);
-        container.appendChild(img);
-        container.appendChild(clearBtn);
-        container.classList.add('has-image');
-        
-        // Re-add click handler to container to allow changing the image
-        container.onclick = function(e) {
-            // Don't trigger if clicking the clear button
-            if (e.target === clearBtn || e.target.closest('.image-upload-clear')) {
-                return;
-            }
-            fileInput.click();
-        };
-        
-        // Store base64 data
-        updateFormValue(fieldId, e.target.result);
+    reader.onload = async function(e) {
+        try {
+            // Scale image if needed
+            const scaledDataUrl = await scaleImageToMaxSize(e.target.result, maxMegapixels);
+            
+            // Clear container safely
+            container.innerHTML = '';
+            
+            // Create file input
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.id = `create-field-${fieldId}`;
+            fileInput.accept = input.accept || 'image/*';
+            fileInput.addEventListener('change', function() {
+                handleImageUpload(fieldId, this);
+            });
+            
+            // Create preview image
+            const img = document.createElement('img');
+            img.src = scaledDataUrl;
+            img.className = 'image-upload-preview';
+            img.alt = 'Preview';
+            
+            // Create clear button
+            const clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'image-upload-clear';
+            clearBtn.title = 'Remove';
+            clearBtn.textContent = '✕';
+            clearBtn.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent triggering container click
+                clearImageUpload(fieldId);
+            });
+            
+            container.appendChild(fileInput);
+            container.appendChild(img);
+            container.appendChild(clearBtn);
+            container.classList.add('has-image');
+            
+            // Re-add click handler to container to allow changing the image
+            container.onclick = function(e) {
+                // Don't trigger if clicking the clear button
+                if (e.target === clearBtn || e.target.closest('.image-upload-clear')) {
+                    return;
+                }
+                fileInput.click();
+            };
+            
+            // Store scaled base64 data
+            updateFormValue(fieldId, scaledDataUrl);
+        } catch (error) {
+            console.error('Error processing image:', error);
+            alert('Failed to process image. Please try again.');
+        }
     };
     reader.readAsDataURL(file);
 }
