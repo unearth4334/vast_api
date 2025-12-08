@@ -3746,13 +3746,23 @@ def execute_set_ui_home(ssh_connection, ui_home_path):
         
         # Build SSH command with proper escaping
         ssh_key = '/root/.ssh/id_ed25519'
-        cmd = f'''ssh -p {port} -i {ssh_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 {user}@{host} "
-        echo 'export UI_HOME={ui_home_path}' >> ~/.bashrc && 
-        export UI_HOME={ui_home_path} && 
-        echo 'UI_HOME successfully set to {ui_home_path}'"'''
+        
+        remote_script = f'''echo 'export UI_HOME={ui_home_path}' >> ~/.bashrc && export UI_HOME={ui_home_path} && echo 'UI_HOME successfully set to {ui_home_path}' '''
+        
+        cmd = [
+            'ssh',
+            '-p', str(port),
+            '-i', ssh_key,
+            '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            '-o', 'ConnectTimeout=10',
+            f'{user}@{host}',
+            remote_script
+        ]
         
         # Execute SSH command
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         
         if result.returncode == 0:
             # Log successful operation
@@ -3871,30 +3881,42 @@ def execute_git_clone(ssh_connection, repository, destination):
         )
         
         ssh_key = '/root/.ssh/id_ed25519'
-        cmd = f'''ssh -p {port} -i {ssh_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 {user}@{host} "
-        set -e
-        if [ ! -d '{destination}' ]; then
-            echo 'Cloning repository {repository}...'
-            git clone --depth 1 {repository} {destination}
-            echo 'Repository cloned successfully to {destination}'
-        else
-            echo 'Repository directory exists at {destination}'
-            cd {destination}
-            # Check if it's a valid git repo with commits
-            if git rev-parse HEAD >/dev/null 2>&1; then
-                echo 'Valid git repository found, pulling updates...'
-                git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || echo 'Repository updated or pull not needed'
-            else
-                echo 'Empty or invalid git repository detected, re-cloning...'
-                cd ..
-                rm -rf {destination}
-                git clone --depth 1 {repository} {destination}
-                echo 'Repository re-cloned successfully to {destination}'
-            fi
-        fi
-        "'''
         
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
+        # Build the remote shell script
+        remote_script = f'''set -e
+if [ ! -d '{destination}' ]; then
+    echo 'Cloning repository {repository}...'
+    git clone --depth 1 {repository} {destination}
+    echo 'Repository cloned successfully to {destination}'
+else
+    echo 'Repository directory exists at {destination}'
+    cd {destination}
+    if git rev-parse HEAD >/dev/null 2>&1; then
+        echo 'Valid git repository found, pulling updates...'
+        git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || echo 'Repository updated or pull not needed'
+    else
+        echo 'Empty or invalid git repository detected, re-cloning...'
+        cd ..
+        rm -rf {destination}
+        git clone --depth 1 {repository} {destination}
+        echo 'Repository re-cloned successfully to {destination}'
+    fi
+fi'''
+        
+        # Use list format for subprocess to avoid shell quoting issues
+        cmd = [
+            'ssh',
+            '-p', str(port),
+            '-i', ssh_key,
+            '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            '-o', 'ConnectTimeout=10',
+            f'{user}@{host}',
+            remote_script
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         
         if result.returncode == 0:
             # Log successful operation
@@ -4016,22 +4038,33 @@ def execute_python_venv_setup(ssh_connection, venv_path):
         )
         
         ssh_key = '/root/.ssh/id_ed25519'
-        cmd = f'''ssh -p {port} -i {ssh_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 {user}@{host} "
-        set -e
-        if [ ! -d '{venv_path}' ]; then
-            echo 'Creating Python virtual environment...'
-            python3 -m venv {venv_path}
-            echo 'Python virtual environment created at {venv_path}'
-        else
-            echo 'Virtual environment already exists at {venv_path}'
-        fi
-        echo 'Activating virtual environment and upgrading pip...'
-        source {venv_path}/bin/activate
-        pip install --upgrade pip
-        echo 'Virtual environment setup completed successfully'
-        "'''
         
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=180)
+        remote_script = f'''set -e
+if [ ! -d '{venv_path}' ]; then
+    echo 'Creating Python virtual environment...'
+    python3 -m venv {venv_path}
+    echo 'Python virtual environment created at {venv_path}'
+else
+    echo 'Virtual environment already exists at {venv_path}'
+fi
+echo 'Activating virtual environment and upgrading pip...'
+source {venv_path}/bin/activate
+pip install --upgrade pip
+echo 'Virtual environment setup completed successfully' '''
+        
+        cmd = [
+            'ssh',
+            '-p', str(port),
+            '-i', ssh_key,
+            '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            '-o', 'ConnectTimeout=10',
+            f'{user}@{host}',
+            remote_script
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
         
         if result.returncode == 0:
             # Log successful operation
