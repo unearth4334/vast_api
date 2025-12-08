@@ -699,7 +699,7 @@ function renderTasklist(stepElement, stepData) {
       
       tasklistHTML += `<li class="${taskItemClass}">
         <span class="task-name">${escapeHtml(taskName)}</span>
-        <span class="task-status ${statusClass}">${escapeHtml(statusDisplay)}${progressInfo}</span>
+        <span class="task-status ${statusClass}">${escapeHtml(statusDisplay)}</span>
       </li>`;
       
       // Render sub-tasks if they exist
