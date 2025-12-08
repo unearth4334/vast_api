@@ -21,8 +21,10 @@ export class ResourceDownloadStatus {
         document.addEventListener('click', (e) => {
             if (!this.deleteMode) return;
             
-            // Don't exit if clicking delete buttons or task items
+            // Don't exit if clicking delete buttons, retry buttons, or task items
             if (e.target.closest('.download-task-delete-btn') || 
+                e.target.closest('.download-task-delete-ne-btn') ||
+                e.target.closest('.download-task-retry-se-btn') ||
                 e.target.closest('.download-delete-all-btn')) {
                 return;
             }
@@ -73,8 +75,10 @@ export class ResourceDownloadStatus {
      * Handle task item click
      */
     handleTaskItemClick(e) {
-        // Don't toggle if clicking delete button
-        if (e.target.closest('.download-task-delete-btn')) {
+        // Don't toggle if clicking delete or retry buttons
+        if (e.target.closest('.download-task-delete-btn') ||
+            e.target.closest('.download-task-delete-ne-btn') ||
+            e.target.closest('.download-task-retry-se-btn')) {
             return;
         }
         
@@ -101,6 +105,25 @@ export class ResourceDownloadStatus {
         } catch (e) {
             console.error('Error deleting task:', e);
             alert('Failed to delete task');
+        }
+    }
+
+    /**
+     * Retry a failed task
+     */
+    async retryTask(jobId) {
+        try {
+            const response = await window.api.post('/downloads/retry', { job_id: jobId });
+            if (response.success) {
+                // Refresh the list
+                await this.pollStatus();
+                // Stay in delete mode
+            } else {
+                throw new Error(response.message || 'Failed to retry task');
+            }
+        } catch (e) {
+            console.error('Error retrying task:', e);
+            alert('Failed to retry task: ' + e.message);
         }
     }
 
@@ -372,7 +395,7 @@ export class ResourceDownloadStatus {
             item.addEventListener('click', (e) => this.handleTaskItemClick(e));
         });
         
-        // Delete button clicks
+        // Delete button clicks (regular delete button)
         const deleteButtons = this.container.querySelectorAll('.download-task-delete-btn');
         deleteButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -380,6 +403,30 @@ export class ResourceDownloadStatus {
                 const jobId = btn.dataset.jobId;
                 if (jobId) {
                     this.deleteTask(jobId);
+                }
+            });
+        });
+        
+        // Delete NE button clicks (split button delete)
+        const deleteNeButtons = this.container.querySelectorAll('.download-task-delete-ne-btn');
+        deleteNeButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const jobId = btn.dataset.jobId;
+                if (jobId) {
+                    this.deleteTask(jobId);
+                }
+            });
+        });
+        
+        // Retry SE button clicks (split button retry)
+        const retrySeButtons = this.container.querySelectorAll('.download-task-retry-se-btn');
+        retrySeButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const jobId = btn.dataset.jobId;
+                if (jobId) {
+                    this.retryTask(jobId);
                 }
             });
         });
@@ -470,6 +517,19 @@ export class ResourceDownloadStatus {
             errorMsg = `<div class="task-error-msg task-verify-msg">🔐 ${this.escapeHtml(job.error)}</div>`;
         }
 
+        // Render buttons based on status
+        let buttonsHtml = '';
+        if (job.status === 'FAILED') {
+            // Split buttons for failed downloads: delete NE + retry SE
+            buttonsHtml = `
+                <button class="download-task-delete-ne-btn" data-job-id="${job.id}">🗑️</button>
+                <button class="download-task-retry-se-btn" data-job-id="${job.id}">🔄</button>
+            `;
+        } else {
+            // Single delete button for all other statuses
+            buttonsHtml = `<button class="download-task-delete-btn" data-job-id="${job.id}">🗑️</button>`;
+        }
+
         return `
             <div class="download-task-item-wrapper">
                 <div class="download-task-item ${statusClass}" data-job-id="${job.id}">
@@ -482,7 +542,7 @@ export class ResourceDownloadStatus {
                     ${progressDetails}
                     ${errorMsg}
                 </div>
-                <button class="download-task-delete-btn" data-job-id="${job.id}">🗑️</button>
+                ${buttonsHtml}
             </div>
         `;
     }
