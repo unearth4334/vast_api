@@ -323,50 +323,50 @@
                 <div class="create-progress-details" id="create-progress-details"></div>
             </div>
             
-            <!-- Execution Queue -->
-            <div class="execution-queue-container">
-                <div class="execution-queue-header">
-                    <span class="execution-queue-title">📋 Execution Queue</span>
-                    <div class="execution-queue-controls">
-                        <div class="view-toggle execution-queue-view-toggle">
-                            <button class="view-btn view-btn-compact active" data-view="compact" title="Compact View">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                    <rect x="1" y="2" width="14" height="3" rx="1"/>
-                                    <rect x="1" y="7" width="14" height="3" rx="1"/>
-                                    <rect x="1" y="12" width="14" height="3" rx="1"/>
-                                </svg>
-                            </button>
-                            <button class="view-btn view-btn-detailed" data-view="detailed" title="Detailed View with Thumbnails">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                    <rect x="1" y="1" width="6" height="6" rx="1"/>
-                                    <rect x="9" y="1" width="6" height="2" rx="1"/>
-                                    <rect x="9" y="5" width="6" height="2" rx="1"/>
-                                    <rect x="1" y="9" width="6" height="6" rx="1"/>
-                                    <rect x="9" y="9" width="6" height="2" rx="1"/>
-                                    <rect x="9" y="13" width="6" height="2" rx="1"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="status-filter execution-queue-status-filter">
-                            <button class="filter-btn filter-btn-success active" data-filter="success" title="Show Successful Executions">✓</button>
-                            <button class="filter-btn filter-btn-failed active" data-filter="failed" title="Show Failed Executions">✕</button>
-                        </div>
-                        <button id="execution-queue-refresh-button" class="execution-queue-refresh-button" onclick="refreshExecutionQueue()" title="Refresh execution queue status">
-                            <span>🔄</span> Refresh
-                        </button>
-                    </div>
-                </div>
-                <div id="execution-queue-content" class="execution-queue-wrapper">
-                    <!-- Queue content will be displayed here -->
-                </div>
-            </div>
-            
             <!-- Output preview -->
             <div id="create-output-container" class="create-output-container">
                 <div class="create-output-header">Output</div>
                 <div class="create-output-preview" id="create-output-preview">
                     <!-- Output will be displayed here -->
                 </div>
+            </div>
+        </div>
+        
+        <!-- Execution Queue (always visible) -->
+        <div class="execution-queue-container">
+            <div class="execution-queue-header">
+                <span class="execution-queue-title">📋 Execution Queue</span>
+                <div class="execution-queue-controls">
+                    <div class="view-toggle execution-queue-view-toggle">
+                        <button class="view-btn view-btn-compact active" data-view="compact" title="Compact View">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <rect x="1" y="2" width="14" height="3" rx="1"/>
+                                <rect x="1" y="7" width="14" height="3" rx="1"/>
+                                <rect x="1" y="12" width="14" height="3" rx="1"/>
+                            </svg>
+                        </button>
+                        <button class="view-btn view-btn-detailed" data-view="detailed" title="Detailed View with Thumbnails">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <rect x="1" y="1" width="6" height="6" rx="1"/>
+                                <rect x="9" y="1" width="6" height="2" rx="1"/>
+                                <rect x="9" y="5" width="6" height="2" rx="1"/>
+                                <rect x="1" y="9" width="6" height="6" rx="1"/>
+                                <rect x="9" y="9" width="6" height="2" rx="1"/>
+                                <rect x="9" y="13" width="6" height="2" rx="1"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="status-filter execution-queue-status-filter">
+                        <button class="filter-btn filter-btn-success active" data-filter="success" title="Show Successful Executions">✓</button>
+                        <button class="filter-btn filter-btn-failed active" data-filter="failed" title="Show Failed Executions">✕</button>
+                    </div>
+                    <button id="execution-queue-refresh-button" class="execution-queue-refresh-button" onclick="refreshExecutionQueue()" title="Refresh execution queue status">
+                        <span>🔄</span> Refresh
+                    </button>
+                </div>
+            </div>
+            <div id="execution-queue-content" class="execution-queue-wrapper">
+                <!-- Queue content will be displayed here -->
             </div>
         </div>
         
