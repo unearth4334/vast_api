@@ -516,6 +516,9 @@ class VastAIConnectionToolbar {
             connection_status: null
         });
         
+        // Set global instance ID for legacy compatibility (workflow executor needs this)
+        window.currentInstanceId = parseInt(instanceId, 10);
+        
         // Update display
         this.updateToolbarDisplay();
         
