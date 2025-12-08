@@ -135,6 +135,16 @@ def scan_models():
             models = scanner.scan_high_low_pairs(base_path, pattern_config)
         else:
             models = scanner.scan_single_models(base_path, model_type)
+            
+            # For upscale_models, also check ESRGAN directory as fallback
+            if model_type == 'upscale_models' and 'ESRGAN' in base_paths:
+                esrgan_models = scanner.scan_single_models(base_paths['ESRGAN'], model_type)
+                # Merge results, avoiding duplicates
+                existing_paths = {m['path'] for m in models}
+                for model in esrgan_models:
+                    if model['path'] not in existing_paths:
+                        models.append(model)
+                logger.info(f"Added {len(esrgan_models)} models from ESRGAN directory")
         
         # Cache result
         set_cached_result(cache_key, models)
