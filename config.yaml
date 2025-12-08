@@ -66,6 +66,7 @@ model_discovery:
     text_encoders: "models/text_encoders"
     vae: "models/vae"
     upscale_models: "models/upscale_models"
+    ESRGAN: "models/ESRGAN"
     
   # High-Low pair patterns for WAN 2.2 style dual-sampling models
   high_low_patterns:
