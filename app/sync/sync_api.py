@@ -3745,7 +3745,8 @@ def execute_set_ui_home(ssh_connection, ui_home_path):
         )
         
         # Build SSH command with proper escaping
-        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
+        ssh_key = '/root/.ssh/id_ed25519'
+        cmd = f'''ssh -p {port} -i {ssh_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 {user}@{host} "
         echo 'export UI_HOME={ui_home_path}' >> ~/.bashrc && 
         export UI_HOME={ui_home_path} && 
         echo 'UI_HOME successfully set to {ui_home_path}'"'''
@@ -3869,7 +3870,8 @@ def execute_git_clone(ssh_connection, repository, destination):
             extra_data={"host": host, "port": port, "user": user}
         )
         
-        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
+        ssh_key = '/root/.ssh/id_ed25519'
+        cmd = f'''ssh -p {port} -i {ssh_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 {user}@{host} "
         set -e
         if [ ! -d '{destination}' ]; then
             echo 'Cloning repository {repository}...'
@@ -4013,7 +4015,8 @@ def execute_python_venv_setup(ssh_connection, venv_path):
             extra_data={"host": host, "port": port, "user": user}
         )
         
-        cmd = f'''ssh -p {port} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {user}@{host} "
+        ssh_key = '/root/.ssh/id_ed25519'
+        cmd = f'''ssh -p {port} -i {ssh_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts -o IdentitiesOnly=yes -o ConnectTimeout=10 {user}@{host} "
         set -e
         if [ ! -d '{venv_path}' ]; then
             echo 'Creating Python virtual environment...'
