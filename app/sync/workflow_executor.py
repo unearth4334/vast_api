@@ -174,7 +174,12 @@ class WorkflowExecutor:
                                     logger.info(f"Workflow resumed, retrying step {step_index + 1}")
                                     state['steps'][step_index]['status'] = 'in_progress'
                                     state_manager.save_state(state)
-                                    success, error_message = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index, instance_id)
+                                    result = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index, instance_id)
+                                    # Handle both 2 and 3 element tuples
+                                    if isinstance(result, tuple) and len(result) == 3:
+                                        success, error_message, _ = result
+                                    else:
+                                        success, error_message = result
                                     break
                                 elif state.get('status') == 'cancelled':
                                     logger.info(f"Workflow {workflow_id} cancelled during blocked state")
