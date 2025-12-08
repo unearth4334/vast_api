@@ -54,7 +54,7 @@ The following progress metrics are now tracked and displayed in real-time:
 
 ### 1. Backend Progress Tracking (scripts/install-custom-nodes.sh)
 
-**Location**: Lines 240-350
+**Function**: `clone_custom_node_with_progress()`
 
 **Features**:
 - Parses git clone output for `Receiving objects` and `Resolving deltas` phases
@@ -110,7 +110,7 @@ The following progress metrics are now tracked and displayed in real-time:
 
 ### 3. Workflow Executor Integration (app/sync/workflow_executor.py)
 
-**Function**: `_execute_install_custom_nodes()` (Lines 722-1202)
+**Function**: `_execute_install_custom_nodes()`
 
 **Features**:
 - Starts async installation via `/ssh/install-custom-nodes`
@@ -136,7 +136,7 @@ The following progress metrics are now tracked and displayed in real-time:
 
 ### 4. Frontend Display (app/webui/js/workflow-refactored.js)
 
-**Function**: `renderTasklist()` (Lines 570-743)
+**Function**: `renderTasklist()`
 
 **Features**:
 - Renders task list with status indicators
@@ -149,7 +149,7 @@ The following progress metrics are now tracked and displayed in real-time:
 ComfyUI-Manager: 45% @ 1.2 MiB/s [12.0 MiB] ⏱01:23 ⏳02:15
 ```
 
-**Progress Info Logic** (Lines 676-694):
+**Progress Info Logic**:
 ```javascript
 let progressInfo = '';
 if (task.clone_progress) progressInfo += ` ${task.clone_progress}%`;
@@ -178,7 +178,7 @@ if (task.eta) progressInfo += ` ⏳${task.eta}`;
 
 ### Running Tests
 ```bash
-cd /home/runner/work/vast_api/vast_api
+cd /path/to/vast_api
 python3 test/test_comprehensive_progress.py -v
 ```
 
@@ -265,18 +265,21 @@ Install Custom Nodes                         [Step 6/7]
 
 ### Configuration
 
-**Poll Interval**: 2 seconds (workflow_executor.py:1112)
+**Poll Interval**: 2 seconds
 ```python
+# In workflow_executor.py _execute_install_custom_nodes()
 time.sleep(2)  # Poll every 2 seconds
 ```
 
-**ETA Update Interval**: 3 seconds (install-custom-nodes.sh:244)
+**ETA Update Interval**: 3 seconds
 ```bash
+# In install-custom-nodes.sh
 local ETA_UPDATE_INTERVAL=3
 ```
 
-**Rolling Window Size**: 4 visible nodes (workflow_executor.py:785)
+**Rolling Window Size**: 4 visible nodes
 ```python
+# In workflow_executor.py _execute_install_custom_nodes()
 MAX_VISIBLE_NODES = 4
 ```
 
@@ -301,4 +304,4 @@ The comprehensive progression readout enhancement is **fully implemented and tes
 
 **Status**: ✅ **COMPLETE**
 
-**Last Updated**: December 8, 2025
+**Last Updated**: December 8, 2024
