@@ -53,12 +53,12 @@ async function initCreateTab() {
     // Set up event listeners
     setupCreateTabEventListeners();
     
-    // Check if SSH connection already exists and initialize ExecutionQueue
-    const createSshInput = document.getElementById('createSshConnectionString');
-    if (createSshInput?.value) {
-        CreateTabState.sshConnection = createSshInput.value;
+    // Check if SSH connection already exists (from new toolbar) and initialize ExecutionQueue
+    const sshConnection = getCurrentSSHConnection();
+    if (sshConnection) {
+        CreateTabState.sshConnection = sshConnection;
         if (CreateTabState.executionQueue) {
-            CreateTabState.executionQueue.setSshConnection(createSshInput.value);
+            CreateTabState.executionQueue.setSshConnection(sshConnection);
         }
     }
     
@@ -676,39 +676,32 @@ function showCreateSuccess(message) {
  * Set up event listeners for Create tab
  */
 function setupCreateTabEventListeners() {
-    // SSH connection string sync
-    const createSshInput = document.getElementById('createSshConnectionString');
-    const vastaiSshInput = document.getElementById('sshConnectionString');
-    const resourcesSshInput = document.getElementById('resourcesSshConnectionString');
+    // Monitor connection toolbar state changes
+    // Poll for connection changes every 2 seconds to update components
+    let lastKnownConnection = getCurrentSSHConnection();
     
-    if (createSshInput) {
-        // Sync from Create tab to other tabs
-        createSshInput.addEventListener('input', function() {
-            if (vastaiSshInput) vastaiSshInput.value = this.value;
-            if (resourcesSshInput) resourcesSshInput.value = this.value;
-            
-            // Update SSH connection in state and execution queue
-            CreateTabState.sshConnection = this.value;
-            if (CreateTabState.executionQueue) {
-                CreateTabState.executionQueue.setSshConnection(this.value);
-            }
-        });
+    setInterval(() => {
+        const currentConnection = getCurrentSSHConnection();
         
-        // Initialize from other tabs if they have values
-        if (vastaiSshInput?.value) {
-            createSshInput.value = vastaiSshInput.value;
-            CreateTabState.sshConnection = vastaiSshInput.value;
+        // If connection changed, update all components
+        if (currentConnection !== lastKnownConnection) {
+            console.log('🔄 SSH connection changed in toolbar, updating Create tab components...');
+            lastKnownConnection = currentConnection;
+            CreateTabState.sshConnection = currentConnection;
+            
+            // Update execution queue
             if (CreateTabState.executionQueue) {
-                CreateTabState.executionQueue.setSshConnection(vastaiSshInput.value);
+                CreateTabState.executionQueue.setSshConnection(currentConnection);
             }
-        } else if (resourcesSshInput?.value) {
-            createSshInput.value = resourcesSshInput.value;
-            CreateTabState.sshConnection = resourcesSshInput.value;
-            if (CreateTabState.executionQueue) {
-                CreateTabState.executionQueue.setSshConnection(resourcesSshInput.value);
+            
+            // Update model selector components
+            if (currentConnection) {
+                updateComponentsSSHConnection(currentConnection);
+                // Auto-refresh model selectors with new connection
+                refreshAllModelSelectors(false);
             }
         }
-    }
+    }, 2000);
 }
 
 /**
@@ -847,9 +840,19 @@ async function refreshAllModelSelectors(forceRefresh = false) {
 
 /**
  * Get current SSH connection string from UI
+ * Prioritizes new connection toolbar over legacy input fields
  * @returns {string|null} SSH connection string or null
  */
 function getCurrentSSHConnection() {
+    // Check new connection toolbar first
+    if (window.VastAIConnectionToolbar) {
+        const toolbarConnection = window.VastAIConnectionToolbar.getSSHConnectionString();
+        if (toolbarConnection) {
+            return toolbarConnection;
+        }
+    }
+    
+    // Fallback to legacy SSH input fields (for backward compatibility)
     const sshInput = document.getElementById('createSshConnectionString') || 
                      document.getElementById('sshConnectionString') ||
                      document.getElementById('resourcesSshConnectionString');
