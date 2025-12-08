@@ -761,6 +761,7 @@ function buildProgressText(tasks, stepData) {
   }
   
   verboseLog('Building progress text for task:', runningTask.name, {
+    message: runningTask.message,
     clone_progress: runningTask.clone_progress,
     download_rate: runningTask.download_rate,
     data_received: runningTask.data_received,
@@ -774,6 +775,11 @@ function buildProgressText(tasks, stepData) {
   
   // Add node name
   parts.push(runningTask.name);
+  
+  // Add message if present (e.g., "collecting (1/10): package-name")
+  if (runningTask.message) {
+    parts.push(runningTask.message);
+  }
   
   // Add clone progress percentage
   if (runningTask.clone_progress) {

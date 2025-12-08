@@ -207,6 +207,7 @@ def _parse_progress_log(log_content: str, current_progress: dict) -> list:
     if current_progress:
         current_node_name = current_progress.get('current_node')
         current_status = current_progress.get('current_status', 'running')
+        requirements_status = current_progress.get('requirements_status', '')
         clone_progress = current_progress.get('clone_progress')
         download_rate = current_progress.get('download_rate')
         data_received = current_progress.get('data_received')
@@ -218,6 +219,9 @@ def _parse_progress_log(log_content: str, current_progress: dict) -> list:
         for node in nodes_list:
             if node['name'] == current_node_name:
                 node['status'] = current_status
+                # Update message with requirements_status if present
+                if requirements_status:
+                    node['message'] = requirements_status
                 if clone_progress is not None:
                     node['clone_progress'] = clone_progress
                 if download_rate:
@@ -237,7 +241,7 @@ def _parse_progress_log(log_content: str, current_progress: dict) -> list:
                 nodes_list.append({
                     'name': current_node_name,
                     'status': current_status,
-                    'message': '',
+                    'message': requirements_status,
                     'clone_progress': clone_progress,
                     'download_rate': download_rate,
                     'data_received': data_received,
