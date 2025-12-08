@@ -88,7 +88,11 @@ mkdir -p "$LOG_PATH"
 # Verbose logging function
 verbose_log() {
     if [ "$VERBOSE" = true ]; then
-        local timestamp=$(date "+%Y-%m-%d %H:%M:%S.%3N")
+        # Portable timestamp with milliseconds (use nanoseconds and truncate)
+        local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+        local nanos=$(date "+%N" 2>/dev/null || echo "000")
+        local millis=${nanos:0:3}
+        timestamp="${timestamp}.${millis}"
         echo "[VERBOSE $timestamp] $*" >&2
         echo "[VERBOSE $timestamp] $*" >> "$LOG_FILE"
     fi

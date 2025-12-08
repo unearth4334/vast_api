@@ -11,6 +11,16 @@ let workflowConfig = {
   pollInterval: 2000 // Poll every 2 seconds
 };
 
+// Enable verbose logging by setting localStorage.setItem('workflowDebug', 'true') in browser console
+const VERBOSE_LOGGING = localStorage.getItem('workflowDebug') === 'true';
+
+// Helper function for verbose logging
+function verboseLog(...args) {
+  if (VERBOSE_LOGGING) {
+    console.log('[VERBOSE]', ...args);
+  }
+}
+
 /**
  * Create transition indicator HTML with spinner and icons
  * @returns {string} - HTML markup for transition indicator
@@ -446,7 +456,7 @@ async function updateWorkflowVisualization() {
     
     const state = result.state;
     
-    console.log('[VERBOSE] Received workflow state:', {
+    verboseLog('Received workflow state:', {
       status: state.status,
       current_step: state.current_step,
       total_steps: state.steps?.length,
@@ -456,7 +466,7 @@ async function updateWorkflowVisualization() {
     // Log current step tasks if available
     if (state.steps?.[state.current_step]?.tasks) {
       const currentStepTasks = state.steps[state.current_step].tasks;
-      console.log('[VERBOSE] Current step tasks:', currentStepTasks.map(t => ({
+      verboseLog('Current step tasks:', currentStepTasks.map(t => ({
         name: t.name,
         status: t.status,
         clone_progress: t.clone_progress,
@@ -684,7 +694,7 @@ function renderTasklist(stepElement, stepData) {
       }
       
       if (progressInfo) {
-        console.log('[VERBOSE] Task progress info for', taskName, ':', progressInfo.trim());
+        verboseLog('Task progress info for', taskName, ':', progressInfo.trim());
       }
       
       tasklistHTML += `<li class="${taskItemClass}">
@@ -750,7 +760,7 @@ function buildProgressText(tasks, stepData) {
     return '';
   }
   
-  console.log('[VERBOSE] Building progress text for task:', runningTask.name, {
+  verboseLog('Building progress text for task:', runningTask.name, {
     clone_progress: runningTask.clone_progress,
     download_rate: runningTask.download_rate,
     data_received: runningTask.data_received,
@@ -791,7 +801,7 @@ function buildProgressText(tasks, stepData) {
   }
   
   const progressText = parts.join(' ');
-  console.log('[VERBOSE] Built progress text:', progressText);
+  verboseLog('Built progress text:', progressText);
   
   return progressText;
 }
