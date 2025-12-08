@@ -132,7 +132,7 @@ class SSHRsyncAdapter(TransportAdapter):
             "--compress-level=6",
             "--whole-file",
             "--update",
-            "--delete-after",
+            # NOTE: --delete flags removed - we only delete on source (remote), never destination (NAS)
             "--info=progress2",
             "--info=stats2",
             "--itemize-changes",
