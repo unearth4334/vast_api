@@ -86,6 +86,13 @@ def scan_models():
                 'message': 'ssh_connection is required'
             }), 400
         
+        # Convert dict to SSH connection string if needed
+        if isinstance(ssh_connection, dict):
+            host = ssh_connection.get('host')
+            port = ssh_connection.get('port', 22)
+            username = ssh_connection.get('username', 'root')
+            ssh_connection = f"ssh -p {port} {username}@{host}"
+        
         if not model_type:
             return jsonify({
                 'success': False,
