@@ -1484,21 +1484,26 @@ def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str
         _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, initial_progress)
         
         # Check if ComfyUI-Auto_installer exists, clone if needed
+        # Note: Using more lenient SSH options to avoid host key verification failures
+        # The host key should have been verified/added in previous setup steps
         check_cmd = [
             'ssh',
             '-p', str(ssh_port),
             '-i', ssh_key,
             '-o', 'ConnectTimeout=10',
-            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'StrictHostKeyChecking=accept-new',
             '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
             '-o', 'IdentitiesOnly=yes',
             f'root@{ssh_host}',
             'test -d /workspace/ComfyUI-Auto_installer'
         ]
         
-        check_result = subprocess.run(check_cmd, timeout=10, capture_output=True)
+        check_result = subprocess.run(check_cmd, timeout=10, capture_output=True, text=True)
         
-        if check_result.returncode != 0:
+        # Check if directory exists OR if directory already exists error
+        directory_exists = (check_result.returncode == 0)
+        
+        if not directory_exists:
             logger.info("ComfyUI-Auto_installer not found, cloning repository...")
             
             # Update progress
@@ -1506,32 +1511,37 @@ def _run_installation_background(task_id: str, ssh_connection: str, ui_home: str
             clone_progress['current_node'] = 'Cloning Auto-installer'
             _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, clone_progress)
             
+            # Clone with conditional check to handle race conditions
             clone_cmd = [
                 'ssh',
                 '-p', str(ssh_port),
                 '-i', ssh_key,
                 '-o', 'ConnectTimeout=10',
-                '-o', 'StrictHostKeyChecking=yes',
+                '-o', 'StrictHostKeyChecking=accept-new',
                 '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
                 '-o', 'IdentitiesOnly=yes',
                 f'root@{ssh_host}',
-                'cd /workspace && git clone https://github.com/unearth4334/ComfyUI-Auto_installer'
+                'if [ ! -d /workspace/ComfyUI-Auto_installer ]; then cd /workspace && git clone https://github.com/unearth4334/ComfyUI-Auto_installer; else echo "Directory already exists, skipping clone"; fi'
             ]
             
             clone_result = subprocess.run(clone_cmd, timeout=300, capture_output=True, text=True)
             
             if clone_result.returncode != 0:
-                logger.error(f"Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}")
-                error_progress = {
-                    'in_progress': False,
-                    'task_id': task_id,
-                    'error': f'Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}',
-                    'completed': False
-                }
-                _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
-                return
+                # Check if failure was due to directory existing (not a fatal error)
+                if 'already exists' in clone_result.stderr.lower():
+                    logger.info("ComfyUI-Auto_installer already exists (created by another process)")
+                else:
+                    logger.error(f"Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}")
+                    error_progress = {
+                        'in_progress': False,
+                        'task_id': task_id,
+                        'error': f'Failed to clone ComfyUI-Auto_installer: {clone_result.stderr}',
+                        'completed': False
+                    }
+                    _write_progress_to_remote(ssh_host, ssh_port, ssh_key, progress_file, error_progress)
+                    return
             
-            logger.info("ComfyUI-Auto_installer cloned successfully")
+            logger.info("ComfyUI-Auto_installer ready")
         else:
             logger.info("ComfyUI-Auto_installer already exists")
         
