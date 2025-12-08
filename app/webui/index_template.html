@@ -290,6 +290,18 @@
         <!-- Step 4: Execute -->
         <div id="create-execute-section" class="create-execute-section" style="display: none;">
             <h4 style="margin: 0 0 var(--size-4-3) 0;">▶️ Step 4: Execute</h4>
+            
+            <!-- Connection requirement notice -->
+            <div id="create-connection-notice" class="create-connection-notice" style="display: none; padding: var(--size-4-3); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-m); margin-bottom: var(--size-4-3); color: var(--text-error);">
+                <div style="display: flex; align-items: center; gap: var(--size-4-2);">
+                    <span style="font-size: 1.5em;">⚠️</span>
+                    <div>
+                        <strong>No Instance Connected</strong>
+                        <p style="margin: var(--size-4-1) 0 0 0; font-size: 0.9em;">Please connect to an instance using the connection toolbar above before executing workflows.</p>
+                    </div>
+                </div>
+            </div>
+            
             <div style="display: flex; gap: var(--size-4-2);">
                 <button id="create-execute-button" class="create-execute-button" onclick="executeWorkflow()">
                     <span>▶️</span> Run Workflow

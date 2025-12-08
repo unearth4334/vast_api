@@ -557,6 +557,24 @@ function showExecuteSection(show) {
     if (section) {
         section.style.display = show ? 'block' : 'none';
     }
+    
+    // Update connection notice visibility based on current connection state
+    if (show) {
+        updateConnectionNotice();
+    }
+}
+
+/**
+ * Update connection notice visibility based on toolbar connection state
+ */
+function updateConnectionNotice() {
+    const notice = document.getElementById('create-connection-notice');
+    if (!notice) return;
+    
+    const sshConnection = getCurrentSSHConnection();
+    
+    // Show notice only if no connection
+    notice.style.display = sshConnection ? 'none' : 'block';
 }
 
 /**
@@ -571,14 +589,20 @@ async function executeWorkflow() {
         return;
     }
     
-    // Get SSH connection string
-    const sshInput = document.getElementById('createSshConnectionString') || 
-                     document.getElementById('sshConnectionString') ||
-                     document.getElementById('resourcesSshConnectionString');
-    const sshConnection = sshInput?.value?.trim();
+    // Get SSH connection string from toolbar (or fallback to legacy inputs)
+    const sshConnection = getCurrentSSHConnection();
     
     if (!sshConnection) {
-        showCreateError('Please enter an SSH connection string');
+        showCreateError('Please connect to an instance using the connection toolbar above');
+        // Show connection notice
+        const notice = document.getElementById('create-connection-notice');
+        if (notice) {
+            notice.style.display = 'block';
+            // Hide notice after 5 seconds
+            setTimeout(() => {
+                notice.style.display = 'none';
+            }, 5000);
+        }
         return;
     }
     
@@ -688,6 +712,9 @@ function setupCreateTabEventListeners() {
             console.log('🔄 SSH connection changed in toolbar, updating Create tab components...');
             lastKnownConnection = currentConnection;
             CreateTabState.sshConnection = currentConnection;
+            
+            // Update connection notice visibility
+            updateConnectionNotice();
             
             // Update execution queue
             if (CreateTabState.executionQueue) {
@@ -1114,3 +1141,4 @@ window.updateComponentsSSHConnection = updateComponentsSSHConnection;
 window.refreshAllModelSelectors = refreshAllModelSelectors;
 window.renderWorkflowFormWithSections = renderWorkflowFormWithSections;
 window.refreshExecutionQueue = refreshExecutionQueue;
+window.updateConnectionNotice = updateConnectionNotice;
