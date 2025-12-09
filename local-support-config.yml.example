@@ -1,0 +1,124 @@
+# Local ComfyUI Support Configuration - Example
+# Copy this file to 'local-support-config.yml' and customize for your setup
+#
+# This configuration enables the container to execute workflows on a ComfyUI 
+# installation that is local to the container host.
+#
+# IMPORTANT: Run the appropriate setup script before using this configuration:
+#   - Linux:   sudo ./scripts/setup-local-host-linux.sh --comfyui-path /path/to/ComfyUI
+#   - Windows: .\scripts\setup-local-host-windows.bat -ComfyUIPath C:\Path\To\ComfyUI
+#
+# The setup script will generate a configuration file with the correct values.
+
+local_support:
+  # Enable or disable local support
+  # Set to true after running setup script
+  enabled: false
+  
+  # Display name for the local instance in the connection toolbar UI
+  # This name will appear alongside VastAI instances
+  display_name: "Local ComfyUI (Host)"
+  
+  # SSH connection details for connecting to the host
+  ssh:
+    # Host address for SSH connection
+    # - Use "host.docker.internal" for Docker Desktop (Mac/Windows)
+    # - Use "172.17.0.1" for Docker Engine on Linux
+    # - Or use the actual host IP address
+    host: "host.docker.internal"
+    
+    # SSH port on the host
+    # Default: 22022 (non-standard port to avoid conflicts)
+    port: 22022
+    
+    # SSH username for connection
+    # This should be the dedicated user created by the setup script
+    username: "comfyui"
+    
+    # Path to SSH private key inside the container
+    # This key file should be mounted as a Docker volume
+    # The setup script generates this key for you
+    private_key: "/root/.ssh/local_host_key"
+    
+  # ComfyUI installation details on the host
+  comfyui:
+    # Full absolute path to ComfyUI installation on the host
+    # Examples:
+    #   Linux:   /home/username/ComfyUI
+    #   Windows: C:/Users/username/ComfyUI
+    # Note: Use forward slashes (/) even on Windows when accessing via SSH
+    # The Windows setup script will convert the path automatically
+    home: "/home/user/ComfyUI"
+    
+    # Python executable to use for running ComfyUI
+    # Options:
+    #   - "python3" (system Python)
+    #   - "python" (on Windows)
+    #   - "/path/to/venv/bin/python" (virtual environment)
+    python_path: "python3"
+    
+    # Port where ComfyUI HTTP API runs
+    # Default: 8188 (ComfyUI default)
+    api_port: 8188
+    
+    # Whether to automatically start ComfyUI if it's not running
+    # If true, the container will start ComfyUI when executing workflows
+    # If false, ComfyUI must be manually started on the host
+    auto_start: true
+    
+  # File system paths on the host
+  paths:
+    # Where to sync output files from workflows (optional)
+    # If specified, workflow outputs will be copied back to this location
+    # Leave empty to disable output syncing
+    output_sync_path: "/home/user/ComfyUI/output"
+    
+    # Where models are stored on the host
+    # Used for resource installation and model management
+    models_path: "/home/user/ComfyUI/models"
+    
+    # Custom nodes directory on the host
+    # Used for installing custom nodes and extensions
+    custom_nodes_path: "/home/user/ComfyUI/custom_nodes"
+    
+  # Feature flags - enable or disable specific features
+  features:
+    # Allow workflow execution on this instance
+    workflow_execution: true
+    
+    # Allow installing resources (models, LoRAs, custom nodes, etc.)
+    resource_installation: true
+    
+    # Allow syncing outputs back to the container
+    output_sync: true
+    
+  # Resource limits and constraints (optional)
+  limits:
+    # Maximum number of concurrent workflow executions
+    # Recommended: 1 for most setups to avoid resource contention
+    max_concurrent_workflows: 1
+    
+    # Maximum file size for resource uploads (in MB)
+    # Large models like SDXL can be 5-10GB
+    max_upload_size_mb: 10000
+    
+    # Timeout for workflow execution (in seconds)
+    # 0 means no timeout
+    workflow_timeout_seconds: 3600
+
+# Additional notes:
+#
+# Security:
+#   - The SSH key should have strict permissions (600)
+#   - SSH port should be firewalled to accept only from Docker network
+#   - The dedicated user should have minimal permissions
+#
+# Networking:
+#   - Ensure the host's SSH server is accessible from the container
+#   - Test with: docker exec -it media-sync-api ssh -p 22022 comfyui@host.docker.internal
+#
+# Troubleshooting:
+#   - Check SSH logs: journalctl -u sshd-local-comfyui (Linux)
+#   - Verify key permissions: ls -la ~/.ssh/local_host_key
+#   - Test connection: ssh -i local_host_key -p 22022 comfyui@host.docker.internal
+#   - Check Docker network: docker network inspect bridge
