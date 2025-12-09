@@ -42,7 +42,13 @@ class HighLowPairModelSelector {
      * @param {string} sshConnection - SSH connection string
      */
     setSSHConnection(sshConnection) {
+        console.log(`[HighLowPairModelSelector] Setting SSH connection for ${this.id}:`, sshConnection);
         this.sshConnection = sshConnection;
+        // Auto-refresh if we now have a connection
+        if (sshConnection && !this.models.length) {
+            console.log(`[HighLowPairModelSelector] Auto-refreshing ${this.id} with new connection`);
+            this.refreshModels(false);
+        }
     }
 
     /**
@@ -166,6 +172,7 @@ class HighLowPairModelSelector {
                 }
             }
 
+            console.log(`[HighLowPairModelSelector] Scanned ${this.models.length} model pairs for ${this.id}:`, this.models);
             this._renderDropdownOptions();
             this._selectDefaultOrFirst();
 
