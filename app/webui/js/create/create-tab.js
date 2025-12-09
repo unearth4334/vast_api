@@ -1081,8 +1081,8 @@ function renderSectionBasedLayout(workflow, container) {
     const sshConnection = getCurrentSSHConnection();
     if (sshConnection) {
         updateComponentsSSHConnection(sshConnection);
-        // Auto-refresh model selectors
-        refreshAllModelSelectors(false);
+        // Note: updateComponentsSSHConnection triggers auto-refresh in each component's setSSHConnection
+        // so we don't need to call refreshAllModelSelectors here
     }
 }
 
