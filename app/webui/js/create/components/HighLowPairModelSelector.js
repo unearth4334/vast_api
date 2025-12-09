@@ -190,6 +190,8 @@ class HighLowPairModelSelector {
      * @private
      */
     _renderDropdownOptions() {
+        console.log(`[HighLowPairModelSelector] Rendering dropdown options for ${this.id}. Select element:`, this.selectElement, 'Models:', this.models);
+        
         // Clear existing options except first default option
         while (this.selectElement.options.length > 1) {
             this.selectElement.remove(1);
@@ -204,8 +206,11 @@ class HighLowPairModelSelector {
             if (model.size) {
                 option.textContent += ` (${this._formatSize(model.size)})`;
             }
+            console.log(`[HighLowPairModelSelector] Adding option ${i}:`, option.textContent);
             this.selectElement.appendChild(option);
         }
+        
+        console.log(`[HighLowPairModelSelector] Dropdown now has ${this.selectElement.options.length} options`);
     }
 
     /**
@@ -213,6 +218,8 @@ class HighLowPairModelSelector {
      * @private
      */
     _selectDefaultOrFirst() {
+        console.log(`[HighLowPairModelSelector] Selecting default/first for ${this.id}. Default high:`, this.defaultHigh, 'Default low:', this.defaultLow);
+        
         // Try to select default value
         if (this.defaultHigh || this.defaultLow) {
             const defaultIndex = this.models.findIndex(m => 
@@ -221,8 +228,10 @@ class HighLowPairModelSelector {
                 m.highNoisePath.includes(this.defaultHigh) ||
                 m.lowNoisePath.includes(this.defaultLow)
             );
+            console.log(`[HighLowPairModelSelector] Found default at index:`, defaultIndex);
             if (defaultIndex >= 0) {
                 this.selectElement.selectedIndex = defaultIndex + 1; // +1 for default option
+                console.log(`[HighLowPairModelSelector] Selected index ${defaultIndex + 1}`);
                 this._handleSelectionChange();
                 return;
             }
@@ -230,6 +239,7 @@ class HighLowPairModelSelector {
 
         // Select first model if required and no default
         if (this.required && this.models.length > 0) {
+            console.log(`[HighLowPairModelSelector] Selecting first model (required=true)`);
             this.selectElement.selectedIndex = 1;
             this._handleSelectionChange();
         }
