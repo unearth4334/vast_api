@@ -232,8 +232,13 @@ class HighLowPairModelSelector {
             );
             console.log(`[HighLowPairModelSelector] Found default at index:`, defaultIndex);
             if (defaultIndex >= 0) {
-                this.selectElement.selectedIndex = defaultIndex + 1; // +1 for default option
-                console.log(`[HighLowPairModelSelector] Selected index ${defaultIndex + 1}`);
+                const targetIndex = defaultIndex + 1; // +1 for default option
+                this.selectElement.selectedIndex = targetIndex;
+                console.log(`[HighLowPairModelSelector] Set selectedIndex to ${targetIndex}, actual value is now:`, this.selectElement.selectedIndex, 'Selected option:', this.selectElement.options[this.selectElement.selectedIndex]?.textContent);
+                // Force a repaint
+                this.selectElement.style.display = 'none';
+                this.selectElement.offsetHeight; // Force reflow
+                this.selectElement.style.display = '';
                 this._handleSelectionChange();
                 return;
             }
@@ -243,6 +248,11 @@ class HighLowPairModelSelector {
         if (this.required && this.models.length > 0) {
             console.log(`[HighLowPairModelSelector] Selecting first model (required=true)`);
             this.selectElement.selectedIndex = 1;
+            console.log(`[HighLowPairModelSelector] Set selectedIndex to 1, actual value is now:`, this.selectElement.selectedIndex);
+            // Force a repaint
+            this.selectElement.style.display = 'none';
+            this.selectElement.offsetHeight; // Force reflow
+            this.selectElement.style.display = '';
             this._handleSelectionChange();
         }
     }
