@@ -55,6 +55,8 @@ class InputConfig:
     field: Optional[str] = None
     fields: Optional[List[str]] = None
     default: Optional[Any] = None
+    default_high: Optional[str] = None
+    default_low: Optional[str] = None
     min: Optional[float] = None
     max: Optional[float] = None
     step: Optional[float] = None
