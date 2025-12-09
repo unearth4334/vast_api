@@ -62,6 +62,7 @@ ui_home_env: /workspace/ComfyUI
 model_discovery:
   base_paths:
     diffusion_models: "models/diffusion_models"
+    checkpoints: "models/checkpoints"
     loras: "models/Lora"  # Capital L for ComfyUI compatibility
     text_encoders: "models/text_encoders"
     vae: "models/vae"
