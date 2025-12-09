@@ -17,6 +17,7 @@ class HighLowPairModelSelector {
      * @param {Function} onChange - Callback when selection changes
      */
     constructor(config, onChange) {
+        console.log(`[HighLowPairModelSelector] Constructor called for ${config.id} with config:`, config);
         this.id = config.id;
         this.label = config.label || 'Model Pair';
         this.description = config.description || '';
@@ -25,6 +26,7 @@ class HighLowPairModelSelector {
         this.defaultLow = config.default_low || '';
         this.required = config.required || false;
         this.onChange = onChange || (() => {});
+        console.log(`[HighLowPairModelSelector] Parsed defaults - High: "${this.defaultHigh}", Low: "${this.defaultLow}"`);
         
         this.element = null;
         this.selectElement = null;
