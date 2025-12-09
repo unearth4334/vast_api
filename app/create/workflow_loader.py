@@ -239,6 +239,8 @@ class WorkflowLoader:
                     field=inp_data.get('field'),
                     fields=inp_data.get('fields'),
                     default=inp_data.get('default'),
+                    default_high=inp_data.get('default_high'),
+                    default_low=inp_data.get('default_low'),
                     min=inp_data.get('min'),
                     max=inp_data.get('max'),
                     step=inp_data.get('step'),
