@@ -283,7 +283,9 @@ generate_ssh_keys() {
     fi
     
     # Generate ED25519 key (modern, secure, fast)
-    ssh-keygen -t ed25519 -f "$key_path" -N "" -C "comfyui-local-container@$(hostname)"
+    if ! ssh-keygen -t ed25519 -f "$key_path" -N "" -C "comfyui-local-container@$(hostname)"; then
+        error "Failed to generate SSH key. Check that ssh-keygen is installed and you have write permissions."
+    fi
     
     # Set proper permissions
     chmod 600 "$key_path"
@@ -474,11 +476,15 @@ generate_config() {
     local config_file="$OUTPUT_DIR/local-support-config.yml"
     
     # Detect if using Docker Desktop or Docker Engine
+    # Note: This detection is best-effort. Verify the host address works for your setup.
     local docker_host="host.docker.internal"
     if ! grep -q "docker" /proc/1/cgroup 2>/dev/null; then
-        # Running on host, likely Docker Engine
+        # Running on host, likely Docker Engine (use bridge IP)
         docker_host="172.17.0.1"
     fi
+    
+    warn "Detected Docker host: $docker_host"
+    warn "If you're using a custom Docker network, update the 'host' value in local-support-config.yml"
     
     cat > "$config_file" << EOF
 # Local ComfyUI Support Configuration

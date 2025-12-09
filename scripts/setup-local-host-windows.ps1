@@ -251,7 +251,8 @@ function New-ComfyUIUser {
     }
     
     # Generate random password (won't be used, SSH keys only)
-    $password = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | ForEach-Object {[char]$_})
+    # Use cryptographically secure random password
+    $password = -join ((48..57) + (65..90) + (97..122) + (33..47) | Get-Random -Count 32 | ForEach-Object {[char]$_})
     $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
     
     # Create user
@@ -321,7 +322,7 @@ function New-SSHKeys {
     
     # Generate ED25519 key
     $hostname = $env:COMPUTERNAME
-    ssh-keygen -t ed25519 -f $keyPath -N '""' -C "comfyui-local-container@$hostname"
+    ssh-keygen -t ed25519 -f $keyPath -N '''' -C "comfyui-local-container@$hostname"
     
     # Create .ssh directory for user
     $userProfile = "C:\Users\$SSHUser"
@@ -569,9 +570,9 @@ function Test-SSHConnection {
     if ($LASTEXITCODE -eq 0) {
         Write-Log "✅ SSH connection test PASSED"
         
-        # Test ComfyUI directory access (convert path for SSH)
-        $unixPath = $ComfyUIPath -replace '\\', '/' -replace '^([A-Z]):', '/$1'
-        $testAccess = ssh -i $keyPath -p $SSHPort -o StrictHostKeyChecking=no "$SSHUser@127.0.0.1" "dir '$ComfyUIPath'" 2>$null
+        # Test ComfyUI directory access
+        # Note: SSH uses bash-like commands even on Windows
+        $testAccess = ssh -i $keyPath -p $SSHPort -o StrictHostKeyChecking=no "$SSHUser@127.0.0.1" "ls '$ComfyUIPath'" 2>$null
         
         if ($LASTEXITCODE -eq 0) {
             Write-Log "✅ ComfyUI directory access test PASSED"

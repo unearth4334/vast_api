@@ -45,7 +45,9 @@ local_support:
     # Full absolute path to ComfyUI installation on the host
     # Examples:
     #   Linux:   /home/username/ComfyUI
-    #   Windows: C:/Users/username/ComfyUI (use forward slashes)
+    #   Windows: C:/Users/username/ComfyUI
+    # Note: Use forward slashes (/) even on Windows when accessing via SSH
+    # The Windows setup script will convert the path automatically
     home: "/home/user/ComfyUI"
     
     # Python executable to use for running ComfyUI
