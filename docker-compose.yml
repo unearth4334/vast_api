@@ -10,6 +10,7 @@ services:
       - "${API_KEY_PATH}:/app/api_key.txt:ro"
       - vast_api_logs:/app/logs
       - vast_api_downloads:/app/downloads
+      - vast_api_workflow_history:/app/data/workflow_history
       - ./resources:/app/resources
       - ./workflows:/app/workflows
     environment:
@@ -37,4 +38,6 @@ volumes:
   vast_api_logs:
     driver: local
   vast_api_downloads:
+    driver: local
+  vast_api_workflow_history:
     driver: local
