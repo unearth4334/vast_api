@@ -1692,12 +1692,45 @@
     overflow: hidden;
     cursor: pointer;
     transition: all 0.2s ease;
+    position: relative;
 }
 
 .history-tile:hover {
     border-color: var(--interactive-accent);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px var(--background-modifier-box-shadow);
+}
+
+/* Stacked tile appearance - creates visual effect of multiple tiles */
+.history-tile-stacked {
+    /* Add pseudo-elements to create stacked effect */
+}
+
+.history-tile-stacked::before,
+.history-tile-stacked::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    height: 100%;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-primary);
+    z-index: -1;
+}
+
+.history-tile-stacked::before {
+    top: -4px;
+}
+
+.history-tile-stacked::after {
+    top: -8px;
+    opacity: 0.6;
+}
+
+.history-tile-stacked:hover::before,
+.history-tile-stacked:hover::after {
+    border-color: var(--interactive-accent);
 }
 
 .history-tile-image {
@@ -1708,6 +1741,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    position: relative;
 }
 
 .history-tile-thumbnail {
@@ -1719,6 +1753,22 @@
 .history-tile-no-thumbnail {
     font-size: 48px;
     color: var(--text-muted);
+}
+
+/* Count badge for collapsed tiles */
+.history-tile-count-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-size: var(--font-ui-small);
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    pointer-events: none;
 }
 
 .history-tile-info {

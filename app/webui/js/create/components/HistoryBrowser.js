@@ -125,6 +125,75 @@ export class HistoryBrowser {
     }
 
     /**
+     * Group consecutive identical records (except timestamp and seed)
+     * @param {Array} records - Array of history records
+     * @returns {Array} Array of grouped records with count
+     */
+    groupConsecutiveRecords(records) {
+        if (records.length === 0) return [];
+
+        const grouped = [];
+        let currentGroup = {
+            representative: records[0],
+            records: [records[0]],
+            count: 1
+        };
+
+        for (let i = 1; i < records.length; i++) {
+            const current = records[i];
+            const previous = records[i - 1];
+
+            // Check if records are identical except timestamp and seed
+            if (this.areRecordsIdentical(current, previous)) {
+                currentGroup.records.push(current);
+                currentGroup.count++;
+            } else {
+                // Push the completed group
+                grouped.push(currentGroup);
+                // Start a new group
+                currentGroup = {
+                    representative: current,
+                    records: [current],
+                    count: 1
+                };
+            }
+        }
+
+        // Don't forget the last group
+        grouped.push(currentGroup);
+
+        return grouped;
+    }
+
+    /**
+     * Check if two records are identical except for timestamp and seed
+     * @param {Object} record1 - First record
+     * @param {Object} record2 - Second record
+     * @returns {boolean} True if records are identical (ignoring timestamp and seed)
+     */
+    areRecordsIdentical(record1, record2) {
+        // Must have same workflow_id
+        if (record1.workflow_id !== record2.workflow_id) {
+            return false;
+        }
+
+        // Compare inputs, excluding seed values
+        const inputs1 = { ...record1.inputs };
+        const inputs2 = { ...record2.inputs };
+
+        // Remove seed-related fields (common names: seed, random_seed, noise_seed)
+        delete inputs1.seed;
+        delete inputs2.seed;
+        delete inputs1.random_seed;
+        delete inputs2.random_seed;
+        delete inputs1.noise_seed;
+        delete inputs2.noise_seed;
+
+        // Compare remaining inputs
+        return JSON.stringify(inputs1) === JSON.stringify(inputs2);
+    }
+
+    /**
      * Render history records as tiles
      */
     renderRecords() {
@@ -142,10 +211,13 @@ export class HistoryBrowser {
         grid.style.display = 'grid';
         empty.style.display = 'none';
 
+        // Group consecutive identical records
+        const groupedRecords = this.groupConsecutiveRecords(this.records);
+
         // Clear grid and render tiles using DOM methods for security
         grid.innerHTML = '';
-        this.records.forEach(record => {
-            const tile = this.createRecordTile(record);
+        groupedRecords.forEach(group => {
+            const tile = this.createRecordTile(group.representative, group.count, group.records);
             grid.appendChild(tile);
         });
 
@@ -159,10 +231,12 @@ export class HistoryBrowser {
 
     /**
      * Create a single history record tile element
-     * @param {Object} record - History record
+     * @param {Object} record - History record (representative of the group)
+     * @param {number} count - Number of identical consecutive records
+     * @param {Array} allRecords - All records in this group (for potential future use)
      * @returns {HTMLElement} Tile element
      */
-    createRecordTile(record) {
+    createRecordTile(record, count = 1, allRecords = [record]) {
         const timestamp = this.formatTimestamp(record.timestamp);
         const thumbnailUrl = record.thumbnail 
             ? `/create/thumbnail/${encodeURIComponent(record.thumbnail)}`
@@ -171,6 +245,11 @@ export class HistoryBrowser {
         // Create tile container
         const tile = document.createElement('div');
         tile.className = 'history-tile';
+        
+        // Add stacked class if count > 1
+        if (count > 1) {
+            tile.classList.add('history-tile-stacked');
+        }
         
         // Add click handler securely
         tile.addEventListener('click', () => {
@@ -192,6 +271,14 @@ export class HistoryBrowser {
             noThumb.className = 'history-tile-no-thumbnail';
             noThumb.textContent = '📷';
             imageContainer.appendChild(noThumb);
+        }
+
+        // Add count badge if count > 1
+        if (count > 1) {
+            const countBadge = document.createElement('div');
+            countBadge.className = 'history-tile-count-badge';
+            countBadge.textContent = `x${count}`;
+            imageContainer.appendChild(countBadge);
         }
 
         // Create info container
