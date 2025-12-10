@@ -189,8 +189,18 @@ export class HistoryBrowser {
         delete inputs1.noise_seed;
         delete inputs2.noise_seed;
 
+        // Sort keys to ensure consistent JSON comparison
+        const sortedInputs1 = Object.keys(inputs1).sort().reduce((acc, key) => {
+            acc[key] = inputs1[key];
+            return acc;
+        }, {});
+        const sortedInputs2 = Object.keys(inputs2).sort().reduce((acc, key) => {
+            acc[key] = inputs2[key];
+            return acc;
+        }, {});
+
         // Compare remaining inputs
-        return JSON.stringify(inputs1) === JSON.stringify(inputs2);
+        return JSON.stringify(sortedInputs1) === JSON.stringify(sortedInputs2);
     }
 
     /**
@@ -235,6 +245,9 @@ export class HistoryBrowser {
      * @param {number} count - Number of identical consecutive records
      * @param {Array} allRecords - All records in this group (for potential future use)
      * @returns {HTMLElement} Tile element
+     * 
+     * Note: When clicking a collapsed tile, the representative (most recent) record is selected.
+     * Future enhancement: Could provide UI to select from all grouped records.
      */
     createRecordTile(record, count = 1, allRecords = [record]) {
         const timestamp = this.formatTimestamp(record.timestamp);
