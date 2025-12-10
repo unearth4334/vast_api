@@ -5,6 +5,7 @@
  */
 
 import { ExecutionQueue } from './components/ExecutionQueue.js';
+import { HistoryBrowser } from './components/HistoryBrowser.js';
 
 // Create Tab state
 const CreateTabState = {
@@ -19,7 +20,9 @@ const CreateTabState = {
     // Current SSH connection
     sshConnection: null,
     // Execution queue component
-    executionQueue: null
+    executionQueue: null,
+    // History browser component
+    historyBrowser: null
 };
 
 /**
@@ -36,6 +39,16 @@ async function initCreateTab() {
         window.executionQueueInstance = CreateTabState.executionQueue;
     } catch (error) {
         console.error('Error initializing ExecutionQueue:', error);
+    }
+    
+    try {
+        // Initialize HistoryBrowser component
+        CreateTabState.historyBrowser = new HistoryBrowser('history-browser-container', onHistoryRecordSelected);
+        
+        // Expose globally for onclick handlers
+        window.historyBrowserInstance = CreateTabState.historyBrowser;
+    } catch (error) {
+        console.error('Error initializing HistoryBrowser:', error);
     }
     
     // Load workflows
@@ -1190,6 +1203,191 @@ async function refreshExecutionQueue() {
     }
 }
 
+/**
+ * Open workflow history browser
+ */
+function openHistoryBrowser() {
+    if (!CreateTabState.selectedWorkflow) {
+        showCreateError('Please select a workflow first');
+        return;
+    }
+    
+    if (CreateTabState.historyBrowser) {
+        CreateTabState.historyBrowser.open(CreateTabState.selectedWorkflow);
+    }
+}
+
+/**
+ * Handle history record selection
+ * @param {Object} record - History record with inputs
+ */
+function onHistoryRecordSelected(record) {
+    console.log('Loading history record:', record);
+    
+    // Ensure the correct workflow is selected
+    if (record.workflow_id !== CreateTabState.selectedWorkflow) {
+        console.warn('History record is for different workflow, switching...');
+        selectWorkflow(record.workflow_id)
+            .then(() => {
+                populateFormFromHistory(record);
+            })
+            .catch((error) => {
+                console.error('Failed to switch workflow:', error);
+                showCreateError(`Failed to load workflow: ${error.message}`);
+            });
+    } else {
+        populateFormFromHistory(record);
+    }
+}
+
+/**
+ * Populate form with values from history record
+ * @param {Object} record - History record
+ */
+function populateFormFromHistory(record) {
+    const inputs = record.inputs || {};
+    
+    // Clear current form values
+    CreateTabState.formValues = {};
+    
+    // Populate each field
+    for (const [fieldId, value] of Object.entries(inputs)) {
+        const fieldElement = document.getElementById(`create-field-${fieldId}`);
+        
+        if (!fieldElement) {
+            console.warn(`Field element not found: ${fieldId}`);
+            continue;
+        }
+        
+        // Handle different field types
+        const field = findFieldById(fieldId);
+        if (!field) continue;
+        
+        switch (field.type) {
+            case 'image':
+                // Restore image upload
+                if (value && typeof value === 'string' && value.startsWith('data:image/')) {
+                    // Simulate file upload by setting the value and triggering preview
+                    handleImageUploadFromData(fieldId, value);
+                }
+                break;
+                
+            case 'textarea':
+            case 'text':
+                fieldElement.value = value || '';
+                updateFormValue(fieldId, value);
+                break;
+                
+            case 'slider':
+                fieldElement.value = value || field.default || 0;
+                const valueInput = document.getElementById(`create-field-${fieldId}-value`);
+                if (valueInput) {
+                    valueInput.value = value || field.default || 0;
+                }
+                updateFormValue(fieldId, value);
+                break;
+                
+            case 'seed':
+                fieldElement.value = value || -1;
+                updateFormValue(fieldId, value);
+                break;
+                
+            case 'checkbox':
+                fieldElement.checked = !!value;
+                updateFormValue(fieldId, !!value);
+                break;
+                
+            case 'select':
+                fieldElement.value = value || '';
+                updateFormValue(fieldId, value);
+                break;
+                
+            default:
+                // For advanced components, we need to restore their state
+                const component = CreateTabState.componentInstances.get(fieldId);
+                if (component && typeof component.setValue === 'function') {
+                    component.setValue(value);
+                }
+                updateFormValue(fieldId, value);
+        }
+    }
+    
+    showCreateSuccess('History record loaded successfully!');
+}
+
+/**
+ * Find field definition by ID
+ * @param {string} fieldId - Field ID
+ * @returns {Object|null} Field definition
+ */
+function findFieldById(fieldId) {
+    if (!CreateTabState.workflowDetails) return null;
+    
+    const allFields = [
+        ...(CreateTabState.workflowDetails.inputs || []),
+        ...(CreateTabState.workflowDetails.advanced || [])
+    ];
+    
+    return allFields.find(f => f.id === fieldId);
+}
+
+/**
+ * Handle image upload from base64 data (for history restoration)
+ * @param {string} fieldId - Field ID
+ * @param {string} base64Data - Base64 image data
+ */
+function handleImageUploadFromData(fieldId, base64Data) {
+    const container = document.getElementById(`create-field-${fieldId}-container`);
+    if (!container) return;
+    
+    // Clear container properly by removing children
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
+    
+    // Create file input
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = `create-field-${fieldId}`;
+    fileInput.accept = 'image/*';
+    fileInput.addEventListener('change', function() {
+        handleImageUpload(fieldId, this);
+    });
+    
+    // Create preview image
+    const img = document.createElement('img');
+    img.src = base64Data;
+    img.className = 'image-upload-preview';
+    img.alt = 'Preview';
+    
+    // Create clear button
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'image-upload-clear';
+    clearBtn.title = 'Remove';
+    clearBtn.textContent = '✕';
+    clearBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        clearImageUpload(fieldId);
+    });
+    
+    container.appendChild(fileInput);
+    container.appendChild(img);
+    container.appendChild(clearBtn);
+    container.classList.add('has-image');
+    
+    // Re-add click handler
+    container.onclick = function(e) {
+        if (e.target === clearBtn || e.target.closest('.image-upload-clear')) {
+            return;
+        }
+        fileInput.click();
+    };
+    
+    // Store value
+    updateFormValue(fieldId, base64Data);
+}
+
 // Export for use in HTML
 window.initCreateTab = initCreateTab;
 window.loadWorkflows = loadWorkflows;
@@ -1210,3 +1408,6 @@ window.refreshAllModelSelectors = refreshAllModelSelectors;
 window.renderWorkflowFormWithSections = renderWorkflowFormWithSections;
 window.refreshExecutionQueue = refreshExecutionQueue;
 window.updateConnectionNotice = updateConnectionNotice;
+// History browser exports
+window.openHistoryBrowser = openHistoryBrowser;
+window.onHistoryRecordSelected = onHistoryRecordSelected;

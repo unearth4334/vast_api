@@ -279,7 +279,17 @@
         
         <!-- Step 3: Configure Inputs -->
         <div class="workflow-tile">
-            <h4 class="tile-header">📝 Step 3: Configure Inputs</h4>
+            <div class="workflow-editor-header">
+                <div class="workflow-editor-header-left">
+                    <h4 class="tile-header">📝 Step 3: Configure Inputs</h4>
+                </div>
+                <div class="workflow-editor-header-right">
+                    <button class="history-button" onclick="openHistoryBrowser()" title="Open workflow history">
+                        <span class="history-button-icon">📜</span>
+                        History
+                    </button>
+                </div>
+            </div>
             <div class="tile-content">
                 <div id="create-form-container" class="create-form-container" style="display: none;">
                     <!-- Form will be dynamically generated here -->
@@ -472,9 +482,10 @@
     <script src="js/create/components/HighLowPairModelSelector.js?v=20251208-v1"></script>
     <script src="js/create/components/HighLowPairLoRASelector.js?v=20251208-v1"></script>
     <script src="js/create/components/ExecutionQueue.js?v=20251208-v1" type="module"></script>
+    <script src="js/create/components/HistoryBrowser.js?v=20251210-v1" type="module"></script>
     
     <!-- Create Tab -->
-    <script src="js/create/create-tab.js?v=20251208-v1" type="module"></script>
+    <script src="js/create/create-tab.js?v=20251210-v1" type="module"></script>
     
     <!-- Legacy Support (temporary) -->
     <script src="js/vastai.js?v=20251116-v2"></script>
