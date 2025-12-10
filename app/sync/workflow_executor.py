@@ -174,7 +174,12 @@ class WorkflowExecutor:
                                     logger.info(f"Workflow resumed, retrying step {step_index + 1}")
                                     state['steps'][step_index]['status'] = 'in_progress'
                                     state_manager.save_state(state)
-                                    success, error_message = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index, instance_id)
+                                    result = self._execute_step(step, ssh_connection, state_manager, workflow_id, step_index, instance_id)
+                                    # Handle both 2 and 3 element tuples
+                                    if isinstance(result, tuple) and len(result) == 3:
+                                        success, error_message, _ = result
+                                    else:
+                                        success, error_message = result
                                     break
                                 elif state.get('status') == 'cancelled':
                                     logger.info(f"Workflow {workflow_id} cancelled during blocked state")
@@ -894,8 +899,11 @@ class WorkflowExecutor:
                             clone_progress = progress_data.get('clone_progress')
                             download_rate = progress_data.get('download_rate')
                             data_received = progress_data.get('data_received')
+                            total_size = progress_data.get('total_size')
+                            elapsed_time = progress_data.get('elapsed_time')
+                            eta = progress_data.get('eta')
                             
-                            logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}, clone: {clone_progress}%")
+                            logger.info(f"Node progress: {processed}/{total_nodes_count}, current: {current_node}, status: {node_status}, clone: {clone_progress}%, rate: {download_rate}, received: {data_received}, elapsed: {elapsed_time}, eta: {eta}")
                             
                             # Mark all previously seen nodes as success (they're completed if we've moved past them)
                             for prev_node in nodes_seen:
@@ -954,9 +962,20 @@ class WorkflowExecutor:
                                                 status = node_statuses.get(node, 'success')
                                                 node_task = {'name': node, 'status': status}
                                                 
-                                                # Add clone progress if this is the current node and it's cloning
-                                                if node == current_node and clone_progress is not None:
-                                                    node_task['clone_progress'] = clone_progress
+                                                # Add progress stats if this is the current node
+                                                if node == current_node:
+                                                    if clone_progress is not None:
+                                                        node_task['clone_progress'] = clone_progress
+                                                    if download_rate:
+                                                        node_task['download_rate'] = download_rate
+                                                    if data_received:
+                                                        node_task['data_received'] = data_received
+                                                    if total_size:
+                                                        node_task['total_size'] = total_size
+                                                    if elapsed_time:
+                                                        node_task['elapsed_time'] = elapsed_time
+                                                    if eta:
+                                                        node_task['eta'] = eta
                                                 
                                                 # Add sub-task for requirements if this node has them
                                                 if node == current_node and has_requirements and requirements_status:
@@ -1023,6 +1042,12 @@ class WorkflowExecutor:
                                                         node_task['download_rate'] = download_rate
                                                     if data_received:
                                                         node_task['data_received'] = data_received
+                                                    if total_size:
+                                                        node_task['total_size'] = total_size
+                                                    if elapsed_time:
+                                                        node_task['elapsed_time'] = elapsed_time
+                                                    if eta:
+                                                        node_task['eta'] = eta
                                                 
                                                 # Add sub-task for requirements if this node has them
                                                 if node == current_node and has_requirements and requirements_status:
@@ -1060,6 +1085,12 @@ class WorkflowExecutor:
                                                         node_task['download_rate'] = download_rate
                                                     if data_received:
                                                         node_task['data_received'] = data_received
+                                                    if total_size:
+                                                        node_task['total_size'] = total_size
+                                                    if elapsed_time:
+                                                        node_task['elapsed_time'] = elapsed_time
+                                                    if eta:
+                                                        node_task['eta'] = eta
                                                 
                                                 # Add sub-task for requirements if this node has them
                                                 if node == current_node and has_requirements and requirements_status:

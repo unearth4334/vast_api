@@ -5,6 +5,14 @@
 # DESCRIPTION
 #     This script installs custom nodes for an existing ComfyUI installation.
 #     It expects ComfyUI to already be installed with a virtual environment.
+#
+# USAGE
+#     ./install-custom-nodes.sh <comfy_path> [--venv-path <path>] [--progress-file <path>] [--verbose]
+#
+# OPTIONS
+#     --venv-path <path>      Path to custom Python virtual environment
+#     --progress-file <path>  Path to custom progress JSON file
+#     --verbose               Enable verbose logging for debugging progress statistics
 
 #===========================================================================
 # SECTION 1: SCRIPT CONFIGURATION & HELPER FUNCTIONS
@@ -19,6 +27,7 @@ fi
 COMFY_PATH="$1"
 CUSTOM_VENV_PATH=""
 CUSTOM_PROGRESS_FILE=""
+VERBOSE=false
 
 # Check for optional venv-path argument
 if [ $# -ge 3 ] && [ "$2" = "--venv-path" ]; then
@@ -28,6 +37,11 @@ fi
 # Check for optional progress-file argument
 if [ $# -ge 5 ] && [ "$4" = "--progress-file" ]; then
     CUSTOM_PROGRESS_FILE="$5"
+fi
+
+# Check for optional verbose flag
+if [[ " $* " =~ " --verbose " ]]; then
+    VERBOSE=true
 fi
 
 # Derive other paths from ComfyUI root and script location
@@ -71,6 +85,24 @@ fi
 # Create logs directory if it doesn't exist
 mkdir -p "$LOG_PATH"
 
+# Verbose logging function
+verbose_log() {
+    if [ "$VERBOSE" = true ]; then
+        # Portable timestamp with milliseconds (use nanoseconds and truncate)
+        local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+        local nanos=$(date "+%N" 2>/dev/null || echo "000000000")
+        # Validate nanos is at least 3 chars and extract first 3 digits
+        if [ ${#nanos} -ge 3 ]; then
+            local millis=${nanos:0:3}
+        else
+            local millis="000"
+        fi
+        timestamp="${timestamp}.${millis}"
+        echo "[VERBOSE $timestamp] $*" >&2
+        echo "[VERBOSE $timestamp] $*" >> "$LOG_FILE"
+    fi
+}
+
 # Write a structured log entry for progress parsing
 write_progress_log() {
     local event_type="$1"
@@ -81,6 +113,8 @@ write_progress_log() {
     
     # Format: [TIMESTAMP] EVENT_TYPE|NODE_NAME|STATUS|MESSAGE
     echo "[$timestamp] $event_type|$node_name|$status|$message" >> "$PROGRESS_LOG"
+    
+    verbose_log "Progress log: event=$event_type, node=$node_name, status=$status, message=$message"
 }
 
 # Write JSON progress file for real-time tracking
@@ -143,11 +177,19 @@ write_json_progress_with_stats() {
     local clone_progress="${10:-}"
     local download_rate="${11:-}"
     local data_received="${12:-}"
+    local total_size="${13:-}"
+    local elapsed_time="${14:-}"
+    local eta="${15:-}"
+    
+    verbose_log "Writing progress JSON: node='$current_node', status='$current_status', progress=$clone_progress%, rate='$download_rate', received='$data_received', size='$total_size', elapsed='$elapsed_time', eta='$eta'"
     
     # Escape node name and strings for JSON (replace quotes with escaped quotes)
     local escaped_node=$(echo "$current_node" | sed 's/"/\\"/g')
     local escaped_rate=$(echo "$download_rate" | sed 's/"/\\"/g')
     local escaped_data=$(echo "$data_received" | sed 's/"/\\"/g')
+    local escaped_total_size=$(echo "$total_size" | sed 's/"/\\"/g')
+    local escaped_elapsed=$(echo "$elapsed_time" | sed 's/"/\\"/g')
+    local escaped_eta=$(echo "$eta" | sed 's/"/\\"/g')
     
     # Determine completion status
     local completed="false"
@@ -176,7 +218,10 @@ write_json_progress_with_stats() {
   \"requirements_status\": \"$requirements_status\"" || echo "")$([ -n "$clone_progress" ] && echo ",
   \"clone_progress\": $clone_progress" || echo "")$([ -n "$download_rate" ] && echo ",
   \"download_rate\": \"$escaped_rate\"" || echo "")$([ -n "$data_received" ] && echo ",
-  \"data_received\": \"$escaped_data\"" || echo "")
+  \"data_received\": \"$escaped_data\"" || echo "")$([ -n "$total_size" ] && echo ",
+  \"total_size\": \"$escaped_total_size\"" || echo "")$([ -n "$elapsed_time" ] && echo ",
+  \"elapsed_time\": \"$escaped_elapsed\"" || echo "")$([ -n "$eta" ] && echo ",
+  \"eta\": \"$escaped_eta\"" || echo "")
 }
 EOF
 }
@@ -191,40 +236,154 @@ clone_with_progress() {
     local successful="$6"
     local failed="$7"
     
-    # Patterns for parsing git clone output
-    local progress_pattern='Receiving objects:[[:space:]]*([0-9]+)%'
-    local data_rate_pattern='([0-9.]+[[:space:]]+(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]+(KiB|MiB|GiB)/s)'
-    local data_only_pattern='([0-9.]+[[:space:]]+(KiB|MiB|GiB))'
+    # Track start time for elapsed time and ETA calculation
+    local start_time=$(date +%s)
+    local last_progress=0
+    local last_update_time=$start_time
+    local last_eta_calc_time=$start_time
+    local ETA_UPDATE_INTERVAL=3  # Update ETA calculation every 3 seconds to reduce overhead
     
     # Run git clone with progress output
     git clone --progress --depth 1 "$repo_url" "$target_path" 2>&1 | while IFS= read -r line; do
-        # Git outputs progress like: "Receiving objects: 45% (123/456), 2.5 MiB | 1.2 MiB/s"
+        # Git outputs progress in multiple phases:
+        # 1. "Receiving objects: X% (a/b)" - downloading data (0-50% of total)
+        # 2. "Resolving deltas: X% (a/b)" - processing deltas (50-100% of total)
+        # We'll combine these phases into a single 0-100% progress
         local progress=""
         local download_rate=""
         local data_received=""
+        local total_size=""
+        local object_count=""
+        local total_objects=""
+        local phase_progress=""
         
-        # Extract percentage (e.g., "Receiving objects: 45%")
-        if [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)% ]]; then
-            progress="${BASH_REMATCH[1]}"
+        # Extract percentage from "Receiving objects" phase (maps to 0-50%)
+        if [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)%[[:space:]]*\(([0-9]+)/([0-9]+)\) ]]; then
+            phase_progress="${BASH_REMATCH[1]}"
+            object_count="${BASH_REMATCH[2]}"
+            total_objects="${BASH_REMATCH[3]}"
+            # Map 0-100% of receiving phase to 0-50% overall progress
+            progress=$((phase_progress / 2))
+            verbose_log "Parsed git progress (receiving): ${phase_progress}% -> overall ${progress}% ($object_count/$total_objects objects)"
+        elif [[ "$line" =~ Receiving[[:space:]]+objects:[[:space:]]*([0-9]+)% ]]; then
+            phase_progress="${BASH_REMATCH[1]}"
+            progress=$((phase_progress / 2))
+            verbose_log "Parsed git progress (receiving): ${phase_progress}% -> overall ${progress}%"
+        # Extract percentage from "Resolving deltas" phase (maps to 50-100%)
+        elif [[ "$line" =~ Resolving[[:space:]]+deltas:[[:space:]]*([0-9]+)%[[:space:]]*\(([0-9]+)/([0-9]+)\) ]]; then
+            phase_progress="${BASH_REMATCH[1]}"
+            local delta_count="${BASH_REMATCH[2]}"
+            local total_deltas="${BASH_REMATCH[3]}"
+            # Map 0-100% of resolving phase to 50-100% overall progress
+            progress=$((50 + phase_progress / 2))
+            verbose_log "Parsed git progress (resolving): ${phase_progress}% -> overall ${progress}% ($delta_count/$total_deltas deltas)"
+        elif [[ "$line" =~ Resolving[[:space:]]+deltas:[[:space:]]*([0-9]+)% ]]; then
+            phase_progress="${BASH_REMATCH[1]}"
+            progress=$((50 + phase_progress / 2))
+            verbose_log "Parsed git progress (resolving): ${phase_progress}% -> overall ${progress}%"
         fi
         
-        # Extract data and rate (e.g., "2.5 MiB | 1.2 MiB/s")
-        if [[ "$line" =~ ([0-9.]+[[:space:]]+(KiB|MiB|GiB))[[:space:]]*\|[[:space:]]*([0-9.]+[[:space:]]+(KiB|MiB|GiB)/s) ]]; then
-            data_received="${BASH_REMATCH[1]}"
-            download_rate="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}"
-        elif [[ "$line" =~ ([0-9.]+[[:space:]]+(KiB|MiB|GiB)) ]] && [[ ! "$line" =~ /s ]]; then
-            # Just data received, no rate yet
-            data_received="${BASH_REMATCH[1]}"
+        # Extract data and rate with better precision
+        # Note: Git uses binary units (KiB, MiB, GiB) which are consistent with our display format
+        # Pattern 1: "2.5 MiB | 1.2 MiB/s" (includes both data and rate)
+        if [[ "$line" =~ ([0-9.]+)[[:space:]]+(KiB|MiB|GiB)[[:space:]]*\|[[:space:]]*([0-9.]+)[[:space:]]+(KiB|MiB|GiB)/s ]]; then
+            data_received="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+            download_rate="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}/s"
+            verbose_log "Parsed git data: received=$data_received, rate=$download_rate"
+        # Pattern 2: Just data received (no rate yet)
+        elif [[ "$line" =~ ([0-9.]+)[[:space:]]+(KiB|MiB|GiB) ]] && [[ ! "$line" =~ /s ]]; then
+            data_received="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
         fi
         
-        # Update JSON progress with clone statistics
+        # Extract total size if present (e.g., "done. Total 456 (delta 123), reused 234 (delta 45), pack-reused 0, pack size 5.2 MiB")
+        if [[ "$line" =~ pack[[:space:]]*size[[:space:]]+([0-9.]+)[[:space:]]+(KiB|MiB|GiB) ]]; then
+            total_size="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+        fi
+        
+        # Calculate elapsed time and ETA
+        local current_time=$(date +%s)
+        local elapsed=$((current_time - start_time))
+        local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+        local eta_str=""
+        
+        # Calculate ETA based on progress using bash arithmetic (avoid bc dependency)
+        # Rate-limit ETA calculation to every few seconds to reduce overhead
+        if [ -n "$progress" ] && [ "$progress" -gt 0 ] && [ "$progress" -lt 100 ]; then
+            # Only calculate ETA if we have meaningful progress and enough time has passed
+            local time_since_last_eta=$((current_time - last_eta_calc_time))
+            if [ "$time_since_last_eta" -ge "$ETA_UPDATE_INTERVAL" ] && [ "$progress" -gt "$last_progress" ]; then
+                local time_diff=$((current_time - last_update_time))
+                # Safeguard against division by zero
+                if [ "$time_diff" -gt 0 ]; then
+                    local progress_diff=$((progress - last_progress))
+                    # Safeguard: ensure progress_diff is positive
+                    if [ "$progress_diff" -gt 0 ]; then
+                        # Use bash integer arithmetic: rate = (progress_diff * 100) / time_diff (in hundredths per second)
+                        local rate_per_sec_x100=$(( (progress_diff * 100) / time_diff ))
+                        if [ "$rate_per_sec_x100" -gt 0 ]; then
+                            local remaining_progress=$((100 - progress))
+                            # eta_seconds = (remaining * 100) / rate_per_sec_x100
+                            local eta_seconds=$(( (remaining_progress * 100) / rate_per_sec_x100 ))
+                            if [ "$eta_seconds" -gt 0 ]; then
+                                eta_str=$(printf "%02d:%02d" $((eta_seconds / 60)) $((eta_seconds % 60)))
+                                verbose_log "ETA calculated: progress_diff=$progress_diff, time_diff=$time_diff, rate_x100=$rate_per_sec_x100, eta=$eta_str"
+                            fi
+                        fi
+                    fi
+                    last_progress=$progress
+                    last_update_time=$current_time
+                    last_eta_calc_time=$current_time
+                fi
+            fi
+        fi
+        
+        # Update JSON progress with comprehensive clone statistics
         if [ -n "$progress" ] || [ -n "$download_rate" ] || [ -n "$data_received" ]; then
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" false "" "$progress" "$download_rate" "$data_received"
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" false "" "$progress" "$download_rate" "$data_received" "$total_size" "$elapsed_str" "$eta_str"
         fi
         
         # Log the output
         echo "$line" >> "$LOG_FILE"
     done
+    
+    # Calculate final elapsed time
+    local end_time=$(date +%s)
+    local total_elapsed=$((end_time - start_time))
+    local elapsed_str=$(printf "%02d:%02d" $((total_elapsed / 60)) $((total_elapsed % 60)))
+    
+    # Get the actual size of the cloned repository
+    if [ -d "$target_path" ]; then
+        # Get size in bytes and convert to human-readable with consistent units (MiB, KiB, GiB)
+        # Using pure bash arithmetic for consistency (no bc or awk dependencies)
+        local repo_size_bytes=$(du -sb "$target_path" 2>/dev/null | cut -f1)
+        local repo_size=""
+        # Validate that we got a valid number
+        if [ -n "$repo_size_bytes" ] && [[ "$repo_size_bytes" =~ ^[0-9]+$ ]]; then
+            if [ "$repo_size_bytes" -ge 1073741824 ]; then
+                # GiB - multiply by 10 for one decimal place, then divide
+                local size_gib_x10=$(( (repo_size_bytes * 10) / 1073741824 ))
+                local size_int=$((size_gib_x10 / 10))
+                local size_dec=$((size_gib_x10 % 10))
+                repo_size="${size_int}.${size_dec} GiB"
+            elif [ "$repo_size_bytes" -ge 1048576 ]; then
+                # MiB - multiply by 10 for one decimal place, then divide
+                local size_mib_x10=$(( (repo_size_bytes * 10) / 1048576 ))
+                local size_int=$((size_mib_x10 / 10))
+                local size_dec=$((size_mib_x10 % 10))
+                repo_size="${size_int}.${size_dec} MiB"
+            else
+                # KiB - multiply by 10 for one decimal place, then divide
+                local size_kib_x10=$(( (repo_size_bytes * 10) / 1024 ))
+                local size_int=$((size_kib_x10 / 10))
+                local size_dec=$((size_kib_x10 % 10))
+                repo_size="${size_int}.${size_dec} KiB"
+            fi
+        fi
+        # Write final completion status with size
+        # Note: Using repo_size for both total_size and data_received as final status
+        # During cloning, data_received shows transfer progress; at completion, shows final size
+        write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "success" "$successful" "$failed" false "" "100" "" "$repo_size" "$repo_size" "$elapsed_str" "00:00"
+    fi
     
     # Return the exit code of git clone (from PIPESTATUS)
     return ${PIPESTATUS[0]}
@@ -313,26 +472,73 @@ install_requirements_with_progress() {
     
     write_log "Executing: $python_bin -m pip install -r $requirements_file" 3
     
+    # Track start time for elapsed time calculation
+    local start_time=$(date +%s)
+    local package_count=0
+    local total_packages=$(grep -v "^#" "$requirements_file" | grep -v "^$" | wc -l)
+    
     # Run pip install with progress output
     "$python_bin" -m pip install -r "$requirements_file" 2>&1 | while IFS= read -r line; do
         # Log the output
         echo "$line" >> "$LOG_FILE"
         
         # Parse pip output for package being installed
-        # Pip outputs like: "Collecting package-name", "Downloading package (size)", "Installing collected packages: ..."
+        # Note: pip uses decimal units (kB, MB, GB) while git uses binary units (KiB, MiB, GiB)
+        # This is intentional as we preserve the original units from each tool
         local current_package=""
-        local download_progress=""
+        local download_size=""
+        local download_rate=""
         
+        # Extract package name from "Collecting package-name"
         if [[ "$line" =~ Collecting[[:space:]]+([^[:space:]]+) ]]; then
             current_package="${BASH_REMATCH[1]}"
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (collecting $current_package)" "" "" ""
-        elif [[ "$line" =~ ^Downloading ]]; then
-            # Just indicate downloading without parsing size
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (downloading)" "" "" ""
+            ((package_count++))
+            local progress_pct=$((package_count * 100 / total_packages))
+            
+            # Calculate elapsed time
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+            
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "collecting ($package_count/$total_packages): $current_package" "$progress_pct" "" "" "" "$elapsed_str" ""
+        # Extract download size and rate from "Downloading package (1.2 MB 3.4 MB/s)"
+        elif [[ "$line" =~ Downloading.*\(([0-9.]+)[[:space:]]+(kB|MB|GB).*([0-9.]+)[[:space:]]+(kB|MB|GB)/s\) ]]; then
+            download_size="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+            download_rate="${BASH_REMATCH[3]} ${BASH_REMATCH[4]}/s"
+            local progress_pct=$((package_count * 100 / total_packages))
+            
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+            
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "downloading ($package_count/$total_packages)" "$progress_pct" "$download_rate" "$download_size" "" "$elapsed_str" ""
+        elif [[ "$line" =~ Downloading.*\(([0-9.]+)[[:space:]]+(kB|MB|GB)\) ]]; then
+            download_size="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+            local progress_pct=$((package_count * 100 / total_packages))
+            
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+            
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "downloading ($package_count/$total_packages)" "$progress_pct" "" "$download_size" "" "$elapsed_str" ""
         elif [[ "$line" =~ Installing[[:space:]]+collected[[:space:]]+packages ]]; then
-            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "running (installing)" "" "" ""
+            local progress_pct=$((package_count * 100 / total_packages))
+            
+            local current_time=$(date +%s)
+            local elapsed=$((current_time - start_time))
+            local elapsed_str=$(printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)))
+            
+            write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "running" "$successful" "$failed" true "installing ($package_count/$total_packages packages)" "$progress_pct" "" "" "" "$elapsed_str" ""
         fi
     done
+    
+    # Calculate final elapsed time
+    local end_time=$(date +%s)
+    local total_elapsed=$((end_time - start_time))
+    local elapsed_str=$(printf "%02d:%02d" $((total_elapsed / 60)) $((total_elapsed % 60)))
+    
+    # Write final status with elapsed time
+    write_json_progress_with_stats true "$total_nodes" "$current_node" "$node_name" "success" "$successful" "$failed" true "installed ($package_count packages)" "100" "" "" "" "$elapsed_str" ""
     
     # Return the exit code of pip install
     return ${PIPESTATUS[0]}

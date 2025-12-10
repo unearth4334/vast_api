@@ -11,6 +11,16 @@ let workflowConfig = {
   pollInterval: 2000 // Poll every 2 seconds
 };
 
+// Enable verbose logging by setting localStorage.setItem('workflowDebug', 'true') in browser console
+const VERBOSE_LOGGING = localStorage.getItem('workflowDebug') === 'true';
+
+// Helper function for verbose logging
+function verboseLog(...args) {
+  if (VERBOSE_LOGGING) {
+    console.log('[VERBOSE]', ...args);
+  }
+}
+
 /**
  * Create transition indicator HTML with spinner and icons
  * @returns {string} - HTML markup for transition indicator
@@ -446,6 +456,28 @@ async function updateWorkflowVisualization() {
     
     const state = result.state;
     
+    verboseLog('Received workflow state:', {
+      status: state.status,
+      current_step: state.current_step,
+      total_steps: state.steps?.length,
+      has_tasks: state.steps?.[state.current_step]?.tasks?.length > 0
+    });
+    
+    // Log current step tasks if available
+    if (state.steps?.[state.current_step]?.tasks) {
+      const currentStepTasks = state.steps[state.current_step].tasks;
+      verboseLog('Current step tasks:', currentStepTasks.map(t => ({
+        name: t.name,
+        status: t.status,
+        clone_progress: t.clone_progress,
+        download_rate: t.download_rate,
+        data_received: t.data_received,
+        total_size: t.total_size,
+        elapsed_time: t.elapsed_time,
+        eta: t.eta
+      })));
+    }
+    
     // Update visualization based on state
     renderWorkflowState(state);
     
@@ -651,10 +683,23 @@ function renderTasklist(stepElement, stepData) {
       if (task.data_received && !task.download_rate) {
         progressInfo += ` (${escapeHtml(task.data_received)})`;
       }
+      if (task.total_size) {
+        progressInfo += ` [${escapeHtml(task.total_size)}]`;
+      }
+      if (task.elapsed_time) {
+        progressInfo += ` ⏱${escapeHtml(task.elapsed_time)}`;
+      }
+      if (task.eta) {
+        progressInfo += ` ⏳${escapeHtml(task.eta)}`;
+      }
+      
+      if (progressInfo) {
+        verboseLog('Task progress info for', taskName, ':', progressInfo.trim());
+      }
       
       tasklistHTML += `<li class="${taskItemClass}">
         <span class="task-name">${escapeHtml(taskName)}</span>
-        <span class="task-status ${statusClass}">${escapeHtml(statusDisplay)}${progressInfo}</span>
+        <span class="task-status ${statusClass}">${escapeHtml(statusDisplay)}</span>
       </li>`;
       
       // Render sub-tasks if they exist
@@ -715,11 +760,26 @@ function buildProgressText(tasks, stepData) {
     return '';
   }
   
+  verboseLog('Building progress text for task:', runningTask.name, {
+    message: runningTask.message,
+    clone_progress: runningTask.clone_progress,
+    download_rate: runningTask.download_rate,
+    data_received: runningTask.data_received,
+    total_size: runningTask.total_size,
+    elapsed_time: runningTask.elapsed_time,
+    eta: runningTask.eta
+  });
+  
   // Build progress text from task data
   let parts = [];
   
   // Add node name
   parts.push(runningTask.name);
+  
+  // Add message if present (e.g., "collecting (1/10): package-name")
+  if (runningTask.message) {
+    parts.push(runningTask.message);
+  }
   
   // Add clone progress percentage
   if (runningTask.clone_progress) {
@@ -736,7 +796,20 @@ function buildProgressText(tasks, stepData) {
     parts.push(`(${runningTask.data_received})`);
   }
   
-  return parts.join(' ');
+  // Add elapsed time if available
+  if (runningTask.elapsed_time) {
+    parts.push(`[${runningTask.elapsed_time}]`);
+  }
+  
+  // Add ETA if available
+  if (runningTask.eta) {
+    parts.push(`ETA: ${runningTask.eta}`);
+  }
+  
+  const progressText = parts.join(' ');
+  verboseLog('Built progress text:', progressText);
+  
+  return progressText;
 }
 
 /**

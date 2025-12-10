@@ -53,12 +53,12 @@ async function initCreateTab() {
     // Set up event listeners
     setupCreateTabEventListeners();
     
-    // Check if SSH connection already exists and initialize ExecutionQueue
-    const createSshInput = document.getElementById('createSshConnectionString');
-    if (createSshInput?.value) {
-        CreateTabState.sshConnection = createSshInput.value;
+    // Check if SSH connection already exists (from new toolbar) and initialize ExecutionQueue
+    const sshConnection = getCurrentSSHConnection();
+    if (sshConnection) {
+        CreateTabState.sshConnection = sshConnection;
         if (CreateTabState.executionQueue) {
-            CreateTabState.executionQueue.setSshConnection(createSshInput.value);
+            CreateTabState.executionQueue.setSshConnection(sshConnection);
         }
     }
     
@@ -255,11 +255,27 @@ function renderFormField(field) {
     
     switch (field.type) {
         case 'image':
+            // Add max image size slider below the upload area
             inputHtml = `
                 <div class="image-upload-container" id="${id}-container">
                     <input type="file" id="${id}" accept="${field.accept || 'image/*'}" onchange="handleImageUpload('${field.id}', this)">
                     <div class="image-upload-icon">📷</div>
                     <div class="image-upload-text">Click or drag to upload image</div>
+                </div>
+                <div class="slider-container" style="margin-top: 12px;">
+                    <label for="${id}-max-size" style="display: block; margin-bottom: 4px; font-size: 13px; color: var(--text-primary);">
+                        Max Image Size: <span class="slider-value" id="${id}-max-size-value">1</span> <span class="slider-unit">MP</span>
+                    </label>
+                    <input 
+                        type="range" 
+                        id="${id}-max-size" 
+                        class="slider-input"
+                        min="0.5"
+                        max="8"
+                        step="0.5"
+                        value="1"
+                        oninput="document.getElementById('${id}-max-size-value').textContent = this.value"
+                    >
                 </div>
             `;
             break;
@@ -438,6 +454,46 @@ function randomizeSeed(fieldId) {
 }
 
 /**
+ * Scale image to fit within max megapixels
+ * @param {string} dataUrl - Base64 data URL of image
+ * @param {number} maxMegapixels - Maximum size in megapixels
+ * @returns {Promise<string>} - Scaled image data URL
+ */
+async function scaleImageToMaxSize(dataUrl, maxMegapixels) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            const currentMegapixels = (img.width * img.height) / 1000000;
+            
+            // If image is already within limit, return as-is
+            if (currentMegapixels <= maxMegapixels) {
+                resolve(dataUrl);
+                return;
+            }
+            
+            // Calculate new dimensions
+            const scaleFactor = Math.sqrt(maxMegapixels / currentMegapixels);
+            const newWidth = Math.round(img.width * scaleFactor);
+            const newHeight = Math.round(img.height * scaleFactor);
+            
+            console.log(`Scaling image from ${img.width}x${img.height} (${currentMegapixels.toFixed(2)}MP) to ${newWidth}x${newHeight} (${maxMegapixels}MP)`);
+            
+            // Create canvas and scale
+            const canvas = document.createElement('canvas');
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, newWidth, newHeight);
+            
+            // Convert to data URL
+            resolve(canvas.toDataURL('image/jpeg', 0.92));
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
+}
+
+/**
  * Handle image upload
  * @param {string} fieldId - Field ID
  * @param {HTMLInputElement} input - File input element
@@ -455,54 +511,66 @@ function handleImageUpload(fieldId, input) {
     const container = document.getElementById(`create-field-${fieldId}-container`);
     if (!container) return;
     
+    // Get max size from slider
+    const maxSizeSlider = document.getElementById(`create-field-${fieldId}-max-size`);
+    const maxMegapixels = maxSizeSlider ? parseFloat(maxSizeSlider.value) : 1.0;
+    
     // Show preview using DOM methods for security
     const reader = new FileReader();
-    reader.onload = function(e) {
-        // Clear container safely
-        container.innerHTML = '';
-        
-        // Create file input
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.id = `create-field-${fieldId}`;
-        fileInput.accept = input.accept || 'image/*';
-        fileInput.addEventListener('change', function() {
-            handleImageUpload(fieldId, this);
-        });
-        
-        // Create preview image
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.className = 'image-upload-preview';
-        img.alt = 'Preview';
-        
-        // Create clear button
-        const clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'image-upload-clear';
-        clearBtn.title = 'Remove';
-        clearBtn.textContent = '✕';
-        clearBtn.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent triggering container click
-            clearImageUpload(fieldId);
-        });
-        
-        container.appendChild(fileInput);
-        container.appendChild(img);
-        container.appendChild(clearBtn);
-        container.classList.add('has-image');
-        
-        // Re-add click handler to container to allow changing the image
-        container.onclick = function(e) {
-            // Don't trigger if clicking the clear button
-            if (e.target === clearBtn || e.target.closest('.image-upload-clear')) {
-                return;
-            }
-            fileInput.click();
-        };
-        
-        // Store base64 data
-        updateFormValue(fieldId, e.target.result);
+    reader.onload = async function(e) {
+        try {
+            // Scale image if needed
+            const scaledDataUrl = await scaleImageToMaxSize(e.target.result, maxMegapixels);
+            
+            // Clear container safely
+            container.innerHTML = '';
+            
+            // Create file input
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.id = `create-field-${fieldId}`;
+            fileInput.accept = input.accept || 'image/*';
+            fileInput.addEventListener('change', function() {
+                handleImageUpload(fieldId, this);
+            });
+            
+            // Create preview image
+            const img = document.createElement('img');
+            img.src = scaledDataUrl;
+            img.className = 'image-upload-preview';
+            img.alt = 'Preview';
+            
+            // Create clear button
+            const clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'image-upload-clear';
+            clearBtn.title = 'Remove';
+            clearBtn.textContent = '✕';
+            clearBtn.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent triggering container click
+                clearImageUpload(fieldId);
+            });
+            
+            container.appendChild(fileInput);
+            container.appendChild(img);
+            container.appendChild(clearBtn);
+            container.classList.add('has-image');
+            
+            // Re-add click handler to container to allow changing the image
+            container.onclick = function(e) {
+                // Don't trigger if clicking the clear button
+                if (e.target === clearBtn || e.target.closest('.image-upload-clear')) {
+                    return;
+                }
+                fileInput.click();
+            };
+            
+            // Store scaled base64 data
+            updateFormValue(fieldId, scaledDataUrl);
+        } catch (error) {
+            console.error('Error processing image:', error);
+            alert('Failed to process image. Please try again.');
+        }
     };
     reader.readAsDataURL(file);
 }
@@ -557,6 +625,24 @@ function showExecuteSection(show) {
     if (section) {
         section.style.display = show ? 'block' : 'none';
     }
+    
+    // Update connection notice visibility based on current connection state
+    if (show) {
+        updateConnectionNotice();
+    }
+}
+
+/**
+ * Update connection notice visibility based on toolbar connection state
+ */
+function updateConnectionNotice() {
+    const notice = document.getElementById('create-connection-notice');
+    if (!notice) return;
+    
+    const sshConnection = getCurrentSSHConnection();
+    
+    // Show notice only if no connection
+    notice.style.display = sshConnection ? 'none' : 'block';
 }
 
 /**
@@ -571,14 +657,20 @@ async function executeWorkflow() {
         return;
     }
     
-    // Get SSH connection string
-    const sshInput = document.getElementById('createSshConnectionString') || 
-                     document.getElementById('sshConnectionString') ||
-                     document.getElementById('resourcesSshConnectionString');
-    const sshConnection = sshInput?.value?.trim();
+    // Get SSH connection string from toolbar (or fallback to legacy inputs)
+    const sshConnection = getCurrentSSHConnection();
     
     if (!sshConnection) {
-        showCreateError('Please enter an SSH connection string');
+        showCreateError('Please connect to an instance using the connection toolbar above');
+        // Show connection notice
+        const notice = document.getElementById('create-connection-notice');
+        if (notice) {
+            notice.style.display = 'block';
+            // Hide notice after 5 seconds
+            setTimeout(() => {
+                notice.style.display = 'none';
+            }, 5000);
+        }
         return;
     }
     
@@ -676,39 +768,35 @@ function showCreateSuccess(message) {
  * Set up event listeners for Create tab
  */
 function setupCreateTabEventListeners() {
-    // SSH connection string sync
-    const createSshInput = document.getElementById('createSshConnectionString');
-    const vastaiSshInput = document.getElementById('sshConnectionString');
-    const resourcesSshInput = document.getElementById('resourcesSshConnectionString');
+    // Monitor connection toolbar state changes
+    // Poll for connection changes every 2 seconds to update components
+    let lastKnownConnection = getCurrentSSHConnection();
     
-    if (createSshInput) {
-        // Sync from Create tab to other tabs
-        createSshInput.addEventListener('input', function() {
-            if (vastaiSshInput) vastaiSshInput.value = this.value;
-            if (resourcesSshInput) resourcesSshInput.value = this.value;
-            
-            // Update SSH connection in state and execution queue
-            CreateTabState.sshConnection = this.value;
-            if (CreateTabState.executionQueue) {
-                CreateTabState.executionQueue.setSshConnection(this.value);
-            }
-        });
+    setInterval(() => {
+        const currentConnection = getCurrentSSHConnection();
         
-        // Initialize from other tabs if they have values
-        if (vastaiSshInput?.value) {
-            createSshInput.value = vastaiSshInput.value;
-            CreateTabState.sshConnection = vastaiSshInput.value;
+        // If connection changed, update all components
+        if (currentConnection !== lastKnownConnection) {
+            console.log('🔄 SSH connection changed in toolbar, updating Create tab components...');
+            lastKnownConnection = currentConnection;
+            CreateTabState.sshConnection = currentConnection;
+            
+            // Update connection notice visibility
+            updateConnectionNotice();
+            
+            // Update execution queue
             if (CreateTabState.executionQueue) {
-                CreateTabState.executionQueue.setSshConnection(vastaiSshInput.value);
+                CreateTabState.executionQueue.setSshConnection(currentConnection);
             }
-        } else if (resourcesSshInput?.value) {
-            createSshInput.value = resourcesSshInput.value;
-            CreateTabState.sshConnection = resourcesSshInput.value;
-            if (CreateTabState.executionQueue) {
-                CreateTabState.executionQueue.setSshConnection(resourcesSshInput.value);
+            
+            // Update model selector components
+            if (currentConnection) {
+                updateComponentsSSHConnection(currentConnection);
+                // Auto-refresh model selectors with new connection
+                refreshAllModelSelectors(false);
             }
         }
-    }
+    }, 2000);
 }
 
 /**
@@ -847,9 +935,19 @@ async function refreshAllModelSelectors(forceRefresh = false) {
 
 /**
  * Get current SSH connection string from UI
+ * Prioritizes new connection toolbar over legacy input fields
  * @returns {string|null} SSH connection string or null
  */
 function getCurrentSSHConnection() {
+    // Check new connection toolbar first
+    if (window.VastAIConnectionToolbar) {
+        const toolbarConnection = window.VastAIConnectionToolbar.getSSHConnectionString();
+        if (toolbarConnection) {
+            return toolbarConnection;
+        }
+    }
+    
+    // Fallback to legacy SSH input fields (for backward compatibility)
     const sshInput = document.getElementById('createSshConnectionString') || 
                      document.getElementById('sshConnectionString') ||
                      document.getElementById('resourcesSshConnectionString');
@@ -983,8 +1081,8 @@ function renderSectionBasedLayout(workflow, container) {
     const sshConnection = getCurrentSSHConnection();
     if (sshConnection) {
         updateComponentsSSHConnection(sshConnection);
-        // Auto-refresh model selectors
-        refreshAllModelSelectors(false);
+        // Note: updateComponentsSSHConnection triggers auto-refresh in each component's setSSHConnection
+        // so we don't need to call refreshAllModelSelectors here
     }
 }
 
@@ -1111,3 +1209,4 @@ window.updateComponentsSSHConnection = updateComponentsSSHConnection;
 window.refreshAllModelSelectors = refreshAllModelSelectors;
 window.renderWorkflowFormWithSections = renderWorkflowFormWithSections;
 window.refreshExecutionQueue = refreshExecutionQueue;
+window.updateConnectionNotice = updateConnectionNotice;

@@ -17,6 +17,7 @@ class HighLowPairModelSelector {
      * @param {Function} onChange - Callback when selection changes
      */
     constructor(config, onChange) {
+        console.log(`[HighLowPairModelSelector] Constructor called for ${config.id} with config:`, config);
         this.id = config.id;
         this.label = config.label || 'Model Pair';
         this.description = config.description || '';
@@ -25,6 +26,7 @@ class HighLowPairModelSelector {
         this.defaultLow = config.default_low || '';
         this.required = config.required || false;
         this.onChange = onChange || (() => {});
+        console.log(`[HighLowPairModelSelector] Parsed defaults - High: "${this.defaultHigh}", Low: "${this.defaultLow}"`);
         
         this.element = null;
         this.selectElement = null;
@@ -42,7 +44,13 @@ class HighLowPairModelSelector {
      * @param {string} sshConnection - SSH connection string
      */
     setSSHConnection(sshConnection) {
+        console.log(`[HighLowPairModelSelector] Setting SSH connection for ${this.id}:`, sshConnection);
         this.sshConnection = sshConnection;
+        // Auto-refresh if we now have a connection
+        if (sshConnection && !this.models.length) {
+            console.log(`[HighLowPairModelSelector] Auto-refreshing ${this.id} with new connection`);
+            this.refreshModels(false);
+        }
     }
 
     /**
@@ -166,6 +174,7 @@ class HighLowPairModelSelector {
                 }
             }
 
+            console.log(`[HighLowPairModelSelector] Scanned ${this.models.length} model pairs for ${this.id}:`, this.models);
             this._renderDropdownOptions();
             this._selectDefaultOrFirst();
 
@@ -183,6 +192,8 @@ class HighLowPairModelSelector {
      * @private
      */
     _renderDropdownOptions() {
+        console.log(`[HighLowPairModelSelector] Rendering dropdown options for ${this.id}. Select element:`, this.selectElement, 'Models:', this.models);
+        
         // Clear existing options except first default option
         while (this.selectElement.options.length > 1) {
             this.selectElement.remove(1);
@@ -197,8 +208,11 @@ class HighLowPairModelSelector {
             if (model.size) {
                 option.textContent += ` (${this._formatSize(model.size)})`;
             }
+            console.log(`[HighLowPairModelSelector] Adding option ${i}:`, option.textContent);
             this.selectElement.appendChild(option);
         }
+        
+        console.log(`[HighLowPairModelSelector] Dropdown now has ${this.selectElement.options.length} options`);
     }
 
     /**
@@ -206,6 +220,8 @@ class HighLowPairModelSelector {
      * @private
      */
     _selectDefaultOrFirst() {
+        console.log(`[HighLowPairModelSelector] Selecting default/first for ${this.id}. Default high:`, this.defaultHigh, 'Default low:', this.defaultLow);
+        
         // Try to select default value
         if (this.defaultHigh || this.defaultLow) {
             const defaultIndex = this.models.findIndex(m => 
@@ -214,8 +230,15 @@ class HighLowPairModelSelector {
                 m.highNoisePath.includes(this.defaultHigh) ||
                 m.lowNoisePath.includes(this.defaultLow)
             );
+            console.log(`[HighLowPairModelSelector] Found default at index:`, defaultIndex);
             if (defaultIndex >= 0) {
-                this.selectElement.selectedIndex = defaultIndex + 1; // +1 for default option
+                const targetIndex = defaultIndex + 1; // +1 for default option
+                this.selectElement.selectedIndex = targetIndex;
+                console.log(`[HighLowPairModelSelector] Set selectedIndex to ${targetIndex}, actual value is now:`, this.selectElement.selectedIndex, 'Selected option:', this.selectElement.options[this.selectElement.selectedIndex]?.textContent);
+                // Force a repaint
+                this.selectElement.style.display = 'none';
+                this.selectElement.offsetHeight; // Force reflow
+                this.selectElement.style.display = '';
                 this._handleSelectionChange();
                 return;
             }
@@ -223,7 +246,13 @@ class HighLowPairModelSelector {
 
         // Select first model if required and no default
         if (this.required && this.models.length > 0) {
+            console.log(`[HighLowPairModelSelector] Selecting first model (required=true)`);
             this.selectElement.selectedIndex = 1;
+            console.log(`[HighLowPairModelSelector] Set selectedIndex to 1, actual value is now:`, this.selectElement.selectedIndex);
+            // Force a repaint
+            this.selectElement.style.display = 'none';
+            this.selectElement.offsetHeight; // Force reflow
+            this.selectElement.style.display = '';
             this._handleSelectionChange();
         }
     }

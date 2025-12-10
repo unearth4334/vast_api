@@ -485,8 +485,18 @@ export class ExecutionQueue {
             executionTimeStr = this.formatExecutionTime(elapsedTime) + ' (ongoing)';
         }
 
-        // Add preview button for successful executions
-        const previewButton = item.status === 'success' ? `
+        // Add warning for cached execution
+        let cachedWarning = '';
+        if (item.cached_execution) {
+            cachedWarning = `
+                <div class="execution-queue-warning">
+                    ⚠️ Cached execution detected - workflow did not actually run
+                </div>
+            `;
+        }
+
+        // Add preview button for successful executions (but not cached ones)
+        const previewButton = (item.status === 'success' && !item.cached_execution) ? `
             <button class="execution-queue-preview-btn" 
                     data-prompt-id="${this.escapeHtml(item.prompt_id)}"
                     title="Preview outputs">
@@ -518,6 +528,7 @@ export class ExecutionQueue {
                             </span>
                             <span class="execution-queue-item-status">${this.escapeHtml(item.status)}</span>
                         </div>
+                        ${cachedWarning}
                         ${executionTimeStr || previewButton ? `
                             <div class="execution-queue-item-footer">
                                 ${executionTimeStr ? `<span class="execution-queue-item-time">⏱️ ${this.escapeHtml(executionTimeStr)}</span>` : ''}

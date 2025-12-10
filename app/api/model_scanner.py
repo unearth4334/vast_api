@@ -416,7 +416,8 @@ def get_model_discovery_config() -> dict:
                 'loras': 'models/loras',
                 'text_encoders': 'models/text_encoders',
                 'vae': 'models/vae',
-                'upscale_models': 'models/upscale_models'
+                'upscale_models': 'models/upscale_models',
+                'ESRGAN': 'models/ESRGAN'  # Direct path for upscaler models
             },
             'extensions': ['.safetensors', '.ckpt', '.pth'],
             'max_depth': 3,

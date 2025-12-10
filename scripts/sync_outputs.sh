@@ -159,7 +159,8 @@ VENV_PY="$XMP_VENV/bin/python"
 # - Use --itemize-changes so we can detect newly-created files (>f+++++++++)
 # - Add --stats so summary lines are guaranteed
 # - Avoid --human-readable so bytes are raw numbers for easy parsing
-RSYNC_FLAGS=(-rltD --delete --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --itemize-changes --stats)
+# NOTE: --delete removed - we only delete on source (remote), never destination (NAS)
+RSYNC_FLAGS=(-rltD --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --itemize-changes --stats)
 if rsync --help 2>&1 | grep -q -- '--mkpath'; then
   RSYNC_FLAGS+=(--mkpath)
 fi
