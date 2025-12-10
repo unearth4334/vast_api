@@ -20,6 +20,7 @@ import io
 from app.create.workflow_loader import WorkflowLoader
 from app.create.workflow_generator import WorkflowGenerator
 from app.create.workflow_validator import WorkflowValidator
+from app.create.workflow_history import WorkflowHistory
 
 logger = logging.getLogger(__name__)
 
@@ -279,6 +280,20 @@ def execute_workflow():
         
         # Generate task ID for tracking
         task_id = str(uuid.uuid4())
+        
+        # Save to history
+        try:
+            WorkflowHistory.save_history_record(
+                workflow_id=workflow_id,
+                inputs=inputs,  # Save original inputs (with base64 images)
+                thumbnail=thumbnail_filename,
+                prompt_id=prompt_id,
+                task_id=task_id
+            )
+            logger.info(f"Saved workflow execution to history")
+        except Exception as e:
+            logger.error(f"Failed to save workflow history: {e}", exc_info=True)
+            # Don't fail the execution if history save fails
         
         return jsonify({
             'success': True,
@@ -937,3 +952,84 @@ def get_thumbnail(filename):
             'success': False,
             'message': f'Failed to serve thumbnail: {str(e)}'
         }), 500
+
+
+@bp.route('/history/list', methods=['GET'])
+def list_history():
+    """
+    List workflow execution history with pagination and filtering
+    
+    Query parameters:
+        - workflow_id: Filter by workflow ID (optional)
+        - limit: Number of records to return (default: 10)
+        - offset: Number of records to skip (default: 0)
+    
+    Returns:
+        JSON with history records and pagination info
+    """
+    try:
+        workflow_id = request.args.get('workflow_id')
+        limit = int(request.args.get('limit', 10))
+        offset = int(request.args.get('offset', 0))
+        
+        # Get history records
+        records = WorkflowHistory.get_history_records(
+            workflow_id=workflow_id,
+            limit=limit,
+            offset=offset
+        )
+        
+        # Get total count for pagination
+        total_count = WorkflowHistory.count_history_records(workflow_id=workflow_id)
+        
+        return jsonify({
+            'success': True,
+            'records': records,
+            'pagination': {
+                'offset': offset,
+                'limit': limit,
+                'total': total_count,
+                'has_more': (offset + limit) < total_count
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing history: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Failed to list history: {str(e)}'
+        }), 500
+
+
+@bp.route('/history/<record_id>', methods=['GET'])
+def get_history_record(record_id):
+    """
+    Get a specific history record by ID
+    
+    Args:
+        record_id: History record ID
+    
+    Returns:
+        JSON with history record details
+    """
+    try:
+        record = WorkflowHistory.get_history_record(record_id)
+        
+        if not record:
+            return jsonify({
+                'success': False,
+                'message': 'History record not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'record': record
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting history record: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Failed to get history record: {str(e)}'
+        }), 500
+
