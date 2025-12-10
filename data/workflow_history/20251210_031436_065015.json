@@ -1,0 +1,15 @@
+{
+  "record_id": "20251210_031436_065015",
+  "workflow_id": "IMG_to_VIDEO",
+  "workflow_hash": "4df7c3cef90000f279ef481c89016d4d",
+  "timestamp": "2025-12-10T03:14:36.065104",
+  "inputs": {
+    "positive_prompt": "A beautiful sunset",
+    "negative_prompt": "ugly, blurry",
+    "seed": 12345,
+    "steps": 20
+  },
+  "thumbnail": "test_thumb.jpg",
+  "prompt_id": "test_prompt_123",
+  "task_id": "test_task_456"
+}

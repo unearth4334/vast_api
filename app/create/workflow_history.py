@@ -117,6 +117,13 @@ class WorkflowHistory:
             
         Returns:
             List of history records, sorted by timestamp (newest first)
+            
+        Note:
+            Current implementation loads all records into memory before pagination.
+            For production use with large datasets (>1000 records), consider:
+            - Implementing file-based pagination by sorting filenames
+            - Using a database (SQLite, PostgreSQL) for efficient querying
+            - Adding caching for frequently accessed records
         """
         try:
             # Get current workflow hash if filtering by workflow_id
@@ -125,6 +132,7 @@ class WorkflowHistory:
                 target_hash = WorkflowHistory.compute_workflow_hash(workflow_id)
             
             # Load all history records
+            # TODO: Optimize for large datasets - consider file-based pagination
             records = []
             for record_file in HISTORY_DIR.glob("*.json"):
                 try:

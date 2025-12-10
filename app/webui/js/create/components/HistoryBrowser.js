@@ -117,8 +117,11 @@ export class HistoryBrowser {
      */
     async loadMore() {
         this.offset += 5;  // Load 5 more at a time
+        // Keep limit at 5 for subsequent loads
+        const previousLimit = this.limit;
         this.limit = 5;
         await this.loadRecords();
+        // Don't restore limit - keep it at 5 for consistent pagination
     }
 
     /**
@@ -139,8 +142,12 @@ export class HistoryBrowser {
         grid.style.display = 'grid';
         empty.style.display = 'none';
 
-        // Render tiles
-        grid.innerHTML = this.records.map(record => this.renderRecordTile(record)).join('');
+        // Clear grid and render tiles using DOM methods for security
+        grid.innerHTML = '';
+        this.records.forEach(record => {
+            const tile = this.createRecordTile(record);
+            grid.appendChild(tile);
+        });
 
         // Show/hide load more button
         if (this.hasMore) {
@@ -151,7 +158,65 @@ export class HistoryBrowser {
     }
 
     /**
-     * Render a single history record tile
+     * Create a single history record tile element
+     * @param {Object} record - History record
+     * @returns {HTMLElement} Tile element
+     */
+    createRecordTile(record) {
+        const timestamp = this.formatTimestamp(record.timestamp);
+        const thumbnailUrl = record.thumbnail 
+            ? `/create/thumbnail/${encodeURIComponent(record.thumbnail)}`
+            : null;
+
+        // Create tile container
+        const tile = document.createElement('div');
+        tile.className = 'history-tile';
+        
+        // Add click handler securely
+        tile.addEventListener('click', () => {
+            this.selectRecord(record.record_id);
+        });
+
+        // Create image container
+        const imageContainer = document.createElement('div');
+        imageContainer.className = 'history-tile-image';
+
+        if (thumbnailUrl) {
+            const img = document.createElement('img');
+            img.src = thumbnailUrl;
+            img.alt = 'Thumbnail';
+            img.className = 'history-tile-thumbnail';
+            imageContainer.appendChild(img);
+        } else {
+            const noThumb = document.createElement('div');
+            noThumb.className = 'history-tile-no-thumbnail';
+            noThumb.textContent = '📷';
+            imageContainer.appendChild(noThumb);
+        }
+
+        // Create info container
+        const infoContainer = document.createElement('div');
+        infoContainer.className = 'history-tile-info';
+
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'history-tile-time';
+        timeDiv.textContent = timestamp;
+
+        const workflowDiv = document.createElement('div');
+        workflowDiv.className = 'history-tile-workflow';
+        workflowDiv.textContent = record.workflow_id;
+
+        infoContainer.appendChild(timeDiv);
+        infoContainer.appendChild(workflowDiv);
+
+        tile.appendChild(imageContainer);
+        tile.appendChild(infoContainer);
+
+        return tile;
+    }
+
+    /**
+     * Render a single history record tile (deprecated - use createRecordTile)
      * @param {Object} record - History record
      * @returns {string} HTML string
      */
@@ -166,7 +231,7 @@ export class HistoryBrowser {
             : `<div class="history-tile-no-thumbnail">📷</div>`;
 
         return `
-            <div class="history-tile" onclick="window.historyBrowserInstance.selectRecord('${this.escapeHtml(record.record_id)}')">
+            <div class="history-tile" data-record-id="${this.escapeHtml(record.record_id)}">
                 <div class="history-tile-image">
                     ${thumbnailHtml}
                 </div>

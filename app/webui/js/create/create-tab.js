@@ -1129,9 +1129,14 @@ function onHistoryRecordSelected(record) {
     // Ensure the correct workflow is selected
     if (record.workflow_id !== CreateTabState.selectedWorkflow) {
         console.warn('History record is for different workflow, switching...');
-        selectWorkflow(record.workflow_id).then(() => {
-            populateFormFromHistory(record);
-        });
+        selectWorkflow(record.workflow_id)
+            .then(() => {
+                populateFormFromHistory(record);
+            })
+            .catch((error) => {
+                console.error('Failed to switch workflow:', error);
+                showCreateError(`Failed to load workflow: ${error.message}`);
+            });
     } else {
         populateFormFromHistory(record);
     }
@@ -1237,8 +1242,10 @@ function handleImageUploadFromData(fieldId, base64Data) {
     const container = document.getElementById(`create-field-${fieldId}-container`);
     if (!container) return;
     
-    // Clear container safely
-    container.innerHTML = '';
+    // Clear container properly by removing children
+    while (container.firstChild) {
+        container.removeChild(container.firstChild);
+    }
     
     // Create file input
     const fileInput = document.createElement('input');
