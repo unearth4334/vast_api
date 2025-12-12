@@ -198,6 +198,18 @@ inputs:
     default_high: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors"
     default_low: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
 
+  - id: "loras"
+    section: "models"
+    node_ids:
+      - "416"  # high noise LoRA loader
+      - "471"  # low noise LoRA loader
+    type: "high_low_pair_lora_list"
+    label: "LoRAs (High/Low Noise Pairs)"
+    description: "Add LoRAs for style/motion control. Each LoRA should have high/low noise variants."
+    required: false
+    model_type: "loras"
+    max_items: 5
+
   - id: "clip_model"
     section: "models"
     token: "{{CLIP_MODEL}}"
