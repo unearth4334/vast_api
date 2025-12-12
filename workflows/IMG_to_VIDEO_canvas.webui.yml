@@ -241,8 +241,16 @@ inputs:
     default: "RealESRGAN_x4plus.pth"
 
   # === ADVANCED FEATURES ===
-  # Note: Feature toggles would require mode tokens in canvas JSON
-  # For now, these features are controlled by the workflow's node mode settings
+  - id: "use_upscaler"
+    section: "advanced"
+    node_ids:
+      - "385"  # ImageUpscaleWithModel node
+      - "418"  # ImageScaleBy (Apply ratio) node
+    type: "node_mode_toggle"
+    label: "Enable Upscaler"
+    description: "Apply AI upscaling to the input image before video generation. Uses the upscale model and ratio configured above."
+    required: false
+    default: false
 
 # Output configuration
 outputs:
