@@ -106,6 +106,9 @@ logs/*
 
 test/workflow_testing/
 
+# Temporary files and scratch work
+temp/*
+
 # Workflow history records (keep directory structure with .gitkeep)
 data/workflow_history/*
 !data/workflow_history/.gitkeep

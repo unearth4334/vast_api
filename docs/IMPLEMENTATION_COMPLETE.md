@@ -326,7 +326,7 @@ Ready for production deployment:
 
 2. **Start Server**
    ```bash
-   python run_sync_api.py
+   python scripts/run_sync_api.py
    ```
 
 3. **Verify v2 API**

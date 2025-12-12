@@ -80,7 +80,7 @@ if __name__ == "__main__":
         resp_json = api_query_offers(api_key, gpu_ram=10, sort='score')
         
         # Save raw response (optional)
-        with open('output.json', 'w') as outfile:
+        with open('temp/output.json', 'w') as outfile:
             json.dump(resp_json, outfile)
 
         # Display formatted output

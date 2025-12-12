@@ -5,8 +5,8 @@ Convenience script to run VastAI CLI from new location
 import sys
 import os
 
-# Add current directory to path to import from app
-sys.path.insert(0, os.path.dirname(__file__))
+# Add parent directory to path to import from app
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.vastai.vast_cli import main
 

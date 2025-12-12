@@ -55,8 +55,8 @@ app/
 ### Convenience Scripts
 
 Created backward-compatible convenience scripts:
-- `run_sync_api.py` - Runs the sync API from the new location
-- `run_vast_cli.py` - Runs the VastAI CLI from the new location
+- `scripts/run_sync_api.py` - Runs the sync API from the new location
+- `scripts/run_vast_cli.py` - Runs the VastAI CLI from the new location
 
 ### How to Use
 
@@ -64,8 +64,8 @@ Created backward-compatible convenience scripts:
 
 ```bash
 # Option 1: Use convenience scripts (recommended for migration)
-python run_sync_api.py
-python run_vast_cli.py
+python scripts/run_sync_api.py
+python scripts/run_vast_cli.py
 
 # Option 2: Use module syntax
 python -m app.sync.sync_api

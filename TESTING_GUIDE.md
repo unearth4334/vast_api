@@ -59,7 +59,7 @@ python3 test/test_custom_nodes_async_api.py -v
 
 3. Start the sync API server:
    ```bash
-   python3 run_sync_api.py
+   python3 scripts/run_sync_api.py
    ```
 
 ### Test Scenario 1: Start Installation
