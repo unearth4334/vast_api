@@ -1653,8 +1653,8 @@
         "aux_id": "Smirnov75/ComfyUI-mxToolkit"
       },
       "widgets_values": [
-        "{{SPEED}}",
-        "{{SPEED}}",
+        7.0,
+        7.0,
         1
       ],
       "color": "#432",
@@ -1841,7 +1841,7 @@
         "Node name for S&R": "RandomNoise"
       },
       "widgets_values": [
-        "{{SEED}}",
+        12345,
         "randomize"
       ],
       "color": "#432",
@@ -2257,8 +2257,8 @@
         "aux_id": "Smirnov75/ComfyUI-mxToolkit"
       },
       "widgets_values": [
-        "{{UPSCALE_RATIO}}",
-        "{{UPSCALE_RATIO}}",
+        2.0,
+        2.0,
         1
       ],
       "color": "#432",
@@ -2582,7 +2582,7 @@
         "Node name for S&R": "PrimitiveStringMultiline"
       },
       "widgets_values": [
-        "{{NEGATIVE_PROMPT}}"
+        "static, blurry, low quality"
       ],
       "color": "#322",
       "bgcolor": "#533",
@@ -2836,8 +2836,8 @@
         "aux_id": "Smirnov75/ComfyUI-mxToolkit"
       },
       "widgets_values": [
-        "{{FRAME_RATE}}",
-        "{{FRAME_RATE}}",
+        16.0,
+        16.0,
         1
       ],
       "color": "#432",
@@ -3270,8 +3270,8 @@
         "aux_id": "Smirnov75/ComfyUI-mxToolkit"
       },
       "widgets_values": [
-        "{{DURATION}}",
-        "{{DURATION}}",
+        5.0,
+        5.0,
         1
       ],
       "color": "#432",
@@ -3330,10 +3330,10 @@
         "Node name for S&R": "mxSlider2D"
       },
       "widgets_values": [
-        "{{SIZE_WIDTH}}",
-        "{{SIZE_WIDTH}}",
-        "{{SIZE_HEIGHT}}",
-        "{{SIZE_HEIGHT}}",
+        896.0,
+        896.0,
+        1120.0,
+        1120.0,
         0,
         0
       ],
@@ -3410,7 +3410,7 @@
         "Node name for S&R": "PrimitiveStringMultiline"
       },
       "widgets_values": [
-        "{{POSITIVE_PROMPT}}"
+        "A beautiful cinematic scene with smooth motion"
       ],
       "color": "#232",
       "bgcolor": "#353",
@@ -3508,7 +3508,7 @@
         "Node name for S&R": "LoadImage"
       },
       "widgets_values": [
-        "{{INPUT_IMAGE}}",
+        "test_image.png",
         "image"
       ],
       "color": "#432",
@@ -4427,8 +4427,8 @@
         "aux_id": "Smirnov75/ComfyUI-mxToolkit"
       },
       "widgets_values": [
-        "{{CFG}}",
-        "{{CFG}}",
+        3.5,
+        3.5,
         1
       ],
       "color": "#432",
@@ -4476,8 +4476,8 @@
         "aux_id": "Smirnov75/ComfyUI-mxToolkit"
       },
       "widgets_values": [
-        "{{STEPS}}",
-        "{{STEPS}}",
+        20.0,
+        20.0,
         0
       ],
       "color": "#432",
@@ -4608,7 +4608,7 @@
         "Node name for S&R": "UNETLoader"
       },
       "widgets_values": [
-        "{{WAN_HIGH_MODEL}}",
+        "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors",
         "default"
       ],
       "color": "#223",
@@ -4647,7 +4647,7 @@
         "Node name for S&R": "UNETLoader"
       },
       "widgets_values": [
-        "{{WAN_LOW_MODEL}}",
+        "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors",
         "default"
       ],
       "color": "#223",
@@ -4697,7 +4697,7 @@
         ]
       },
       "widgets_values": [
-        "{{CLIP_MODEL}}",
+        "Wan-2.2/umt5_xxl_fp16.safetensors",
         "wan",
         "default"
       ],
@@ -4746,7 +4746,7 @@
         ]
       },
       "widgets_values": [
-        "{{VAE_MODEL}}"
+        "Wan-2.1/wan_2.1_vae.safetensors"
       ],
       "color": "#223",
       "bgcolor": "#335",
@@ -4785,7 +4785,7 @@
         "Node name for S&R": "UpscaleModelLoader"
       },
       "widgets_values": [
-        "{{UPSCALE_MODEL}}"
+        "RealESRGAN_x4plus.pth"
       ],
       "color": "#223",
       "bgcolor": "#335",

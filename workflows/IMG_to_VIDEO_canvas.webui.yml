@@ -1,10 +1,10 @@
-# IMG to VIDEO Workflow - WebUI Wrapper v2.0
-# Redesigned with extensible component architecture and section-based layout
-# Changes to this file will be reflected when the workflow is reloaded in the Create tab
+# IMG to VIDEO Workflow - WebUI Wrapper v3.0 (Token-based)
+# Uses token replacement for robust workflow updates
+# Tokens are embedded in the canvas JSON file and replaced at generation time
 
-name: "IMG to VIDEO"
+name: "IMG to VIDEO (Canvas)"
 description: "Generate video from a single image using WAN 2.2 Image-to-Video model with high/low noise dual sampling"
-version: "2.0.0"
+version: "3.0.0"
 category: "video"
 tags:
   - image-to-video
@@ -12,8 +12,8 @@ tags:
   - video-generation
   - 14B-model
 
-# Workflow JSON file reference (relative to this file)
-workflow_file: "IMG to VIDEO.json"
+# Workflow JSON file reference (canvas format)
+workflow_file: "IMG_to_VIDEO_canvas.json"
 
 # Thumbnail/preview image (optional)
 thumbnail: null
@@ -46,13 +46,12 @@ layout:
       title: "🔧 Advanced Features"
       collapsed: true
 
-# Input fields organized by section
+# Token-based inputs - no node IDs required!
 inputs:
   # === BASIC SETTINGS ===
   - id: "input_image"
     section: "basic"
-    node_id: "88"
-    field: "image"
+    token: "{{INPUT_IMAGE}}"
     type: "image"
     label: "Input Image"
     description: "Source image to animate. Will be resized to fit the selected output size."
@@ -60,22 +59,12 @@ inputs:
     accept: "image/png,image/jpeg,image/webp"
     max_size_mb: 10
 
-  - id: "enable_florence_caption"
-    section: "basic"
-    node_id: "451"
-    field: "string_a"
-    type: "checkbox"
-    label: "Auto-Caption from Image"
-    description: "Use Florence2 AI to automatically generate a description of the image"
-    default: false
-
   - id: "positive_prompt"
     section: "basic"
-    node_id: "408"
-    field: "value"
+    token: "{{POSITIVE_PROMPT}}"
     type: "textarea"
     label: "Positive Prompt"
-    description: "Describe the motion and style you want in the video. If auto-caption is enabled, this will be appended to the generated caption."
+    description: "Describe the motion and style you want in the video"
     required: true
     default: "The subject moves naturally with smooth cinematic motion, high quality, detailed"
     placeholder: "Describe the desired motion and style..."
@@ -84,8 +73,7 @@ inputs:
 
   - id: "negative_prompt"
     section: "basic"
-    node_id: "409"
-    field: "value"
+    token: "{{NEGATIVE_PROMPT}}"
     type: "textarea"
     label: "Negative Prompt"
     description: "What to avoid in the generation"
@@ -95,11 +83,7 @@ inputs:
 
   - id: "seed"
     section: "basic"
-    node_ids:
-      - "73"   # RandomNoise node
-      - "465"  # Sampler low
-      - "466"  # Sampler high
-    field: "noise_seed"
+    token: "{{SEED}}"
     type: "seed"
     label: "Seed"
     description: "Random seed for reproducibility (-1 for random)"
@@ -108,21 +92,9 @@ inputs:
     control_after_generate: "randomize"
 
   # === GENERATION PARAMETERS ===
-  - id: "custom_size"
-    section: "generation"
-    node_id: "518"
-    field: "value"
-    type: "checkbox"
-    label: "Use Custom Size"
-    description: "Override auto-sizing from input image"
-    default: false
-
   - id: "size_x"
     section: "generation"
-    node_id: "83"
-    fields:
-      - "Xi"
-      - "Xf"
+    token: "{{SIZE_WIDTH}}"
     type: "slider"
     label: "Width"
     description: "Output width in pixels"
@@ -131,16 +103,10 @@ inputs:
     step: 64
     default: 896
     unit: "px"
-    depends_on:
-      field: "custom_size"
-      value: true
 
   - id: "size_y"
     section: "generation"
-    node_id: "83"
-    fields:
-      - "Yi"
-      - "Yf"
+    token: "{{SIZE_HEIGHT}}"
     type: "slider"
     label: "Height"
     description: "Output height in pixels"
@@ -149,14 +115,10 @@ inputs:
     step: 64
     default: 1120
     unit: "px"
-    depends_on:
-      field: "custom_size"
-      value: true
 
   - id: "duration"
     section: "generation"
-    node_id: "426"
-    field: "Xi"
+    token: "{{DURATION}}"
     type: "slider"
     label: "Duration"
     description: "Video length in seconds"
@@ -168,10 +130,7 @@ inputs:
 
   - id: "steps"
     section: "generation"
-    node_id: "82"
-    fields:
-      - "Xi"
-      - "Xf"
+    token: "{{STEPS}}"
     type: "slider"
     label: "Steps"
     description: "Denoising steps. Higher = better quality but slower."
@@ -182,10 +141,7 @@ inputs:
 
   - id: "cfg"
     section: "generation"
-    node_id: "85"
-    fields:
-      - "Xi"
-      - "Xf"
+    token: "{{CFG}}"
     type: "slider"
     label: "CFG Scale"
     description: "Prompt adherence strength. Higher = more prompt influence."
@@ -196,8 +152,7 @@ inputs:
 
   - id: "frame_rate"
     section: "generation"
-    node_id: "490"
-    field: "Xi"
+    token: "{{FRAME_RATE}}"
     type: "slider"
     label: "Frame Rate"
     description: "Output frames per second"
@@ -209,10 +164,7 @@ inputs:
 
   - id: "speed"
     section: "generation"
-    node_id: "157"
-    fields:
-      - "Xi"
-      - "Xf"
+    token: "{{SPEED}}"
     type: "slider"
     label: "Sampling Speed"
     description: "ModelSamplingSD3 shift parameter"
@@ -223,49 +175,32 @@ inputs:
 
   - id: "upscale_ratio"
     section: "generation"
-    node_id: "421"
-    fields:
-      - "Xi"
-      - "Xf"
+    token: "{{UPSCALE_RATIO}}"
     type: "slider"
     label: "Upscale Ratio"
     description: "Scale factor for upscaling"
     min: 1.0
     max: 4.0
     step: 0.5
-    default: 1.5
+    default: 2.0
 
   # === MODEL SELECTION ===
-  # Note: These use advanced component types that scan the remote instance for available models
   - id: "main_model"
     section: "models"
-    node_ids:
-      - "522"  # high noise loader
-      - "523"  # low noise loader
     type: "high_low_pair_model"
     label: "Main Model (High/Low Noise Pair)"
     description: "Diffusion model pair for generation. Click refresh to scan instance for available models."
     required: true
     model_type: "diffusion_models"
-    default_high: "Wan-2.2_ComfyUI_repackaged/wan2.2_t2v_high_noise_14B_fp16.safetensors"
-    default_low: "Wan-2.2_ComfyUI_repackaged/wan2.2_t2v_low_noise_14B_fp16.safetensors"
-
-  - id: "loras"
-    section: "models"
-    node_ids:
-      - "416"  # high noise LoRA loader
-      - "471"  # low noise LoRA loader
-    type: "high_low_pair_lora_list"
-    label: "LoRAs (High/Low Noise Pairs)"
-    description: "Add LoRAs for style/motion control. Each LoRA should have high/low noise variants."
-    required: false
-    model_type: "loras"
-    max_items: 5
+    tokens:
+      high: "{{WAN_HIGH_MODEL}}"
+      low: "{{WAN_LOW_MODEL}}"
+    default_high: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors"
+    default_low: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
 
   - id: "clip_model"
     section: "models"
-    node_id: "460"
-    field: "clip_name"
+    token: "{{CLIP_MODEL}}"
     type: "single_model"
     label: "CLIP Model"
     description: "Text encoder model"
@@ -275,8 +210,7 @@ inputs:
 
   - id: "vae_model"
     section: "models"
-    node_id: "461"
-    field: "vae_name"
+    token: "{{VAE_MODEL}}"
     type: "single_model"
     label: "VAE Model"
     description: "Variational autoencoder"
@@ -286,8 +220,7 @@ inputs:
 
   - id: "upscale_model"
     section: "models"
-    node_id: "384"
-    field: "model_name"
+    token: "{{UPSCALE_MODEL}}"
     type: "single_model"
     label: "Upscale Model"
     description: "Super-resolution model for upscaling"
@@ -296,150 +229,17 @@ inputs:
     default: "RealESRGAN_x4plus.pth"
 
   # === ADVANCED FEATURES ===
-  - id: "save_last_frame"
-    section: "features"
-    category: "Video Output"
-    type: "checkbox"
-    label: "Save Last Frame"
-    description: "Save the final frame as a separate image"
-    default: false
-
-  - id: "enable_interpolation"
-    section: "features"
-    category: "Video Output"
-    node_id: "431"
-    type: "checkbox"
-    label: "Enable Interpolation"
-    description: "Use RIFE for frame interpolation"
-    default: false
-
-  - id: "enable_upscaler"
-    section: "features"
-    category: "Video Output"
-    type: "checkbox"
-    label: "Enable Upscaler"
-    description: "Apply upscaling without interpolation"
-    default: false
-
-  - id: "enable_upscale_interpolation"
-    section: "features"
-    category: "Video Output"
-    type: "checkbox"
-    label: "Enable Upscale + Interpolation"
-    description: "Apply both upscaling and interpolation"
-    default: true
-
-  - id: "enable_video_enhancer"
-    section: "features"
-    category: "Quality"
-    node_ids:
-      - "481"
-      - "482"
-    type: "checkbox"
-    label: "Video Enhancer"
-    description: "WanVideoEnhanceAVideoKJ for quality enhancement"
-    default: true
-
-  - id: "enable_cfgzerostar"
-    section: "features"
-    category: "Quality"
-    node_ids:
-      - "483"
-      - "484"
-    type: "checkbox"
-    label: "CFGZeroStar"
-    description: "CFG guidance enhancement for better quality"
-    default: true
-
-  - id: "enable_speed_regulation"
-    section: "features"
-    category: "Quality"
-    node_ids:
-      - "467"
-      - "468"
-    type: "checkbox"
-    label: "Speed Regulation"
-    description: "ModelSamplingSD3 speed control"
-    default: true
-
-  - id: "enable_normalized_attention"
-    section: "features"
-    category: "Quality"
-    node_ids:
-      - "485"
-      - "486"
-    type: "checkbox"
-    label: "Normalized Attention"
-    description: "WanVideoNAG for normalized attention"
-    default: true
-
-  - id: "enable_magcache"
-    section: "features"
-    category: "Performance"
-    node_ids:
-      - "505"
-      - "506"
-    type: "checkbox"
-    label: "MagCache"
-    description: "Memory optimization via caching"
-    default: true
-
-  - id: "enable_torchcompile"
-    section: "features"
-    category: "Performance"
-    type: "checkbox"
-    label: "TorchCompile"
-    description: "JIT compilation (experimental, may not work on all systems)"
-    default: false
-
-  - id: "enable_blockswap"
-    section: "features"
-    category: "Performance"
-    node_ids:
-      - "500"
-      - "501"
-    type: "checkbox"
-    label: "BlockSwap"
-    description: "VRAM reduction via model offloading"
-    default: true
-
-  - id: "vram_reduction"
-    section: "features"
-    category: "Performance"
-    node_id: "502"
-    fields:
-      - "Xi"
-      - "Xf"
-    type: "slider"
-    label: "VRAM Reduction"
-    description: "Percentage of model offloading. 0% = fastest (most VRAM), 100% = slowest (least VRAM)"
-    min: 0
-    max: 100
-    step: 10
-    default: 100
-    unit: "%"
-    depends_on:
-      field: "enable_blockswap"
-      value: true
+  # Note: Feature toggles would require mode tokens in canvas JSON
+  # For now, these features are controlled by the workflow's node mode settings
 
 # Output configuration
 outputs:
   - id: "original_video"
-    node_id: "398"
+    node_id: "398"  # Still need node_id to identify output nodes
     type: "video"
     format: "mp4"
     label: "Original Video"
     description: "Video at native frame rate with color matching"
-
-  - id: "interpolated_video"
-    node_id: "433"
-    type: "video"
-    format: "mp4"
-    label: "Interpolated Video"
-    description: "Video with frame interpolation using RIFE"
-    depends_on:
-      field: "enable_interpolation"
-      value: true
 
 # Model requirements (for validation and display)
 requirements:
@@ -462,12 +262,8 @@ requirements:
       size_gb: 0.2
     - type: "upscale"
       name: "RealESRGAN x4 Plus"
-      path: "upscale_models/RealESRGAN_x4plus.pth"
+      path: "RealESRGAN_x4plus.pth"
       size_gb: 0.06
-    - type: "rife"
-      name: "RIFE 4.7"
-      path: "rife/rife47.pth"
-      size_gb: 0.1
 
   custom_nodes:
     - name: "ComfyUI-VideoHelperSuite"
@@ -488,10 +284,6 @@ requirements:
     - name: "ComfyUI-Easy-Use"
       repo: "https://github.com/yolain/ComfyUI-Easy-Use"
       required: true
-    - name: "ComfyUI-Florence2"
-      repo: "https://github.com/kijai/ComfyUI-Florence2"
-      required: false
-      note: "Required only if using auto-caption feature"
 
   vram: "24GB minimum (48GB recommended for longer videos)"
   compute: "NVIDIA GPU with CUDA support"
@@ -501,28 +293,23 @@ presets:
   - name: "Quick Preview"
     description: "Fast generation for testing"
     values:
-      duration: 2
+      duration: 2.0
       steps: 15
-      frame_rate: 12
-      vram_reduction: 100
-      enable_upscale_interpolation: false
-      enable_interpolation: false
+      frame_rate: 12.0
+      upscale_ratio: 1.0
 
   - name: "High Quality"
     description: "Best quality, slower generation"
     values:
-      duration: 5
+      duration: 5.0
       steps: 30
-      frame_rate: 24
+      frame_rate: 24.0
       upscale_ratio: 2.0
-      vram_reduction: 0
-      enable_upscale_interpolation: true
 
   - name: "Balanced"
     description: "Good balance of quality and speed"
     values:
-      duration: 5
+      duration: 5.0
       steps: 20
-      frame_rate: 16
-      vram_reduction: 50
-      enable_upscale_interpolation: true
+      frame_rate: 16.0
+      upscale_ratio: 1.5

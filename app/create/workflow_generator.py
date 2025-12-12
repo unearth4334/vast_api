@@ -4,6 +4,7 @@ Generates ComfyUI workflow JSON from user inputs
 """
 
 import copy
+import json
 import logging
 import random
 from datetime import datetime
@@ -29,7 +30,79 @@ class WorkflowGenerator:
         self.template = template
     def generate(self, inputs: Dict[str, Any]) -> dict:
         """
-        Generate workflow JSON from inputs
+        Generate workflow JSON from inputs using token replacement or node-based updates
+        
+        Args:
+            inputs: User input values
+            
+        Returns:
+            Generated workflow JSON
+        """
+        # Check if this workflow uses token-based replacement
+        uses_tokens = any(inp.token or inp.tokens for inp in self.config.inputs)
+        
+        if uses_tokens:
+            # NEW: Token-based replacement (more robust)
+            return self._generate_with_tokens(inputs)
+        else:
+            # LEGACY: Node-based replacement (for backwards compatibility)
+            return self._generate_with_nodes(inputs)
+    
+    def _generate_with_tokens(self, inputs: Dict[str, Any]) -> dict:
+        """
+        Generate workflow using token replacement method
+        
+        Args:
+            inputs: User input values
+            
+        Returns:
+            Generated workflow JSON
+        """
+        # Convert template to JSON string for token replacement
+        workflow_str = json.dumps(self.template)
+        
+        # Generate timestamp for filename tokens
+        now = datetime.now()
+        timestamp_date = now.strftime("%Y-%m-%d")
+        timestamp_time = now.strftime("%H%M%S")
+        
+        # Apply each input's token replacement
+        for input_config in self.config.inputs:
+            try:
+                # Check if input is conditionally shown
+                if input_config.depends_on:
+                    if not self._check_dependency(inputs, input_config.depends_on):
+                        logger.debug(f"Skipping input {input_config.id} (dependency not met)")
+                        continue
+                
+                # Get input value
+                value = inputs.get(input_config.id)
+                if value is None and input_config.default is not None:
+                    value = input_config.default
+                
+                # Skip if no value and not required
+                if value is None and not input_config.required:
+                    continue
+                
+                # Apply token replacement
+                workflow_str = self._apply_token_replacement(workflow_str, input_config, value, inputs)
+                
+            except Exception as e:
+                logger.error(f"Error applying token for input {input_config.id}: {e}", exc_info=True)
+                # Continue processing other inputs
+        
+        # Replace timestamp tokens
+        workflow_str = workflow_str.replace('"{{TIMESTAMP_DATE}}"', json.dumps(timestamp_date))
+        workflow_str = workflow_str.replace('"{{TIMESTAMP_TIME}}"', json.dumps(timestamp_time))
+        
+        # Parse back to dict
+        workflow = json.loads(workflow_str)
+        
+        return workflow
+    
+    def _generate_with_nodes(self, inputs: Dict[str, Any]) -> dict:
+        """
+        Generate workflow using legacy node-based method
         
         Args:
             inputs: User input values
@@ -89,6 +162,169 @@ class WorkflowGenerator:
             return input_value in value
         else:
             return input_value == value
+    
+    def _apply_token_replacement(self, workflow_str: str, config: InputConfig, value: Any, all_inputs: Dict[str, Any]) -> str:
+        """
+        Apply token replacement for a single input
+        
+        Args:
+            workflow_str: Workflow JSON as string
+            config: Input configuration
+            value: Input value
+            all_inputs: All user inputs (for context)
+            
+        Returns:
+            Updated workflow string
+        """
+        input_type = config.type
+        
+        # Handle different input types
+        if input_type == 'seed':
+            return self._replace_seed_token(workflow_str, config, value)
+        elif input_type in ['text', 'textarea']:
+            return self._replace_text_token(workflow_str, config, value)
+        elif input_type == 'slider':
+            return self._replace_numeric_token(workflow_str, config, value)
+        elif input_type in ['toggle', 'checkbox']:
+            return self._replace_boolean_token(workflow_str, config, value)
+        elif input_type == 'image':
+            return self._replace_text_token(workflow_str, config, value)
+        elif input_type == 'high_low_pair_model':
+            return self._replace_high_low_model_tokens(workflow_str, config, value)
+        elif input_type == 'high_low_pair_lora_list':
+            return self._replace_lora_list_tokens(workflow_str, config, value)
+        elif input_type == 'single_model':
+            return self._replace_single_model_token(workflow_str, config, value)
+        elif input_type == 'dropdown':
+            return self._replace_text_token(workflow_str, config, value)
+        else:
+            logger.warning(f"Unknown input type for token replacement: {input_type}")
+            return workflow_str
+    
+    def _replace_text_token(self, workflow_str: str, config: InputConfig, value: Any) -> str:
+        """Replace text token in workflow"""
+        if not config.token:
+            return workflow_str
+        
+        text_value = str(value) if value is not None else ""
+        # Replace token with properly escaped JSON string
+        workflow_str = workflow_str.replace(
+            f'"{config.token}"',
+            json.dumps(text_value)
+        )
+        logger.debug(f"Replaced token {config.token} with text value")
+        return workflow_str
+    
+    def _replace_numeric_token(self, workflow_str: str, config: InputConfig, value: Any) -> str:
+        """Replace numeric token in workflow"""
+        if not config.token:
+            return workflow_str
+        
+        numeric_value = float(value) if value is not None else config.default
+        
+        # Clamp to range if specified
+        if config.min is not None and numeric_value < config.min:
+            numeric_value = config.min
+        if config.max is not None and numeric_value > config.max:
+            numeric_value = config.max
+        
+        # Replace token with numeric value (no quotes)
+        workflow_str = workflow_str.replace(
+            f'"{config.token}"',
+            json.dumps(numeric_value)
+        )
+        logger.debug(f"Replaced token {config.token} with numeric value: {numeric_value}")
+        return workflow_str
+    
+    def _replace_boolean_token(self, workflow_str: str, config: InputConfig, value: Any) -> str:
+        """Replace boolean token in workflow"""
+        if not config.token:
+            return workflow_str
+        
+        bool_value = bool(value) if value is not None else False
+        
+        # Replace token with boolean value
+        workflow_str = workflow_str.replace(
+            f'"{config.token}"',
+            json.dumps(bool_value)
+        )
+        logger.debug(f"Replaced token {config.token} with boolean value: {bool_value}")
+        return workflow_str
+    
+    def _replace_seed_token(self, workflow_str: str, config: InputConfig, value: Any) -> str:
+        """Replace seed token in workflow"""
+        if not config.token:
+            return workflow_str
+        
+        seed_value = int(value) if value is not None else -1
+        
+        # If seed is -1 (random), generate a random seed
+        if seed_value == -1:
+            seed_value = random.randint(0, 2147483647)
+            logger.info(f"Generated random seed: {seed_value}")
+        
+        # Replace token with seed value
+        workflow_str = workflow_str.replace(
+            f'"{config.token}"',
+            json.dumps(seed_value)
+        )
+        logger.debug(f"Replaced token {config.token} with seed: {seed_value}")
+        return workflow_str
+    
+    def _replace_high_low_model_tokens(self, workflow_str: str, config: InputConfig, value: Any) -> str:
+        """Replace high/low model pair tokens"""
+        if not config.tokens:
+            return workflow_str
+        
+        if not value or not isinstance(value, dict):
+            logger.warning(f"Invalid high-low model value for {config.id}")
+            return workflow_str
+        
+        # Replace high noise token
+        if 'high' in config.tokens:
+            high_path = value.get('highNoisePath', config.default_high or '')
+            workflow_str = workflow_str.replace(
+                f'"{config.tokens["high"]}"',
+                json.dumps(high_path)
+            )
+            logger.debug(f"Replaced high noise token {config.tokens['high']} with: {high_path}")
+        
+        # Replace low noise token
+        if 'low' in config.tokens:
+            low_path = value.get('lowNoisePath', config.default_low or '')
+            workflow_str = workflow_str.replace(
+                f'"{config.tokens["low"]}"',
+                json.dumps(low_path)
+            )
+            logger.debug(f"Replaced low noise token {config.tokens['low']} with: {low_path}")
+        
+        return workflow_str
+    
+    def _replace_lora_list_tokens(self, workflow_str: str, config: InputConfig, value: Any) -> str:
+        """Replace LoRA list tokens (not fully implemented yet - needs Power Lora format)"""
+        # TODO: Implement LoRA list token replacement if needed
+        # For now, fall back to node-based method for LoRAs
+        logger.debug(f"LoRA list token replacement not yet implemented for {config.id}")
+        return workflow_str
+    
+    def _replace_single_model_token(self, workflow_str: str, config: InputConfig, value: Any) -> str:
+        """Replace single model token"""
+        if not config.token:
+            return workflow_str
+        
+        if not value or not isinstance(value, dict):
+            # Use default if available
+            model_path = config.default or ''
+        else:
+            model_path = value.get('path', config.default or '')
+        
+        # Replace token with model path
+        workflow_str = workflow_str.replace(
+            f'"{config.token}"',
+            json.dumps(model_path)
+        )
+        logger.debug(f"Replaced model token {config.token} with: {model_path}")
+        return workflow_str
     
     def _apply_input(self, workflow: dict, input_config: InputConfig, inputs: Dict[str, Any]):
         """

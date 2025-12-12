@@ -50,10 +50,15 @@ class InputConfig:
     label: str
     description: str
     required: bool
+    # Token-based value replacement (NEW - preferred method)
+    token: Optional[str] = None  # Single token like "{{DURATION}}"
+    tokens: Optional[Dict[str, str]] = None  # Multiple tokens like {"high": "{{WAN_HIGH}}", "low": "{{WAN_LOW}}"}
+    # Legacy node-based value replacement (deprecated but still supported)
     node_id: Optional[str] = None
     node_ids: Optional[List[str]] = None
     field: Optional[str] = None
     fields: Optional[List[str]] = None
+    # Value constraints and defaults
     default: Optional[Any] = None
     default_high: Optional[str] = None
     default_low: Optional[str] = None
@@ -234,10 +239,15 @@ class WorkflowLoader:
                     label=inp_data['label'],
                     description=inp_data.get('description', ''),
                     required=inp_data.get('required', False),
+                    # Token-based (NEW)
+                    token=inp_data.get('token'),
+                    tokens=inp_data.get('tokens'),
+                    # Node-based (legacy)
                     node_id=inp_data.get('node_id'),
                     node_ids=inp_data.get('node_ids'),
                     field=inp_data.get('field'),
                     fields=inp_data.get('fields'),
+                    # Value constraints
                     default=inp_data.get('default'),
                     default_high=inp_data.get('default_high'),
                     default_low=inp_data.get('default_low'),
