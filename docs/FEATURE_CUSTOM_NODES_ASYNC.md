@@ -56,7 +56,7 @@ Implemented a fully asynchronous architecture that decouples installation execut
 ### 7. Documentation (NEW)
 **Files:**
 - `ARCHITECTURE.md` - Complete technical documentation
-- `TESTING_GUIDE.md` - Testing procedures and scenarios
+- `TESTING.md` - Testing procedures and scenarios
 
 ## Performance Improvements
 
@@ -190,7 +190,7 @@ app/sync/workflow_executor.py     (MODIFIED, ~200 lines changed)
 test/test_background_tasks.py     (NEW, 286 lines)
 test/test_custom_nodes_async_api.py (NEW, 312 lines)
 ARCHITECTURE.md                   (NEW, 450+ lines)
-TESTING_GUIDE.md                  (NEW, 200+ lines)
+TESTING.md                        (NEW, 200+ lines)
 ```
 
 ## Success Criteria - All Met ✅

@@ -409,7 +409,7 @@ If issues arise:
 
 ## Testing Strategy
 
-See `TESTING_GUIDE.md` for comprehensive testing procedures.
+See `TESTING.md` for comprehensive testing procedures.
 
 **Key Test Areas:**
 1. Unit tests for BackgroundTaskManager (14 tests)

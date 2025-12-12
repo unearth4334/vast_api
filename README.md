@@ -3,7 +3,7 @@
 An easy-to-use tool for syncing media from local Docker containers and VastAI cloud VMs. Provides a web API interface designed for deployment on QNAP NAS.
 
 > **🎉 NEW: Redesigned Sync System Available!**  
-> See [SYNC_REDESIGN_README.md](SYNC_REDESIGN_README.md) for the new v2 API with real-time progress, WebSocket support, and enhanced performance.
+> See [docs/GUIDE_SYNC_REDESIGN.md](docs/GUIDE_SYNC_REDESIGN.md) for the new v2 API with real-time progress, WebSocket support, and enhanced performance.
 
 ## Features
 
