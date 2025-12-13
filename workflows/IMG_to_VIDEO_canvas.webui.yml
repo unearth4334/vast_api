@@ -300,7 +300,7 @@ inputs:
     label: "Save Last Frame"
     description: "Save the final frame as a separate image output"
     required: false
-    default: false
+    default: 2  # mode: 2 = disabled (bypass)
 
   - id: "enable_interpolation"
     section: "features"
@@ -311,7 +311,7 @@ inputs:
     label: "Enable Interpolation (RIFE)"
     description: "Use RIFE to interpolate frames and increase smoothness"
     required: false
-    default: false
+    default: 0  # mode: 0 = enabled
 
   - id: "use_upscaler"
     section: "features"
@@ -322,7 +322,7 @@ inputs:
     label: "Enable Upscaler"
     description: "Apply AI upscaling to the input image before video generation. Uses the upscale model and ratio configured above."
     required: false
-    default: false
+    default: 2  # mode: 2 = disabled (bypass)
 
   - id: "enable_upscale_interpolation"
     section: "features"
@@ -333,7 +333,7 @@ inputs:
     label: "Enable Upscale + Interpolation"
     description: "Apply both upscaling and frame interpolation (combines both techniques)"
     required: false
-    default: false
+    default: 2  # mode: 2 = disabled (bypass)
 
   - id: "enable_video_enhancer"
     section: "features"
@@ -344,7 +344,7 @@ inputs:
     label: "Video Enhancer (WanVideoEnhanceAVideoKJ)"
     description: "Apply WAN video enhancement for improved quality"
     required: false
-    default: false
+    default: 0  # mode: 0 = enabled
 
   - id: "enable_cfg_zero_star"
     section: "features"
@@ -355,7 +355,7 @@ inputs:
     label: "CFGZeroStar"
     description: "Enable CFG guidance enhancement for better prompt adherence"
     required: false
-    default: false
+    default: 0  # mode: 0 = enabled
 
   - id: "enable_speed_regulation"
     section: "features"
@@ -366,7 +366,7 @@ inputs:
     label: "Speed Regulation"
     description: "Enable ModelSamplingSD3 speed control for sampling adjustments"
     required: false
-    default: false
+    default: 0  # mode: 0 = enabled
 
   - id: "enable_normalized_attention"
     section: "features"
@@ -377,7 +377,7 @@ inputs:
     label: "Normalized Attention (WanVideoNAG)"
     description: "Apply normalized attention guidance for better consistency"
     required: false
-    default: false
+    default: 0  # mode: 0 = enabled
 
   # Performance & Memory
   - id: "enable_magcache"
@@ -388,7 +388,7 @@ inputs:
     label: "MagCache"
     description: "Enable memory caching to speed up repeated operations"
     required: false
-    default: false
+    default: 0  # mode: 0 = enabled
 
   - id: "enable_torch_compile"
     section: "features"
@@ -399,7 +399,7 @@ inputs:
     label: "TorchCompile"
     description: "Enable JIT compilation for faster execution (first run will be slower)"
     required: false
-    default: false
+    default: 4  # mode: 4 = muted (disabled)
 
   - id: "enable_block_swap"
     section: "features"
@@ -410,7 +410,7 @@ inputs:
     label: "BlockSwap"
     description: "Enable model offloading to reduce VRAM usage at the cost of speed"
     required: false
-    default: false
+    default: 0  # mode: 0 = enabled
 
   # VRAM Control
   - id: "vram_reduction"
@@ -423,8 +423,8 @@ inputs:
     description: "Percentage of model to offload to system RAM (0% = all in VRAM, 100% = maximum offloading)"
     min: 0
     max: 100
-    step: 5
-    default: 0
+    step: 1
+    default: 100
     unit: "%"
 
 # Output configuration
