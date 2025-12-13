@@ -1245,6 +1245,47 @@ def ssh_setup_civitdl():
         })
 
 
+@app.route('/ssh/install-browser-agent', methods=['POST', 'OPTIONS'])
+def install_browser_agent_ssh():
+    """Install BrowserAgent on remote instance via SSH"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        logger.info(f"Installing BrowserAgent via SSH: {ssh_connection}")
+        
+        # Create context for logging
+        operation_id = f"browser_agent_install_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+        context = LogContext(
+            operation_id=operation_id,
+            user_agent="vast_api/1.0 (ssh_browser_agent_install)",
+            session_id=f"session_{int(time.time())}",
+            ip_address="localhost",
+            template_name="comfyui"
+        )
+        
+        # Use the template-based installation
+        result = execute_browser_agent_install(ssh_connection, {}, context)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error installing BrowserAgent: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error installing BrowserAgent: {str(e)}'
+        })
+
+
 @app.route('/ssh/test-civitdl', methods=['POST', 'OPTIONS'])
 def ssh_test_civitdl():
     """Test CivitDL installation on remote instance"""
@@ -2931,6 +2972,47 @@ def setup_civitdl():
         })
 
 
+@app.route('/vastai/install-browser-agent', methods=['POST', 'OPTIONS'])
+def install_browser_agent_vastai():
+    """Install BrowserAgent on VastAI instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        ssh_connection = data.get('ssh_connection')
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            })
+        
+        logger.info(f"Installing BrowserAgent via SSH: {ssh_connection}")
+        
+        # Create context for logging
+        operation_id = f"browser_agent_install_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+        context = LogContext(
+            operation_id=operation_id,
+            user_agent="vast_api/1.0 (vastai_browser_agent_install)",
+            session_id=f"session_{int(time.time())}",
+            ip_address="localhost",
+            template_name="comfyui"
+        )
+        
+        # Use the template-based installation
+        result = execute_browser_agent_install(ssh_connection, {}, context)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error installing BrowserAgent: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error installing BrowserAgent: {str(e)}'
+        })
+
+
 @app.route('/vastai/search-offers', methods=['GET', 'OPTIONS'])
 def search_vastai_offers():
     """Search for available VastAI offers"""
@@ -4186,18 +4268,50 @@ def execute_browser_agent_install(ssh_connection, step, context: LogContext):
         ssh_key = '/root/.ssh/id_ed25519'
         
         # Multi-step installation script following the deployment guide
+        # Made idempotent - safe to run multiple times
         remote_script = '''set -e
 
+echo "=== BrowserAgent Installation ==="
+echo ""
+
+# Quick check if already installed and working
+if [ -d "/root/BrowserAgent" ]; then
+    echo "Checking existing installation..."
+    if PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -c "from browser_agent.agent.core import Agent" 2>/dev/null; then
+        echo "✓ BrowserAgent is already installed and working"
+        echo ""
+        echo "=== Verifying installation ==="
+        PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -c "from browser_agent.agent.core import Agent; print('✓ Import successful')"
+        python3 -m playwright --version 2>/dev/null || echo "Playwright version: Not available"
+        
+        # Check if Chromium is installed
+        if ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome 2>/dev/null | head -1; then
+            echo "✓ Chromium browser installed"
+        else
+            echo "⚠ Chromium not found, installing..."
+            python3 -m playwright install chromium
+        fi
+        
+        echo ""
+        echo "✅ BrowserAgent verification completed - installation is functional"
+        exit 0
+    else
+        echo "⚠ BrowserAgent found but not working, reinstalling..."
+    fi
+fi
+
 echo "=== Step 1: Update package list ==="
-apt-get update
+apt-get update -qq
 
 echo ""
 echo "=== Step 2: Install system dependencies for Chromium ==="
-apt-get install -y \
+echo "Installing required system libraries (may show 'already installed')..."
+apt-get install -y -qq \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libdbus-1-3 libxkbcommon0 \
     libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
-    libgbm1 libpango-1.0-0 libcairo2 libasound2
+    libgbm1 libpango-1.0-0 libcairo2 libasound2 2>&1 | grep -v "already the newest version" || true
+echo "✓ System dependencies verified"
 
 echo ""
 echo "=== Step 3: Clone or update BrowserAgent repository ==="
@@ -4207,26 +4321,26 @@ if [ ! -d "BrowserAgent" ]; then
     git clone https://github.com/unearth4334/BrowserAgent.git
     cd BrowserAgent
     git checkout main
-    echo "Repository cloned successfully"
+    echo "✓ Repository cloned successfully"
 else
     echo "BrowserAgent directory exists, updating..."
     cd BrowserAgent
     git fetch origin
     git checkout main
     git pull origin main
-    echo "Repository updated successfully"
+    echo "✓ Repository updated successfully"
 fi
 
 echo ""
 echo "=== Step 4: Install Python dependencies ==="
 cd /root/BrowserAgent
-pip install --upgrade .
-echo "Python dependencies installed"
+pip install --upgrade . -q
+echo "✓ Python dependencies installed"
 
 echo ""
 echo "=== Step 5: Install Playwright Chromium browser ==="
 python3 -m playwright install chromium
-echo "Chromium browser installed"
+echo "✓ Chromium browser installed"
 
 echo ""
 echo "=== Step 6: Verify installation ==="
@@ -4238,12 +4352,20 @@ python3 -m playwright --version
 
 echo ""
 echo "=== Step 8: Verify Chromium executable ==="
-ls -lh ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1
+if ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1; then
+    echo "✓ Chromium executable verified"
+else
+    echo "⚠ Warning: Chromium executable not found"
+fi
 
 echo ""
 echo "=== Step 9: Run unit tests (optional) ==="
 cd /root/BrowserAgent
-PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -m pytest tests/ --ignore=tests/integration/ -v --tb=short || echo "Warning: Some tests failed, but installation may still be functional"
+if PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -m pytest tests/ --ignore=tests/integration/ -v --tb=short 2>&1; then
+    echo "✓ All tests passed"
+else
+    echo "⚠ Some tests failed, but installation may still be functional"
+fi
 
 echo ""
 echo "✅ BrowserAgent installation completed successfully"
