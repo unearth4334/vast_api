@@ -92,6 +92,33 @@ inputs:
     control_after_generate: "randomize"
 
   # === GENERATION PARAMETERS ===
+  - id: "auto_size_enabled"
+    section: "generation"
+    type: "checkbox"
+    label: "Automatic Sizing"
+    description: "Automatically calculate output dimensions based on input image and max size constraint"
+    default: false
+    controls_fields:
+      - "size_x"
+      - "size_y"
+    requires_fields:
+      - "input_image"
+      - "max_image_size"
+
+  - id: "max_image_size"
+    section: "generation"
+    type: "slider"
+    label: "Max Image Size"
+    description: "Maximum dimension (width or height) for automatic sizing. The image will be scaled to fit within this constraint while maintaining aspect ratio."
+    min: 512
+    max: 2048
+    step: 64
+    default: 1024
+    unit: "px"
+    visible_when:
+      field: "auto_size_enabled"
+      value: true
+
   - id: "size_x"
     section: "generation"
     token: "{{SIZE_WIDTH}}"
@@ -103,6 +130,8 @@ inputs:
     step: 64
     default: 896
     unit: "px"
+    controlled_by: "auto_size_enabled"
+    auto_calculate: true
 
   - id: "size_y"
     section: "generation"
@@ -115,6 +144,8 @@ inputs:
     step: 64
     default: 1120
     unit: "px"
+    controlled_by: "auto_size_enabled"
+    auto_calculate: true
 
   - id: "duration"
     section: "generation"
@@ -241,8 +272,32 @@ inputs:
     default: "RealESRGAN_x4plus.pth"
 
   # === ADVANCED FEATURES ===
+  
+  # Output & Enhancement Toggles
+  - id: "save_last_frame"
+    section: "features"
+    node_ids:
+      - "447"  # SaveImage node
+      - "444"  # ImageFromBatch node
+    type: "node_mode_toggle"
+    label: "Save Last Frame"
+    description: "Save the final frame as a separate image output"
+    required: false
+    default: false
+
+  - id: "enable_interpolation"
+    section: "features"
+    node_ids:
+      - "431"  # RIFE VFI node (base interpolation)
+      - "433"  # VHS_VideoCombine (Save Interpoled)
+    type: "node_mode_toggle"
+    label: "Enable Interpolation (RIFE)"
+    description: "Use RIFE to interpolate frames and increase smoothness"
+    required: false
+    default: false
+
   - id: "use_upscaler"
-    section: "advanced"
+    section: "features"
     node_ids:
       - "385"  # ImageUpscaleWithModel node
       - "418"  # ImageScaleBy (Apply ratio) node
@@ -251,6 +306,109 @@ inputs:
     description: "Apply AI upscaling to the input image before video generation. Uses the upscale model and ratio configured above."
     required: false
     default: false
+
+  - id: "enable_upscale_interpolation"
+    section: "features"
+    node_ids:
+      - "442"  # RIFE VFI node (upscale path)
+      - "443"  # VHS_VideoCombine (Save UPINT)
+    type: "node_mode_toggle"
+    label: "Enable Upscale + Interpolation"
+    description: "Apply both upscaling and frame interpolation (combines both techniques)"
+    required: false
+    default: false
+
+  - id: "enable_video_enhancer"
+    section: "features"
+    node_ids:
+      - "481"  # WanVideoEnhanceAVideoKJ (Enhance High)
+      - "482"  # WanVideoEnhanceAVideoKJ (Enhance Low)
+    type: "node_mode_toggle"
+    label: "Video Enhancer (WanVideoEnhanceAVideoKJ)"
+    description: "Apply WAN video enhancement for improved quality"
+    required: false
+    default: false
+
+  - id: "enable_cfg_zero_star"
+    section: "features"
+    node_ids:
+      - "483"  # CFGZeroStarAndInit (CFG Zero High)
+      - "484"  # CFGZeroStarAndInit (CFG Zero Low)
+    type: "node_mode_toggle"
+    label: "CFGZeroStar"
+    description: "Enable CFG guidance enhancement for better prompt adherence"
+    required: false
+    default: false
+
+  - id: "enable_speed_regulation"
+    section: "features"
+    node_ids:
+      - "467"  # ModelSamplingSD3 (SamplingHigh)
+      - "468"  # ModelSamplingSD3 (SamplingLow)
+    type: "node_mode_toggle"
+    label: "Speed Regulation"
+    description: "Enable ModelSamplingSD3 speed control for sampling adjustments"
+    required: false
+    default: false
+
+  - id: "enable_normalized_attention"
+    section: "features"
+    node_ids:
+      - "485"  # WanVideoNAG (NAG High)
+      - "486"  # WanVideoNAG (NAG Low)
+    type: "node_mode_toggle"
+    label: "Normalized Attention (WanVideoNAG)"
+    description: "Apply normalized attention guidance for better consistency"
+    required: false
+    default: false
+
+  # Performance & Memory
+  - id: "enable_magcache"
+    section: "features"
+    node_ids:
+      - "506"  # MagCache Low
+    type: "node_mode_toggle"
+    label: "MagCache"
+    description: "Enable memory caching to speed up repeated operations"
+    required: false
+    default: false
+
+  - id: "enable_torch_compile"
+    section: "features"
+    node_ids:
+      - "492"  # TorchCompileModelWanVideo (Compile High)
+      - "494"  # TorchCompileModelWanVideo (Compile Low)
+    type: "node_mode_toggle"
+    label: "TorchCompile"
+    description: "Enable JIT compilation for faster execution (first run will be slower)"
+    required: false
+    default: false
+
+  - id: "enable_block_swap"
+    section: "features"
+    node_ids:
+      - "500"  # wanBlockSwap (BlockSwap High)
+      - "501"  # wanBlockSwap (BlockSwap Low)
+    type: "node_mode_toggle"
+    label: "BlockSwap"
+    description: "Enable model offloading to reduce VRAM usage at the cost of speed"
+    required: false
+    default: false
+
+  # VRAM Control
+  - id: "vram_reduction"
+    section: "features"
+    node_ids:
+      - "502"  # mxSlider (Reduce VRAM usage - BlockSwap)
+    token: "{{VRAM_REDUCTION}}"
+    type: "slider"
+    label: "VRAM Reduction"
+    description: "Percentage of model to offload to system RAM (0% = all in VRAM, 100% = maximum offloading)"
+    min: 0
+    max: 100
+    step: 5
+    default: 0
+    unit: "%"
 
 # Output configuration
 outputs:

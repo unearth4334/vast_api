@@ -4568,8 +4568,8 @@
         }
       },
       "widgets_values": [
-        100,
-        100,
+        "{{VRAM_REDUCTION}}",
+        "{{VRAM_REDUCTION}}",
         0
       ],
       "color": "#432",
