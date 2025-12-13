@@ -290,18 +290,24 @@ export async function executeTemplateStep(stepName) {
   // Enhanced debugging for template execution
   console.log(`🔧 executeTemplateStep called with: "${stepName}"`);
   
-  const sshConnectionString = document.getElementById('sshConnectionString')?.value.trim();
+  // Get SSH connection from toolbar (new) or fallback to input field (old)
+  let sshConnectionString = '';
+  if (window.VastAIConnectionToolbar && typeof window.VastAIConnectionToolbar.getSSHConnectionString === 'function') {
+    sshConnectionString = window.VastAIConnectionToolbar.getSSHConnectionString();
+    console.log(`🔗 SSH from toolbar: "${sshConnectionString}"`);
+  } else {
+    sshConnectionString = document.getElementById('sshConnectionString')?.value.trim() || '';
+    console.log(`🔗 SSH from input field: "${sshConnectionString}"`);
+  }
+  
   const templateId = document.getElementById('templateSelector')?.value;
   
-  console.log(`🔗 SSH Connection String: "${sshConnectionString}"`);
   console.log(`🎛️ Template ID: "${templateId}"`);
   console.log(`📋 Current Template:`, currentTemplate);
-  console.log(`📍 SSH Element exists:`, !!document.getElementById('sshConnectionString'));
-  console.log(`📍 Template Selector exists:`, !!document.getElementById('templateSelector'));
   
   if (!sshConnectionString) {
     console.log(`❌ No SSH connection string provided`);
-    showSetupResult('Please enter an SSH connection string first.', 'error');
+    showSetupResult('Please connect to an instance first (use toolbar or enter SSH connection).', 'error');
     return;
   }
   
