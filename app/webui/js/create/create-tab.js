@@ -1782,3 +1782,11 @@ window.handleMaxSizeInputChange = handleMaxSizeInputChange;
 window.handleApplyMaxSize = handleApplyMaxSize;
 window.handleAutoSizeToggle = handleAutoSizeToggle;
 window.storeImageDimensions = storeImageDimensions;
+
+// Auto-initialize if Create tab is already visible when module loads
+// This handles the case where the module loads after the tab is shown
+if (document.getElementById('create-tab')?.classList.contains('active') && !window.createTabInitialized) {
+    console.log('🎨 Auto-initializing Create tab (tab is already visible)...');
+    initCreateTab();
+    window.createTabInitialized = true;
+}

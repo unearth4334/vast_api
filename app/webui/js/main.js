@@ -45,17 +45,30 @@ function showTab(tabName, event) {
             initCreateTab();
             window.createTabInitialized = true;
         } else {
-            console.warn('⚠️ initCreateTab function not available yet. Retrying...');
-            // Retry after a short delay to allow module to load
-            setTimeout(() => {
+            console.warn('⚠️ initCreateTab function not available yet. Retrying with exponential backoff...');
+            // Retry with exponential backoff (100ms, 200ms, 500ms, 1000ms)
+            let attempt = 0;
+            const maxAttempts = 4;
+            const delays = [100, 200, 500, 1000];
+            
+            const retryInit = () => {
                 if (typeof initCreateTab === 'function') {
-                    console.log('🎨 Calling initCreateTab() after retry...');
+                    console.log(`🎨 Calling initCreateTab() after retry (attempt ${attempt + 1})...`);
                     initCreateTab();
                     window.createTabInitialized = true;
                 } else {
-                    console.error('❌ initCreateTab function still not available after retry');
+                    attempt++;
+                    if (attempt < maxAttempts) {
+                        console.warn(`⚠️ Retry ${attempt}/${maxAttempts} - initCreateTab still not available, waiting ${delays[attempt]}ms...`);
+                        setTimeout(retryInit, delays[attempt]);
+                    } else {
+                        console.error('❌ initCreateTab function still not available after all retries');
+                        console.error('❌ Please refresh the page or report this issue');
+                    }
                 }
-            }, 100);
+            };
+            
+            setTimeout(retryInit, delays[0]);
         }
     }
     
