@@ -4385,6 +4385,10 @@ fi
 echo ""
 echo "=== Step 4: Install Python dependencies ==="
 cd /root/BrowserAgent
+# Install playwright first as it's required before we can use python3 -m playwright
+pip install playwright -q
+echo "✓ Playwright package installed"
+# Then install BrowserAgent itself
 pip install --upgrade . -q
 echo "✓ Python dependencies installed"
 
