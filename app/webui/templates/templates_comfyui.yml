@@ -136,15 +136,15 @@ ui_config:
       style: "primary"
       tooltip: "Create symbolic links for model directories (upscale_models, loras)"
       
-    - label: "🔌 Install Custom Nodes"
-      action: "install_custom_nodes"
-      style: "primary"
-      tooltip: "Clone auto-installer, install custom nodes, and verify dependencies"
-      
     - label: "🌐 Install BrowserAgent"
       action: "install_browser_agent"
       style: "primary"
       tooltip: "Install BrowserAgent for automated browser-based workflow execution"
+      
+    - label: "🔌 Install Custom Nodes"
+      action: "install_custom_nodes"
+      style: "primary"
+      tooltip: "Clone auto-installer, install custom nodes, and verify dependencies"
       
     - label: "🔄 Reboot Instance"
       action: "reboot_instance"
