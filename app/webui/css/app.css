@@ -909,6 +909,12 @@ body {
     opacity: 0.5;
 }
 
+.workflow-step.disabled .step-button:not(:disabled) {
+    /* Allow clickable buttons even when workflow step is disabled */
+    opacity: 1;
+    cursor: pointer;
+}
+
 .workflow-step.disabled .step-toggle {
     background: var(--interactive-normal);
 }

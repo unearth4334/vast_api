@@ -878,12 +878,29 @@ function updateWorkflowSteps(template) {
     const buttonContainer = document.createElement('div');
     buttonContainer.className = 'step-button-container';
     
-    // Create step label (buttons no longer executable in server-side mode)
+    // Create step button that can be clicked for individual execution
     const stepButton = document.createElement('button');
     stepButton.className = 'step-button';
     stepButton.textContent = button.label;
-    stepButton.disabled = true; // Individual steps not executable in workflow mode
-    stepButton.title = 'Steps are executed as part of workflow';
+    stepButton.title = button.tooltip || `Click to execute: ${button.label}`;
+    
+    // Add click handler based on action type
+    const action = button.action;
+    if (action === 'install_browser_agent' || action === 'setup_civitdl' || 
+        action === 'install_custom_nodes' || action === 'test_ssh') {
+      // These actions can execute individually via templates API
+      stepButton.onclick = () => {
+        if (window.VastAITemplates && typeof window.VastAITemplates.executeTemplateStep === 'function') {
+          window.VastAITemplates.executeTemplateStep(button.label);
+        } else {
+          console.error('VastAITemplates.executeTemplateStep not available');
+        }
+      };
+    } else {
+      // Other actions only work in workflow mode
+      stepButton.disabled = true;
+      stepButton.title = 'This step requires workflow execution';
+    }
     
     // Create toggle button
     const toggleButton = document.createElement('button');
