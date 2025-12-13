@@ -189,6 +189,9 @@ function updateSetupButtons(template) {
         case 'set_ui_home':
           btnElement.onclick = () => executeTemplateStep('Set UI Home');
           break;
+        case 'install_browser_agent':
+          btnElement.onclick = () => executeTemplateStep('Install BrowserAgent');
+          break;
         case 'setup_python_venv':
           btnElement.onclick = () => executeTemplateStep('Setup Python Virtual Environment');
           break;
