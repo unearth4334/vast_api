@@ -59,6 +59,59 @@ setup_steps:
     type: "python_venv"
     path: "/workspace/ComfyUI/venv"
     description: "Create Python virtual environment for ComfyUI"
+    
+  - name: "Install BrowserAgent"
+    type: "browser_agent_install"
+    description: "Install BrowserAgent for automated workflow execution in browser"
+    repository: "https://github.com/unearth4334/BrowserAgent.git"
+    destination: "/root/BrowserAgent"
+    branch: "main"
+    commands:
+      - name: "Update package list"
+        command: "apt-get update"
+        description: "Update apt package list"
+        
+      - name: "Install system dependencies"
+        command: |
+          apt-get install -y \
+            libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libdrm2 libdbus-1-3 libxkbcommon0 \
+            libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+            libgbm1 libpango-1.0-0 libcairo2 libasound2
+        description: "Install required system libraries for Chromium"
+        
+      - name: "Clone or update BrowserAgent"
+        command: |
+          cd /root
+          if [ ! -d "BrowserAgent" ]; then
+            git clone https://github.com/unearth4334/BrowserAgent.git
+            cd BrowserAgent
+            git checkout main
+          else
+            cd BrowserAgent
+            git fetch origin
+            git checkout main
+            git pull origin main
+          fi
+        description: "Clone BrowserAgent repository or update existing installation"
+        
+      - name: "Install Python dependencies"
+        command: "cd /root/BrowserAgent && pip install --upgrade ."
+        description: "Install BrowserAgent Python package and dependencies"
+        
+      - name: "Install Playwright browser"
+        command: "python3 -m playwright install chromium"
+        description: "Install Chromium browser for Playwright (~300MB)"
+        
+      - name: "Verify installation"
+        command: |
+          PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -c "from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
+        description: "Verify BrowserAgent can be imported"
+        
+      - name: "Run unit tests"
+        command: "cd /root/BrowserAgent && PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -m pytest tests/ --ignore=tests/integration/ -v --tb=short"
+        description: "Run BrowserAgent unit tests to verify installation"
+        optional: true
 
 # UI Configuration
 ui_config:
@@ -87,6 +140,11 @@ ui_config:
       action: "install_custom_nodes"
       style: "primary"
       tooltip: "Clone auto-installer, install custom nodes, and verify dependencies"
+      
+    - label: "🌐 Install BrowserAgent"
+      action: "install_browser_agent"
+      style: "primary"
+      tooltip: "Install BrowserAgent for automated browser-based workflow execution"
       
     - label: "🔄 Reboot Instance"
       action: "reboot_instance"

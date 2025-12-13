@@ -3483,6 +3483,15 @@ def execute_step(ssh_connection, step, template_data, context: LogContext):
                     'message': 'No Python venv path specified in step or template environment'
                 }
         
+        elif step_type == 'browser_agent_install':
+            enhanced_logger.log_operation(
+                message="Installing BrowserAgent for automated workflow execution",
+                operation="browser_agent_install_step",
+                context=context,
+                extra_data={"ssh_connection_info": ssh_connection.split('@')[-1] if '@' in ssh_connection else ssh_connection}
+            )
+            result = execute_browser_agent_install(ssh_connection, step, context)
+        
         else:
             enhanced_logger.log_error(
                 message=f"Unknown step type: {step_type}",
@@ -4128,6 +4137,194 @@ echo 'Virtual environment setup completed successfully' '''
         return {
             'success': False,
             'message': f'Error setting up Python virtual environment: {str(e)}'
+        }
+
+
+def execute_browser_agent_install(ssh_connection, step, context: LogContext):
+    """Execute BrowserAgent installation with system dependencies, Python packages, and verification"""
+    try:
+        enhanced_logger.log_operation(
+            "🌐 Starting BrowserAgent installation",
+            "browser_agent_install_start",
+            context=context,
+            extra_data={"ssh_connection": ssh_connection, "step_config": step}
+        )
+        
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            enhanced_logger.log_error(
+                "Invalid SSH connection string format for BrowserAgent install",
+                "ssh_parse_error",
+                context=context,
+                extra_data={"ssh_connection": ssh_connection}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        if not host or not port:
+            enhanced_logger.log_error(
+                "Missing host or port in SSH connection",
+                "ssh_connection_incomplete",
+                context=context,
+                extra_data={"host": host, "port": port}
+            )
+            return {
+                'success': False,
+                'message': 'Invalid SSH connection string format'
+            }
+        
+        enhanced_logger.log_operation(
+            f"🔌 Connecting to {user}@{host}:{port} for BrowserAgent installation",
+            "ssh_connection_attempt",
+            context=context,
+            extra_data={"host": host, "port": port, "user": user}
+        )
+        
+        ssh_key = '/root/.ssh/id_ed25519'
+        
+        # Multi-step installation script following the deployment guide
+        remote_script = '''set -e
+
+echo "=== Step 1: Update package list ==="
+apt-get update
+
+echo ""
+echo "=== Step 2: Install system dependencies for Chromium ==="
+apt-get install -y \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+    libcups2 libdrm2 libdbus-1-3 libxkbcommon0 \
+    libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+    libgbm1 libpango-1.0-0 libcairo2 libasound2
+
+echo ""
+echo "=== Step 3: Clone or update BrowserAgent repository ==="
+cd /root
+if [ ! -d "BrowserAgent" ]; then
+    echo "Cloning BrowserAgent repository..."
+    git clone https://github.com/unearth4334/BrowserAgent.git
+    cd BrowserAgent
+    git checkout main
+    echo "Repository cloned successfully"
+else
+    echo "BrowserAgent directory exists, updating..."
+    cd BrowserAgent
+    git fetch origin
+    git checkout main
+    git pull origin main
+    echo "Repository updated successfully"
+fi
+
+echo ""
+echo "=== Step 4: Install Python dependencies ==="
+cd /root/BrowserAgent
+pip install --upgrade .
+echo "Python dependencies installed"
+
+echo ""
+echo "=== Step 5: Install Playwright Chromium browser ==="
+python3 -m playwright install chromium
+echo "Chromium browser installed"
+
+echo ""
+echo "=== Step 6: Verify installation ==="
+PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -c "from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
+
+echo ""
+echo "=== Step 7: Check Playwright version ==="
+python3 -m playwright --version
+
+echo ""
+echo "=== Step 8: Verify Chromium executable ==="
+ls -lh ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1
+
+echo ""
+echo "=== Step 9: Run unit tests (optional) ==="
+cd /root/BrowserAgent
+PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -m pytest tests/ --ignore=tests/integration/ -v --tb=short || echo "Warning: Some tests failed, but installation may still be functional"
+
+echo ""
+echo "✅ BrowserAgent installation completed successfully"
+'''
+        
+        cmd = [
+            'ssh',
+            '-p', str(port),
+            '-i', ssh_key,
+            '-o', 'StrictHostKeyChecking=accept-new',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            '-o', 'IdentitiesOnly=yes',
+            '-o', 'ConnectTimeout=10',
+            f'{user}@{host}',
+            remote_script
+        ]
+        
+        enhanced_logger.log_operation(
+            "Executing BrowserAgent installation script",
+            "browser_agent_install_execute",
+            context=context,
+            extra_data={"command_length": len(remote_script)}
+        )
+        
+        # Longer timeout for installation (10 minutes due to Chromium download)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        
+        if result.returncode == 0:
+            enhanced_logger.log_operation(
+                "✅ BrowserAgent installation completed successfully",
+                "browser_agent_install_success",
+                context=context,
+                extra_data={
+                    "return_code": result.returncode,
+                    "output_length": len(result.stdout)
+                }
+            )
+            return {
+                'success': True,
+                'message': 'BrowserAgent installed and verified successfully',
+                'output': result.stdout
+            }
+        else:
+            enhanced_logger.log_error(
+                f"BrowserAgent installation failed: {result.stderr.strip()}",
+                "browser_agent_install_failed",
+                context=context,
+                extra_data={
+                    "return_code": result.returncode,
+                    "stderr": result.stderr.strip(),
+                    "stdout": result.stdout.strip()
+                }
+            )
+            return {
+                'success': False,
+                'message': f'BrowserAgent installation failed with return code {result.returncode}',
+                'error': result.stderr,
+                'output': result.stdout
+            }
+            
+    except subprocess.TimeoutExpired:
+        enhanced_logger.log_error(
+            "BrowserAgent installation timed out",
+            "ssh_timeout",
+            context=context,
+            extra_data={"timeout_seconds": 600}
+        )
+        return {
+            'success': False,
+            'message': 'SSH command timed out during BrowserAgent installation (exceeded 10 minutes)'
+        }
+    except Exception as e:
+        enhanced_logger.log_error(
+            f"Unexpected error during BrowserAgent installation: {str(e)}",
+            "browser_agent_install_error",
+            context=context,
+            extra_data={"error_type": type(e).__name__, "error_message": str(e)}
+        )
+        return {
+            'success': False,
+            'message': f'Error installing BrowserAgent: {str(e)}'
         }
 
 
