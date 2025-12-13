@@ -1787,6 +1787,11 @@ window.storeImageDimensions = storeImageDimensions;
 // This handles the case where the module loads after the tab is shown
 if (document.getElementById('create-tab')?.classList.contains('active') && !window.createTabInitialized) {
     console.log('🎨 Auto-initializing Create tab (tab is already visible)...');
-    initCreateTab();
+    // Set flag first to prevent multiple simultaneous initializations
     window.createTabInitialized = true;
+    initCreateTab().catch(error => {
+        console.error('❌ Auto-initialization failed:', error);
+        // Reset flag on failure to allow retry
+        window.createTabInitialized = false;
+    });
 }

@@ -42,8 +42,13 @@ function showTab(tabName, event) {
     if (tabName === 'create' && !window.createTabInitialized) {
         if (typeof initCreateTab === 'function') {
             console.log('🎨 Calling initCreateTab()...');
-            initCreateTab();
+            // Set flag first to prevent multiple simultaneous initializations
             window.createTabInitialized = true;
+            initCreateTab().catch(error => {
+                console.error('❌ initCreateTab failed:', error);
+                // Reset flag on failure to allow retry
+                window.createTabInitialized = false;
+            });
         } else {
             console.warn('⚠️ initCreateTab function not available yet. Retrying with exponential backoff...');
             // Retry with exponential backoff: wait 100ms, then 200ms, then 500ms, then 1000ms
@@ -54,8 +59,13 @@ function showTab(tabName, event) {
             const retryInit = () => {
                 if (typeof initCreateTab === 'function') {
                     console.log(`🎨 Calling initCreateTab() after retry (attempt ${attempt + 1})...`);
-                    initCreateTab();
+                    // Set flag first to prevent multiple simultaneous initializations
                     window.createTabInitialized = true;
+                    initCreateTab().catch(error => {
+                        console.error('❌ initCreateTab failed after retry:', error);
+                        // Reset flag on failure to allow retry
+                        window.createTabInitialized = false;
+                    });
                 } else {
                     attempt++;
                     if (attempt < maxAttempts) {
