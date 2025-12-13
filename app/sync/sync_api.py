@@ -1060,14 +1060,17 @@ def ssh_configure_links():
                 'message': f'SSH key not found: {ssh_key}'
             })
         
+        # First ensure the models directory exists, then create the source directories if they don't exist
+        mkdir_cmd = f'mkdir -p "{ui_home}/models/ESRGAN" "{ui_home}/models/Lora"'
+        
         # Configure upscale_models link (handle both directories and symlinks)
         upscale_cmd = f'rm -rf "{ui_home}/models/upscale_models" 2>/dev/null || true; ln -s "{ui_home}/models/ESRGAN" "{ui_home}/models/upscale_models"'
         
         # Configure loras link (handle both directories and symlinks)
         loras_cmd = f'rm -rf "{ui_home}/models/loras" 2>/dev/null || true; ln -s "{ui_home}/models/Lora" "{ui_home}/models/loras"'
         
-        # Combine commands
-        combined_cmd = f'{upscale_cmd} && {loras_cmd}'
+        # Combine commands: create directories first, then symlinks
+        combined_cmd = f'{mkdir_cmd} && {upscale_cmd} && {loras_cmd}'
         logger.info(f"Remote command to execute: {combined_cmd}")
         
         ssh_cmd = [
