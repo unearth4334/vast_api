@@ -415,6 +415,9 @@ function updateWorkflowSteps(template) {
       case 'install_custom_nodes':
         stepButton.onclick = installCustomNodes;
         break;
+      case 'install_browser_agent':
+        stepButton.onclick = () => VastAITemplates.executeTemplateStep('Install BrowserAgent');
+        break;
       case 'verify_dependencies':
         stepButton.onclick = verifyDependencies;
         break;
