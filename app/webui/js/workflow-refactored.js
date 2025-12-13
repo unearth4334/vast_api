@@ -867,12 +867,33 @@ function updateWorkflowSteps(template) {
   
   console.log(`🔧 Creating ${buttons.length} workflow steps`);
   
+  // Get setup steps to map button actions to step names
+  const setupSteps = template.setup_steps || [];
+  
   // Create workflow steps for each button
   buttons.forEach((button, index) => {
     // Create step element
     const stepDiv = document.createElement('div');
     stepDiv.className = 'workflow-step';
     stepDiv.dataset.action = button.action;
+    
+    // Find corresponding setup step to get the actual step name
+    const setupStep = setupSteps.find(step => {
+      const stepType = step.type;
+      // Map step types to button actions
+      const typeToAction = {
+        'test_ssh': 'test_ssh',
+        'civitdl_install': 'setup_civitdl',
+        'set_ui_home': 'set_ui_home',
+        'configure_links': 'configure_links',
+        'install_custom_nodes': 'install_custom_nodes',
+        'browser_agent_install': 'install_browser_agent',
+        'reboot': 'reboot_instance'
+      };
+      return typeToAction[stepType] === button.action;
+    });
+    
+    const stepName = setupStep ? setupStep.name : button.label;
     
     // Create button container for horizontal layout
     const buttonContainer = document.createElement('div');
@@ -891,7 +912,7 @@ function updateWorkflowSteps(template) {
       // These actions can execute individually via templates API
       stepButton.onclick = () => {
         if (window.VastAITemplates && typeof window.VastAITemplates.executeTemplateStep === 'function') {
-          window.VastAITemplates.executeTemplateStep(button.label);
+          window.VastAITemplates.executeTemplateStep(stepName);
         } else {
           console.error('VastAITemplates.executeTemplateStep not available');
         }
