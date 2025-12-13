@@ -982,19 +982,6 @@ function storeImageDimensions(width, height) {
 }
 
 /**
- * Helper tool state
- */
-const HelperToolState = {
-    autoSizing: {
-        enabled: false,
-        maxSize: 1024,
-        appliedMaxSize: 1024,
-        currentImageDimensions: null,
-        targets: { width_field: 'size_x', height_field: 'size_y' }
-    }
-};
-
-/**
  * Handle max size slider change
  */
 function handleMaxSizeChange(toolId, value) {
