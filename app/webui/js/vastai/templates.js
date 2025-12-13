@@ -184,28 +184,51 @@ function updateSetupButtons(template) {
       // Set onclick handler based on action
       switch (button.action) {
         case 'setup_civitdl':
-          btnElement.onclick = () => executeTemplateStep('Install CivitDL');
+          btnElement.onclick = () => {
+            console.log('🎨 Setup CivitDL button clicked');
+            executeTemplateStep('Install CivitDL');
+          };
           break;
         case 'set_ui_home':
-          btnElement.onclick = () => executeTemplateStep('Set UI Home');
+          btnElement.onclick = () => {
+            console.log('📁 Set UI Home button clicked');
+            executeTemplateStep('Set UI Home');
+          };
           break;
         case 'install_browser_agent':
-          btnElement.onclick = () => executeTemplateStep('Install BrowserAgent');
+          btnElement.onclick = () => {
+            console.log('🌐 Install BrowserAgent button clicked');
+            console.log('  Action:', button.action);
+            console.log('  Step name: Install BrowserAgent');
+            executeTemplateStep('Install BrowserAgent');
+          };
           break;
         case 'setup_python_venv':
-          btnElement.onclick = () => executeTemplateStep('Setup Python Virtual Environment');
+          btnElement.onclick = () => {
+            console.log('🐍 Setup Python venv button clicked');
+            executeTemplateStep('Setup Python Virtual Environment');
+          };
           break;
         case 'clone_auto_installer':
-          btnElement.onclick = () => executeTemplateStep('Clone ComfyUI Auto Installer');
+          btnElement.onclick = () => {
+            console.log('🔗 Clone auto-installer button clicked');
+            executeTemplateStep('Clone ComfyUI Auto Installer');
+          };
           break;
         case 'get_ui_home':
-          btnElement.onclick = getUIHome;
+          btnElement.onclick = () => {
+            console.log('📍 Get UI Home button clicked');
+            getUIHome();
+          };
           break;
         case 'terminate_connection':
-          btnElement.onclick = terminateConnection;
+          btnElement.onclick = () => {
+            console.log('🔌 Terminate connection button clicked');
+            terminateConnection();
+          };
           break;
         default:
-          btnElement.onclick = () => console.log(`Unknown action: ${button.action}`);
+          btnElement.onclick = () => console.log(`❌ Unknown action: ${button.action}`);
       }
       
       console.log(`  ${index+1}. Creating button: "${button.label}" (${button.action})`);
@@ -289,27 +312,45 @@ export async function executeTemplateStep(stepName) {
   }
   
   console.log(`✅ All validations passed, executing template step...`);
+  console.log(`📤 POST /templates/${templateId}/execute-step`);
+  console.log(`   Request data:`, { ssh_connection: sshConnectionString, step_name: stepName });
   showSetupResult(`Executing: ${stepName}...`, 'info');
   
   try {
+    console.log(`⏳ Sending API request...`);
     const data = await api.post(`/templates/${templateId}/execute-step`, {
       ssh_connection: sshConnectionString,
       step_name: stepName
     });
     
+    console.log(`📥 API response received:`, data);
+    console.log(`   success: ${data.success}`);
+    console.log(`   message: ${data.message}`);
+    
     if (data.success) {
+      console.log(`✅ ${stepName} completed successfully!`);
       showSetupResult(`✅ ${stepName} completed successfully!`, 'success');
       if (data.output) {
-        console.log(`${stepName} output:`, data.output);
+        console.log(`📄 ${stepName} output:`);
+        console.log(data.output);
       }
     } else {
+      console.log(`❌ ${stepName} failed:`, data.message);
       let errorMsg = `❌ ${stepName} failed: ${data.message}`;
       if (data.error) {
+        console.log(`   Error details:`, data.error);
         errorMsg += `\n\nDetails: ${data.error}`;
       }
       showSetupResult(errorMsg, 'error');
     }
   } catch (error) {
+    console.error(`💥 Exception during ${stepName}:`, error);
+    console.error(`   Error type: ${error.constructor.name}`);
+    console.error(`   Error message: ${error.message}`);
+    if (error.response) {
+      console.error(`   Response status: ${error.response.status}`);
+      console.error(`   Response data:`, error.response.data);
+    }
     showSetupResult(`❌ ${stepName} request failed: ${error.message}`, 'error');
   }
 }
