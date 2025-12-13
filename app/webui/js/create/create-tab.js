@@ -212,6 +212,11 @@ function renderWorkflowForm(workflow) {
         </div>
     `;
     
+    // Helper tools (if present)
+    if (workflow.helper_tools && workflow.helper_tools.length > 0) {
+        html += renderHelperTools(workflow.helper_tools);
+    }
+    
     // Main inputs
     if (workflow.inputs && workflow.inputs.length > 0) {
         html += `
@@ -580,6 +585,13 @@ function handleImageUpload(fieldId, input) {
             
             // Store scaled base64 data
             updateFormValue(fieldId, scaledDataUrl);
+            
+            // Get actual image dimensions and trigger auto-sizing
+            const img = new Image();
+            img.onload = function() {
+                storeImageDimensions(img.width, img.height);
+            };
+            img.src = scaledDataUrl;
         } catch (error) {
             console.error('Error processing image:', error);
             alert('Failed to process image. Please try again.');
@@ -797,6 +809,344 @@ function showCreateSuccess(message) {
         result.className = 'setup-result success';
         result.textContent = `✅ ${message}`;
         result.style.display = 'block';
+    }
+}
+
+/**
+ * Helper tool state
+ */
+const HelperToolState = {
+    autoSizing: {
+        enabled: false,
+        maxSize: 1024,
+        appliedMaxSize: 1024,
+        currentImageDimensions: null,
+        targets: { width_field: 'size_x', height_field: 'size_y' }
+    }
+};
+
+/**
+ * Handle max size slider change
+ */
+function handleMaxSizeChange(toolId, value) {
+    const numberInput = document.getElementById(`helper-max_image_size-value`);
+    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
+    
+    if (numberInput) {
+        numberInput.value = value;
+    }
+    
+    HelperToolState.autoSizing.maxSize = parseInt(value);
+    
+    // Enable apply button if value differs from applied value
+    if (applyBtn) {
+        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
+    }
+}
+
+/**
+ * Handle max size number input change
+ */
+function handleMaxSizeInputChange(toolId, value) {
+    const slider = document.getElementById(`helper-max_image_size`);
+    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
+    
+    if (slider) {
+        slider.value = value;
+    }
+    
+    HelperToolState.autoSizing.maxSize = parseInt(value);
+    
+    // Enable apply button if value differs from applied value
+    if (applyBtn) {
+        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
+    }
+}
+
+/**
+ * Handle apply button click
+ */
+function handleApplyMaxSize(toolId) {
+    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
+    
+    HelperToolState.autoSizing.appliedMaxSize = HelperToolState.autoSizing.maxSize;
+    
+    if (applyBtn) {
+        applyBtn.disabled = true;
+    }
+    
+    // Recalculate dimensions if auto-sizing is enabled and we have image dimensions
+    if (HelperToolState.autoSizing.enabled && HelperToolState.autoSizing.currentImageDimensions) {
+        calculateAndApplyAutoSize();
+    }
+}
+
+/**
+ * Handle auto-size toggle change
+ */
+function handleAutoSizeToggle(toolId, enabled) {
+    HelperToolState.autoSizing.enabled = enabled;
+    
+    const widthField = HelperToolState.autoSizing.targets.width_field;
+    const heightField = HelperToolState.autoSizing.targets.height_field;
+    
+    // Get the field elements
+    const widthSlider = document.getElementById(`create-field-${widthField}`);
+    const widthInput = document.getElementById(`create-field-${widthField}-value`);
+    const heightSlider = document.getElementById(`create-field-${heightField}`);
+    const heightInput = document.getElementById(`create-field-${heightField}-value`);
+    
+    if (enabled) {
+        // Disable manual size controls
+        if (widthSlider) widthSlider.disabled = true;
+        if (widthInput) widthInput.disabled = true;
+        if (heightSlider) heightSlider.disabled = true;
+        if (heightInput) heightInput.disabled = true;
+        
+        // Calculate dimensions if we have image data
+        if (HelperToolState.autoSizing.currentImageDimensions) {
+            calculateAndApplyAutoSize();
+        }
+    } else {
+        // Enable manual size controls
+        if (widthSlider) widthSlider.disabled = false;
+        if (widthInput) widthInput.disabled = false;
+        if (heightSlider) heightSlider.disabled = false;
+        if (heightInput) heightInput.disabled = false;
+    }
+}
+
+/**
+ * Calculate automatic size based on image dimensions and max size
+ */
+function calculateAndApplyAutoSize() {
+    const { currentImageDimensions, appliedMaxSize } = HelperToolState.autoSizing;
+    
+    if (!currentImageDimensions) return;
+    
+    const { width: imgWidth, height: imgHeight } = currentImageDimensions;
+    const aspectRatio = imgWidth / imgHeight;
+    
+    let targetWidth, targetHeight;
+    
+    // Calculate dimensions maintaining aspect ratio
+    if (imgWidth > imgHeight) {
+        targetWidth = Math.min(appliedMaxSize, imgWidth);
+        targetHeight = Math.round(targetWidth / aspectRatio);
+    } else {
+        targetHeight = Math.min(appliedMaxSize, imgHeight);
+        targetWidth = Math.round(targetHeight * aspectRatio);
+    }
+    
+    // Snap to 64px grid
+    targetWidth = Math.round(targetWidth / 64) * 64;
+    targetHeight = Math.round(targetHeight / 64) * 64;
+    
+    // Ensure minimum size
+    targetWidth = Math.max(64, targetWidth);
+    targetHeight = Math.max(64, targetHeight);
+    
+    console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} → ${targetWidth}x${targetHeight} (max: ${appliedMaxSize}px)`);
+    
+    // Update the form fields
+    const widthField = HelperToolState.autoSizing.targets.width_field;
+    const heightField = HelperToolState.autoSizing.targets.height_field;
+    
+    const widthSlider = document.getElementById(`create-field-${widthField}`);
+    const widthInput = document.getElementById(`create-field-${widthField}-value`);
+    const heightSlider = document.getElementById(`create-field-${heightField}`);
+    const heightInput = document.getElementById(`create-field-${heightField}-value`);
+    
+    if (widthSlider) widthSlider.value = targetWidth;
+    if (widthInput) widthInput.value = targetWidth;
+    if (heightSlider) heightSlider.value = targetHeight;
+    if (heightInput) heightInput.value = targetHeight;
+    
+    // Update form values
+    updateFormValue(widthField, targetWidth);
+    updateFormValue(heightField, targetHeight);
+}
+
+/**
+ * Store image dimensions for auto-sizing
+ * Called when an image is uploaded
+ */
+function storeImageDimensions(width, height) {
+    HelperToolState.autoSizing.currentImageDimensions = { width, height };
+    console.log(`📷 Image dimensions stored: ${width}x${height}`);
+    
+    // If auto-sizing is enabled, calculate and apply
+    if (HelperToolState.autoSizing.enabled) {
+        calculateAndApplyAutoSize();
+    }
+}
+
+/**
+ * Helper tool state
+ */
+const HelperToolState = {
+    autoSizing: {
+        enabled: false,
+        maxSize: 1024,
+        appliedMaxSize: 1024,
+        currentImageDimensions: null,
+        targets: { width_field: 'size_x', height_field: 'size_y' }
+    }
+};
+
+/**
+ * Handle max size slider change
+ */
+function handleMaxSizeChange(toolId, value) {
+    const numberInput = document.getElementById(`helper-max_image_size-value`);
+    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
+    
+    if (numberInput) {
+        numberInput.value = value;
+    }
+    
+    HelperToolState.autoSizing.maxSize = parseInt(value);
+    
+    // Enable apply button if value differs from applied value
+    if (applyBtn) {
+        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
+    }
+}
+
+/**
+ * Handle max size number input change
+ */
+function handleMaxSizeInputChange(toolId, value) {
+    const slider = document.getElementById(`helper-max_image_size`);
+    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
+    
+    if (slider) {
+        slider.value = value;
+    }
+    
+    HelperToolState.autoSizing.maxSize = parseInt(value);
+    
+    // Enable apply button if value differs from applied value
+    if (applyBtn) {
+        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
+    }
+}
+
+/**
+ * Handle apply button click
+ */
+function handleApplyMaxSize(toolId) {
+    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
+    
+    HelperToolState.autoSizing.appliedMaxSize = HelperToolState.autoSizing.maxSize;
+    
+    if (applyBtn) {
+        applyBtn.disabled = true;
+    }
+    
+    // Recalculate dimensions if auto-sizing is enabled and we have image dimensions
+    if (HelperToolState.autoSizing.enabled && HelperToolState.autoSizing.currentImageDimensions) {
+        calculateAndApplyAutoSize();
+    }
+}
+
+/**
+ * Handle auto-size toggle change
+ */
+function handleAutoSizeToggle(toolId, enabled) {
+    HelperToolState.autoSizing.enabled = enabled;
+    
+    const widthField = HelperToolState.autoSizing.targets.width_field;
+    const heightField = HelperToolState.autoSizing.targets.height_field;
+    
+    // Get the field elements
+    const widthSlider = document.getElementById(`create-field-${widthField}`);
+    const widthInput = document.getElementById(`create-field-${widthField}-value`);
+    const heightSlider = document.getElementById(`create-field-${heightField}`);
+    const heightInput = document.getElementById(`create-field-${heightField}-value`);
+    
+    if (enabled) {
+        // Disable manual size controls
+        if (widthSlider) widthSlider.disabled = true;
+        if (widthInput) widthInput.disabled = true;
+        if (heightSlider) heightSlider.disabled = true;
+        if (heightInput) heightInput.disabled = true;
+        
+        // Calculate dimensions if we have image data
+        if (HelperToolState.autoSizing.currentImageDimensions) {
+            calculateAndApplyAutoSize();
+        }
+    } else {
+        // Enable manual size controls
+        if (widthSlider) widthSlider.disabled = false;
+        if (widthInput) widthInput.disabled = false;
+        if (heightSlider) heightSlider.disabled = false;
+        if (heightInput) heightInput.disabled = false;
+    }
+}
+
+/**
+ * Calculate automatic size based on image dimensions and max size
+ */
+function calculateAndApplyAutoSize() {
+    const { currentImageDimensions, appliedMaxSize } = HelperToolState.autoSizing;
+    
+    if (!currentImageDimensions) return;
+    
+    const { width: imgWidth, height: imgHeight } = currentImageDimensions;
+    const aspectRatio = imgWidth / imgHeight;
+    
+    let targetWidth, targetHeight;
+    
+    // Calculate dimensions maintaining aspect ratio
+    if (imgWidth > imgHeight) {
+        targetWidth = Math.min(appliedMaxSize, imgWidth);
+        targetHeight = Math.round(targetWidth / aspectRatio);
+    } else {
+        targetHeight = Math.min(appliedMaxSize, imgHeight);
+        targetWidth = Math.round(targetHeight * aspectRatio);
+    }
+    
+    // Snap to 64px grid
+    targetWidth = Math.round(targetWidth / 64) * 64;
+    targetHeight = Math.round(targetHeight / 64) * 64;
+    
+    // Ensure minimum size
+    targetWidth = Math.max(64, targetWidth);
+    targetHeight = Math.max(64, targetHeight);
+    
+    console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} → ${targetWidth}x${targetHeight} (max: ${appliedMaxSize}px)`);
+    
+    // Update the form fields
+    const widthField = HelperToolState.autoSizing.targets.width_field;
+    const heightField = HelperToolState.autoSizing.targets.height_field;
+    
+    const widthSlider = document.getElementById(`create-field-${widthField}`);
+    const widthInput = document.getElementById(`create-field-${widthField}-value`);
+    const heightSlider = document.getElementById(`create-field-${heightField}`);
+    const heightInput = document.getElementById(`create-field-${heightField}-value`);
+    
+    if (widthSlider) widthSlider.value = targetWidth;
+    if (widthInput) widthInput.value = targetWidth;
+    if (heightSlider) heightSlider.value = targetHeight;
+    if (heightInput) heightInput.value = targetHeight;
+    
+    // Update form values
+    updateFormValue(widthField, targetWidth);
+    updateFormValue(heightField, targetHeight);
+}
+
+/**
+ * Store image dimensions for auto-sizing
+ * Called when an image is uploaded
+ */
+function storeImageDimensions(width, height) {
+    HelperToolState.autoSizing.currentImageDimensions = { width, height };
+    console.log(`📷 Image dimensions stored: ${width}x${height}`);
+    
+    // If auto-sizing is enabled, calculate and apply
+    if (HelperToolState.autoSizing.enabled) {
+        calculateAndApplyAutoSize();
     }
 }
 
@@ -1032,6 +1382,11 @@ function renderSectionBasedLayout(workflow, container) {
             <p style="margin: 0; color: var(--text-muted);">${escapeHtml(workflow.description)}</p>
         </div>
     `;
+    
+    // Helper tools (if present)
+    if (workflow.helper_tools && workflow.helper_tools.length > 0) {
+        html += renderHelperTools(workflow.helper_tools);
+    }
     
     container.innerHTML = html;
 
@@ -1434,3 +1789,9 @@ window.updateConnectionNotice = updateConnectionNotice;
 // History browser exports
 window.openHistoryBrowser = openHistoryBrowser;
 window.onHistoryRecordSelected = onHistoryRecordSelected;
+// Helper tool exports
+window.handleMaxSizeChange = handleMaxSizeChange;
+window.handleMaxSizeInputChange = handleMaxSizeInputChange;
+window.handleApplyMaxSize = handleApplyMaxSize;
+window.handleAutoSizeToggle = handleAutoSizeToggle;
+window.storeImageDimensions = storeImageDimensions;

@@ -1882,3 +1882,128 @@
 .history-button-icon {
     font-size: 16px;
 }
+
+/* =========================
+   HELPER TOOLS STYLES
+   ========================= */
+
+.helper-tools-section {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-3);
+    margin-bottom: var(--size-4-4);
+}
+
+.helper-tool-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+}
+
+.helper-tool-header {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.helper-tool-icon {
+    font-size: 20px;
+}
+
+.helper-tool-label {
+    flex: 1;
+}
+
+.helper-tool-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-3);
+}
+
+.helper-tool-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+}
+
+.helper-tool-control-group.inline-checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+.helper-tool-control-label {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.slider-with-apply-container {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+.helper-tool-slider {
+    flex: 1;
+    min-width: 0;
+}
+
+.helper-tool-number {
+    width: 80px;
+    text-align: center;
+}
+
+.helper-tool-apply-btn {
+    padding: var(--size-4-1) var(--size-4-3);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-small);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.helper-tool-apply-btn:hover:not(:disabled) {
+    background: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+}
+
+.helper-tool-apply-btn:disabled {
+    background: var(--background-modifier-border);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.helper-tool-checkbox {
+    cursor: pointer;
+}
+
+.helper-tool-checkbox-label {
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    cursor: pointer;
+    user-select: none;
+}
+
+.helper-tool-description {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: var(--size-4-1);
+}
+
+/* Disabled state for size fields when auto-sizing is enabled */
+input[type="range"]:disabled,
+input[type="number"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
