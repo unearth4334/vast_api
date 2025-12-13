@@ -1020,11 +1020,18 @@ def ssh_configure_links():
         return ("", 204)
     
     try:
+        logger.info("=== CONFIGURE LINKS START ===")
         data = request.get_json() if request.is_json else {}
+        logger.info(f"Request data: {data}")
+        
         ssh_connection = data.get('ssh_connection')
         ui_home = data.get('ui_home', '/workspace/ComfyUI')
         
+        logger.info(f"SSH Connection: {ssh_connection}")
+        logger.info(f"UI Home: {ui_home}")
+        
         if not ssh_connection:
+            logger.error("No SSH connection string provided")
             return jsonify({
                 'success': False,
                 'message': 'SSH connection string is required'
@@ -1032,7 +1039,9 @@ def ssh_configure_links():
         
         try:
             ssh_host, ssh_port = _extract_host_port(ssh_connection)
+            logger.info(f"Extracted host={ssh_host}, port={ssh_port}")
         except ValueError as e:
+            logger.error(f"Failed to extract host/port: {str(e)}")
             return jsonify({
                 'success': False,
                 'message': f'Invalid SSH connection format: {str(e)}'
@@ -1041,6 +1050,15 @@ def ssh_configure_links():
         logger.info(f"Configuring model links on {ssh_host}:{ssh_port}")
         
         ssh_key = '/root/.ssh/id_ed25519'
+        logger.info(f"Using SSH key: {ssh_key}")
+        
+        # Check if SSH key exists
+        if not os.path.exists(ssh_key):
+            logger.error(f"SSH key not found: {ssh_key}")
+            return jsonify({
+                'success': False,
+                'message': f'SSH key not found: {ssh_key}'
+            })
         
         # Configure upscale_models link (handle both directories and symlinks)
         upscale_cmd = f'rm -rf "{ui_home}/models/upscale_models" 2>/dev/null || true; ln -s "{ui_home}/models/ESRGAN" "{ui_home}/models/upscale_models"'
@@ -1050,6 +1068,7 @@ def ssh_configure_links():
         
         # Combine commands
         combined_cmd = f'{upscale_cmd} && {loras_cmd}'
+        logger.info(f"Remote command to execute: {combined_cmd}")
         
         ssh_cmd = [
             'ssh',
@@ -1063,17 +1082,26 @@ def ssh_configure_links():
             combined_cmd
         ]
         
+        logger.info(f"SSH command: {' '.join(ssh_cmd)}")
+        logger.info("Executing SSH command...")
+        
         result = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=15)
         
+        logger.info(f"SSH command completed with return code: {result.returncode}")
+        logger.info(f"STDOUT: {result.stdout}")
+        logger.info(f"STDERR: {result.stderr}")
+        
         if result.returncode == 0:
-            logger.info(f"Model links configured successfully on {ssh_host}:{ssh_port}")
+            logger.info(f"✅ Model links configured successfully on {ssh_host}:{ssh_port}")
             return jsonify({
                 'success': True,
                 'message': 'Model links configured successfully',
                 'output': result.stdout
             })
         else:
-            logger.error(f"Failed to configure model links on {ssh_host}:{ssh_port}: {result.stderr}")
+            logger.error(f"❌ Failed to configure model links on {ssh_host}:{ssh_port}")
+            logger.error(f"Return code: {result.returncode}")
+            logger.error(f"Error output: {result.stderr}")
             return jsonify({
                 'success': False,
                 'message': 'Failed to configure model links',
@@ -1082,12 +1110,13 @@ def ssh_configure_links():
             })
             
     except subprocess.TimeoutExpired:
+        logger.error("SSH command timed out after 15 seconds")
         return jsonify({
             'success': False,
             'message': 'SSH command timed out'
         })
     except Exception as e:
-        logger.error(f"Configure links error: {str(e)}")
+        logger.error(f"💥 Configure links error: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'message': f'Configure links error: {str(e)}'
