@@ -46,6 +46,52 @@ layout:
       title: "🔧 Advanced Features"
       collapsed: true
 
+# Helper Tools (not workflow fields, but UI utilities)
+helper_tools:
+  - id: "auto_sizing"
+    type: "auto_size_calculator"
+    label: "Automatic Sizing"
+    description: "Calculate optimal output dimensions based on input image aspect ratio"
+    position: "header"  # Display below workflow title/description
+    controls:
+      - id: "max_image_size"
+        type: "slider_with_apply"
+        label: "Max Image Size"
+        description: "Maximum dimension (width or height). Image will be scaled to fit within this constraint while maintaining aspect ratio."
+        min: 512
+        max: 2048
+        step: 64
+        default: 1024
+        unit: "px"
+        apply_button: true
+        apply_button_label: "Apply"
+        apply_button_enabled_when: "value_changed"
+      - id: "auto_size_toggle"
+        type: "checkbox"
+        label: "Enable Automatic Sizing"
+        description: "When enabled, Width and Height will be automatically calculated and those fields will be disabled"
+        default: false
+        position: "inline_right"  # Display inline to the right of max_image_size slider
+    targets:
+      width_field: "size_x"
+      height_field: "size_y"
+    requires:
+      - "input_image"
+    triggers:
+      - "input_image_upload"
+      - "auto_size_toggle_change"
+      - "max_image_size_apply"
+    behavior:
+      when_enabled:
+        - disable_field: "size_x"
+        - disable_field: "size_y"
+        - calculate_and_update: ["size_x", "size_y"]
+      when_disabled:
+        - enable_field: "size_x"
+        - enable_field: "size_y"
+      calculation_method: "maintain_aspect_ratio_fit_max"
+      snap_to_grid: 64
+
 # Token-based inputs - no node IDs required!
 inputs:
   # === BASIC SETTINGS ===
@@ -92,33 +138,6 @@ inputs:
     control_after_generate: "randomize"
 
   # === GENERATION PARAMETERS ===
-  - id: "auto_size_enabled"
-    section: "generation"
-    type: "checkbox"
-    label: "Automatic Sizing"
-    description: "Automatically calculate output dimensions based on input image and max size constraint"
-    default: false
-    controls_fields:
-      - "size_x"
-      - "size_y"
-    requires_fields:
-      - "input_image"
-      - "max_image_size"
-
-  - id: "max_image_size"
-    section: "generation"
-    type: "slider"
-    label: "Max Image Size"
-    description: "Maximum dimension (width or height) for automatic sizing. The image will be scaled to fit within this constraint while maintaining aspect ratio."
-    min: 512
-    max: 2048
-    step: 64
-    default: 1024
-    unit: "px"
-    visible_when:
-      field: "auto_size_enabled"
-      value: true
-
   - id: "size_x"
     section: "generation"
     token: "{{SIZE_WIDTH}}"
@@ -144,8 +163,6 @@ inputs:
     step: 64
     default: 1120
     unit: "px"
-    controlled_by: "auto_size_enabled"
-    auto_calculate: true
 
   - id: "duration"
     section: "generation"
