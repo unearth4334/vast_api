@@ -4257,6 +4257,10 @@ echo 'Virtual environment setup completed successfully' '''
 def execute_browser_agent_install(ssh_connection, step, context: LogContext):
     """Execute BrowserAgent installation with system dependencies, Python packages, and verification"""
     try:
+        logger.info("=== BROWSER AGENT INSTALL START ===")
+        logger.info(f"SSH Connection: {ssh_connection}")
+        logger.info(f"Step config: {step}")
+        
         enhanced_logger.log_operation(
             "🌐 Starting BrowserAgent installation",
             "browser_agent_install_start",
@@ -4265,7 +4269,10 @@ def execute_browser_agent_install(ssh_connection, step, context: LogContext):
         )
         
         ssh_info = parse_ssh_connection(ssh_connection)
+        logger.info(f"Parsed SSH info: {ssh_info}")
+        
         if not ssh_info:
+            logger.error("Failed to parse SSH connection string")
             enhanced_logger.log_error(
                 "Invalid SSH connection string format for BrowserAgent install",
                 "ssh_parse_error",
@@ -4278,7 +4285,10 @@ def execute_browser_agent_install(ssh_connection, step, context: LogContext):
             }
         
         host, port, user = ssh_info['host'], ssh_info['port'], ssh_info.get('user', 'root')
+        logger.info(f"Extracted host={host}, port={port}, user={user}")
+        
         if not host or not port:
+            logger.error(f"Missing host or port: host={host}, port={port}")
             enhanced_logger.log_error(
                 "Missing host or port in SSH connection",
                 "ssh_connection_incomplete",
@@ -4298,6 +4308,15 @@ def execute_browser_agent_install(ssh_connection, step, context: LogContext):
         )
         
         ssh_key = '/root/.ssh/id_ed25519'
+        logger.info(f"Using SSH key: {ssh_key}")
+        
+        # Check if SSH key exists
+        if not os.path.exists(ssh_key):
+            logger.error(f"SSH key not found: {ssh_key}")
+            return {
+                'success': False,
+                'message': f'SSH key not found: {ssh_key}'
+            }
         
         # Multi-step installation script following the deployment guide
         # Made idempotent - safe to run multiple times
@@ -4420,6 +4439,10 @@ exit 0  # Explicitly exit with success
             remote_script
         ]
         
+        logger.info(f"Remote script length: {len(remote_script)} bytes")
+        logger.info(f"SSH command: {' '.join(cmd[:9])} <script>")
+        logger.info("Script first 500 chars: " + remote_script[:500])
+        
         enhanced_logger.log_operation(
             "Executing BrowserAgent installation script",
             "browser_agent_install_execute",
@@ -4427,10 +4450,25 @@ exit 0  # Explicitly exit with success
             extra_data={"command_length": len(remote_script)}
         )
         
+        logger.info("Executing SSH command for BrowserAgent installation (timeout: 600s)...")
+        
         # Longer timeout for installation (10 minutes due to Chromium download)
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         
+        logger.info(f"SSH command completed with return code: {result.returncode}")
+        logger.info(f"STDOUT length: {len(result.stdout)} bytes")
+        logger.info(f"STDERR length: {len(result.stderr)} bytes")
+        logger.info("=" * 80)
+        logger.info("STDOUT:")
+        logger.info(result.stdout)
+        logger.info("=" * 80)
+        if result.stderr:
+            logger.info("STDERR:")
+            logger.info(result.stderr)
+            logger.info("=" * 80)
+        
         if result.returncode == 0:
+            logger.info("✅ BrowserAgent installation completed successfully")
             enhanced_logger.log_operation(
                 "✅ BrowserAgent installation completed successfully",
                 "browser_agent_install_success",
@@ -4446,6 +4484,9 @@ exit 0  # Explicitly exit with success
                 'output': result.stdout
             }
         else:
+            logger.error(f"❌ BrowserAgent installation failed")
+            logger.error(f"Return code: {result.returncode}")
+            logger.error(f"Error output: {result.stderr}")
             enhanced_logger.log_error(
                 f"BrowserAgent installation failed: {result.stderr.strip()}",
                 "browser_agent_install_failed",
@@ -4464,6 +4505,7 @@ exit 0  # Explicitly exit with success
             }
             
     except subprocess.TimeoutExpired:
+        logger.error("❌ BrowserAgent installation timed out after 600 seconds")
         enhanced_logger.log_error(
             "BrowserAgent installation timed out",
             "ssh_timeout",
@@ -4475,6 +4517,10 @@ exit 0  # Explicitly exit with success
             'message': 'SSH command timed out during BrowserAgent installation (exceeded 10 minutes)'
         }
     except Exception as e:
+        logger.error(f"❌ Exception during BrowserAgent installation: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        import traceback
+        logger.error(f"Traceback:\n{traceback.format_exc()}")
         enhanced_logger.log_error(
             f"Unexpected error during BrowserAgent installation: {str(e)}",
             "browser_agent_install_error",

@@ -267,6 +267,9 @@ class WorkflowExecutor:
                 return self._execute_configure_links(ssh_connection, ui_home)
             elif action == 'sync_instance':
                 return self._execute_sync_instance(ssh_connection)
+            elif action == 'install_browser_agent':
+                ui_home = step.get('ui_home', '/workspace/ComfyUI')
+                return self._execute_install_browser_agent(ssh_connection, ui_home, state_manager, workflow_id, step_index)
             elif action == 'install_custom_nodes':
                 ui_home = step.get('ui_home', '/workspace/ComfyUI')
                 return self._execute_install_custom_nodes(ssh_connection, ui_home, state_manager, workflow_id, step_index)
@@ -722,6 +725,49 @@ class WorkflowExecutor:
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Auto Installer clone failed: {error_msg}")
+            return False, f"Connection error: {error_msg}"
+    
+    def _execute_install_browser_agent(self, ssh_connection: str, ui_home: str,
+                                       state_manager, workflow_id: str, step_index: int) -> tuple:
+        """Install BrowserAgent by calling /ssh/install-browser-agent API endpoint."""
+        logger.info("=== WORKFLOW EXECUTOR: Starting BrowserAgent installation ===")
+        logger.info(f"SSH Connection: {ssh_connection}")
+        logger.info(f"UI Home: {ui_home}")
+        
+        try:
+            logger.info(f"Calling API: {API_BASE_URL}/ssh/install-browser-agent")
+            response = requests.post(
+                f"{API_BASE_URL}/ssh/install-browser-agent",
+                json={
+                    'ssh_connection': ssh_connection,
+                    'ui_home': ui_home
+                },
+                timeout=600  # 10 minutes for BrowserAgent installation
+            )
+            
+            logger.info(f"API response status: {response.status_code}")
+            result = response.json()
+            logger.info(f"API response success: {result.get('success')}")
+            logger.info(f"API response message: {result.get('message')}")
+            
+            if result.get('success'):
+                logger.info("✅ BrowserAgent installation successful")
+                return True, None
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                logger.error(f"❌ BrowserAgent installation failed: {error_msg}")
+                return False, error_msg
+                
+        except requests.exceptions.Timeout:
+            error_msg = "API request timed out after 600 seconds"
+            logger.error(f"❌ {error_msg}")
+            return False, error_msg
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"❌ BrowserAgent installation failed with exception: {error_msg}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
             return False, f"Connection error: {error_msg}"
     
     def _execute_install_custom_nodes(self, ssh_connection: str, ui_home: str, 
