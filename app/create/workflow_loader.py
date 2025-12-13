@@ -42,6 +42,24 @@ class LayoutConfig:
 
 
 @dataclass
+class HelperToolConfig:
+    """Configuration for a helper tool (UI utility, not a workflow field)"""
+    id: str
+    type: str
+    label: str
+    description: str
+    position: str = 'header'
+    controls: List[Dict[str, Any]] = field(default_factory=list)
+    targets: Optional[Dict[str, str]] = None
+    requires: Optional[List[str]] = None
+    triggers: Optional[List[str]] = None
+    behavior: Optional[Dict[str, Any]] = None
+    
+    def to_dict(self):
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
 class InputConfig:
     """Configuration for a single workflow input"""
     id: str
@@ -104,6 +122,7 @@ class WorkflowConfig:
     outputs: List[OutputConfig]
     thumbnail: Optional[str] = None
     tags: List[str] = field(default_factory=list)
+    helper_tools: List[HelperToolConfig] = field(default_factory=list)
     
     def to_dict(self):
         return {
@@ -119,7 +138,8 @@ class WorkflowConfig:
             'tags': self.tags,
             'layout': self.layout.to_dict(),
             'inputs': [inp.to_dict() for inp in self.inputs],
-            'outputs': [out.to_dict() for out in self.outputs]
+            'outputs': [out.to_dict() for out in self.outputs],
+            'helper_tools': [tool.to_dict() for tool in self.helper_tools]
         }
 
 
@@ -274,6 +294,23 @@ class WorkflowLoader:
                 )
                 outputs.append(output_config)
             
+            # Parse helper tools
+            helper_tools = []
+            for tool_data in data.get('helper_tools', []):
+                helper_tool = HelperToolConfig(
+                    id=tool_data['id'],
+                    type=tool_data['type'],
+                    label=tool_data['label'],
+                    description=tool_data.get('description', ''),
+                    position=tool_data.get('position', 'header'),
+                    controls=tool_data.get('controls', []),
+                    targets=tool_data.get('targets'),
+                    requires=tool_data.get('requires'),
+                    triggers=tool_data.get('triggers'),
+                    behavior=tool_data.get('behavior')
+                )
+                helper_tools.append(helper_tool)
+            
             # Create workflow config
             workflow = WorkflowConfig(
                 id=workflow_id,
@@ -288,7 +325,8 @@ class WorkflowLoader:
                 tags=data.get('tags', []),
                 layout=layout,
                 inputs=inputs,
-                outputs=outputs
+                outputs=outputs,
+                helper_tools=helper_tools
             )
             
             # Cache the result
