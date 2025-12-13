@@ -566,3 +566,207 @@ def cancel_task(task_id: str):
             'success': False,
             'message': f'Error cancelling task: {str(e)}'
         }), 500
+
+
+@create_bp.route('/queue-workflow', methods=['POST', 'OPTIONS'])
+def queue_workflow_browser_agent():
+    """
+    Queue a workflow on remote instance using BrowserAgent.
+    Replaces the broken API-based execution method.
+    """
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    import paramiko
+    import time
+    import re
+    import tempfile
+    
+    try:
+        data = request.get_json()
+        ssh_connection = data.get('ssh_connection')
+        workflow_id = data.get('workflow_id')
+        inputs = data.get('inputs', {})
+        
+        if not ssh_connection:
+            return jsonify({
+                'success': False,
+                'message': 'SSH connection string is required'
+            }), 400
+        
+        if not workflow_id:
+            return jsonify({
+                'success': False,
+                'message': 'Workflow ID is required'
+            }), 400
+        
+        logger.info(f"Queueing workflow {workflow_id} on remote instance via BrowserAgent")
+        
+        # 1. Generate workflow JSON with user inputs
+        generator = WorkflowGenerator()
+        validator = WorkflowValidator()
+        
+        # Load workflow
+        workflow_data = load_workflow_json(f"{workflow_id}.json")
+        if not workflow_data:
+            return jsonify({
+                'success': False,
+                'message': f'Workflow file not found: {workflow_id}.json'
+            }), 404
+        
+        # Load webui wrapper for input field mapping
+        webui_config = load_webui_wrapper(workflow_id)
+        
+        # Generate final workflow with user inputs
+        final_workflow = generator.generate_workflow(
+            workflow_id=workflow_id,
+            workflow_template=workflow_data,
+            webui_config=webui_config,
+            user_inputs=inputs
+        )
+        
+        # Validate
+        validation_result = validator.validate_workflow(final_workflow)
+        if not validation_result['valid']:
+            return jsonify({
+                'success': False,
+                'message': 'Generated workflow failed validation',
+                'errors': validation_result.get('errors', [])
+            }), 400
+        
+        # 2. Parse SSH connection
+        from ..vastai.vastai_utils import parse_ssh_connection
+        ssh_info = parse_ssh_connection(ssh_connection)
+        if not ssh_info:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid SSH connection string'
+            }), 400
+        
+        # 3. Connect to remote instance
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        connect_kwargs = {
+            'hostname': ssh_info['host'],
+            'port': ssh_info['port'],
+            'username': ssh_info['user'],
+            'timeout': 30
+        }
+        
+        # Try key-based auth first, then password if available
+        try:
+            ssh.connect(**connect_kwargs)
+        except paramiko.AuthenticationException:
+            return jsonify({
+                'success': False,
+                'message': 'SSH authentication failed. Please ensure SSH keys are configured.'
+            }), 401
+        
+        try:
+            # 4. Upload workflow file to remote /tmp
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp:
+                json.dump(final_workflow, tmp, indent=2)
+                tmp_path = tmp.name
+            
+            remote_path = f"/tmp/workflow_{int(time.time())}_{uuid.uuid4().hex[:8]}.json"
+            sftp = ssh.open_sftp()
+            sftp.put(tmp_path, remote_path)
+            sftp.close()
+            
+            # Clean up local temp file
+            os.unlink(tmp_path)
+            
+            logger.info(f"Uploaded workflow to {remote_path}")
+            
+            # 5. Check if browser server is running
+            stdin, stdout, stderr = ssh.exec_command(
+                "ps aux | grep 'browser_agent.server.browser_server' | grep -v grep"
+            )
+            output = stdout.read().decode()
+            is_running = "browser_server" in output
+            
+            logger.info(f"Browser server running: {is_running}")
+            
+            # 6. Start browser server if not running
+            browser_agent_path = "/root/BrowserAgent"
+            if not is_running:
+                logger.info("Starting browser server...")
+                start_cmd = (
+                    f"cd {browser_agent_path} && "
+                    f"PYTHONPATH={browser_agent_path}/src:$PYTHONPATH "
+                    f"nohup python3 -m browser_agent.server.browser_server "
+                    f"--port 8765 --headless > /tmp/browser_server.log 2>&1 &"
+                )
+                ssh.exec_command(start_cmd)
+                time.sleep(3)  # Wait for server to start
+                logger.info("Browser server started")
+            
+            # 7. Queue workflow using UI-click method
+            comfyui_url = "http://localhost:8188"
+            queue_cmd = (
+                f"cd {browser_agent_path}/examples/comfyui && "
+                f"PYTHONPATH={browser_agent_path}/src:$PYTHONPATH "
+                f"python3 queue_workflow_ui_click.py "
+                f"--workflow-path {remote_path} "
+                f"--comfyui-url {comfyui_url}"
+            )
+            
+            logger.info(f"Executing queue command...")
+            stdin, stdout, stderr = ssh.exec_command(queue_cmd, timeout=60)
+            queue_output = stdout.read().decode()
+            queue_error = stderr.read().decode()
+            
+            logger.info(f"Queue output: {queue_output}")
+            if queue_error:
+                logger.error(f"Queue stderr: {queue_error}")
+            
+            # 8. Extract prompt ID
+            prompt_id = None
+            match = re.search(r'Prompt ID: ([a-f0-9-]+)', queue_output)
+            if match:
+                prompt_id = match.group(1)
+                logger.info(f"Workflow queued successfully! Prompt ID: {prompt_id}")
+            else:
+                # Check for errors
+                if "error" in queue_output.lower() or queue_error:
+                    error_msg = queue_error or queue_output
+                    logger.error(f"Failed to queue workflow: {error_msg}")
+                    return jsonify({
+                        'success': False,
+                        'message': 'Failed to queue workflow on ComfyUI',
+                        'details': error_msg
+                    }), 500
+            
+            # 9. Clean up remote temp file
+            ssh.exec_command(f"rm -f {remote_path}")
+            
+            if prompt_id:
+                return jsonify({
+                    'success': True,
+                    'prompt_id': prompt_id,
+                    'message': f'Workflow queued successfully! Prompt ID: {prompt_id}',
+                    'workflow_id': workflow_id
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Workflow was sent but no prompt ID was returned',
+                    'output': queue_output
+                }), 500
+            
+        finally:
+            ssh.close()
+            
+    except paramiko.SSHException as e:
+        logger.error(f"SSH error queueing workflow: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'SSH connection error: {str(e)}'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error queueing workflow: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Error queueing workflow: {str(e)}'
+        }), 500

@@ -670,7 +670,7 @@ async function executeWorkflow() {
         return;
     }
     
-    // Get SSH connection string from toolbar (or fallback to legacy inputs)
+    // Get SSH connection string from toolbar
     const sshConnection = getCurrentSSHConnection();
     
     if (!sshConnection) {
@@ -702,7 +702,13 @@ async function executeWorkflow() {
     updateExecuteButton(true);
     
     try {
-        const response = await fetch('/create/execute', {
+        console.log('🚀 Queueing workflow via BrowserAgent...');
+        console.log('   Workflow ID:', workflowId);
+        console.log('   SSH Connection:', sshConnection);
+        console.log('   Form inputs:', CreateTabState.formValues);
+        
+        // Use new BrowserAgent-based queueing endpoint
+        const response = await fetch('/create/queue-workflow', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -717,14 +723,31 @@ async function executeWorkflow() {
         const data = await response.json();
         
         if (data.success) {
-            CreateTabState.taskId = data.task_id;
-            showCreateSuccess(`Workflow queued successfully! Task ID: ${data.task_id}`);
-            // TODO: Start polling for status
+            console.log('✅ Workflow queued successfully!');
+            console.log('   Prompt ID:', data.prompt_id);
+            
+            CreateTabState.taskId = data.prompt_id;
+            showCreateSuccess(data.message || `Workflow queued! Prompt ID: ${data.prompt_id}`);
+            
+            // Add to execution queue display
+            if (window.ExecutionQueue) {
+                window.ExecutionQueue.addTask({
+                    id: data.prompt_id,
+                    workflow_id: workflowId,
+                    status: 'queued',
+                    started_at: new Date().toISOString(),
+                    message: 'Workflow queued on ComfyUI'
+                });
+            }
         } else {
-            showCreateError(data.message || 'Failed to execute workflow');
+            console.error('❌ Failed to queue workflow:', data.message);
+            if (data.details) {
+                console.error('   Details:', data.details);
+            }
+            showCreateError(data.message || 'Failed to queue workflow');
         }
     } catch (error) {
-        console.error('Error executing workflow:', error);
+        console.error('💥 Error queueing workflow:', error);
         showCreateError(`Error: ${error.message}`);
     } finally {
         CreateTabState.isExecuting = false;
