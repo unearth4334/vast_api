@@ -587,11 +587,11 @@ function handleImageUpload(fieldId, input) {
             updateFormValue(fieldId, scaledDataUrl);
             
             // Get actual image dimensions and trigger auto-sizing
-            const img = new Image();
-            img.onload = function() {
-                storeImageDimensions(img.width, img.height);
+            const dimensionImg = new Image();
+            dimensionImg.onload = function() {
+                storeImageDimensions(dimensionImg.width, dimensionImg.height);
             };
-            img.src = scaledDataUrl;
+            dimensionImg.src = scaledDataUrl;
         } catch (error) {
             console.error('Error processing image:', error);
             alert('Failed to process image. Please try again.');
