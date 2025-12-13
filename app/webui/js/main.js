@@ -46,10 +46,10 @@ function showTab(tabName, event) {
             window.createTabInitialized = true;
         } else {
             console.warn('⚠️ initCreateTab function not available yet. Retrying with exponential backoff...');
-            // Retry with exponential backoff (100ms, 200ms, 500ms, 1000ms)
-            let attempt = 0;
-            const maxAttempts = 4;
+            // Retry with exponential backoff: wait 100ms, then 200ms, then 500ms, then 1000ms
             const delays = [100, 200, 500, 1000];
+            const maxAttempts = delays.length;
+            let attempt = 0;
             
             const retryInit = () => {
                 if (typeof initCreateTab === 'function') {
@@ -68,6 +68,7 @@ function showTab(tabName, event) {
                 }
             };
             
+            // Start first retry attempt
             setTimeout(retryInit, delays[0]);
         }
     }
