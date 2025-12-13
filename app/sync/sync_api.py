@@ -4361,14 +4361,19 @@ fi
 echo ""
 echo "=== Step 9: Run unit tests (optional) ==="
 cd /root/BrowserAgent
-if PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -m pytest tests/ --ignore=tests/integration/ -v --tb=short 2>&1; then
+set +e  # Allow tests to fail without stopping script
+PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -m pytest tests/ --ignore=tests/integration/ -v --tb=short 2>&1
+TEST_RESULT=$?
+set -e  # Re-enable exit on error
+if [ $TEST_RESULT -eq 0 ]; then
     echo "✓ All tests passed"
 else
-    echo "⚠ Some tests failed, but installation may still be functional"
+    echo "⚠ Some tests failed (exit code: $TEST_RESULT), but installation may still be functional"
 fi
 
 echo ""
 echo "✅ BrowserAgent installation completed successfully"
+exit 0  # Explicitly exit with success
 '''
         
         cmd = [
