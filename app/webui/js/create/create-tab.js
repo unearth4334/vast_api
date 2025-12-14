@@ -980,7 +980,7 @@ function handleMaxSizeChange(toolId, value) {
     
     // Enable apply button if value differs from applied value
     if (applyBtn) {
-        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
+        applyBtn.disabled = (parseFloat(value) === HelperToolState.autoSizing.appliedMaxSize);
     }
 }
 
