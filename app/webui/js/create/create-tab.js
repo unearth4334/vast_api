@@ -958,8 +958,8 @@ function renderHelperTools(helperTools) {
 const HelperToolState = {
     autoSizing: {
         enabled: false,
-        maxSize: 1024,
-        appliedMaxSize: 1024,
+        maxSize: 1.0,  // in megapixels (MP)
+        appliedMaxSize: 1.0,  // in megapixels (MP)
         currentImageDimensions: null,
         targets: { width_field: 'size_x', height_field: 'size_y' }
     }
@@ -976,7 +976,7 @@ function handleMaxSizeChange(toolId, value) {
         numberInput.value = value;
     }
     
-    HelperToolState.autoSizing.maxSize = parseInt(value);
+    HelperToolState.autoSizing.maxSize = parseFloat(value);
     
     // Enable apply button if value differs from applied value
     if (applyBtn) {
@@ -995,11 +995,11 @@ function handleMaxSizeInputChange(toolId, value) {
         slider.value = value;
     }
     
-    HelperToolState.autoSizing.maxSize = parseInt(value);
+    HelperToolState.autoSizing.maxSize = parseFloat(value);
     
     // Enable apply button if value differs from applied value
     if (applyBtn) {
-        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
+        applyBtn.disabled = (parseFloat(value) === HelperToolState.autoSizing.appliedMaxSize);
     }
 }
 
@@ -1057,7 +1057,7 @@ function handleAutoSizeToggle(toolId, enabled) {
 }
 
 /**
- * Calculate automatic size based on image dimensions and max size
+ * Calculate automatic size based on image dimensions and max megapixels
  */
 function calculateAndApplyAutoSize() {
     const { currentImageDimensions, appliedMaxSize } = HelperToolState.autoSizing;
@@ -1067,26 +1067,44 @@ function calculateAndApplyAutoSize() {
     const { width: imgWidth, height: imgHeight } = currentImageDimensions;
     const aspectRatio = imgWidth / imgHeight;
     
+    // Calculate current megapixels
+    const currentMP = (imgWidth * imgHeight) / 1000000;
+    const maxMP = appliedMaxSize;
+    
     let targetWidth, targetHeight;
     
-    // Calculate dimensions maintaining aspect ratio
-    if (imgWidth > imgHeight) {
-        targetWidth = Math.min(appliedMaxSize, imgWidth);
-        targetHeight = Math.round(targetWidth / aspectRatio);
+    // Only scale down if image exceeds max megapixels
+    if (currentMP > maxMP) {
+        // Calculate target total pixels from megapixels
+        const targetPixels = maxMP * 1000000;
+        
+        // Calculate new dimensions maintaining aspect ratio
+        // area = width * height, and width/height = aspectRatio
+        // So: area = width * (width/aspectRatio) = width² / aspectRatio
+        // Therefore: width = sqrt(area * aspectRatio)
+        targetWidth = Math.sqrt(targetPixels * aspectRatio);
+        targetHeight = targetWidth / aspectRatio;
+        
+        // Round to integers
+        targetWidth = Math.round(targetWidth);
+        targetHeight = Math.round(targetHeight);
+        
+        // Snap to 64px grid
+        targetWidth = Math.round(targetWidth / 64) * 64;
+        targetHeight = Math.round(targetHeight / 64) * 64;
+        
+        // Ensure minimum size
+        targetWidth = Math.max(64, targetWidth);
+        targetHeight = Math.max(64, targetHeight);
+        
+        console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} (${currentMP.toFixed(2)}MP) → ${targetWidth}x${targetHeight} (${((targetWidth * targetHeight) / 1000000).toFixed(2)}MP, max: ${maxMP}MP)`);
     } else {
-        targetHeight = Math.min(appliedMaxSize, imgHeight);
-        targetWidth = Math.round(targetHeight * aspectRatio);
+        // Image is already within limits, use original dimensions (snapped to grid)
+        targetWidth = Math.round(imgWidth / 64) * 64;
+        targetHeight = Math.round(imgHeight / 64) * 64;
+        
+        console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} (${currentMP.toFixed(2)}MP) → ${targetWidth}x${targetHeight} (no scaling needed, within ${maxMP}MP limit)`);
     }
-    
-    // Snap to 64px grid
-    targetWidth = Math.round(targetWidth / 64) * 64;
-    targetHeight = Math.round(targetHeight / 64) * 64;
-    
-    // Ensure minimum size
-    targetWidth = Math.max(64, targetWidth);
-    targetHeight = Math.max(64, targetHeight);
-    
-    console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} → ${targetWidth}x${targetHeight} (max: ${appliedMaxSize}px)`);
     
     // Update the form fields
     const widthField = HelperToolState.autoSizing.targets.width_field;
