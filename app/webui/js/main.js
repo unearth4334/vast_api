@@ -40,17 +40,26 @@ function showTab(tabName, event) {
     
     // Initialize Create tab when shown
     if (tabName === 'create' && !window.createTabInitialized) {
+        console.log('🎨 Create tab activated, checking initialization...');
+        console.log('🎨 Current state:', {
+            createTabInitialized: window.createTabInitialized,
+            initCreateTabExists: typeof initCreateTab === 'function',
+            initCreateTabType: typeof initCreateTab
+        });
+        
         if (typeof initCreateTab === 'function') {
             console.log('🎨 Calling initCreateTab()...');
             // Set flag first to prevent multiple simultaneous initializations
             window.createTabInitialized = true;
             initCreateTab().catch(error => {
                 console.error('❌ initCreateTab failed:', error);
+                console.error('❌ Error stack:', error.stack);
                 // Reset flag on failure to allow retry
                 window.createTabInitialized = false;
             });
         } else {
             console.warn('⚠️ initCreateTab function not available yet. Retrying with exponential backoff...');
+            console.warn('⚠️ typeof initCreateTab:', typeof initCreateTab);
             // Retry with exponential backoff: wait 100ms, then 200ms, then 500ms, then 1000ms
             const delays = [100, 200, 500, 1000];
             const maxAttempts = delays.length;

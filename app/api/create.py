@@ -54,14 +54,24 @@ def list_workflows():
     Returns:
         JSON with list of workflow metadata
     """
+    logger.info("📋 Received request to list workflows")
     try:
+        logger.info("🔍 Calling WorkflowLoader.discover_workflows()...")
         workflows = WorkflowLoader.discover_workflows()
+        logger.info(f"✅ Discovered {len(workflows)} workflow(s)")
+        
+        for wf in workflows:
+            logger.info(f"  📄 Workflow: {wf.id} - {wf.name} (category: {wf.category})")
+        
+        workflow_dicts = [w.to_dict() for w in workflows]
+        logger.info(f"📦 Returning {len(workflow_dicts)} workflow(s) as JSON")
+        
         return jsonify({
             'success': True,
-            'workflows': [w.to_dict() for w in workflows]
+            'workflows': workflow_dicts
         })
     except Exception as e:
-        logger.error(f"Error listing workflows: {e}", exc_info=True)
+        logger.error(f"❌ Error listing workflows: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'message': f'Failed to list workflows: {str(e)}'

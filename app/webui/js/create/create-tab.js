@@ -86,28 +86,61 @@ async function loadWorkflows() {
     const container = document.getElementById('create-workflows-grid');
     if (!container) {
         console.error('❌ create-workflows-grid container not found');
+        console.error('❌ DOM element #create-workflows-grid is missing from the page');
         return;
     }
     
+    console.log('✅ Found container:', container);
     container.innerHTML = '<div class="create-empty-state"><div class="create-empty-state-icon">⏳</div><div class="create-empty-state-description">Loading workflows...</div></div>';
+    console.log('🔄 Set loading state in container');
     
     try {
         console.log('📡 Fetching /create/workflows/list...');
         const response = await fetch('/create/workflows/list');
-        console.log('📡 Response status:', response.status);
+        console.log('📡 Response received:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+        
         const data = await response.json();
-        console.log('📋 Workflows data:', data);
+        console.log('📋 Workflows data received:', {
+            success: data.success,
+            workflowCount: data.workflows ? data.workflows.length : 0,
+            message: data.message,
+            fullData: data
+        });
         
         if (data.success && data.workflows) {
             console.log(`✅ Loaded ${data.workflows.length} workflow(s)`);
+            console.log('📋 Workflow details:', data.workflows.map(w => ({
+                id: w.id,
+                name: w.name,
+                category: w.category,
+                description: w.description
+            })));
+            
             CreateTabState.workflows = data.workflows;
+            console.log('💾 Stored workflows in CreateTabState');
+            
+            console.log('🎨 Calling renderWorkflowGrid()...');
             renderWorkflowGrid(data.workflows);
         } else {
-            console.error('⚠️ API returned error:', data.message);
+            console.error('⚠️ API returned error or missing workflows:', {
+                success: data.success,
+                hasWorkflows: !!data.workflows,
+                message: data.message,
+                data: data
+            });
             container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">⚠️</div><div class="create-empty-state-title">Error Loading Workflows</div><div class="create-empty-state-description">${data.message || 'Unknown error'}</div></div>`;
         }
     } catch (error) {
-        console.error('❌ Error loading workflows:', error);
+        console.error('❌ Error loading workflows:', {
+            message: error.message,
+            stack: error.stack,
+            error: error
+        });
         container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">❌</div><div class="create-empty-state-title">Connection Error</div><div class="create-empty-state-description">${error.message}</div></div>`;
     }
 }
@@ -117,15 +150,34 @@ async function loadWorkflows() {
  * @param {Array} workflows - Array of workflow objects
  */
 function renderWorkflowGrid(workflows) {
+    console.log('🎨 renderWorkflowGrid() called with:', {
+        workflowCount: workflows ? workflows.length : 0,
+        workflows: workflows
+    });
+    
     const container = document.getElementById('create-workflows-grid');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Container not found in renderWorkflowGrid');
+        return;
+    }
+    
+    console.log('✅ Container found:', container);
     
     if (!workflows || workflows.length === 0) {
+        console.warn('⚠️ No workflows to render - showing empty state');
+        console.warn('⚠️ Empty condition:', {
+            workflowsIsNull: workflows === null,
+            workflowsIsUndefined: workflows === undefined,
+            workflowsLength: workflows ? workflows.length : 'N/A'
+        });
         container.innerHTML = '<div class="create-empty-state"><div class="create-empty-state-icon">📭</div><div class="create-empty-state-title">No Workflows Available</div><div class="create-empty-state-description">No workflow definitions found in the workflows directory.</div></div>';
         return;
     }
     
-    container.innerHTML = workflows.map(workflow => `
+    console.log(`🎨 Rendering ${workflows.length} workflow card(s)...`);
+    const html = workflows.map(workflow => {
+        console.log(`  📄 Rendering card for workflow: ${workflow.id} (${workflow.name})`);
+        return `
         <div class="workflow-card" data-workflow-id="${escapeHtml(workflow.id)}" onclick="selectWorkflow('${escapeHtml(workflow.id)}')">
             <div class="workflow-card-header">
                 <span class="workflow-card-icon">${workflow.icon || '⚙️'}</span>
@@ -138,7 +190,16 @@ function renderWorkflowGrid(workflows) {
                 ${(workflow.tags || []).slice(0, 2).map(tag => `<span class="workflow-tag">${escapeHtml(tag)}</span>`).join('')}
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
+    
+    console.log('📝 Generated HTML length:', html.length);
+    console.log('📝 HTML preview (first 200 chars):', html.substring(0, 200));
+    
+    container.innerHTML = html;
+    console.log('✅ Updated container innerHTML');
+    console.log('✅ Container now has', container.children.length, 'child elements');
+    console.log('✅ Workflow grid rendering complete');
 }
 
 /**
