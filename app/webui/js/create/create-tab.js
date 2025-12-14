@@ -883,71 +883,57 @@ function renderHelperTools(helperTools) {
     
     let html = '<div class="create-form-section helper-tools-section">';
     html += '<div class="create-form-section-header">';
-    html += '<h4>🛠️ Helper Tools</h4>';
+    html += '<h4 class="create-form-section-title">🛠️ Helper Tools</h4>';
     html += '</div>';
+    html += '<div class="create-form-section-content">';
     
     for (const tool of helperTools) {
         html += `<div class="helper-tool" data-tool-id="${escapeHtml(tool.id)}">`;
-        html += `<div class="helper-tool-header">`;
-        html += `<label class="helper-tool-label">${escapeHtml(tool.label)}</label>`;
-        if (tool.description) {
-            html += `<span class="helper-tool-description">${escapeHtml(tool.description)}</span>`;
-        }
-        html += `</div>`;
         
-        // Render controls
+        // Render controls directly without extra header/label/description
         if (tool.controls && tool.controls.length > 0) {
-            html += `<div class="helper-tool-controls">`;
-            
             for (const control of tool.controls) {
                 if (control.type === 'slider_with_apply') {
-                    html += `<div class="helper-tool-control slider-with-apply">`;
-                    html += `<label class="create-field-label">${escapeHtml(control.label)}</label>`;
-                    if (control.description) {
-                        html += `<span class="create-field-description">${escapeHtml(control.description)}</span>`;
-                    }
-                    html += `<div class="create-field-slider-container">`;
-                    html += `<input type="range" id="helper-${escapeHtml(control.id)}" class="create-field-slider" `;
+                    html += `<div class="create-form-field">`;
+                    html += `<label>${escapeHtml(control.label)}</label>`;
+                    html += `<div class="slider-container">`;
+                    html += `<input type="range" id="helper-${escapeHtml(control.id)}" class="slider-input" `;
                     html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
                     html += `value="${control.default || control.min || 0}" `;
                     html += `onchange="handleMaxSizeChange('${escapeHtml(tool.id)}', this.value)">`;
-                    html += `<input type="number" id="helper-${escapeHtml(control.id)}-value" class="create-field-number" `;
+                    html += `<input type="number" id="helper-${escapeHtml(control.id)}-value" class="slider-value" `;
                     html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
                     html += `value="${control.default || control.min || 0}" `;
                     html += `oninput="handleMaxSizeInputChange('${escapeHtml(tool.id)}', this.value)">`;
                     if (control.unit) {
-                        html += `<span class="create-field-unit">${escapeHtml(control.unit)}</span>`;
+                        html += `<span class="slider-unit">${escapeHtml(control.unit)}</span>`;
                     }
-                    html += `</div>`;
                     if (control.apply_button) {
-                        html += `<button type="button" id="helper-${escapeHtml(control.id)}-apply" class="create-field-apply-button" `;
+                        html += `<button type="button" id="helper-${escapeHtml(control.id)}-apply" class="seed-randomize" `;
                         html += `onclick="handleApplyMaxSize('${escapeHtml(tool.id)}')" disabled>`;
                         html += `${escapeHtml(control.apply_button_label || 'Apply')}`;
                         html += `</button>`;
                     }
                     html += `</div>`;
+                    html += `</div>`;
                 } else if (control.type === 'checkbox') {
-                    html += `<div class="helper-tool-control checkbox ${control.position || ''}">`;
-                    html += `<label class="create-field-checkbox-container">`;
+                    html += `<div class="create-form-field">`;
+                    html += `<div class="checkbox-field-container">`;
                     html += `<input type="checkbox" id="helper-${escapeHtml(control.id)}" `;
                     html += `onchange="handleAutoSizeToggle('${escapeHtml(tool.id)}', this.checked)" `;
                     if (control.default) html += 'checked ';
                     html += `>`;
-                    html += `<span class="create-field-checkbox-label">${escapeHtml(control.label)}</span>`;
-                    html += `</label>`;
-                    if (control.description) {
-                        html += `<span class="create-field-description">${escapeHtml(control.description)}</span>`;
-                    }
+                    html += `<label for="helper-${escapeHtml(control.id)}" class="checkbox-field-label">${escapeHtml(control.label)}</label>`;
+                    html += `</div>`;
                     html += `</div>`;
                 }
             }
-            
-            html += `</div>`; // helper-tool-controls
         }
         
         html += `</div>`; // helper-tool
     }
     
+    html += '</div>'; // create-form-section-content
     html += '</div>'; // helper-tools-section
     return html;
 }
