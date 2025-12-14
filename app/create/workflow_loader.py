@@ -167,29 +167,40 @@ class WorkflowLoader:
         Returns:
             List of WorkflowMetadata objects
         """
+        logger.info("🔍 Starting workflow discovery...")
         workflows_dir = cls.get_workflows_dir()
+        logger.info(f"📂 Workflows directory: {workflows_dir}")
         
         if not workflows_dir.exists():
-            logger.warning(f"Workflows directory not found: {workflows_dir}")
+            logger.warning(f"⚠️ Workflows directory not found: {workflows_dir}")
             return []
         
+        logger.info(f"✅ Workflows directory exists, scanning for .webui.yml files...")
         workflows = []
         
         # Find all .webui.yml files
-        for yaml_file in workflows_dir.glob('*.webui.yml'):
+        yaml_files = list(workflows_dir.glob('*.webui.yml'))
+        logger.info(f"📄 Found {len(yaml_files)} .webui.yml file(s): {[f.name for f in yaml_files]}")
+        
+        for yaml_file in yaml_files:
             try:
+                logger.info(f"📖 Reading {yaml_file.name}...")
                 with open(yaml_file, 'r') as f:
                     data = yaml.safe_load(f)
                 
                 # Extract workflow ID from filename
                 workflow_id = yaml_file.stem.replace('.webui', '')
+                logger.info(f"  🆔 Workflow ID: {workflow_id}")
                 
                 # Check if corresponding JSON file exists using workflow_file from YAML
                 workflow_json_name = data.get('workflow_file', f"{workflow_id}.json")
+                logger.info(f"  🔍 Looking for JSON file: {workflow_json_name}")
                 json_file = workflows_dir / workflow_json_name
                 if not json_file.exists():
-                    logger.warning(f"JSON file not found for {workflow_id}: {workflow_json_name}, skipping")
+                    logger.warning(f"  ⚠️ JSON file not found for {workflow_id}: {workflow_json_name}, skipping")
                     continue
+                
+                logger.info(f"  ✅ JSON file found: {json_file.name}")
                 
                 # Create metadata object
                 metadata = WorkflowMetadata(
@@ -204,12 +215,14 @@ class WorkflowLoader:
                     time_estimate=data.get('time_estimate', {})
                 )
                 
+                logger.info(f"  ✅ Created metadata for: {workflow_id} - {metadata.name}")
                 workflows.append(metadata)
                 
             except Exception as e:
-                logger.error(f"Error parsing workflow {yaml_file}: {e}")
+                logger.error(f"  ❌ Error parsing workflow {yaml_file}: {e}", exc_info=True)
                 continue
         
+        logger.info(f"🎉 Discovery complete: {len(workflows)} workflow(s) loaded")
         return workflows
     
     @classmethod

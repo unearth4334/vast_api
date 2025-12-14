@@ -86,28 +86,61 @@ async function loadWorkflows() {
     const container = document.getElementById('create-workflows-grid');
     if (!container) {
         console.error('❌ create-workflows-grid container not found');
+        console.error('❌ DOM element #create-workflows-grid is missing from the page');
         return;
     }
     
+    console.log('✅ Found container:', container);
     container.innerHTML = '<div class="create-empty-state"><div class="create-empty-state-icon">⏳</div><div class="create-empty-state-description">Loading workflows...</div></div>';
+    console.log('🔄 Set loading state in container');
     
     try {
         console.log('📡 Fetching /create/workflows/list...');
         const response = await fetch('/create/workflows/list');
-        console.log('📡 Response status:', response.status);
+        console.log('📡 Response received:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+        
         const data = await response.json();
-        console.log('📋 Workflows data:', data);
+        console.log('📋 Workflows data received:', {
+            success: data.success,
+            workflowCount: data.workflows ? data.workflows.length : 0,
+            message: data.message,
+            fullData: data
+        });
         
         if (data.success && data.workflows) {
             console.log(`✅ Loaded ${data.workflows.length} workflow(s)`);
+            console.log('📋 Workflow details:', data.workflows.map(w => ({
+                id: w.id,
+                name: w.name,
+                category: w.category,
+                description: w.description
+            })));
+            
             CreateTabState.workflows = data.workflows;
+            console.log('💾 Stored workflows in CreateTabState');
+            
+            console.log('🎨 Calling renderWorkflowGrid()...');
             renderWorkflowGrid(data.workflows);
         } else {
-            console.error('⚠️ API returned error:', data.message);
+            console.error('⚠️ API returned error or missing workflows:', {
+                success: data.success,
+                hasWorkflows: !!data.workflows,
+                message: data.message,
+                data: data
+            });
             container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">⚠️</div><div class="create-empty-state-title">Error Loading Workflows</div><div class="create-empty-state-description">${data.message || 'Unknown error'}</div></div>`;
         }
     } catch (error) {
-        console.error('❌ Error loading workflows:', error);
+        console.error('❌ Error loading workflows:', {
+            message: error.message,
+            stack: error.stack,
+            error: error
+        });
         container.innerHTML = `<div class="create-empty-state"><div class="create-empty-state-icon">❌</div><div class="create-empty-state-title">Connection Error</div><div class="create-empty-state-description">${error.message}</div></div>`;
     }
 }
@@ -117,15 +150,34 @@ async function loadWorkflows() {
  * @param {Array} workflows - Array of workflow objects
  */
 function renderWorkflowGrid(workflows) {
+    console.log('🎨 renderWorkflowGrid() called with:', {
+        workflowCount: workflows ? workflows.length : 0,
+        workflows: workflows
+    });
+    
     const container = document.getElementById('create-workflows-grid');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Container not found in renderWorkflowGrid');
+        return;
+    }
+    
+    console.log('✅ Container found:', container);
     
     if (!workflows || workflows.length === 0) {
+        console.warn('⚠️ No workflows to render - showing empty state');
+        console.warn('⚠️ Empty condition:', {
+            workflowsIsNull: workflows === null,
+            workflowsIsUndefined: workflows === undefined,
+            workflowsLength: workflows ? workflows.length : 'N/A'
+        });
         container.innerHTML = '<div class="create-empty-state"><div class="create-empty-state-icon">📭</div><div class="create-empty-state-title">No Workflows Available</div><div class="create-empty-state-description">No workflow definitions found in the workflows directory.</div></div>';
         return;
     }
     
-    container.innerHTML = workflows.map(workflow => `
+    console.log(`🎨 Rendering ${workflows.length} workflow card(s)...`);
+    const html = workflows.map(workflow => {
+        console.log(`  📄 Rendering card for workflow: ${workflow.id} (${workflow.name})`);
+        return `
         <div class="workflow-card" data-workflow-id="${escapeHtml(workflow.id)}" onclick="selectWorkflow('${escapeHtml(workflow.id)}')">
             <div class="workflow-card-header">
                 <span class="workflow-card-icon">${workflow.icon || '⚙️'}</span>
@@ -138,7 +190,16 @@ function renderWorkflowGrid(workflows) {
                 ${(workflow.tags || []).slice(0, 2).map(tag => `<span class="workflow-tag">${escapeHtml(tag)}</span>`).join('')}
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
+    
+    console.log('📝 Generated HTML length:', html.length);
+    console.log('📝 HTML preview (first 200 chars):', html.substring(0, 200));
+    
+    container.innerHTML = html;
+    console.log('✅ Updated container innerHTML');
+    console.log('✅ Container now has', container.children.length, 'child elements');
+    console.log('✅ Workflow grid rendering complete');
 }
 
 /**
@@ -813,13 +874,92 @@ function showCreateSuccess(message) {
 }
 
 /**
+ * Render helper tools section
+ * @param {Array} helperTools - Array of helper tool configurations
+ * @returns {string} HTML for helper tools section
+ */
+function renderHelperTools(helperTools) {
+    if (!helperTools || helperTools.length === 0) return '';
+    
+    let html = '<div class="create-form-section helper-tools-section">';
+    html += '<div class="create-form-section-header">';
+    html += '<h4>🛠️ Helper Tools</h4>';
+    html += '</div>';
+    
+    for (const tool of helperTools) {
+        html += `<div class="helper-tool" data-tool-id="${escapeHtml(tool.id)}">`;
+        html += `<div class="helper-tool-header">`;
+        html += `<label class="helper-tool-label">${escapeHtml(tool.label)}</label>`;
+        if (tool.description) {
+            html += `<span class="helper-tool-description">${escapeHtml(tool.description)}</span>`;
+        }
+        html += `</div>`;
+        
+        // Render controls
+        if (tool.controls && tool.controls.length > 0) {
+            html += `<div class="helper-tool-controls">`;
+            
+            for (const control of tool.controls) {
+                if (control.type === 'slider_with_apply') {
+                    html += `<div class="helper-tool-control slider-with-apply">`;
+                    html += `<label class="create-field-label">${escapeHtml(control.label)}</label>`;
+                    if (control.description) {
+                        html += `<span class="create-field-description">${escapeHtml(control.description)}</span>`;
+                    }
+                    html += `<div class="create-field-slider-container">`;
+                    html += `<input type="range" id="helper-${escapeHtml(control.id)}" class="create-field-slider" `;
+                    html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
+                    html += `value="${control.default || control.min || 0}" `;
+                    html += `onchange="handleMaxSizeChange('${escapeHtml(tool.id)}', this.value)">`;
+                    html += `<input type="number" id="helper-${escapeHtml(control.id)}-value" class="create-field-number" `;
+                    html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
+                    html += `value="${control.default || control.min || 0}" `;
+                    html += `oninput="handleMaxSizeInputChange('${escapeHtml(tool.id)}', this.value)">`;
+                    if (control.unit) {
+                        html += `<span class="create-field-unit">${escapeHtml(control.unit)}</span>`;
+                    }
+                    html += `</div>`;
+                    if (control.apply_button) {
+                        html += `<button type="button" id="helper-${escapeHtml(control.id)}-apply" class="create-field-apply-button" `;
+                        html += `onclick="handleApplyMaxSize('${escapeHtml(tool.id)}')" disabled>`;
+                        html += `${escapeHtml(control.apply_button_label || 'Apply')}`;
+                        html += `</button>`;
+                    }
+                    html += `</div>`;
+                } else if (control.type === 'checkbox') {
+                    html += `<div class="helper-tool-control checkbox ${control.position || ''}">`;
+                    html += `<label class="create-field-checkbox-container">`;
+                    html += `<input type="checkbox" id="helper-${escapeHtml(control.id)}" `;
+                    html += `onchange="handleAutoSizeToggle('${escapeHtml(tool.id)}', this.checked)" `;
+                    if (control.default) html += 'checked ';
+                    html += `>`;
+                    html += `<span class="create-field-checkbox-label">${escapeHtml(control.label)}</span>`;
+                    html += `</label>`;
+                    if (control.description) {
+                        html += `<span class="create-field-description">${escapeHtml(control.description)}</span>`;
+                    }
+                    html += `</div>`;
+                }
+            }
+            
+            html += `</div>`; // helper-tool-controls
+        }
+        
+        html += `</div>`; // helper-tool
+    }
+    
+    html += '</div>'; // helper-tools-section
+    return html;
+}
+
+/**
  * Helper tool state
  */
 const HelperToolState = {
     autoSizing: {
         enabled: false,
-        maxSize: 1024,
-        appliedMaxSize: 1024,
+        maxSize: 1.0,  // in megapixels (MP)
+        appliedMaxSize: 1.0,  // in megapixels (MP)
         currentImageDimensions: null,
         targets: { width_field: 'size_x', height_field: 'size_y' }
     }
@@ -836,11 +976,11 @@ function handleMaxSizeChange(toolId, value) {
         numberInput.value = value;
     }
     
-    HelperToolState.autoSizing.maxSize = parseInt(value);
+    HelperToolState.autoSizing.maxSize = parseFloat(value);
     
     // Enable apply button if value differs from applied value
     if (applyBtn) {
-        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
+        applyBtn.disabled = (parseFloat(value) === HelperToolState.autoSizing.appliedMaxSize);
     }
 }
 
@@ -855,11 +995,11 @@ function handleMaxSizeInputChange(toolId, value) {
         slider.value = value;
     }
     
-    HelperToolState.autoSizing.maxSize = parseInt(value);
+    HelperToolState.autoSizing.maxSize = parseFloat(value);
     
     // Enable apply button if value differs from applied value
     if (applyBtn) {
-        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
+        applyBtn.disabled = (parseFloat(value) === HelperToolState.autoSizing.appliedMaxSize);
     }
 }
 
@@ -917,7 +1057,7 @@ function handleAutoSizeToggle(toolId, enabled) {
 }
 
 /**
- * Calculate automatic size based on image dimensions and max size
+ * Calculate automatic size based on image dimensions and max megapixels
  */
 function calculateAndApplyAutoSize() {
     const { currentImageDimensions, appliedMaxSize } = HelperToolState.autoSizing;
@@ -927,182 +1067,44 @@ function calculateAndApplyAutoSize() {
     const { width: imgWidth, height: imgHeight } = currentImageDimensions;
     const aspectRatio = imgWidth / imgHeight;
     
+    // Calculate current megapixels
+    const currentMP = (imgWidth * imgHeight) / 1000000;
+    const maxMP = appliedMaxSize;
+    
     let targetWidth, targetHeight;
     
-    // Calculate dimensions maintaining aspect ratio
-    if (imgWidth > imgHeight) {
-        targetWidth = Math.min(appliedMaxSize, imgWidth);
-        targetHeight = Math.round(targetWidth / aspectRatio);
-    } else {
-        targetHeight = Math.min(appliedMaxSize, imgHeight);
-        targetWidth = Math.round(targetHeight * aspectRatio);
-    }
-    
-    // Snap to 64px grid
-    targetWidth = Math.round(targetWidth / 64) * 64;
-    targetHeight = Math.round(targetHeight / 64) * 64;
-    
-    // Ensure minimum size
-    targetWidth = Math.max(64, targetWidth);
-    targetHeight = Math.max(64, targetHeight);
-    
-    console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} → ${targetWidth}x${targetHeight} (max: ${appliedMaxSize}px)`);
-    
-    // Update the form fields
-    const widthField = HelperToolState.autoSizing.targets.width_field;
-    const heightField = HelperToolState.autoSizing.targets.height_field;
-    
-    const widthSlider = document.getElementById(`create-field-${widthField}`);
-    const widthInput = document.getElementById(`create-field-${widthField}-value`);
-    const heightSlider = document.getElementById(`create-field-${heightField}`);
-    const heightInput = document.getElementById(`create-field-${heightField}-value`);
-    
-    if (widthSlider) widthSlider.value = targetWidth;
-    if (widthInput) widthInput.value = targetWidth;
-    if (heightSlider) heightSlider.value = targetHeight;
-    if (heightInput) heightInput.value = targetHeight;
-    
-    // Update form values
-    updateFormValue(widthField, targetWidth);
-    updateFormValue(heightField, targetHeight);
-}
-
-/**
- * Store image dimensions for auto-sizing
- * Called when an image is uploaded
- */
-function storeImageDimensions(width, height) {
-    HelperToolState.autoSizing.currentImageDimensions = { width, height };
-    console.log(`📷 Image dimensions stored: ${width}x${height}`);
-    
-    // If auto-sizing is enabled, calculate and apply
-    if (HelperToolState.autoSizing.enabled) {
-        calculateAndApplyAutoSize();
-    }
-}
-
-/**
- * Handle max size slider change
- */
-function handleMaxSizeChange(toolId, value) {
-    const numberInput = document.getElementById(`helper-max_image_size-value`);
-    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
-    
-    if (numberInput) {
-        numberInput.value = value;
-    }
-    
-    HelperToolState.autoSizing.maxSize = parseInt(value);
-    
-    // Enable apply button if value differs from applied value
-    if (applyBtn) {
-        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
-    }
-}
-
-/**
- * Handle max size number input change
- */
-function handleMaxSizeInputChange(toolId, value) {
-    const slider = document.getElementById(`helper-max_image_size`);
-    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
-    
-    if (slider) {
-        slider.value = value;
-    }
-    
-    HelperToolState.autoSizing.maxSize = parseInt(value);
-    
-    // Enable apply button if value differs from applied value
-    if (applyBtn) {
-        applyBtn.disabled = (parseInt(value) === HelperToolState.autoSizing.appliedMaxSize);
-    }
-}
-
-/**
- * Handle apply button click
- */
-function handleApplyMaxSize(toolId) {
-    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
-    
-    HelperToolState.autoSizing.appliedMaxSize = HelperToolState.autoSizing.maxSize;
-    
-    if (applyBtn) {
-        applyBtn.disabled = true;
-    }
-    
-    // Recalculate dimensions if auto-sizing is enabled and we have image dimensions
-    if (HelperToolState.autoSizing.enabled && HelperToolState.autoSizing.currentImageDimensions) {
-        calculateAndApplyAutoSize();
-    }
-}
-
-/**
- * Handle auto-size toggle change
- */
-function handleAutoSizeToggle(toolId, enabled) {
-    HelperToolState.autoSizing.enabled = enabled;
-    
-    const widthField = HelperToolState.autoSizing.targets.width_field;
-    const heightField = HelperToolState.autoSizing.targets.height_field;
-    
-    // Get the field elements
-    const widthSlider = document.getElementById(`create-field-${widthField}`);
-    const widthInput = document.getElementById(`create-field-${widthField}-value`);
-    const heightSlider = document.getElementById(`create-field-${heightField}`);
-    const heightInput = document.getElementById(`create-field-${heightField}-value`);
-    
-    if (enabled) {
-        // Disable manual size controls
-        if (widthSlider) widthSlider.disabled = true;
-        if (widthInput) widthInput.disabled = true;
-        if (heightSlider) heightSlider.disabled = true;
-        if (heightInput) heightInput.disabled = true;
+    // Only scale down if image exceeds max megapixels
+    if (currentMP > maxMP) {
+        // Calculate target total pixels from megapixels
+        const targetPixels = maxMP * 1000000;
         
-        // Calculate dimensions if we have image data
-        if (HelperToolState.autoSizing.currentImageDimensions) {
-            calculateAndApplyAutoSize();
-        }
+        // Calculate new dimensions maintaining aspect ratio
+        // area = width * height, and width/height = aspectRatio
+        // So: area = width * (width/aspectRatio) = width² / aspectRatio
+        // Therefore: width = sqrt(area * aspectRatio)
+        targetWidth = Math.sqrt(targetPixels * aspectRatio);
+        targetHeight = targetWidth / aspectRatio;
+        
+        // Round to integers
+        targetWidth = Math.round(targetWidth);
+        targetHeight = Math.round(targetHeight);
+        
+        // Snap to 64px grid
+        targetWidth = Math.round(targetWidth / 64) * 64;
+        targetHeight = Math.round(targetHeight / 64) * 64;
+        
+        // Ensure minimum size
+        targetWidth = Math.max(64, targetWidth);
+        targetHeight = Math.max(64, targetHeight);
+        
+        console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} (${currentMP.toFixed(2)}MP) → ${targetWidth}x${targetHeight} (${((targetWidth * targetHeight) / 1000000).toFixed(2)}MP, max: ${maxMP}MP)`);
     } else {
-        // Enable manual size controls
-        if (widthSlider) widthSlider.disabled = false;
-        if (widthInput) widthInput.disabled = false;
-        if (heightSlider) heightSlider.disabled = false;
-        if (heightInput) heightInput.disabled = false;
+        // Image is already within limits, use original dimensions (snapped to grid)
+        targetWidth = Math.round(imgWidth / 64) * 64;
+        targetHeight = Math.round(imgHeight / 64) * 64;
+        
+        console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} (${currentMP.toFixed(2)}MP) → ${targetWidth}x${targetHeight} (no scaling needed, within ${maxMP}MP limit)`);
     }
-}
-
-/**
- * Calculate automatic size based on image dimensions and max size
- */
-function calculateAndApplyAutoSize() {
-    const { currentImageDimensions, appliedMaxSize } = HelperToolState.autoSizing;
-    
-    if (!currentImageDimensions) return;
-    
-    const { width: imgWidth, height: imgHeight } = currentImageDimensions;
-    const aspectRatio = imgWidth / imgHeight;
-    
-    let targetWidth, targetHeight;
-    
-    // Calculate dimensions maintaining aspect ratio
-    if (imgWidth > imgHeight) {
-        targetWidth = Math.min(appliedMaxSize, imgWidth);
-        targetHeight = Math.round(targetWidth / aspectRatio);
-    } else {
-        targetHeight = Math.min(appliedMaxSize, imgHeight);
-        targetWidth = Math.round(targetHeight * aspectRatio);
-    }
-    
-    // Snap to 64px grid
-    targetWidth = Math.round(targetWidth / 64) * 64;
-    targetHeight = Math.round(targetHeight / 64) * 64;
-    
-    // Ensure minimum size
-    targetWidth = Math.max(64, targetWidth);
-    targetHeight = Math.max(64, targetHeight);
-    
-    console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} → ${targetWidth}x${targetHeight} (max: ${appliedMaxSize}px)`);
     
     // Update the form fields
     const widthField = HelperToolState.autoSizing.targets.width_field;
@@ -1782,3 +1784,16 @@ window.handleMaxSizeInputChange = handleMaxSizeInputChange;
 window.handleApplyMaxSize = handleApplyMaxSize;
 window.handleAutoSizeToggle = handleAutoSizeToggle;
 window.storeImageDimensions = storeImageDimensions;
+
+// Auto-initialize if Create tab is already visible when module loads
+// This handles the case where the module loads after the tab is shown
+if (document.getElementById('create-tab')?.classList.contains('active') && !window.createTabInitialized) {
+    console.log('🎨 Auto-initializing Create tab (tab is already visible)...');
+    // Set flag first to prevent multiple simultaneous initializations
+    window.createTabInitialized = true;
+    initCreateTab().catch(error => {
+        console.error('❌ Auto-initialization failed:', error);
+        // Reset flag on failure to allow retry
+        window.createTabInitialized = false;
+    });
+}
