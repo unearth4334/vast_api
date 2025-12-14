@@ -703,7 +703,9 @@ class WorkflowGenerator:
         
         mode_value = int(value) if value is not None else config.default
         if mode_value is None:
-            mode_value = 0  # Default to enabled
+            # Default to mode 2 (bypassed) for safety - avoids unexpected node execution
+            mode_value = 2
+            logger.warning(f"No mode value or default for {config.id}, using mode 2 (bypass)")
         
         # Canvas format: workflow has a 'nodes' array
         if 'nodes' in workflow and isinstance(workflow['nodes'], list):
@@ -717,7 +719,8 @@ class WorkflowGenerator:
                 else:
                     logger.warning(f"Node {node_id} not found in workflow for {config.id}")
         # Legacy format: workflow is a dict of node_id -> node
-        elif str(config.node_ids[0]) in workflow:
+        # Check if any node_id exists as a string key to determine format
+        elif any(str(nid) in workflow for nid in config.node_ids):
             for node_id in config.node_ids:
                 if str(node_id) in workflow:
                     workflow[str(node_id)]['mode'] = mode_value

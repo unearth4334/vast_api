@@ -63,10 +63,20 @@ def test_node_mode_toggle():
     try:
         generator = WorkflowGenerator(config, template)
         
+        # Get the first toggle input and its node IDs for testing
+        first_toggle = toggle_inputs[0]
+        test_field_id = first_toggle.id
+        test_node_ids = [int(nid) for nid in first_toggle.node_ids]
+        test_default = first_toggle.default
+        
+        print(f"\n   Testing with field: {test_field_id}")
+        print(f"   Node IDs: {test_node_ids}")
+        print(f"   Default mode: {test_default}")
+        
         # Test case 1: Enable a toggle (mode = 0)
-        print("\n   Test 1: Enable 'save_last_frame' (mode = 0)")
+        print(f"\n   Test 1: Enable '{test_field_id}' (mode = 0)")
         test_inputs_1 = {
-            'save_last_frame': 0,  # enabled
+            test_field_id: 0,  # enabled
             'input_image': 'test.png',
             'positive_prompt': 'test prompt',
             'seed': 12345
@@ -76,28 +86,27 @@ def test_node_mode_toggle():
         
         # Check if the mode was applied correctly
         if 'nodes' in workflow_1:
-            node_447 = next((n for n in workflow_1['nodes'] if n.get('id') == 447), None)
-            node_444 = next((n for n in workflow_1['nodes'] if n.get('id') == 444), None)
+            test_nodes = [next((n for n in workflow_1['nodes'] if n.get('id') == nid), None) 
+                          for nid in test_node_ids]
             
-            if node_447 and node_444:
-                mode_447 = node_447.get('mode')
-                mode_444 = node_444.get('mode')
-                print(f"     Node 447 mode: {mode_447} (expected: 0)")
-                print(f"     Node 444 mode: {mode_444} (expected: 0)")
+            if all(test_nodes):
+                modes = [n.get('mode') for n in test_nodes]
+                for i, (node_id, mode) in enumerate(zip(test_node_ids, modes)):
+                    print(f"     Node {node_id} mode: {mode} (expected: 0)")
                 
-                if mode_447 == 0 and mode_444 == 0:
+                if all(m == 0 for m in modes):
                     print("     ✓ Mode correctly set to 0 (enabled)")
                 else:
-                    print(f"     ✗ Mode not correct! Expected 0, got {mode_447}/{mode_444}")
+                    print(f"     ✗ Mode not correct! Expected all 0, got {modes}")
                     return False
             else:
-                print("     ✗ Nodes 447/444 not found in workflow")
+                print(f"     ✗ Some nodes not found in workflow: {test_node_ids}")
                 return False
         
         # Test case 2: Disable a toggle (mode = 2)
-        print("\n   Test 2: Disable 'save_last_frame' (mode = 2)")
+        print(f"\n   Test 2: Disable '{test_field_id}' (mode = 2)")
         test_inputs_2 = {
-            'save_last_frame': 2,  # disabled/bypass
+            test_field_id: 2,  # disabled/bypass
             'input_image': 'test.png',
             'positive_prompt': 'test prompt',
             'seed': 12345
@@ -107,28 +116,27 @@ def test_node_mode_toggle():
         
         # Check if the mode was applied correctly
         if 'nodes' in workflow_2:
-            node_447 = next((n for n in workflow_2['nodes'] if n.get('id') == 447), None)
-            node_444 = next((n for n in workflow_2['nodes'] if n.get('id') == 444), None)
+            test_nodes = [next((n for n in workflow_2['nodes'] if n.get('id') == nid), None) 
+                          for nid in test_node_ids]
             
-            if node_447 and node_444:
-                mode_447 = node_447.get('mode')
-                mode_444 = node_444.get('mode')
-                print(f"     Node 447 mode: {mode_447} (expected: 2)")
-                print(f"     Node 444 mode: {mode_444} (expected: 2)")
+            if all(test_nodes):
+                modes = [n.get('mode') for n in test_nodes]
+                for i, (node_id, mode) in enumerate(zip(test_node_ids, modes)):
+                    print(f"     Node {node_id} mode: {mode} (expected: 2)")
                 
-                if mode_447 == 2 and mode_444 == 2:
+                if all(m == 2 for m in modes):
                     print("     ✓ Mode correctly set to 2 (disabled)")
                 else:
-                    print(f"     ✗ Mode not correct! Expected 2, got {mode_447}/{mode_444}")
+                    print(f"     ✗ Mode not correct! Expected all 2, got {modes}")
                     return False
             else:
-                print("     ✗ Nodes 447/444 not found in workflow")
+                print(f"     ✗ Some nodes not found in workflow: {test_node_ids}")
                 return False
         
         # Test case 3: Use default value
-        print("\n   Test 3: Use default value from config")
+        print(f"\n   Test 3: Use default value from config")
         test_inputs_3 = {
-            # save_last_frame not provided, should use default (2)
+            # Field not provided, should use default
             'input_image': 'test.png',
             'positive_prompt': 'test prompt',
             'seed': 12345
@@ -138,22 +146,21 @@ def test_node_mode_toggle():
         
         # Check if the mode was applied correctly
         if 'nodes' in workflow_3:
-            node_447 = next((n for n in workflow_3['nodes'] if n.get('id') == 447), None)
-            node_444 = next((n for n in workflow_3['nodes'] if n.get('id') == 444), None)
+            test_nodes = [next((n for n in workflow_3['nodes'] if n.get('id') == nid), None) 
+                          for nid in test_node_ids]
             
-            if node_447 and node_444:
-                mode_447 = node_447.get('mode')
-                mode_444 = node_444.get('mode')
-                print(f"     Node 447 mode: {mode_447} (expected: 2 from default)")
-                print(f"     Node 444 mode: {mode_444} (expected: 2 from default)")
+            if all(test_nodes):
+                modes = [n.get('mode') for n in test_nodes]
+                for i, (node_id, mode) in enumerate(zip(test_node_ids, modes)):
+                    print(f"     Node {node_id} mode: {mode} (expected: {test_default} from default)")
                 
-                if mode_447 == 2 and mode_444 == 2:
+                if all(m == test_default for m in modes):
                     print("     ✓ Default mode correctly applied")
                 else:
-                    print(f"     ✗ Default mode not correct! Expected 2, got {mode_447}/{mode_444}")
+                    print(f"     ✗ Default mode not correct! Expected all {test_default}, got {modes}")
                     return False
             else:
-                print("     ✗ Nodes 447/444 not found in workflow")
+                print(f"     ✗ Some nodes not found in workflow: {test_node_ids}")
                 return False
         
         print("\n   ✓ All tests passed!")

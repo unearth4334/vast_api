@@ -447,7 +447,15 @@ function renderFormField(field) {
             // Node mode toggle: maps checkbox to ComfyUI node mode values
             // Checked (enabled) = mode 0, Unchecked (disabled) = mode 2 or 4
             const isEnabled = field.default === 0;
-            const disabledMode = field.default === 4 ? 4 : 2; // Preserve the disabled mode type
+            // Preserve the disabled mode type - valid modes are 2 (bypass) and 4 (muted)
+            let disabledMode = 2; // Default to bypass
+            if (field.default === 4) {
+                disabledMode = 4;
+            } else if (field.default === 2) {
+                disabledMode = 2;
+            } else if (field.default !== 0) {
+                console.warn(`Unknown node mode default ${field.default} for ${field.id}, using mode 2 (bypass)`);
+            }
             inputHtml = `
                 <div class="checkbox-field-container">
                     <input 
