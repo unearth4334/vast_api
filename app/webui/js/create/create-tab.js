@@ -895,7 +895,13 @@ function renderHelperTools(helperTools) {
             for (const control of tool.controls) {
                 if (control.type === 'slider_with_apply') {
                     html += `<div class="create-form-field">`;
-                    html += `<label>${escapeHtml(control.label)}</label>`;
+                    // Include unit in label if present
+                    const labelText = control.unit ? `${control.label} (${control.unit})` : control.label;
+                    html += `<label>${escapeHtml(labelText)}</label>`;
+                    // Add short description if present
+                    if (control.description) {
+                        html += `<div class="field-description">${escapeHtml(control.description)}</div>`;
+                    }
                     html += `<div class="slider-container">`;
                     html += `<input type="range" id="helper-${escapeHtml(control.id)}" class="slider-input" `;
                     html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
@@ -905,9 +911,7 @@ function renderHelperTools(helperTools) {
                     html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
                     html += `value="${control.default || control.min || 0}" `;
                     html += `oninput="handleMaxSizeInputChange('${escapeHtml(tool.id)}', this.value)">`;
-                    if (control.unit) {
-                        html += `<span class="slider-unit">${escapeHtml(control.unit)}</span>`;
-                    }
+                    // Note: unit is now included in the label, not displayed separately
                     if (control.apply_button) {
                         html += `<button type="button" id="helper-${escapeHtml(control.id)}-apply" class="helper-tool-apply-button" `;
                         html += `onclick="handleApplyMaxSize('${escapeHtml(tool.id)}')" disabled>`;
