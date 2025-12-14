@@ -334,27 +334,11 @@ function renderFormField(field) {
     
     switch (field.type) {
         case 'image':
-            // Add max image size slider below the upload area
             inputHtml = `
                 <div class="image-upload-container" id="${id}-container">
                     <input type="file" id="${id}" accept="${field.accept || 'image/*'}" onchange="handleImageUpload('${field.id}', this)">
                     <div class="image-upload-icon">📷</div>
                     <div class="image-upload-text">Click or drag to upload image</div>
-                </div>
-                <div class="slider-container" style="margin-top: 12px;">
-                    <label for="${id}-max-size" style="display: block; margin-bottom: 4px; font-size: 13px; color: var(--text-primary);">
-                        Max Image Size: <span class="slider-value" id="${id}-max-size-value">1</span> <span class="slider-unit">MP</span>
-                    </label>
-                    <input 
-                        type="range" 
-                        id="${id}-max-size" 
-                        class="slider-input"
-                        min="0.5"
-                        max="8"
-                        step="0.5"
-                        value="1"
-                        oninput="document.getElementById('${id}-max-size-value').textContent = this.value"
-                    >
                 </div>
             `;
             break;
@@ -590,8 +574,8 @@ function handleImageUpload(fieldId, input) {
     const container = document.getElementById(`create-field-${fieldId}-container`);
     if (!container) return;
     
-    // Get max size from slider
-    const maxSizeSlider = document.getElementById(`create-field-${fieldId}-max-size`);
+    // Get max size from helper tools slider
+    const maxSizeSlider = document.getElementById('helper-max_image_size');
     const maxMegapixels = maxSizeSlider ? parseFloat(maxSizeSlider.value) : 1.0;
     
     // Show preview using DOM methods for security
