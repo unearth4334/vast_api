@@ -209,6 +209,9 @@ class WorkflowGenerator:
             return self._replace_single_model_token(workflow_str, config, value)
         elif input_type == 'dropdown':
             return self._replace_text_token(workflow_str, config, value)
+        elif input_type == 'node_mode_toggle':
+            # Node mode toggles are handled in post-processing, not via token replacement
+            return workflow_str
         else:
             logger.warning(f"Unknown input type for token replacement: {input_type}")
             return workflow_str
