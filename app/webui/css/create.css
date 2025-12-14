@@ -1896,26 +1896,39 @@
     /* Minimal wrapper for helper tool controls */
 }
 
-/* Apply button for helper tools (appears in slider containers) */
+/* Header row with label and apply button */
+.helper-tool-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+/* Apply button for helper tools (right-justified on same line as label) */
 .helper-tool-apply-button {
-    background: var(--interactive-normal);
-    color: var(--text-normal);
-    border: 1px solid var(--background-modifier-border);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
     border-radius: var(--radius-s);
-    padding: var(--size-4-2);
+    padding: var(--size-4-2) var(--size-4-3);
     cursor: pointer;
     font-size: var(--font-ui-small);
+    font-weight: 500;
     transition: all 0.2s ease;
     white-space: nowrap;
 }
 
 .helper-tool-apply-button:hover:not(:disabled) {
-    background: var(--interactive-hover);
+    background: var(--interactive-accent-hover);
+    transform: translateY(-1px);
 }
 
 .helper-tool-apply-button:disabled {
-    opacity: 0.5;
+    background: var(--background-modifier-border);
+    color: var(--text-muted);
     cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
 }
 
 /* Disabled state for size fields when auto-sizing is enabled */
