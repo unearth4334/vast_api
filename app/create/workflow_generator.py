@@ -98,6 +98,18 @@ class WorkflowGenerator:
         # Parse back to dict
         workflow = json.loads(workflow_str)
         
+        # Apply node-based modifications for types that don't use tokens (e.g., node_mode_toggle)
+        for input_config in self.config.inputs:
+            try:
+                if input_config.type == 'node_mode_toggle':
+                    value = inputs.get(input_config.id)
+                    if value is None and input_config.default is not None:
+                        value = input_config.default
+                    if value is not None:
+                        self._apply_node_mode_toggle(workflow, input_config, value)
+            except Exception as e:
+                logger.error(f"Error applying node mode toggle {input_config.id}: {e}", exc_info=True)
+        
         return workflow
     
     def _generate_with_nodes(self, inputs: Dict[str, Any]) -> dict:
@@ -197,6 +209,9 @@ class WorkflowGenerator:
             return self._replace_single_model_token(workflow_str, config, value)
         elif input_type == 'dropdown':
             return self._replace_text_token(workflow_str, config, value)
+        elif input_type == 'node_mode_toggle':
+            # Node mode toggles are handled in post-processing, not via token replacement
+            return workflow_str
         else:
             logger.warning(f"Unknown input type for token replacement: {input_type}")
             return workflow_str
@@ -364,6 +379,8 @@ class WorkflowGenerator:
             self._apply_single_model(workflow, input_config, value)
         elif input_type == 'dropdown':
             self._apply_dropdown(workflow, input_config, value)
+        elif input_type == 'node_mode_toggle':
+            self._apply_node_mode_toggle(workflow, input_config, value)
         else:
             logger.warning(f"Unknown input type: {input_type} for {input_config.id}")
     
@@ -665,6 +682,53 @@ class WorkflowGenerator:
         model_path = value.get('path', '')
         workflow[config.node_id]['inputs'][config.field] = model_path
         logger.debug(f"Applied single model to node {config.node_id}.{config.field}: {model_path}")
+    
+    def _apply_node_mode_toggle(self, workflow: dict, config: InputConfig, value: Any):
+        """
+        Apply node mode toggle - sets the 'mode' field for ComfyUI nodes
+        
+        Mode values:
+        - 0 = enabled (node is active)
+        - 2 = bypassed (node is skipped)
+        - 4 = muted (node is disabled)
+        
+        Args:
+            workflow: Workflow JSON (canvas format with 'nodes' array)
+            config: Input configuration with node_ids list
+            value: Integer mode value (0, 2, or 4)
+        """
+        if not config.node_ids:
+            logger.warning(f"Missing node_ids for node_mode_toggle: {config.id}")
+            return
+        
+        mode_value = int(value) if value is not None else config.default
+        if mode_value is None:
+            # Default to mode 2 (bypassed) for safety - avoids unexpected node execution
+            mode_value = 2
+            logger.warning(f"No mode value or default for {config.id}, using mode 2 (bypass)")
+        
+        # Canvas format: workflow has a 'nodes' array
+        if 'nodes' in workflow and isinstance(workflow['nodes'], list):
+            for node_id in config.node_ids:
+                # Find node by id in the nodes array
+                for node in workflow['nodes']:
+                    if node.get('id') == int(node_id):
+                        node['mode'] = mode_value
+                        logger.debug(f"Set node {node_id} mode to {mode_value} for {config.id}")
+                        break
+                else:
+                    logger.warning(f"Node {node_id} not found in workflow for {config.id}")
+        # Legacy format: workflow is a dict of node_id -> node
+        # Check if any node_id exists as a string key to determine format
+        elif any(str(nid) in workflow for nid in config.node_ids):
+            for node_id in config.node_ids:
+                if str(node_id) in workflow:
+                    workflow[str(node_id)]['mode'] = mode_value
+                    logger.debug(f"Set node {node_id} mode to {mode_value} for {config.id}")
+                else:
+                    logger.warning(f"Node {node_id} not found in workflow for {config.id}")
+        else:
+            logger.warning(f"Could not determine workflow format for node_mode_toggle: {config.id}")
     
     def _update_filename_prefixes(self, workflow: dict, timestamp: str):
         """
