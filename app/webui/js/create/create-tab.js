@@ -443,6 +443,26 @@ function renderFormField(field) {
             // Don't show the label twice for checkboxes
             return `<div class="create-form-field">${description}${inputHtml}</div>`;
             
+        case 'node_mode_toggle':
+            // Node mode toggle: maps checkbox to ComfyUI node mode values
+            // Checked (enabled) = mode 0, Unchecked (disabled) = mode 2 or 4
+            const isEnabled = field.default === 0;
+            const disabledMode = field.default === 4 ? 4 : 2; // Preserve the disabled mode type
+            inputHtml = `
+                <div class="checkbox-field-container">
+                    <input 
+                        type="checkbox" 
+                        id="${id}" 
+                        ${isEnabled ? 'checked' : ''}
+                        data-disabled-mode="${disabledMode}"
+                        onchange="updateNodeModeToggle('${field.id}', this)"
+                    >
+                    <label for="${id}" class="checkbox-field-label">${escapeHtml(field.label)}</label>
+                </div>
+            `;
+            // Don't show the label twice for toggles
+            return `<div class="create-form-field">${description}${inputHtml}</div>`;
+            
         case 'select':
             inputHtml = `
                 <select id="${id}" onchange="updateFormValue('${field.id}', this.value)">
@@ -490,6 +510,18 @@ function initializeFormDefaults(workflow) {
 function updateFormValue(fieldId, value) {
     CreateTabState.formValues[fieldId] = value;
     console.log(`Updated ${fieldId}:`, value);
+}
+
+/**
+ * Update node mode toggle value
+ * Maps checkbox state to ComfyUI node mode values
+ * @param {string} fieldId - Field ID
+ * @param {HTMLInputElement} checkbox - Checkbox element
+ */
+function updateNodeModeToggle(fieldId, checkbox) {
+    const disabledMode = parseInt(checkbox.dataset.disabledMode) || 2;
+    const modeValue = checkbox.checked ? 0 : disabledMode;
+    updateFormValue(fieldId, modeValue);
 }
 
 /**
@@ -1763,6 +1795,7 @@ window.toggleAdvancedSection = toggleAdvancedSection;
 window.executeWorkflow = executeWorkflow;
 window.exportWorkflowJSON = exportWorkflowJSON;
 window.updateFormValue = updateFormValue;
+window.updateNodeModeToggle = updateNodeModeToggle;
 window.updateSliderValue = updateSliderValue;
 window.updateSliderFromInput = updateSliderFromInput;
 window.randomizeSeed = randomizeSeed;
