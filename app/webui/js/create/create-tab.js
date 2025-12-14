@@ -334,27 +334,11 @@ function renderFormField(field) {
     
     switch (field.type) {
         case 'image':
-            // Add max image size slider below the upload area
             inputHtml = `
                 <div class="image-upload-container" id="${id}-container">
                     <input type="file" id="${id}" accept="${field.accept || 'image/*'}" onchange="handleImageUpload('${field.id}', this)">
                     <div class="image-upload-icon">📷</div>
                     <div class="image-upload-text">Click or drag to upload image</div>
-                </div>
-                <div class="slider-container" style="margin-top: 12px;">
-                    <label for="${id}-max-size" style="display: block; margin-bottom: 4px; font-size: 13px; color: var(--text-primary);">
-                        Max Image Size: <span class="slider-value" id="${id}-max-size-value">1</span> <span class="slider-unit">MP</span>
-                    </label>
-                    <input 
-                        type="range" 
-                        id="${id}-max-size" 
-                        class="slider-input"
-                        min="0.5"
-                        max="8"
-                        step="0.5"
-                        value="1"
-                        oninput="document.getElementById('${id}-max-size-value').textContent = this.value"
-                    >
                 </div>
             `;
             break;
@@ -543,6 +527,12 @@ function updateSliderValue(fieldId, value) {
         valueInput.value = value;
     }
     updateFormValue(fieldId, parseFloat(value));
+    
+    // If this is a width or height field, update apply button state
+    const { targets } = HelperToolState.autoSizing;
+    if (fieldId === targets.width_field || fieldId === targets.height_field) {
+        updateApplyButtonState();
+    }
 }
 
 /**
@@ -556,6 +546,12 @@ function updateSliderFromInput(fieldId, value) {
         slider.value = value;
     }
     updateFormValue(fieldId, parseFloat(value));
+    
+    // If this is a width or height field, update apply button state
+    const { targets } = HelperToolState.autoSizing;
+    if (fieldId === targets.width_field || fieldId === targets.height_field) {
+        updateApplyButtonState();
+    }
 }
 
 /**
@@ -630,8 +626,8 @@ function handleImageUpload(fieldId, input) {
     const container = document.getElementById(`create-field-${fieldId}-container`);
     if (!container) return;
     
-    // Get max size from slider
-    const maxSizeSlider = document.getElementById(`create-field-${fieldId}-max-size`);
+    // Get max size from helper tools slider
+    const maxSizeSlider = document.getElementById('helper-max_image_size');
     const maxMegapixels = maxSizeSlider ? parseFloat(maxSizeSlider.value) : 1.0;
     
     // Show preview using DOM methods for security
@@ -923,71 +919,56 @@ function renderHelperTools(helperTools) {
     
     let html = '<div class="create-form-section helper-tools-section">';
     html += '<div class="create-form-section-header">';
-    html += '<h4>🛠️ Helper Tools</h4>';
+    html += '<h4 class="create-form-section-title">🛠️ Helper Tools</h4>';
     html += '</div>';
+    html += '<div class="create-form-section-content">';
     
     for (const tool of helperTools) {
         html += `<div class="helper-tool" data-tool-id="${escapeHtml(tool.id)}">`;
-        html += `<div class="helper-tool-header">`;
-        html += `<label class="helper-tool-label">${escapeHtml(tool.label)}</label>`;
-        if (tool.description) {
-            html += `<span class="helper-tool-description">${escapeHtml(tool.description)}</span>`;
-        }
-        html += `</div>`;
         
-        // Render controls
+        // Render controls directly without extra header/label/description
         if (tool.controls && tool.controls.length > 0) {
-            html += `<div class="helper-tool-controls">`;
-            
             for (const control of tool.controls) {
                 if (control.type === 'slider_with_apply') {
-                    html += `<div class="helper-tool-control slider-with-apply">`;
-                    html += `<label class="create-field-label">${escapeHtml(control.label)}</label>`;
-                    if (control.description) {
-                        html += `<span class="create-field-description">${escapeHtml(control.description)}</span>`;
-                    }
-                    html += `<div class="create-field-slider-container">`;
-                    html += `<input type="range" id="helper-${escapeHtml(control.id)}" class="create-field-slider" `;
-                    html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
-                    html += `value="${control.default || control.min || 0}" `;
-                    html += `onchange="handleMaxSizeChange('${escapeHtml(tool.id)}', this.value)">`;
-                    html += `<input type="number" id="helper-${escapeHtml(control.id)}-value" class="create-field-number" `;
-                    html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
-                    html += `value="${control.default || control.min || 0}" `;
-                    html += `oninput="handleMaxSizeInputChange('${escapeHtml(tool.id)}', this.value)">`;
-                    if (control.unit) {
-                        html += `<span class="create-field-unit">${escapeHtml(control.unit)}</span>`;
-                    }
-                    html += `</div>`;
+                    html += `<div class="create-form-field">`;
+                    // Create a flex container for label and apply button
+                    html += `<div class="helper-tool-header-row">`;
+                    // Include unit in label if present
+                    const labelText = control.unit ? `${control.label} (${control.unit})` : control.label;
+                    html += `<label>${escapeHtml(labelText)}</label>`;
+                    // Apply button right-justified on same line as label
                     if (control.apply_button) {
-                        html += `<button type="button" id="helper-${escapeHtml(control.id)}-apply" class="create-field-apply-button" `;
-                        html += `onclick="handleApplyMaxSize('${escapeHtml(tool.id)}')" disabled>`;
+                        html += `<button type="button" id="helper-${escapeHtml(control.id)}-apply" class="helper-tool-apply-button" `;
+                        html += `onclick="handleApplyMaxSize('${escapeHtml(tool.id)}')">`;
                         html += `${escapeHtml(control.apply_button_label || 'Apply')}`;
                         html += `</button>`;
                     }
-                    html += `</div>`;
-                } else if (control.type === 'checkbox') {
-                    html += `<div class="helper-tool-control checkbox ${control.position || ''}">`;
-                    html += `<label class="create-field-checkbox-container">`;
-                    html += `<input type="checkbox" id="helper-${escapeHtml(control.id)}" `;
-                    html += `onchange="handleAutoSizeToggle('${escapeHtml(tool.id)}', this.checked)" `;
-                    if (control.default) html += 'checked ';
-                    html += `>`;
-                    html += `<span class="create-field-checkbox-label">${escapeHtml(control.label)}</span>`;
-                    html += `</label>`;
+                    html += `</div>`; // helper-tool-header-row
+                    // Add short description if present
                     if (control.description) {
-                        html += `<span class="create-field-description">${escapeHtml(control.description)}</span>`;
+                        html += `<div class="field-description">${escapeHtml(control.description)}</div>`;
                     }
-                    html += `</div>`;
+                    html += `<div class="slider-container">`;
+                    html += `<input type="range" id="helper-${escapeHtml(control.id)}" class="slider-input" `;
+                    html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
+                    html += `value="${control.default || control.min || 0}" `;
+                    html += `onchange="handleMaxSizeChange('${escapeHtml(tool.id)}', this.value)">`;
+                    html += `<input type="number" id="helper-${escapeHtml(control.id)}-value" class="slider-value" `;
+                    html += `min="${control.min || 0}" max="${control.max || 100}" step="${control.step || 1}" `;
+                    html += `value="${control.default || control.min || 0}" `;
+                    html += `oninput="handleMaxSizeInputChange('${escapeHtml(tool.id)}', this.value)">`;
+                    html += `</div>`; // slider-container
+                    html += `</div>`; // create-form-field
+                } else if (control.type === 'checkbox') {
+                    // Skip checkbox rendering - we're removing the toggle
                 }
             }
-            
-            html += `</div>`; // helper-tool-controls
         }
         
         html += `</div>`; // helper-tool
     }
     
+    html += '</div>'; // create-form-section-content
     html += '</div>'; // helper-tools-section
     return html;
 }
@@ -997,10 +978,9 @@ function renderHelperTools(helperTools) {
  */
 const HelperToolState = {
     autoSizing: {
-        enabled: false,
         maxSize: 1.0,  // in megapixels (MP)
-        appliedMaxSize: 1.0,  // in megapixels (MP)
         currentImageDimensions: null,
+        calculatedDimensions: null,  // Store last calculated values
         targets: { width_field: 'size_x', height_field: 'size_y' }
     }
 };
@@ -1010,7 +990,6 @@ const HelperToolState = {
  */
 function handleMaxSizeChange(toolId, value) {
     const numberInput = document.getElementById(`helper-max_image_size-value`);
-    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
     
     if (numberInput) {
         numberInput.value = value;
@@ -1018,10 +997,9 @@ function handleMaxSizeChange(toolId, value) {
     
     HelperToolState.autoSizing.maxSize = parseFloat(value);
     
-    // Enable apply button if value differs from applied value
-    if (applyBtn) {
-        applyBtn.disabled = (parseFloat(value) === HelperToolState.autoSizing.appliedMaxSize);
-    }
+    // Recalculate dimensions and update button state
+    updateCalculatedDimensions();
+    updateApplyButtonState();
 }
 
 /**
@@ -1029,7 +1007,6 @@ function handleMaxSizeChange(toolId, value) {
  */
 function handleMaxSizeInputChange(toolId, value) {
     const slider = document.getElementById(`helper-max_image_size`);
-    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
     
     if (slider) {
         slider.value = value;
@@ -1037,79 +1014,61 @@ function handleMaxSizeInputChange(toolId, value) {
     
     HelperToolState.autoSizing.maxSize = parseFloat(value);
     
-    // Enable apply button if value differs from applied value
-    if (applyBtn) {
-        applyBtn.disabled = (parseFloat(value) === HelperToolState.autoSizing.appliedMaxSize);
-    }
+    // Recalculate dimensions and update button state
+    updateCalculatedDimensions();
+    updateApplyButtonState();
 }
 
 /**
- * Handle apply button click
+ * Handle apply button click - fills in calculated values
  */
 function handleApplyMaxSize(toolId) {
-    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
+    const { calculatedDimensions } = HelperToolState.autoSizing;
     
-    HelperToolState.autoSizing.appliedMaxSize = HelperToolState.autoSizing.maxSize;
-    
-    if (applyBtn) {
-        applyBtn.disabled = true;
-    }
-    
-    // Recalculate dimensions if auto-sizing is enabled and we have image dimensions
-    if (HelperToolState.autoSizing.enabled && HelperToolState.autoSizing.currentImageDimensions) {
-        calculateAndApplyAutoSize();
-    }
-}
-
-/**
- * Handle auto-size toggle change
- */
-function handleAutoSizeToggle(toolId, enabled) {
-    HelperToolState.autoSizing.enabled = enabled;
+    if (!calculatedDimensions) return;
     
     const widthField = HelperToolState.autoSizing.targets.width_field;
     const heightField = HelperToolState.autoSizing.targets.height_field;
     
-    // Get the field elements
     const widthSlider = document.getElementById(`create-field-${widthField}`);
     const widthInput = document.getElementById(`create-field-${widthField}-value`);
     const heightSlider = document.getElementById(`create-field-${heightField}`);
     const heightInput = document.getElementById(`create-field-${heightField}-value`);
     
-    if (enabled) {
-        // Disable manual size controls
-        if (widthSlider) widthSlider.disabled = true;
-        if (widthInput) widthInput.disabled = true;
-        if (heightSlider) heightSlider.disabled = true;
-        if (heightInput) heightInput.disabled = true;
-        
-        // Calculate dimensions if we have image data
-        if (HelperToolState.autoSizing.currentImageDimensions) {
-            calculateAndApplyAutoSize();
-        }
-    } else {
-        // Enable manual size controls
-        if (widthSlider) widthSlider.disabled = false;
-        if (widthInput) widthInput.disabled = false;
-        if (heightSlider) heightSlider.disabled = false;
-        if (heightInput) heightInput.disabled = false;
-    }
+    // Apply calculated values to form fields
+    if (widthSlider) widthSlider.value = calculatedDimensions.width;
+    if (widthInput) widthInput.value = calculatedDimensions.width;
+    if (heightSlider) heightSlider.value = calculatedDimensions.height;
+    if (heightInput) heightInput.value = calculatedDimensions.height;
+    
+    // Update form values
+    updateFormValue(widthField, calculatedDimensions.width);
+    updateFormValue(heightField, calculatedDimensions.height);
+    
+    // Update button state (will be disabled since values now match)
+    updateApplyButtonState();
+    
+    console.log(`✅ Applied dimensions: ${calculatedDimensions.width}x${calculatedDimensions.height}`);
 }
 
 /**
- * Calculate automatic size based on image dimensions and max megapixels
+ * Calculate dimensions based on current settings
  */
-function calculateAndApplyAutoSize() {
-    const { currentImageDimensions, appliedMaxSize } = HelperToolState.autoSizing;
+function updateCalculatedDimensions() {
+    const { currentImageDimensions, maxSize } = HelperToolState.autoSizing;
     
-    if (!currentImageDimensions) return;
+    if (!currentImageDimensions) {
+        // No image loaded - set to null (will show as "?")
+        HelperToolState.autoSizing.calculatedDimensions = null;
+        return;
+    }
     
     const { width: imgWidth, height: imgHeight } = currentImageDimensions;
     const aspectRatio = imgWidth / imgHeight;
     
     // Calculate current megapixels
     const currentMP = (imgWidth * imgHeight) / 1000000;
-    const maxMP = appliedMaxSize;
+    const maxMP = maxSize;
     
     let targetWidth, targetHeight;
     
@@ -1119,9 +1078,6 @@ function calculateAndApplyAutoSize() {
         const targetPixels = maxMP * 1000000;
         
         // Calculate new dimensions maintaining aspect ratio
-        // area = width * height, and width/height = aspectRatio
-        // So: area = width * (width/aspectRatio) = width² / aspectRatio
-        // Therefore: width = sqrt(area * aspectRatio)
         targetWidth = Math.sqrt(targetPixels * aspectRatio);
         targetHeight = targetWidth / aspectRatio;
         
@@ -1136,33 +1092,51 @@ function calculateAndApplyAutoSize() {
         // Ensure minimum size
         targetWidth = Math.max(64, targetWidth);
         targetHeight = Math.max(64, targetHeight);
-        
-        console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} (${currentMP.toFixed(2)}MP) → ${targetWidth}x${targetHeight} (${((targetWidth * targetHeight) / 1000000).toFixed(2)}MP, max: ${maxMP}MP)`);
     } else {
         // Image is already within limits, use original dimensions (snapped to grid)
         targetWidth = Math.round(imgWidth / 64) * 64;
         targetHeight = Math.round(imgHeight / 64) * 64;
-        
-        console.log(`📐 Auto-sizing: ${imgWidth}x${imgHeight} (${currentMP.toFixed(2)}MP) → ${targetWidth}x${targetHeight} (no scaling needed, within ${maxMP}MP limit)`);
     }
     
-    // Update the form fields
+    HelperToolState.autoSizing.calculatedDimensions = {
+        width: targetWidth,
+        height: targetHeight
+    };
+}
+
+/**
+ * Update apply button state based on whether current values match calculated values
+ */
+function updateApplyButtonState() {
+    const applyBtn = document.getElementById(`helper-max_image_size-apply`);
+    if (!applyBtn) return;
+    
+    const { calculatedDimensions } = HelperToolState.autoSizing;
+    
+    // If no image loaded (calculatedDimensions is null), disable button
+    if (!calculatedDimensions) {
+        applyBtn.disabled = true;
+        return;
+    }
+    
     const widthField = HelperToolState.autoSizing.targets.width_field;
     const heightField = HelperToolState.autoSizing.targets.height_field;
     
-    const widthSlider = document.getElementById(`create-field-${widthField}`);
     const widthInput = document.getElementById(`create-field-${widthField}-value`);
-    const heightSlider = document.getElementById(`create-field-${heightField}`);
     const heightInput = document.getElementById(`create-field-${heightField}-value`);
     
-    if (widthSlider) widthSlider.value = targetWidth;
-    if (widthInput) widthInput.value = targetWidth;
-    if (heightSlider) heightSlider.value = targetHeight;
-    if (heightInput) heightInput.value = targetHeight;
+    if (!widthInput || !heightInput) {
+        applyBtn.disabled = true;
+        return;
+    }
     
-    // Update form values
-    updateFormValue(widthField, targetWidth);
-    updateFormValue(heightField, targetHeight);
+    const currentWidth = parseInt(widthInput.value);
+    const currentHeight = parseInt(heightInput.value);
+    
+    // Enable button if values don't match calculated values
+    const valuesMatch = (currentWidth === calculatedDimensions.width && 
+                        currentHeight === calculatedDimensions.height);
+    applyBtn.disabled = valuesMatch;
 }
 
 /**
@@ -1173,10 +1147,9 @@ function storeImageDimensions(width, height) {
     HelperToolState.autoSizing.currentImageDimensions = { width, height };
     console.log(`📷 Image dimensions stored: ${width}x${height}`);
     
-    // If auto-sizing is enabled, calculate and apply
-    if (HelperToolState.autoSizing.enabled) {
-        calculateAndApplyAutoSize();
-    }
+    // Recalculate dimensions and update button state
+    updateCalculatedDimensions();
+    updateApplyButtonState();
 }
 
 /**

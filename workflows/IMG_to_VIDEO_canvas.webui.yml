@@ -57,7 +57,7 @@ helper_tools:
       - id: "max_image_size"
         type: "slider_with_apply"
         label: "Max Image Size"
-        description: "Maximum megapixels (MP). If the image exceeds this size, it will be scaled down while maintaining aspect ratio."
+        description: "Limits image size by scaling down if it exceeds the specified megapixels."
         min: 0.1
         max: 4.0
         step: 0.1
@@ -66,12 +66,6 @@ helper_tools:
         apply_button: true
         apply_button_label: "Apply"
         apply_button_enabled_when: "value_changed"
-      - id: "auto_size_toggle"
-        type: "checkbox"
-        label: "Enable Automatic Sizing"
-        description: "When enabled, Width and Height will be automatically calculated and those fields will be disabled"
-        default: false
-        position: "inline_right"  # Display inline to the right of max_image_size slider
     targets:
       width_field: "size_x"
       height_field: "size_y"
