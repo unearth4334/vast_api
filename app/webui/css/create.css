@@ -1896,6 +1896,28 @@
     /* Minimal wrapper for helper tool controls */
 }
 
+/* Apply button for helper tools (appears in slider containers) */
+.helper-tool-apply-button {
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-2);
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.helper-tool-apply-button:hover:not(:disabled) {
+    background: var(--interactive-hover);
+}
+
+.helper-tool-apply-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* Disabled state for size fields when auto-sizing is enabled */
 input[type="range"]:disabled,
 input[type="number"]:disabled {

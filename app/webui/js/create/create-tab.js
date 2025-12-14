@@ -909,13 +909,13 @@ function renderHelperTools(helperTools) {
                         html += `<span class="slider-unit">${escapeHtml(control.unit)}</span>`;
                     }
                     if (control.apply_button) {
-                        html += `<button type="button" id="helper-${escapeHtml(control.id)}-apply" class="seed-randomize" `;
+                        html += `<button type="button" id="helper-${escapeHtml(control.id)}-apply" class="helper-tool-apply-button" `;
                         html += `onclick="handleApplyMaxSize('${escapeHtml(tool.id)}')" disabled>`;
                         html += `${escapeHtml(control.apply_button_label || 'Apply')}`;
                         html += `</button>`;
                     }
-                    html += `</div>`;
-                    html += `</div>`;
+                    html += `</div>`; // slider-container
+                    html += `</div>`; // create-form-field
                 } else if (control.type === 'checkbox') {
                     html += `<div class="create-form-field">`;
                     html += `<div class="checkbox-field-container">`;
