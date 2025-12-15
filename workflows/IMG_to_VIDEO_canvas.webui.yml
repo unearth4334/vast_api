@@ -421,6 +421,22 @@ inputs:
     default: 100
     unit: "%"
 
+  # Automatic Prompting
+  - id: "enable_auto_prompt"
+    section: "features"
+    node_ids:
+      - "473"  # DownloadAndLoadFlorence2Model
+      - "480"  # Florence2Run
+      - "474"  # Text Find and Replace (photo -> video)
+      - "475"  # Text Find and Replace (image -> video)
+      - "476"  # Text Find and Replace (painting -> video)
+      - "472"  # Text Find and Replace (illustration -> video)
+    type: "node_mode_toggle"
+    label: "Automatic Prompting (Florence2)"
+    description: "Enable Florence2 AI to automatically generate descriptive prompts from the input image. When enabled, generates and enhances prompts automatically."
+    required: false
+    default: 0  # mode: 0 = enabled
+
 # Output configuration
 outputs:
   - id: "original_video"
