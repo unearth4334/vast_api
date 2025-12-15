@@ -1,0 +1,147 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                     IMG_to_VIDEO Test Input - Quick Reference               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📄 FILE: test/samples/IMG_to_VIDEO_comprehensive_test.json
+🖼️  IMAGE: test/samples/sample_input_image.jpeg (400KB, 1664x2432 JPEG)
+📚 DOCS: docs/TEST_INPUT_IMG_TO_VIDEO.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONFIGURATION SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ DIMENSIONS ─────────────────────────────────────────────────────────────────┐
+│ Size:      576 x 832 px (portrait, non-standard)                             │
+│ Duration:  5 seconds                                                          │
+│ FPS:       16 frames per second                                               │
+│ Output:    ~80 base frames (+ interpolation)                                  │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ GENERATION ──────────────────────────────────────────────────────────────────┐
+│ Steps:          20                                                            │
+│ CFG Scale:      3.5                                                           │
+│ Speed:          7                                                             │
+│ Upscale Ratio:  2x                                                            │
+│ Seed:           -1 (random)                                                   │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ MODELS ──────────────────────────────────────────────────────────────────────┐
+│ Main (High): Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16...    │
+│ Main (Low):  Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16...     │
+│ LoRA:        Nsfw-22_ComfyUI_repackaged/Nsfw-22_[high/low]_noise.safeten...  │
+│              Strength: 1.0                                                    │
+│ CLIP:        Wan-2.2/umt5_xxl_fp16.safetensors                                │
+│ VAE:         Wan-2.1/wan_2.1_vae.safetensors                                  │
+│ Upscale:     RealESRGAN_x4plus.pth                                            │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ FEATURES (✅ = ON, ❌ = OFF) ────────────────────────────────────────────────┐
+│ ❌ Save Last Frame              ✅ Video Enhancer                             │
+│ ✅ Interpolation (RIFE)         ✅ CFGZeroStar                                │
+│ ❌ Upscaler                      ✅ Speed Regulation                          │
+│ ❌ Upscale + Interpolation       ✅ Normalized Attention                      │
+│ ✅ MagCache                      ✅ TorchCompile                              │
+│ ✅ BlockSwap                     ✅ Automatic Prompting                       │
+│                                                                               │
+│ VRAM Reduction: 100 (maximum optimization)                                   │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ PROMPTS ─────────────────────────────────────────────────────────────────────┐
+│ Positive: "The subject moves naturally with smooth cinematic motion,         │
+│            high quality, detailed"                                            │
+│                                                                               │
+│ Negative: "fast movements, blurry, mouth moving, talking, teeth visible,     │
+│            strong blush"                                                      │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+USAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 MANUAL TESTING (WebUI):
+   1. Start server: python3 app.py
+   2. Open: http://localhost:5050
+   3. Go to "Create" tab
+   4. Import: test/samples/IMG_to_VIDEO_comprehensive_test.json
+   5. Verify all fields populated
+   6. Test model scanning (Refresh buttons)
+   7. Execute workflow (if connected)
+
+🔧 API TESTING:
+   curl -X POST http://localhost:5050/create/generate-workflow \
+     -H "Content-Type: application/json" \
+     -d @test/samples/IMG_to_VIDEO_comprehensive_test.json
+
+🔍 MODEL SCANNING (with SSH connection):
+   python3 scripts/create_test_input.py "root@123.45.67.89 -p 12345"
+   
+   This will:
+   • Scan instance for available models
+   • Match requested models (Wan 2.2, Nsfw-22, etc.)
+   • Update test input with actual paths
+   • Display summary of findings
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COVERAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ All 30 workflow inputs configured
+✅ All required fields populated
+✅ All optional fields set with test values
+✅ High/low noise model pairs configured
+✅ LoRA with custom strength
+✅ All feature toggles explicitly set
+✅ Non-standard dimensions (tests custom sizing)
+✅ Portrait aspect ratio (tests edge cases)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXPECTED RESULTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏱️  Generation Time:  3-8 minutes (depends on GPU)
+💾 VRAM Usage:        ~22-24 GB (with VRAM reduction)
+📹 Output:           5-second video, 576x832, 16 FPS
+🎨 Quality:          High (20 steps, interpolation, enhancement)
+🔄 Motion:           Smooth (RIFE interpolation, speed regulation)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FILES CREATED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ test/samples/IMG_to_VIDEO_comprehensive_test.json
+   • Complete test configuration
+   • All 30 inputs configured
+   • Ready for immediate use
+
+✅ test/samples/sample_input_image.jpeg
+   • Already exists (400KB JPEG)
+   • 1664x2432 resolution
+   • Will be resized to 576x832
+
+✅ scripts/create_test_input.py
+   • Model scanning automation
+   • Retrieves models from instance
+   • Updates test input with real paths
+   • Executable: chmod +x
+
+✅ docs/TEST_INPUT_IMG_TO_VIDEO.md
+   • Complete documentation (797 lines)
+   • Usage instructions
+   • Validation checklist
+   • Troubleshooting guide
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Test input created
+✅ JSON validated
+✅ Image verified (400KB, valid JPEG)
+✅ Documentation complete
+✅ Model scanning script ready
+✅ Ready for testing
+
+📚 Full Documentation: docs/TEST_INPUT_IMG_TO_VIDEO.md
+🎯 Coverage: 100% of workflow inputs (30/30)
+
+═══════════════════════════════════════════════════════════════════════════════

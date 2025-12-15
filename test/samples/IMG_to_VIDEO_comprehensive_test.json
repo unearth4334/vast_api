@@ -1,0 +1,46 @@
+{
+  "workflow_id": "IMG_to_VIDEO_canvas",
+  "name": "Comprehensive Test Input",
+  "description": "Test input with all parameters configured - models to be validated against instance",
+  "inputs": {
+    "input_image": "test/samples/sample_input_image.jpeg",
+    "positive_prompt": "The subject moves naturally with smooth cinematic motion, high quality, detailed",
+    "negative_prompt": "fast movements, blurry, mouth moving, talking, teeth visible, strong blush",
+    "seed": -1,
+    "size_x": 576,
+    "size_y": 832,
+    "duration": 5,
+    "steps": 20,
+    "cfg": 3.5,
+    "frame_rate": 16,
+    "speed": 7,
+    "upscale_ratio": 2,
+    "main_model": {
+      "highNoisePath": "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors",
+      "lowNoisePath": "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
+    },
+    "loras": [
+      {
+        "highNoisePath": "Nsfw-22_ComfyUI_repackaged/Nsfw-22_high_noise.safetensors",
+        "lowNoisePath": "Nsfw-22_ComfyUI_repackaged/Nsfw-22_low_noise.safetensors",
+        "strength": 1.0
+      }
+    ],
+    "clip_model": "Wan-2.2/umt5_xxl_fp16.safetensors",
+    "vae_model": "Wan-2.1/wan_2.1_vae.safetensors",
+    "upscale_model": "RealESRGAN_x4plus.pth",
+    "save_last_frame": 2,
+    "enable_interpolation": 0,
+    "enable_upscaler": 2,
+    "enable_upscale_interpolation": 2,
+    "video_enhancer": 0,
+    "cfg_zero_star": 0,
+    "speed_regulation": 0,
+    "normalized_attention": 0,
+    "magcache": 0,
+    "torchcompile": 0,
+    "blockswap": 0,
+    "vram_reduction": 100,
+    "automatic_prompting": 0
+  }
+}
