@@ -60,6 +60,27 @@ class HelperToolConfig:
 
 
 @dataclass
+class InputMetadata:
+    """Optional metadata for input validation and documentation"""
+    # Widget structure documentation
+    widget_type: Optional[str] = None  # e.g., "mxSlider", "mxSlider2D", "PrimitiveStringMultiline"
+    widget_pattern: Optional[str] = None  # e.g., "[value, value, step]" for documentation
+    widget_indices: Optional[List[int]] = None  # Which indices in widgets_values are modified
+    
+    # Node targeting (for documentation/validation)
+    target_nodes: Optional[List[Dict[str, str]]] = None  # [{"node_id": "85", "description": "CFG slider"}]
+    
+    # Coupling information
+    coupled_with: Optional[str] = None  # ID of related input (e.g., size_y coupled with size_x)
+    
+    # Complex structure documentation (for LoRA, models, etc.)
+    structure: Optional[Dict[str, Any]] = None
+    
+    def to_dict(self):
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
 class InputConfig:
     """Configuration for a single workflow input"""
     id: str
@@ -88,9 +109,14 @@ class InputConfig:
     model_type: Optional[str] = None
     accept: Optional[str] = None
     max_size_mb: Optional[int] = None
+    # Optional metadata for validation and documentation
+    metadata: Optional[InputMetadata] = None
     
     def to_dict(self):
-        return {k: v for k, v in asdict(self).items() if v is not None}
+        result = {k: v for k, v in asdict(self).items() if v is not None and k != 'metadata'}
+        if self.metadata:
+            result['metadata'] = self.metadata.to_dict()
+        return result
 
 
 @dataclass
@@ -101,6 +127,19 @@ class OutputConfig:
     type: str
     format: str
     label: str
+    
+    def to_dict(self):
+        return asdict(self)
+
+
+@dataclass
+class ValidationConfig:
+    """Optional validation configuration for workflow"""
+    strict_mode: bool = False
+    check_tokens: bool = True  # Verify all tokens in yml exist in template
+    check_node_ids: bool = True  # Verify all node_ids exist in template
+    check_widgets: bool = False  # Validate widget structure (strict)
+    warn_on_mismatch: bool = True  # Warn instead of error on validation failures
     
     def to_dict(self):
         return asdict(self)
@@ -123,9 +162,10 @@ class WorkflowConfig:
     thumbnail: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     helper_tools: List[HelperToolConfig] = field(default_factory=list)
+    validation: Optional[ValidationConfig] = None
     
     def to_dict(self):
-        return {
+        result = {
             'id': self.id,
             'name': self.name,
             'description': self.description,
@@ -141,6 +181,9 @@ class WorkflowConfig:
             'outputs': [out.to_dict() for out in self.outputs],
             'helper_tools': [tool.to_dict() for tool in self.helper_tools]
         }
+        if self.validation:
+            result['validation'] = self.validation.to_dict()
+        return result
 
 
 class WorkflowLoader:
@@ -265,6 +308,19 @@ class WorkflowLoader:
             # Parse inputs
             inputs = []
             for inp_data in data.get('inputs', []):
+                # Parse optional metadata
+                metadata = None
+                if 'metadata' in inp_data:
+                    meta_data = inp_data['metadata']
+                    metadata = InputMetadata(
+                        widget_type=meta_data.get('widget_type'),
+                        widget_pattern=meta_data.get('widget_pattern'),
+                        widget_indices=meta_data.get('widget_indices'),
+                        target_nodes=meta_data.get('target_nodes'),
+                        coupled_with=meta_data.get('coupled_with'),
+                        structure=meta_data.get('structure')
+                    )
+                
                 input_config = InputConfig(
                     id=inp_data['id'],
                     section=inp_data['section'],
@@ -291,7 +347,8 @@ class WorkflowLoader:
                     depends_on=inp_data.get('depends_on'),
                     model_type=inp_data.get('model_type'),
                     accept=inp_data.get('accept'),
-                    max_size_mb=inp_data.get('max_size_mb')
+                    max_size_mb=inp_data.get('max_size_mb'),
+                    metadata=metadata
                 )
                 inputs.append(input_config)
             
@@ -324,6 +381,18 @@ class WorkflowLoader:
                 )
                 helper_tools.append(helper_tool)
             
+            # Parse validation config
+            validation = None
+            if 'validation' in data:
+                val_data = data['validation']
+                validation = ValidationConfig(
+                    strict_mode=val_data.get('strict_mode', False),
+                    check_tokens=val_data.get('check_tokens', True),
+                    check_node_ids=val_data.get('check_node_ids', True),
+                    check_widgets=val_data.get('check_widgets', False),
+                    warn_on_mismatch=val_data.get('warn_on_mismatch', True)
+                )
+            
             # Create workflow config
             workflow = WorkflowConfig(
                 id=workflow_id,
@@ -339,7 +408,8 @@ class WorkflowLoader:
                 layout=layout,
                 inputs=inputs,
                 outputs=outputs,
-                helper_tools=helper_tools
+                helper_tools=helper_tools,
+                validation=validation
             )
             
             # Cache the result

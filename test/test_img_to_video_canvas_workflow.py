@@ -342,6 +342,7 @@ class WorkflowTestFixture:
             (502, 0, test_inputs["vram_reduction"], "VRAM reduction"),
         ]
         
+        print("\n   Text/Special Input Validation:")
         all_correct = True
         for node_id, widget_index, expected_value, description in widget_checks:
             if node_id not in nodes_by_id:

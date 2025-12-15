@@ -58,6 +58,13 @@ All numeric slider inputs in the WebUI update specific nodes in the generated wo
 - **Widget Pattern**: `[upscale_ratio, upscale_ratio, 1]`
 - **Example**: Input `upscale_ratio=1.5` → Node 421: `[1.5, 1.5, 1]`
 
+### Input: `vram_reduction` (VRAM Reduction)
+- **Default**: 100
+- **Range**: 0 - 100 (percentage)
+- **Target Node**: 502 (mxSlider "VRAM reduction")
+- **Widget Pattern**: `[vram_reduction, vram_reduction, 0]`
+- **Example**: Input `vram_reduction=71` → Node 502: `[71.0, 71.0, 0]`
+
 ---
 
 ## Single-Value Input Mappings
@@ -79,15 +86,10 @@ All numeric slider inputs in the WebUI update specific nodes in the generated wo
 - **Type**: String (textarea)
 
 ### Input: `input_image`
-- **Target Node**: 88
+- **Target Node**: 88 (LoadImage)
 - **Widget Index**: 0
 - **Type**: String (file path)
-
-### Input: `vram_reduction`
-- **Default**: 100
-- **Range**: 0 - 100 (percentage)
-- **Target Node**: 502
-- **Widget Index**: 0
+- **Example**: Input `input_image="upload_12345.jpeg"` → Node 88: `["upload_12345.jpeg", "image"]`
 
 ---
 
@@ -156,12 +158,14 @@ Feature toggles in the WebUI control the `mode` property of specific nodes:
 Model selection inputs populate `widgets_values[0]` in loader nodes:
 
 ### Input: `main_model.highNoisePath`
-- **Target Node**: 522 (WAN High Noise Model Loader)
+- **Target Node**: 522 (UNETLoader - High Noise)
 - **Widget Index**: 0
+- **Example**: `"Smooth Mix Wan 2.2 (I2V&T2V 14B)/smoothMixWan22I2VT2V_i2vHigh.safetensors"`
 
 ### Input: `main_model.lowNoisePath`
-- **Target Node**: 523 (WAN Low Noise Model Loader)
+- **Target Node**: 523 (UNETLoader - Low Noise)
 - **Widget Index**: 0
+- **Example**: `"Smooth Mix Wan 2.2 (I2V&T2V 14B)/smoothMixWan22I2VT2V_i2vLow.safetensors"`
 
 ### Input: `clip_model.path`
 - **Target Node**: 460 (CLIP Model Loader)
@@ -174,6 +178,47 @@ Model selection inputs populate `widgets_values[0]` in loader nodes:
 ### Input: `upscale_model.path`
 - **Target Node**: 384 (Upscale Model Loader)
 - **Widget Index**: 0
+
+---
+
+## LoRA System Mapping
+
+LoRA inputs use Power Lora Loader nodes with complex widget structure:
+
+### Input: `loras`
+- **Type**: high_low_pair_lora_list
+- **Target Nodes**: 
+  - Node 416: Power Lora Loader (high noise)
+  - Node 471: Power Lora Loader (low noise)
+- **Widget Structure**: `widgets_values[2]` contains LoRA data object
+- **LoRA Data Format**:
+  ```json
+  {
+    "on": true/false,
+    "lora": "path/to/lora.safetensors",
+    "strength": 1.0,
+    "strengthTwo": null
+  }
+  ```
+- **Empty State**: `{}` when no LoRA is added
+- **Example - LoRA Added**:
+  ```json
+  {
+    "on": true,
+    "lora": "(wan 2.2 experimental) WAN General NSFW model/NSFW-22-H-e8.safetensors",
+    "strength": 1,
+    "strengthTwo": null
+  }
+  ```
+- **Example - Strength Changed**:
+  ```json
+  {
+    "on": true,
+    "lora": "(wan 2.2 experimental) WAN General NSFW model/NSFW-22-H-e8.safetensors",
+    "strength": 2,
+    "strengthTwo": null
+  }
+  ```
 
 ---
 
@@ -196,20 +241,45 @@ Model selection inputs populate `widgets_values[0]` in loader nodes:
 6. ✅ Upscale Ratio variation (2.0 → 1.5)
 7. ✅ Multiple simultaneous changes
 
+### Text and Special Input Tests (`test_text_and_special_inputs.py`)
+1. ✅ Positive prompt change
+2. ✅ Negative prompt change
+3. ✅ Input image change
+4. ✅ Seed change
+5. ✅ VRAM reduction change (100 → 71)
+6. ✅ Main model change
+7. ✅ LoRA system validation
+
 ---
 
 ## Sample Files Used for Analysis
 
-The following workflow files were analyzed to determine the mapping:
+The following 28 workflow files were analyzed to determine the mapping:
 
+**Baseline**:
 - `WAN2.2_Img2Video (Original).json` - Baseline with default values
+
+**Numeric Variations** (7):
 - `WAN2.2_Img2Video(CFGChangedTo5).json` - Node 85 analysis
 - `WAN2.2_Img2Video(StepsChangedTo30).json` - Node 82 analysis
 - `WAN2.2_Img2Video(DurationChangedTo8Sec).json` - Node 426 analysis
 - `WAN2.2_Img2Video(FrameRateChangedTo20).json` - Node 490 analysis
 - `WAN2.2_Img2Video(SpeedChangedTo10).json` - Node 157 analysis
 - `WAN2.2_Img2Video(UpscaleRatioChangedTo1.5).json` - Node 421 analysis
-- Various toggle samples (AutoPrompt, BlockSwap, Interpolation, etc.)
+- `WAN2.2_Img2Video(ChangedReduceVRAMUsageTo71).json` - Node 502 analysis
+
+**Text/Special Variations** (8):
+- `WAN2.2_Img2Video(ChangedInputImage).json` - Node 88 analysis
+- `WAN2.2_Img2Video(ChangedPositivePrompt).json` - Node 408 analysis
+- `WAN2.2_Img2Video(ChangedNegativePrompt).json` - Node 409 analysis
+- `WAN2.2_Img2Video(ChangedSeed).json` - Node 73 analysis
+- `WAN2.2_Img2Video(ChangedMainModel).json` - Nodes 522, 523 analysis
+- `WAN2.2_Img2Video(LoRA Added).json` - LoRA system analysis
+- `WAN2.2_Img2Video(LoRAStrengthChanged).json` - LoRA strength analysis
+- `WAN2.2_Img2Video(NoLoraAdded).json` - LoRA empty state analysis
+
+**Toggle Variations** (12):
+- Various toggle samples (AutoPrompt, BlockSwap, CFGZeroStar, Interpolation, MagCache, NormalizedAttention, SavingLastFrame, SpeedRegulation, TorchCompile, UpscaleAndInterpolation, Upscaler, VideoEnhance)
 
 ---
 
@@ -266,6 +336,7 @@ python3 test/test_img_to_video_canvas_workflow.py && python3 test/test_widget_va
 
 ---
 
-**Last Updated**: 2025-01-XX  
-**Test Status**: ✅ All Tests Passing (13/13)  
-**Coverage**: 30 inputs, 85 nodes, 27 tokens
+**Last Updated**: 2025-12-15  
+**Test Status**: ✅ All Tests Passing (20/20)  
+**Coverage**: 29/30 inputs (97%), 85 nodes, 27 tokens  
+**Sample Files**: 28 analyzed

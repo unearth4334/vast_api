@@ -27,6 +27,14 @@ time_estimate:
   max: 600
   note: "Varies significantly based on duration and resolution"
 
+# Validation Configuration (Optional - enables template validation)
+validation:
+  strict_mode: false  # If true, validation errors will prevent workflow generation
+  check_tokens: true  # Verify all tokens in inputs exist in template
+  check_node_ids: true  # Verify all node_ids exist in template
+  check_widgets: false  # Validate widget structure (requires metadata)
+  warn_on_mismatch: true  # Warn instead of error on validation failures
+
 # UI Layout Configuration - Section-based layout for organized UI
 layout:
   sections:
@@ -145,9 +153,26 @@ inputs:
     unit: "px"
     controlled_by: "auto_size_enabled"
     auto_calculate: true
+    # Optional metadata - shows coupling and 2D slider pattern
+    metadata:
+      widget_type: "mxSlider2D"
+      widget_pattern: "[width, width, height, height, 0, 0]"  # 2D slider format
+      widget_indices: [0, 1]  # Width uses indices 0-1
+      coupled_with: "size_y"  # Paired with height
+      target_nodes:
+        - node_id: "83"
+          description: "EmptyLatentImage size (shared with size_y)"
 
   - id: "size_y"
     section: "generation"
+    metadata:
+      widget_type: "mxSlider2D"
+      widget_pattern: "[width, width, height, height, 0, 0]"
+      widget_indices: [2, 3]  # Height uses indices 2-3
+      coupled_with: "size_x"
+      target_nodes:
+        - node_id: "83"
+          description: "EmptyLatentImage size (shared with size_x)"
     token: "{{SIZE_HEIGHT}}"
     type: "slider"
     label: "Height"
@@ -180,6 +205,14 @@ inputs:
     max: 40
     step: 1
     default: 20
+    # Optional metadata for validation and documentation
+    metadata:
+      widget_type: "mxSlider"
+      widget_pattern: "[value, value, step]"
+      widget_indices: [0, 1]
+      target_nodes:
+        - node_id: "82"
+          description: "KSampler steps parameter"
 
   - id: "cfg"
     section: "generation"
@@ -191,6 +224,14 @@ inputs:
     max: 10.0
     step: 0.5
     default: 3.5
+    # Optional metadata for validation and documentation
+    metadata:
+      widget_type: "mxSlider"
+      widget_pattern: "[value, value, step]"  # Pattern: duplicate value at indices 0-1
+      widget_indices: [0, 1]
+      target_nodes:
+        - node_id: "85"
+          description: "KSampler CFG parameter"
 
   - id: "frame_rate"
     section: "generation"

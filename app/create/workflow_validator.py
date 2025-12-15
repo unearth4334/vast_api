@@ -284,3 +284,275 @@ class WorkflowValidator:
         """Validate toggle value"""
         if not isinstance(value, bool):
             result.add_error(config.id, f'{config.label} must be true or false')
+
+
+class TemplateValidationResult:
+    """Results from template validation"""
+    
+    def __init__(self):
+        self.errors: List[str] = []
+        self.warnings: List[str] = []
+        self.info: List[str] = []
+        
+    def add_error(self, message: str):
+        """Add an error message"""
+        self.errors.append(message)
+        logger.error(f"❌ Template Validation Error: {message}")
+        
+    def add_warning(self, message: str):
+        """Add a warning message"""
+        self.warnings.append(message)
+        logger.warning(f"⚠️ Template Validation Warning: {message}")
+        
+    def add_info(self, message: str):
+        """Add an info message"""
+        self.info.append(message)
+        logger.info(f"ℹ️ Template Validation Info: {message}")
+        
+    @property
+    def is_valid(self) -> bool:
+        """Check if validation passed (no errors)"""
+        return len(self.errors) == 0
+        
+    @property
+    def has_warnings(self) -> bool:
+        """Check if there are warnings"""
+        return len(self.warnings) > 0
+        
+    def summary(self) -> str:
+        """Get validation summary"""
+        status = "✅ PASSED" if self.is_valid else "❌ FAILED"
+        lines = [
+            "=" * 80,
+            f"Template Validation Results: {status}",
+            "=" * 80,
+            f"Errors: {len(self.errors)}",
+            f"Warnings: {len(self.warnings)}",
+            f"Info: {len(self.info)}",
+            "=" * 80
+        ]
+        
+        if self.errors:
+            lines.append("\nErrors:")
+            for err in self.errors:
+                lines.append(f"  • {err}")
+                
+        if self.warnings:
+            lines.append("\nWarnings:")
+            for warn in self.warnings:
+                lines.append(f"  • {warn}")
+        
+        return "\n".join(lines)
+
+
+class TemplateValidator:
+    """Validates workflow configurations against templates"""
+    
+    @staticmethod
+    def validate_template_mapping(config: WorkflowConfig, template: dict) -> TemplateValidationResult:
+        """
+        Validate workflow configuration against template
+        
+        Args:
+            config: Workflow configuration
+            template: Workflow template JSON
+            
+        Returns:
+            TemplateValidationResult object
+        """
+        import json
+        import re
+        
+        result = TemplateValidationResult()
+        
+        # Skip validation if not configured
+        if not config.validation:
+            result.add_info("No validation configuration, skipping validation")
+            return result
+            
+        val_config = config.validation
+        result.add_info(f"Starting validation (strict={val_config.strict_mode})")
+        
+        # Extract template data
+        template_str = json.dumps(template)
+        template_nodes = {str(node['id']): node for node in template.get('nodes', [])}
+        
+        # Validate tokens
+        if val_config.check_tokens:
+            TemplateValidator._validate_tokens(config, template_str, result)
+            
+        # Validate node IDs
+        if val_config.check_node_ids:
+            TemplateValidator._validate_node_ids(config, template_nodes, result)
+            
+        # Validate widget structures
+        if val_config.check_widgets:
+            TemplateValidator._validate_widgets(config, template_nodes, result)
+            
+        # Log summary
+        logger.info(result.summary())
+        
+        return result
+    
+    @staticmethod
+    def _validate_tokens(config: WorkflowConfig, template_str: str, result: TemplateValidationResult):
+        """Validate that all tokens in config exist in template"""
+        import re
+        
+        result.add_info("Checking token mappings...")
+        
+        # Extract all tokens from template
+        template_tokens = set(re.findall(r'\{\{([A-Z_]+)\}\}', template_str))
+        
+        # Check each input's tokens
+        config_tokens = set()
+        for inp in config.inputs:
+            # Single token
+            if inp.token:
+                token_name = inp.token.strip('{}')
+                config_tokens.add(token_name)
+                
+                if token_name not in template_tokens:
+                    msg = f"Input '{inp.id}': Token {inp.token} not found in template"
+                    if config.validation.warn_on_mismatch:
+                        result.add_warning(msg)
+                    else:
+                        result.add_error(msg)
+                else:
+                    # Count occurrences
+                    count = template_str.count(inp.token)
+                    result.add_info(f"Input '{inp.id}': Token {inp.token} found {count} time(s)")
+                    
+            # Multiple tokens
+            if inp.tokens:
+                for key, token in inp.tokens.items():
+                    token_name = token.strip('{}')
+                    config_tokens.add(token_name)
+                    
+                    if token_name not in template_tokens:
+                        msg = f"Input '{inp.id}': Token {token} ({key}) not found in template"
+                        if config.validation.warn_on_mismatch:
+                            result.add_warning(msg)
+                        else:
+                            result.add_error(msg)
+                    else:
+                        count = template_str.count(token)
+                        result.add_info(f"Input '{inp.id}': Token {token} ({key}) found {count} time(s)")
+        
+        # Check for unused tokens in template
+        unused_tokens = template_tokens - config_tokens
+        if unused_tokens:
+            result.add_warning(f"Template has {len(unused_tokens)} unused token(s): {sorted(unused_tokens)}")
+            
+        result.add_info(f"Token validation complete: {len(config_tokens)} token(s) checked")
+    
+    @staticmethod
+    def _validate_node_ids(config: WorkflowConfig, template_nodes: Dict[str, dict], result: TemplateValidationResult):
+        """Validate that all node_ids in config exist in template"""
+        result.add_info("Checking node ID mappings...")
+        
+        checked_nodes = set()
+        
+        for inp in config.inputs:
+            # Single node ID
+            if inp.node_id:
+                checked_nodes.add(inp.node_id)
+                if inp.node_id not in template_nodes:
+                    msg = f"Input '{inp.id}': Node ID '{inp.node_id}' not found in template"
+                    if config.validation.warn_on_mismatch:
+                        result.add_warning(msg)
+                    else:
+                        result.add_error(msg)
+                else:
+                    node = template_nodes[inp.node_id]
+                    result.add_info(f"Input '{inp.id}': Node {inp.node_id} ({node.get('type', 'unknown')}) found")
+                    
+            # Multiple node IDs
+            if inp.node_ids:
+                for node_id in inp.node_ids:
+                    checked_nodes.add(node_id)
+                    if node_id not in template_nodes:
+                        msg = f"Input '{inp.id}': Node ID '{node_id}' not found in template"
+                        if config.validation.warn_on_mismatch:
+                            result.add_warning(msg)
+                        else:
+                            result.add_error(msg)
+                    else:
+                        node = template_nodes[node_id]
+                        result.add_info(f"Input '{inp.id}': Node {node_id} ({node.get('type', 'unknown')}) found")
+        
+        result.add_info(f"Node ID validation complete: {len(checked_nodes)} node(s) checked")
+    
+    @staticmethod
+    def _validate_widgets(config: WorkflowConfig, template_nodes: Dict[str, dict], result: TemplateValidationResult):
+        """Validate widget structures against metadata"""
+        result.add_info("Checking widget structures...")
+        
+        validated_count = 0
+        
+        for inp in config.inputs:
+            # Only validate if metadata is provided
+            if not inp.metadata or not inp.metadata.target_nodes:
+                continue
+                
+            for target_info in inp.metadata.target_nodes:
+                node_id = target_info.get('node_id')
+                if not node_id:
+                    continue
+                    
+                if node_id not in template_nodes:
+                    result.add_warning(f"Input '{inp.id}': Metadata references unknown node {node_id}")
+                    continue
+                    
+                node = template_nodes[node_id]
+                validated_count += 1
+                
+                # Check widget type if specified
+                if inp.metadata.widget_type:
+                    actual_type = node.get('type')
+                    expected_type = inp.metadata.widget_type
+                    
+                    if actual_type != expected_type:
+                        msg = (f"Input '{inp.id}': Node {node_id} type mismatch - "
+                               f"expected '{expected_type}', got '{actual_type}'")
+                        result.add_warning(msg)
+                    else:
+                        result.add_info(f"Input '{inp.id}': Node {node_id} type '{actual_type}' validated")
+                        
+                # Check widget_values structure if indices specified
+                if inp.metadata.widget_indices and 'widgets_values' in node:
+                    widgets_values = node['widgets_values']
+                    max_index = max(inp.metadata.widget_indices)
+                    
+                    if max_index >= len(widgets_values):
+                        msg = (f"Input '{inp.id}': Node {node_id} widget_values has {len(widgets_values)} elements, "
+                               f"but metadata references index {max_index}")
+                        result.add_warning(msg)
+                    else:
+                        result.add_info(
+                            f"Input '{inp.id}': Node {node_id} widget indices {inp.metadata.widget_indices} validated"
+                        )
+        
+        result.add_info(f"Widget validation complete: {validated_count} widget(s) checked")
+    
+    @staticmethod
+    def validate_workflow_file(workflow_id: str) -> TemplateValidationResult:
+        """
+        Load and validate a workflow by ID
+        
+        Args:
+            workflow_id: Workflow identifier
+            
+        Returns:
+            TemplateValidationResult object
+        """
+        from app.create.workflow_loader import WorkflowLoader
+        
+        # Load workflow config
+        config = WorkflowLoader.load_workflow(workflow_id)
+        
+        # Load template
+        template = WorkflowLoader.load_workflow_json(workflow_id)
+        
+        # Validate
+        return TemplateValidator.validate_template_mapping(config, template)
