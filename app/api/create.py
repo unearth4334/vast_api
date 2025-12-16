@@ -1075,3 +1075,245 @@ def get_history_record(record_id):
             'message': f'Failed to get history record: {str(e)}'
         }), 500
 
+
+@bp.route('/queue-workflow', methods=['POST'])
+def queue_workflow_with_browseragent():
+    """
+    Queue workflow on remote instance using BrowserAgent
+    
+    This endpoint:
+    1. Accepts an input JSON file or inputs object
+    2. Generates workflow from inputs
+    3. Uploads workflow and images to remote instance
+    4. Queues workflow using BrowserAgent UI click method
+    
+    Request JSON:
+        {
+            "instance_id": 12345,  // Optional: VastAI instance ID
+            "ssh_connection": "ssh -p 12345 root@host",  // Optional: direct SSH connection
+            "workflow_id": "IMG_to_VIDEO_canvas",
+            "inputs": {  // Can be inputs object or reference to uploaded file
+                "input_image": "sample_input_image.jpeg" or "data:image/jpeg;base64,...",
+                "positive_prompt": "...",
+                ...
+            }
+        }
+        
+    Returns:
+        JSON with prompt_id and execution status
+    """
+    data = request.get_json()
+    
+    instance_id = data.get('instance_id')
+    ssh_connection = data.get('ssh_connection')
+    workflow_id = data.get('workflow_id')
+    inputs = data.get('inputs', {})
+    
+    if not ssh_connection and not instance_id:
+        return jsonify({
+            'success': False,
+            'message': 'Either ssh_connection or instance_id is required'
+        }), 400
+    
+    if not workflow_id:
+        return jsonify({
+            'success': False,
+            'message': 'workflow_id is required'
+        }), 400
+    
+    try:
+        # Get SSH connection from instance ID if needed
+        if not ssh_connection and instance_id:
+            from app.vastai.vast_manager import VastManager
+            vast_manager = VastManager()
+            instances = vast_manager.list_instances()
+            instance = next((inst for inst in instances if inst.get('id') == instance_id), None)
+            
+            if not instance:
+                return jsonify({
+                    'success': False,
+                    'message': f'Instance {instance_id} not found'
+                }), 404
+            
+            # Build SSH connection string
+            ssh_host = instance.get('ssh_host')
+            ssh_port = instance.get('ssh_port')
+            if not ssh_host or not ssh_port:
+                return jsonify({
+                    'success': False,
+                    'message': f'Instance {instance_id} does not have SSH access'
+                }), 400
+            
+            ssh_connection = f"ssh -p {ssh_port} root@{ssh_host}"
+        
+        # Parse SSH connection details
+        host, port = _parse_ssh_connection(ssh_connection)
+        
+        # Load workflow template and config
+        workflow_config = WorkflowLoader.load_workflow(workflow_id)
+        workflow_template = WorkflowLoader.load_workflow_json(workflow_id)
+        
+        # Process image inputs - upload to remote and replace with filenames
+        image_fields = [f for f in workflow_config.inputs if f.type == 'image']
+        processed_inputs = inputs.copy()
+        thumbnail_saved = False
+        thumbnail_filename = None
+        
+        for field in image_fields:
+            field_value = inputs.get(field.id)
+            if field_value and isinstance(field_value, str):
+                if field_value.startswith('data:image/'):
+                    # This is a base64 image - upload it and replace with filename
+                    filename = _upload_image_to_remote(field_value, ssh_connection, host, port)
+                    processed_inputs[field.id] = filename
+                    logger.info(f"Uploaded image for {field.id}: {filename}")
+                    
+                    # Save thumbnail from first image input
+                    if not thumbnail_saved:
+                        thumbnail_filename = _save_thumbnail(field_value)
+                        thumbnail_saved = True
+                        logger.info(f"Saved thumbnail: {thumbnail_filename}")
+                else:
+                    # This is a filename - verify it exists on remote
+                    logger.info(f"Using existing image file: {field_value}")
+        
+        # Generate workflow JSON with processed inputs
+        generator = WorkflowGenerator(workflow_config, workflow_template)
+        generated_workflow = generator.generate(processed_inputs)
+        
+        # Upload workflow JSON to remote instance workflows directory
+        workflow_remote_path = _upload_workflow_to_browseragent(generated_workflow, ssh_connection, host, port)
+        logger.info(f"Uploaded workflow to: {workflow_remote_path}")
+        
+        # Queue workflow using BrowserAgent
+        prompt_id = _queue_workflow_with_browseragent(workflow_remote_path, ssh_connection, host, port)
+        
+        # Save queue timestamp
+        workflow_queue_times[prompt_id] = time.time()
+        
+        # Save thumbnail reference
+        if thumbnail_filename:
+            workflow_thumbnails[prompt_id] = thumbnail_filename
+        
+        # Save workflow metadata
+        min_expected_time = workflow_config.time_estimate.get('min', 60) if workflow_config.time_estimate else 60
+        workflow_metadata[prompt_id] = {
+            'workflow_id': workflow_id,
+            'min_time': min_expected_time
+        }
+        
+        # Generate task ID for tracking
+        task_id = str(uuid.uuid4())
+        
+        # Save to history
+        try:
+            WorkflowHistory.save_history_record(
+                workflow_id=workflow_id,
+                inputs=inputs,
+                thumbnail=thumbnail_filename,
+                prompt_id=prompt_id,
+                task_id=task_id
+            )
+            logger.info(f"Saved workflow execution to history")
+        except Exception as e:
+            logger.error(f"Failed to save workflow history: {e}", exc_info=True)
+        
+        return jsonify({
+            'success': True,
+            'task_id': task_id,
+            'prompt_id': prompt_id,
+            'message': 'Workflow queued successfully via BrowserAgent'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error queueing workflow: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Failed to queue workflow: {str(e)}'
+        }), 500
+
+
+def _upload_workflow_to_browseragent(workflow_json, ssh_connection, host, port):
+    """
+    Upload workflow JSON to remote instance in BrowserAgent-accessible location
+    
+    Returns: remote path to workflow file
+    """
+    import json
+    
+    # Generate unique workflow filename
+    filename = f"workflow_{uuid.uuid4().hex[:8]}.json"
+    
+    # Write to temporary file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
+        json.dump(workflow_json, tmp_file, indent=2)
+        tmp_path = tmp_file.name
+    
+    try:
+        # Upload to remote instance workflows directory where BrowserAgent can find it
+        remote_path = f"/workspace/ComfyUI/user/default/workflows/{filename}"
+        scp_cmd = [
+            'scp',
+            '-P', port,
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            tmp_path,
+            f'root@{host}:{remote_path}'
+        ]
+        
+        result = subprocess.run(scp_cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to upload workflow: {result.stderr}")
+        
+        logger.info(f"Successfully uploaded workflow to BrowserAgent location: {filename}")
+        return remote_path
+        
+    finally:
+        # Clean up temporary file
+        Path(tmp_path).unlink(missing_ok=True)
+
+
+def _queue_workflow_with_browseragent(workflow_path, ssh_connection, host, port):
+    """
+    Queue workflow on remote instance using BrowserAgent UI click method
+    
+    Returns: ComfyUI prompt_id
+    """
+    # Execute BrowserAgent queue script on remote
+    queue_cmd = [
+        'ssh',
+        '-p', port,
+        '-o', 'StrictHostKeyChecking=yes',
+        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+        f'root@{host}',
+        f'cd ~/BrowserAgent && ./.venv/bin/python examples/comfyui/queue_workflow_ui_click.py --workflow-path {workflow_path} --comfyui-url http://localhost:18188'
+    ]
+    
+    result = subprocess.run(queue_cmd, capture_output=True, text=True, timeout=60)
+    
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to queue workflow via BrowserAgent: {result.stderr}")
+    
+    # Parse output to find prompt ID
+    # BrowserAgent outputs: "✅ Queued! Prompt ID: <uuid>"
+    import re
+    output = result.stdout
+    
+    # Look for prompt ID in output
+    match = re.search(r'Prompt ID:\s*([a-f0-9\-]+)', output, re.IGNORECASE)
+    
+    if match:
+        prompt_id = match.group(1)
+        logger.info(f"Queued workflow via BrowserAgent with prompt_id: {prompt_id}")
+        return prompt_id
+    else:
+        # BrowserAgent might have queued but not retrieved the ID
+        # Check if there's a success message
+        if 'Success' in output or 'queued' in output.lower():
+            logger.warning("Workflow queued but prompt_id not found in output")
+            # Generate a temporary ID (client should check queue status)
+            return f"queued_{uuid.uuid4().hex[:8]}"
+        else:
+            raise RuntimeError(f"Could not extract prompt_id from BrowserAgent output: {output}")
+
