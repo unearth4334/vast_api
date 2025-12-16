@@ -22,7 +22,6 @@ image: Visual/LoRAs/images/1811313@2176505.mp4
 
 # Download
 
-#### High Noise
 ```bash
 # High noise
 civitdl "https://civitai.com/models/1811313?modelVersionId=2176505" "$UI_HOME"/models/Lora
