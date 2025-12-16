@@ -1,4 +1,5 @@
 ---
+title: "POV Cowgirl"
 tags:
   - lora
 aliases:

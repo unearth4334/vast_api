@@ -1,4 +1,5 @@
 ---
+title: "DR34ML4Y NSFW"
 tags:
   - lora
 aliases:
