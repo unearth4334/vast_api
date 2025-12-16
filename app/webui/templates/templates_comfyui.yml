@@ -95,21 +95,21 @@ setup_steps:
           fi
         description: "Clone BrowserAgent repository or update existing installation"
         
-      - name: "Install Python dependencies"
-        command: "cd /root/BrowserAgent && pip install --upgrade ."
-        description: "Install BrowserAgent Python package and dependencies"
+      - name: "Setup virtual environment and install dependencies"
+        command: "cd /root/BrowserAgent && python3 -m venv .venv && ./.venv/bin/python -m pip install -r requirements.txt"
+        description: "Create virtual environment and install BrowserAgent dependencies"
         
       - name: "Install Playwright browser"
-        command: "python3 -m playwright install chromium"
+        command: "cd /root/BrowserAgent && ./.venv/bin/python -m playwright install chromium"
         description: "Install Chromium browser for Playwright (~300MB)"
         
       - name: "Verify installation"
         command: |
-          PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -c "from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
+          cd /root/BrowserAgent && ./.venv/bin/python -c "from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
         description: "Verify BrowserAgent can be imported"
         
       - name: "Run unit tests"
-        command: "cd /root/BrowserAgent && PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -m pytest tests/ --ignore=tests/integration/ -v --tb=short"
+        command: "cd /root/BrowserAgent && ./.venv/bin/python -m pytest tests/ --ignore=tests/integration/ -v --tb=short"
         description: "Run BrowserAgent unit tests to verify installation"
         optional: true
 

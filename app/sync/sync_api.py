@@ -4326,21 +4326,21 @@ echo "=== BrowserAgent Installation ==="
 echo ""
 
 # Quick check if already installed and working
-if [ -d "/root/BrowserAgent" ]; then
+if [ -d "/root/BrowserAgent" ] && [ -d "/root/BrowserAgent/.venv" ]; then
     echo "Checking existing installation..."
-    if PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -c "from browser_agent.agent.core import Agent" 2>/dev/null; then
+    if cd /root/BrowserAgent && ./.venv/bin/python -c "from browser_agent.agent.core import Agent" 2>/dev/null; then
         echo "✓ BrowserAgent is already installed and working"
         echo ""
         echo "=== Verifying installation ==="
-        PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -c "from browser_agent.agent.core import Agent; print('✓ Import successful')"
-        python3 -m playwright --version 2>/dev/null || echo "Playwright version: Not available"
+        cd /root/BrowserAgent && ./.venv/bin/python -c "from browser_agent.agent.core import Agent; print('✓ Import successful')"
+        ./.venv/bin/python -m playwright --version 2>/dev/null || echo "Playwright version: Not available"
         
         # Check if Chromium is installed
         if ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome 2>/dev/null | head -1; then
             echo "✓ Chromium browser installed"
         else
             echo "⚠ Chromium not found, installing..."
-            python3 -m playwright install chromium
+            ./.venv/bin/python -m playwright install chromium
         fi
         
         echo ""
@@ -4383,29 +4383,27 @@ else
 fi
 
 echo ""
-echo "=== Step 4: Install Python dependencies ==="
+echo "=== Step 4: Setup virtual environment and install dependencies ==="
 cd /root/BrowserAgent
-# Install playwright and common dependencies first
-echo "Installing playwright and common dependencies..."
-pip install playwright rich -q
-echo "✓ Playwright and rich packages installed"
-# Then install BrowserAgent itself (without -q to see any issues)
-echo "Installing BrowserAgent package..."
-pip install --upgrade .
+echo "Creating virtual environment..."
+python3 -m venv .venv
+echo "✓ Virtual environment created"
+echo "Installing requirements from requirements.txt..."
+./.venv/bin/python -m pip install -r requirements.txt
 echo "✓ Python dependencies installed"
 
 echo ""
 echo "=== Step 5: Install Playwright Chromium browser ==="
-python3 -m playwright install chromium
+./.venv/bin/python -m playwright install chromium
 echo "✓ Chromium browser installed"
 
 echo ""
 echo "=== Step 6: Verify installation ==="
-PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -c "from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
+cd /root/BrowserAgent && ./.venv/bin/python -c "from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
 
 echo ""
 echo "=== Step 7: Check Playwright version ==="
-python3 -m playwright --version
+./.venv/bin/python -m playwright --version
 
 echo ""
 echo "=== Step 8: Verify Chromium executable ==="
@@ -4419,7 +4417,7 @@ echo ""
 echo "=== Step 9: Run unit tests (optional) ==="
 cd /root/BrowserAgent
 set +e  # Allow tests to fail without stopping script
-PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 -m pytest tests/ --ignore=tests/integration/ -v --tb=short 2>&1
+./.venv/bin/python -m pytest tests/ --ignore=tests/integration/ -v --tb=short 2>&1
 TEST_RESULT=$?
 set -e  # Re-enable exit on error
 if [ $TEST_RESULT -eq 0 ]; then
