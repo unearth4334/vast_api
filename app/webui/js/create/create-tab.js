@@ -1064,39 +1064,19 @@ function updateCalculatedDimensions() {
     }
     
     const { width: imgWidth, height: imgHeight } = currentImageDimensions;
-    const aspectRatio = imgWidth / imgHeight;
     
-    // Calculate current megapixels
-    const currentMP = (imgWidth * imgHeight) / 1000000;
-    const maxMP = maxSize;
+    // The image dimensions are already scaled to fit within max megapixels during upload
+    // Just use those dimensions directly - they're already correct
+    let targetWidth = imgWidth;
+    let targetHeight = imgHeight;
     
-    let targetWidth, targetHeight;
+    // Snap to 64px grid
+    targetWidth = Math.round(targetWidth / 64) * 64;
+    targetHeight = Math.round(targetHeight / 64) * 64;
     
-    // Only scale down if image exceeds max megapixels
-    if (currentMP > maxMP) {
-        // Calculate target total pixels from megapixels
-        const targetPixels = maxMP * 1000000;
-        
-        // Calculate new dimensions maintaining aspect ratio
-        targetWidth = Math.sqrt(targetPixels * aspectRatio);
-        targetHeight = targetWidth / aspectRatio;
-        
-        // Round to integers
-        targetWidth = Math.round(targetWidth);
-        targetHeight = Math.round(targetHeight);
-        
-        // Snap to 64px grid
-        targetWidth = Math.round(targetWidth / 64) * 64;
-        targetHeight = Math.round(targetHeight / 64) * 64;
-        
-        // Ensure minimum size
-        targetWidth = Math.max(64, targetWidth);
-        targetHeight = Math.max(64, targetHeight);
-    } else {
-        // Image is already within limits, use original dimensions (snapped to grid)
-        targetWidth = Math.round(imgWidth / 64) * 64;
-        targetHeight = Math.round(imgHeight / 64) * 64;
-    }
+    // Ensure minimum size
+    targetWidth = Math.max(64, targetWidth);
+    targetHeight = Math.max(64, targetHeight);
     
     HelperToolState.autoSizing.calculatedDimensions = {
         width: targetWidth,
