@@ -4328,7 +4328,7 @@ echo ""
 # Quick check if already installed and working
 if [ -d "/root/BrowserAgent" ] && [ -d "/root/BrowserAgent/.venv" ]; then
     echo "Checking existing installation..."
-    if cd /root/BrowserAgent && ./.venv/bin/python -c "from browser_agent.agent.core import Agent" 2>/dev/null; then
+    if cd /root/BrowserAgent && ./.venv/bin/python -c "import browser_agent; from browser_agent.agent.core import Agent" 2>/dev/null; then
         echo "✓ BrowserAgent is already installed and working"
         echo ""
         echo "=== Verifying installation ==="
@@ -4391,6 +4391,9 @@ echo "✓ Virtual environment created"
 echo "Installing requirements from requirements.txt..."
 ./.venv/bin/python -m pip install -r requirements.txt
 echo "✓ Python dependencies installed"
+echo "Installing BrowserAgent package..."
+./.venv/bin/python -m pip install -e .
+echo "✓ BrowserAgent package installed"
 
 echo ""
 echo "=== Step 5: Install Playwright Chromium browser ==="
@@ -4399,7 +4402,7 @@ echo "✓ Chromium browser installed"
 
 echo ""
 echo "=== Step 6: Verify installation ==="
-cd /root/BrowserAgent && ./.venv/bin/python -c "from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
+cd /root/BrowserAgent && ./.venv/bin/python -c "import browser_agent; from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
 
 echo ""
 echo "=== Step 7: Check Playwright version ==="

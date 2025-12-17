@@ -77,8 +77,8 @@ model_discovery:
       extract_name_regex: "^(.+?)(?:_high_noise|_low_noise|_i2vHigh-mid|_i2vLow-mid)"
       
     loras:
-      high_suffix: "regex:(_high_noise\\.safetensors|-H-.*\\.safetensors|-HIGH-.*\\.safetensors|_HIGH-.*\\.safetensors)$"
-      low_suffix: "regex:(_low_noise\\.safetensors|-L-.*\\.safetensors|-LOW-.*\\.safetensors|_LOW-.*\\.safetensors)$"
+      high_suffix: "regex:(_high_noise.*\\.safetensors|-H-.*\\.safetensors|-HIGH-.*\\.safetensors|_HIGH-.*\\.safetensors)$"
+      low_suffix: "regex:(_low_noise.*\\.safetensors|-L-.*\\.safetensors|-LOW-.*\\.safetensors|_LOW-.*\\.safetensors)$"
       extract_name_regex: "^(.+?)(?:_high_noise|_low_noise|-H-|-L-|-HIGH-|-LOW-|_HIGH-|_LOW-)"
   
   # File extensions to scan
