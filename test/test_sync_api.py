@@ -93,6 +93,29 @@ class TestSyncAPI(unittest.TestCase):
         self.assertFalse(data['vastai']['available'])
         self.assertIn('error', data['vastai'])
 
+    def test_health_endpoint(self):
+        """Test health endpoint without external dependencies"""
+        response = self.app.get('/health')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'healthy')
+        self.assertEqual(data['message'], 'Service is running')
+
+    @patch('app.sync.sync_api.VastManager')
+    def test_health_endpoint_independent_of_vastai(self, mock_vast_manager):
+        """Test health endpoint works even when VastAI API fails"""
+        mock_vast_manager.side_effect = Exception("VastAI API down")
+
+        response = self.app.get('/health')
+        self.assertEqual(response.status_code, 200)
+        
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'healthy')
+        self.assertEqual(data['message'], 'Service is running')
+        # Ensure no VastAI status in health endpoint
+        self.assertNotIn('vastai', data)
+
     @patch('app.sync.sync_api.run_sync')
     def test_sync_forge_success(self, mock_run_sync):
         """Test successful Forge sync"""
