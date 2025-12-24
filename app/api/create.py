@@ -18,7 +18,6 @@ from PIL import Image
 import io
 
 from app.create.workflow_loader import WorkflowLoader
-from app.create.workflow_generator import WorkflowGenerator
 from app.create.workflow_validator import WorkflowValidator
 from app.create.workflow_history import WorkflowHistory
 
@@ -170,16 +169,20 @@ def generate_workflow():
                 'errors': validation_result.errors
             }), 400
         
-        # Generate workflow JSON with processed inputs
-        generator = WorkflowGenerator(workflow_config, workflow_template)
-        generated_workflow = generator.generate(processed_inputs)
+        # Generate workflow JSON using interpreter
+        from app.create.interpreter_adapter import InterpreterAdapter
+        from pathlib import Path
+        
+        wrapper_path = Path(f'workflows/{workflow_id}.webui.yml')
+        adapter = InterpreterAdapter(workflow_id, wrapper_path)
+        generated_workflow = adapter.generate(processed_inputs)
         
         # Add metadata
         metadata = {
             'workflow_id': workflow_id,
             'version': workflow_config.version,
             'generated_at': datetime.utcnow().isoformat() + 'Z',
-            'input_summary': generator.get_input_summary(processed_inputs)
+            'input_summary': adapter.get_input_summary(processed_inputs)
         }
         
         return jsonify({
@@ -274,9 +277,13 @@ def execute_workflow():
                     thumbnail_saved = True
                     logger.info(f"Saved thumbnail: {thumbnail_filename}")
         
-        # Generate workflow JSON with processed inputs
-        generator = WorkflowGenerator(workflow_config, workflow_template)
-        generated_workflow = generator.generate(processed_inputs)
+        # Generate workflow JSON using interpreter
+        from app.create.interpreter_adapter import InterpreterAdapter
+        from pathlib import Path
+        
+        wrapper_path = Path(f'workflows/{workflow_id}.webui.yml')
+        adapter = InterpreterAdapter(workflow_id, wrapper_path)
+        generated_workflow = adapter.generate(processed_inputs)
         
         # Upload workflow JSON to remote instance
         workflow_path = _upload_workflow_to_remote(generated_workflow, ssh_connection, host, port)
@@ -1177,9 +1184,13 @@ def queue_workflow_with_browseragent():
                     # This is a filename - verify it exists on remote
                     logger.info(f"Using existing image file: {field_value}")
         
-        # Generate workflow JSON with processed inputs
-        generator = WorkflowGenerator(workflow_config, workflow_template)
-        generated_workflow = generator.generate(processed_inputs)
+        # Generate workflow JSON using interpreter
+        from app.create.interpreter_adapter import InterpreterAdapter
+        from pathlib import Path
+        
+        wrapper_path = Path(f'workflows/{workflow_id}.webui.yml')
+        adapter = InterpreterAdapter(workflow_id, wrapper_path)
+        generated_workflow = adapter.generate(processed_inputs)
         
         # Upload workflow JSON to remote instance workflows directory
         workflow_remote_path = _upload_workflow_to_browseragent(generated_workflow, ssh_connection, host, port)

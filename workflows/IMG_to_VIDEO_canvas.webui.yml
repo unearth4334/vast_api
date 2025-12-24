@@ -1,8 +1,4 @@
-# IMG to VIDEO Workflow - WebUI Wrapper v3.0 (Token-based)
-# Uses token replacement for robust workflow updates
-# Tokens are embedded in the canvas JSON file and replaced at generation time
-
-name: "IMG to VIDEO (Canvas)"
+name: "IMG to VIDEO"
 description: "Generate video from a single image using WAN 2.2 Image-to-Video model with high/low noise dual sampling"
 version: "3.0.0"
 category: "video"
@@ -13,24 +9,188 @@ tags:
   - 14B-model
 
 # Workflow JSON file reference (canvas format)
-workflow_file: "IMG_to_VIDEO_canvas.json"
+workflow_file: "workflows/IMG_to_VIDEO_canvas.json"
+base_hash: "47e91030"  # Original workflow hash for validation
+
+# Node mapping for programmatic workflow modification
+# Maps UI parameters to workflow node modifications
+node_mapping:
+  # === SCALAR PARAMETERS (mxSlider nodes) ===
+  duration:
+    node_id: 426
+    node_type: "mxSlider"
+    node_title: "Duration"
+    widget_indices: [0, 1]  # Both indices set to same value
+    action_type: "modify_widget"
+    
+  steps:
+    node_id: 82
+    node_type: "mxSlider"
+    node_title: "Steps"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  cfg:
+    node_id: 85
+    node_type: "mxSlider"
+    node_title: "CFG"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  frame_rate:
+    node_id: 490
+    node_type: "mxSlider"
+    node_title: "Frame rate"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  speed:
+    node_id: 157
+    node_type: "mxSlider"
+    node_title: "Speed"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  upscale_ratio:
+    node_id: 421
+    node_type: "mxSlider"
+    node_title: "Upscale Ratio"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  vram_reduction:
+    node_id: 502
+    node_type: "mxSlider"
+    node_title: "Reduce VRAM usage (BlockSwap)"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  seed:
+    node_id: 73
+    node_type: "RandomNoise"
+    node_title: "Noise"
+    widget_indices: [0]
+    action_type: "modify_widget"
+    
+  # === VECTOR PARAMETERS (mxSlider2D node) ===
+  size_x:
+    node_id: 83
+    node_type: "mxSlider2D"
+    node_title: "Size"
+    widget_indices: [0, 1]  # X dimension
+    action_type: "modify_vector_widget"
+    vector_key: "x"
+    
+  size_y:
+    node_id: 83
+    node_type: "mxSlider2D"
+    node_title: "Size"
+    widget_indices: [2, 3]  # Y dimension
+    action_type: "modify_vector_widget"
+    vector_key: "y"
+    
+  # === FEATURE TOGGLES (mode-based) ===
+  save_last_frame:
+    node_ids: [447]
+    node_type: "SaveImage"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+    
+  enable_interpolation:
+    node_ids: [431, 442, 433]
+    node_type: "RIFE VFI + Save"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+    
+  use_upscaler:
+    node_ids: [385, 437, 419]
+    node_type: "ImageUpscaleWithModel + Save"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+    
+  enable_upscale_interpolation:
+    node_ids: [443]
+    node_type: "Save UPINT (combined output)"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+    # Note: This controls the combined upscaled+interpolated output save node only
+    # The processing nodes (385, 431, 437, 442) are controlled by use_upscaler and enable_interpolation
+    # When enabled, produces a third output that is both upscaled AND interpolated
+    
+  enable_video_enhancer:
+    node_ids: [481, 482]
+    node_type: "WanVideoEnhanceAVideoKJ"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4  # muted instead of bypassed
+    
+  enable_cfg_zero_star:
+    node_ids: [483, 484]
+    node_type: "CFGZeroStarAndInit"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_speed_regulation:
+    node_ids: [467, 468]
+    node_type: "ModelSamplingSD3"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_normalized_attention:
+    node_ids: [485, 486]
+    node_type: "WanVideoNAG"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_magcache:
+    node_ids: [505, 506]
+    node_type: "MagCache"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_block_swap:
+    node_ids: [500, 501]
+    node_type: "wanBlockSwap"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_torch_compile:
+    node_ids: [492, 494]
+    node_type: "TorchCompileModelWanVideo"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_auto_prompt:
+    node_ids: [403]
+    node_type: "Fast Groups Bypasser (rgthree)"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  # === LORA CONFIGURATION ===
+  loras:
+    high_node_id: 416
+    low_node_id: 471
+    node_type: "Power Lora Loader (rgthree)"
+    action_type: "add_lora_pair"
+    max_loras: 5
 
 # Thumbnail/preview image (optional)
 thumbnail: null
 
-# Estimated VRAM requirement
-vram_estimate: "24GB"
-
-# Estimated generation time (in seconds, approximate)
-time_estimate:
-  min: 120
-  max: 600
-  note: "Varies significantly based on duration and resolution"
-
 # Validation Configuration (Optional - enables template validation)
 validation:
   strict_mode: false  # If true, validation errors will prevent workflow generation
-  check_tokens: true  # Verify all tokens in inputs exist in template
   check_node_ids: true  # Verify all node_ids exist in template
   check_widgets: false  # Validate widget structure (requires metadata)
   warn_on_mismatch: true  # Warn instead of error on validation failures
@@ -94,12 +254,10 @@ helper_tools:
       calculation_method: "maintain_aspect_ratio_fit_max"
       snap_to_grid: 64
 
-# Token-based inputs - no node IDs required!
 inputs:
   # === BASIC SETTINGS ===
   - id: "input_image"
     section: "basic"
-    token: "{{INPUT_IMAGE}}"
     type: "image"
     label: "Input Image"
     description: "Source image to animate. Will be resized to fit the selected output size."
@@ -109,7 +267,6 @@ inputs:
 
   - id: "positive_prompt"
     section: "basic"
-    token: "{{POSITIVE_PROMPT}}"
     type: "textarea"
     label: "Positive Prompt"
     description: "Describe the motion and style you want in the video"
@@ -121,7 +278,6 @@ inputs:
 
   - id: "negative_prompt"
     section: "basic"
-    token: "{{NEGATIVE_PROMPT}}"
     type: "textarea"
     label: "Negative Prompt"
     description: "What to avoid in the generation"
@@ -131,7 +287,6 @@ inputs:
 
   - id: "seed"
     section: "basic"
-    token: "{{SEED}}"
     type: "seed"
     label: "Seed"
     description: "Random seed for reproducibility (-1 for random)"
@@ -142,7 +297,6 @@ inputs:
   # === GENERATION PARAMETERS ===
   - id: "size_x"
     section: "generation"
-    token: "{{SIZE_WIDTH}}"
     type: "slider"
     label: "Width"
     description: "Output width in pixels"
@@ -151,29 +305,12 @@ inputs:
     step: 64
     default: 896
     unit: "px"
+    node_mapping: "size_x"  # Links to node_mapping section
     controlled_by: "auto_size_enabled"
     auto_calculate: true
-    # Optional metadata - shows coupling and 2D slider pattern
-    metadata:
-      widget_type: "mxSlider2D"
-      widget_pattern: "[width, width, height, height, 0, 0]"  # 2D slider format
-      widget_indices: [0, 1]  # Width uses indices 0-1
-      coupled_with: "size_y"  # Paired with height
-      target_nodes:
-        - node_id: "83"
-          description: "EmptyLatentImage size (shared with size_y)"
 
   - id: "size_y"
     section: "generation"
-    metadata:
-      widget_type: "mxSlider2D"
-      widget_pattern: "[width, width, height, height, 0, 0]"
-      widget_indices: [2, 3]  # Height uses indices 2-3
-      coupled_with: "size_x"
-      target_nodes:
-        - node_id: "83"
-          description: "EmptyLatentImage size (shared with size_x)"
-    token: "{{SIZE_HEIGHT}}"
     type: "slider"
     label: "Height"
     description: "Output height in pixels"
@@ -182,10 +319,10 @@ inputs:
     step: 64
     default: 1120
     unit: "px"
+    node_mapping: "size_y"  # Links to node_mapping section
 
   - id: "duration"
     section: "generation"
-    token: "{{DURATION}}"
     type: "slider"
     label: "Duration"
     description: "Video length in seconds"
@@ -194,10 +331,10 @@ inputs:
     step: 0.5
     default: 5.0
     unit: "seconds"
+    node_mapping: "duration"  # Links to node_mapping section
 
   - id: "steps"
     section: "generation"
-    token: "{{STEPS}}"
     type: "slider"
     label: "Steps"
     description: "Denoising steps. Higher = better quality but slower."
@@ -205,18 +342,10 @@ inputs:
     max: 40
     step: 1
     default: 20
-    # Optional metadata for validation and documentation
-    metadata:
-      widget_type: "mxSlider"
-      widget_pattern: "[value, value, step]"
-      widget_indices: [0, 1]
-      target_nodes:
-        - node_id: "82"
-          description: "KSampler steps parameter"
+    node_mapping: "steps"  # Links to node_mapping section
 
   - id: "cfg"
     section: "generation"
-    token: "{{CFG}}"
     type: "slider"
     label: "CFG Scale"
     description: "Prompt adherence strength. Higher = more prompt influence."
@@ -224,18 +353,10 @@ inputs:
     max: 10.0
     step: 0.5
     default: 3.5
-    # Optional metadata for validation and documentation
-    metadata:
-      widget_type: "mxSlider"
-      widget_pattern: "[value, value, step]"  # Pattern: duplicate value at indices 0-1
-      widget_indices: [0, 1]
-      target_nodes:
-        - node_id: "85"
-          description: "KSampler CFG parameter"
+    node_mapping: "cfg"  # Links to node_mapping section
 
   - id: "frame_rate"
     section: "generation"
-    token: "{{FRAME_RATE}}"
     type: "slider"
     label: "Frame Rate"
     description: "Output frames per second"
@@ -244,10 +365,10 @@ inputs:
     step: 1.0
     default: 16.0
     unit: "FPS"
+    node_mapping: "frame_rate"  # Links to node_mapping section
 
   - id: "speed"
     section: "generation"
-    token: "{{SPEED}}"
     type: "slider"
     label: "Sampling Speed"
     description: "ModelSamplingSD3 shift parameter"
@@ -255,10 +376,10 @@ inputs:
     max: 15.0
     step: 0.5
     default: 7.0
+    node_mapping: "speed"  # Links to node_mapping section
 
   - id: "upscale_ratio"
     section: "generation"
-    token: "{{UPSCALE_RATIO}}"
     type: "slider"
     label: "Upscale Ratio"
     description: "Scale factor for upscaling"
@@ -266,6 +387,7 @@ inputs:
     max: 4.0
     step: 0.5
     default: 2.0
+    node_mapping: "upscale_ratio"  # Links to node_mapping section
 
   # === MODEL SELECTION ===
   - id: "main_model"
@@ -275,17 +397,11 @@ inputs:
     description: "Diffusion model pair for generation. Click refresh to scan instance for available models."
     required: true
     model_type: "diffusion_models"
-    tokens:
-      high: "{{WAN_HIGH_MODEL}}"
-      low: "{{WAN_LOW_MODEL}}"
     default_high: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors"
     default_low: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
 
   - id: "loras"
     section: "models"
-    node_ids:
-      - "416"  # high noise LoRA loader
-      - "471"  # low noise LoRA loader
     type: "high_low_pair_lora_list"
     label: "LoRAs (High/Low Noise Pairs)"
     description: "Add LoRAs for style/motion control. Each LoRA should have high/low noise variants."
@@ -295,7 +411,6 @@ inputs:
 
   - id: "clip_model"
     section: "models"
-    token: "{{CLIP_MODEL}}"
     type: "single_model"
     label: "CLIP Model"
     description: "Text encoder model"
@@ -305,7 +420,6 @@ inputs:
 
   - id: "vae_model"
     section: "models"
-    token: "{{VAE_MODEL}}"
     type: "single_model"
     label: "VAE Model"
     description: "Variational autoencoder"
@@ -315,7 +429,6 @@ inputs:
 
   - id: "upscale_model"
     section: "models"
-    token: "{{UPSCALE_MODEL}}"
     type: "single_model"
     label: "Upscale Model"
     description: "Super-resolution model for upscaling"
@@ -328,131 +441,107 @@ inputs:
   # Output & Enhancement Toggles
   - id: "save_last_frame"
     section: "features"
-    node_ids:
-      - "447"  # SaveImage node
-      - "444"  # ImageFromBatch node
     type: "node_mode_toggle"
     label: "Save Last Frame"
     description: "Save the final frame as a separate image output"
     required: false
     default: 2  # mode: 2 = disabled (bypass)
+    node_mapping: "save_last_frame"
 
   - id: "enable_interpolation"
     section: "features"
-    node_ids:
-      - "431"  # RIFE VFI node (base interpolation)
-      - "433"  # VHS_VideoCombine (Save Interpoled)
     type: "node_mode_toggle"
     label: "Enable Interpolation (RIFE)"
     description: "Use RIFE to interpolate frames and increase smoothness"
     required: false
     default: 0  # mode: 0 = enabled
+    node_mapping: "enable_interpolation"
 
   - id: "use_upscaler"
     section: "features"
-    node_ids:
-      - "385"  # ImageUpscaleWithModel node
-      - "418"  # ImageScaleBy (Apply ratio) node
     type: "node_mode_toggle"
     label: "Enable Upscaler"
     description: "Apply AI upscaling to the input image before video generation. Uses the upscale model and ratio configured above."
     required: false
     default: 2  # mode: 2 = disabled (bypass)
+    node_mapping: "use_upscaler"
 
   - id: "enable_upscale_interpolation"
     section: "features"
-    node_ids:
-      - "442"  # RIFE VFI node (upscale path)
-      - "443"  # VHS_VideoCombine (Save UPINT)
     type: "node_mode_toggle"
     label: "Enable Upscale + Interpolation"
     description: "Apply both upscaling and frame interpolation (combines both techniques)"
     required: false
     default: 2  # mode: 2 = disabled (bypass)
+    node_mapping: "enable_upscale_interpolation"
 
   - id: "enable_video_enhancer"
     section: "features"
-    node_ids:
-      - "481"  # WanVideoEnhanceAVideoKJ (Enhance High)
-      - "482"  # WanVideoEnhanceAVideoKJ (Enhance Low)
     type: "node_mode_toggle"
     label: "Video Enhancer (WanVideoEnhanceAVideoKJ)"
     description: "Apply WAN video enhancement for improved quality"
     required: false
     default: 0  # mode: 0 = enabled
+    node_mapping: "enable_video_enhancer"
 
   - id: "enable_cfg_zero_star"
     section: "features"
-    node_ids:
-      - "483"  # CFGZeroStarAndInit (CFG Zero High)
-      - "484"  # CFGZeroStarAndInit (CFG Zero Low)
     type: "node_mode_toggle"
     label: "CFGZeroStar"
     description: "Enable CFG guidance enhancement for better prompt adherence"
     required: false
     default: 0  # mode: 0 = enabled
+    node_mapping: "enable_cfg_zero_star"
 
   - id: "enable_speed_regulation"
     section: "features"
-    node_ids:
-      - "467"  # ModelSamplingSD3 (SamplingHigh)
-      - "468"  # ModelSamplingSD3 (SamplingLow)
     type: "node_mode_toggle"
     label: "Speed Regulation"
     description: "Enable ModelSamplingSD3 speed control for sampling adjustments"
     required: false
     default: 0  # mode: 0 = enabled
+    node_mapping: "enable_speed_regulation"
 
   - id: "enable_normalized_attention"
     section: "features"
-    node_ids:
-      - "485"  # WanVideoNAG (NAG High)
-      - "486"  # WanVideoNAG (NAG Low)
     type: "node_mode_toggle"
     label: "Normalized Attention (WanVideoNAG)"
     description: "Apply normalized attention guidance for better consistency"
     required: false
     default: 0  # mode: 0 = enabled
+    node_mapping: "enable_normalized_attention"
 
   # Performance & Memory
   - id: "enable_magcache"
     section: "features"
-    node_ids:
-      - "506"  # MagCache Low
     type: "node_mode_toggle"
     label: "MagCache"
     description: "Enable memory caching to speed up repeated operations"
     required: false
     default: 0  # mode: 0 = enabled
+    node_mapping: "enable_magcache"
 
   - id: "enable_torch_compile"
     section: "features"
-    node_ids:
-      - "492"  # TorchCompileModelWanVideo (Compile High)
-      - "494"  # TorchCompileModelWanVideo (Compile Low)
     type: "node_mode_toggle"
     label: "TorchCompile"
     description: "Enable JIT compilation for faster execution (first run will be slower)"
     required: false
     default: 4  # mode: 4 = muted (disabled)
+    node_mapping: "enable_torch_compile"
 
   - id: "enable_block_swap"
     section: "features"
-    node_ids:
-      - "500"  # wanBlockSwap (BlockSwap High)
-      - "501"  # wanBlockSwap (BlockSwap Low)
     type: "node_mode_toggle"
     label: "BlockSwap"
     description: "Enable model offloading to reduce VRAM usage at the cost of speed"
     required: false
     default: 0  # mode: 0 = enabled
+    node_mapping: "enable_block_swap"
 
   # VRAM Control
   - id: "vram_reduction"
     section: "features"
-    node_ids:
-      - "502"  # mxSlider (Reduce VRAM usage - BlockSwap)
-    token: "{{VRAM_REDUCTION}}"
     type: "slider"
     label: "VRAM Reduction"
     description: "Percentage of model to offload to system RAM (0% = all in VRAM, 100% = maximum offloading)"
@@ -461,101 +550,14 @@ inputs:
     step: 1
     default: 100
     unit: "%"
+    node_mapping: "vram_reduction"
 
   # Automatic Prompting
   - id: "enable_auto_prompt"
     section: "features"
-    node_ids:
-      - "473"  # DownloadAndLoadFlorence2Model
-      - "480"  # Florence2Run
-      - "474"  # Text Find and Replace (photo -> video)
-      - "475"  # Text Find and Replace (image -> video)
-      - "476"  # Text Find and Replace (painting -> video)
-      - "472"  # Text Find and Replace (illustration -> video)
     type: "node_mode_toggle"
     label: "Automatic Prompting (Florence2)"
     description: "Enable Florence2 AI to automatically generate descriptive prompts from the input image. When enabled, generates and enhances prompts automatically."
     required: false
     default: 0  # mode: 0 = enabled
-
-# Output configuration
-outputs:
-  - id: "original_video"
-    node_id: "398"  # Still need node_id to identify output nodes
-    type: "video"
-    format: "mp4"
-    label: "Original Video"
-    description: "Video at native frame rate with color matching"
-
-# Model requirements (for validation and display)
-requirements:
-  models:
-    - type: "unet"
-      name: "WAN 2.2 High Noise 14B"
-      path: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors"
-      size_gb: 27.8
-    - type: "unet"
-      name: "WAN 2.2 Low Noise 14B"
-      path: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
-      size_gb: 27.8
-    - type: "clip"
-      name: "UMT5 XXL"
-      path: "Wan-2.2/umt5_xxl_fp16.safetensors"
-      size_gb: 9.8
-    - type: "vae"
-      name: "WAN 2.1 VAE"
-      path: "Wan-2.1/wan_2.1_vae.safetensors"
-      size_gb: 0.2
-    - type: "upscale"
-      name: "RealESRGAN x4 Plus"
-      path: "RealESRGAN_x4plus.pth"
-      size_gb: 0.06
-
-  custom_nodes:
-    - name: "ComfyUI-VideoHelperSuite"
-      repo: "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
-      required: true
-    - name: "ComfyUI-KJNodes"
-      repo: "https://github.com/kijai/ComfyUI-KJNodes"
-      required: true
-    - name: "rgthree-comfy"
-      repo: "https://github.com/rgthree/rgthree-comfy"
-      required: true
-    - name: "ComfyUI-mxToolkit"
-      repo: "https://github.com/Intersection98/ComfyUI_mxToolkit"
-      required: true
-    - name: "ComfyUI-WanVideoWrapper"
-      repo: "https://github.com/kijai/ComfyUI-WanVideoWrapper"
-      required: true
-    - name: "ComfyUI-Easy-Use"
-      repo: "https://github.com/yolain/ComfyUI-Easy-Use"
-      required: true
-
-  vram: "24GB minimum (48GB recommended for longer videos)"
-  compute: "NVIDIA GPU with CUDA support"
-
-# Presets for quick configuration
-presets:
-  - name: "Quick Preview"
-    description: "Fast generation for testing"
-    values:
-      duration: 2.0
-      steps: 15
-      frame_rate: 12.0
-      upscale_ratio: 1.0
-
-  - name: "High Quality"
-    description: "Best quality, slower generation"
-    values:
-      duration: 5.0
-      steps: 30
-      frame_rate: 24.0
-      upscale_ratio: 2.0
-
-  - name: "Balanced"
-    description: "Good balance of quality and speed"
-    values:
-      duration: 5.0
-      steps: 20
-      frame_rate: 16.0
-      upscale_ratio: 1.5
+    node_mapping: "enable_auto_prompt"
