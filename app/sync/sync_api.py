@@ -4388,6 +4388,11 @@ cd /root/BrowserAgent
 echo "Creating virtual environment..."
 python3 -m venv .venv
 echo "✓ Virtual environment created"
+
+echo "Patching pyproject.toml to allow Python 3.10..."
+sed -i 's/requires-python = ">=3.11"/requires-python = ">=3.10"/' pyproject.toml
+echo "✓ Python version requirement updated to >=3.10"
+
 echo "Installing requirements from requirements.txt..."
 ./.venv/bin/python -m pip install -r requirements.txt
 echo "✓ Python dependencies installed"

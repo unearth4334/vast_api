@@ -98,17 +98,25 @@ class WorkflowGenerator:
         # Parse back to dict
         workflow = json.loads(workflow_str)
         
-        # Apply node-based modifications for types that don't use tokens (e.g., node_mode_toggle)
+        # Apply node-based modifications for types that don't use tokens
         for input_config in self.config.inputs:
             try:
+                # Node mode toggles - change node modes to enable/disable nodes
                 if input_config.type == 'node_mode_toggle':
                     value = inputs.get(input_config.id)
                     if value is None and input_config.default is not None:
                         value = input_config.default
                     if value is not None:
                         self._apply_node_mode_toggle(workflow, input_config, value)
+                
+                # LoRA lists - require direct node manipulation due to complex structure
+                elif input_config.type == 'high_low_pair_lora_list':
+                    value = inputs.get(input_config.id)
+                    if value is not None and value:  # Only apply if not empty
+                        self._apply_lora_list(workflow, input_config, value)
+                        
             except Exception as e:
-                logger.error(f"Error applying node mode toggle {input_config.id}: {e}", exc_info=True)
+                logger.error(f"Error applying node-based modification for {input_config.id}: {e}", exc_info=True)
         
         return workflow
     
@@ -606,7 +614,7 @@ class WorkflowGenerator:
         Apply LoRA list to Power Lora Loader nodes
         
         Args:
-            workflow: Workflow JSON
+            workflow: Workflow JSON (canvas or legacy format)
             config: Input configuration
             value: List of LoRA objects with highNoisePath, lowNoisePath, strength
         """
@@ -620,7 +628,6 @@ class WorkflowGenerator:
         
         high_node_id = config.node_ids[0]
         low_node_id = config.node_ids[1]
-        field_name = config.field or '➕ Add Lora'
         
         # Build Power Lora Loader config
         high_lora_config = {}
@@ -635,28 +642,52 @@ class WorkflowGenerator:
                 'on': True,
                 'lora': lora.get('highNoisePath', ''),
                 'strength': lora.get('strength', 1.0),
-                'strength_clip': lora.get('strength', 1.0)
+                'strengthTwo': None  # Power Lora Loader uses strengthTwo, not strength_clip
             }
             low_lora_config[key] = {
                 'on': True,
                 'lora': lora.get('lowNoisePath', ''),
                 'strength': lora.get('strength', 1.0),
-                'strength_clip': lora.get('strength', 1.0)
+                'strengthTwo': None
             }
         
-        # Apply to high noise node
-        if high_node_id in workflow:
-            workflow[high_node_id]['inputs'][field_name] = high_lora_config
-            logger.debug(f"Applied {len(high_lora_config)} LoRAs to high noise node {high_node_id}")
-        else:
-            logger.warning(f"High noise LoRA node {high_node_id} not found")
+        # Canvas format: workflow has a 'nodes' array
+        if 'nodes' in workflow and isinstance(workflow['nodes'], list):
+            for node_id, lora_config in [(high_node_id, high_lora_config), (low_node_id, low_lora_config)]:
+                # Find node by id in the nodes array
+                for node in workflow['nodes']:
+                    if node.get('id') == int(node_id):
+                        # Power Lora Loader uses widgets_values array
+                        # Structure: [{}, {'type': 'PowerLoraLoaderHeaderWidget'}, lora_config, {}, '']
+                        if 'widgets_values' in node and isinstance(node['widgets_values'], list):
+                            # Replace the LoRA config (index 2 in widgets_values)
+                            node['widgets_values'][2] = lora_config
+                            logger.debug(f"Applied {len(lora_config)} LoRAs to node {node_id}")
+                        else:
+                            logger.warning(f"Node {node_id} has invalid widgets_values structure")
+                        break
+                else:
+                    logger.warning(f"LoRA node {node_id} not found in workflow")
         
-        # Apply to low noise node
-        if low_node_id in workflow:
-            workflow[low_node_id]['inputs'][field_name] = low_lora_config
-            logger.debug(f"Applied {len(low_lora_config)} LoRAs to low noise node {low_node_id}")
+        # Legacy format: workflow is a dict of node_id -> node
+        elif str(high_node_id) in workflow or str(low_node_id) in workflow:
+            field_name = config.field or '➕ Add Lora'
+            
+            # Apply to high noise node
+            if str(high_node_id) in workflow:
+                workflow[str(high_node_id)]['inputs'][field_name] = high_lora_config
+                logger.debug(f"Applied {len(high_lora_config)} LoRAs to high noise node {high_node_id}")
+            else:
+                logger.warning(f"High noise LoRA node {high_node_id} not found")
+            
+            # Apply to low noise node
+            if str(low_node_id) in workflow:
+                workflow[str(low_node_id)]['inputs'][field_name] = low_lora_config
+                logger.debug(f"Applied {len(low_lora_config)} LoRAs to low noise node {low_node_id}")
+            else:
+                logger.warning(f"Low noise LoRA node {low_node_id} not found")
         else:
-            logger.warning(f"Low noise LoRA node {low_node_id} not found")
+            logger.warning(f"Could not determine workflow format for LoRA list: {config.id}")
     
     def _apply_single_model(self, workflow: dict, config: InputConfig, value: Any):
         """

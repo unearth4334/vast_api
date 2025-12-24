@@ -1252,6 +1252,23 @@ def _upload_workflow_to_browseragent(workflow_json, ssh_connection, host, port):
     try:
         # Upload to remote instance workflows directory where BrowserAgent can find it
         remote_path = f"/workspace/ComfyUI/user/default/workflows/{filename}"
+        
+        # First, ensure the target directory exists on remote instance
+        mkdir_cmd = [
+            'ssh',
+            '-p', port,
+            '-o', 'StrictHostKeyChecking=yes',
+            '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+            f'root@{host}',
+            'mkdir -p /workspace/ComfyUI/user/default/workflows'
+        ]
+        
+        mkdir_result = subprocess.run(mkdir_cmd, capture_output=True, text=True)
+        
+        if mkdir_result.returncode != 0:
+            logger.warning(f"Failed to create remote directory (may already exist): {mkdir_result.stderr}")
+        
+        # Now copy the workflow file
         scp_cmd = [
             'scp',
             '-P', port,
