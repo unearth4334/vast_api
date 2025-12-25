@@ -10,6 +10,7 @@ An easy-to-use tool for syncing media from local Docker containers and VastAI cl
 - 🔥 **Sync Forge**: Sync from Stable Diffusion WebUI Forge (10.0.78.108:2222)
 - 🖼️ **Sync ComfyUI**: Sync from ComfyUI (10.0.78.108:2223)  
 - ☁️ **Sync VastAI**: Auto-discover running VastAI instance and sync
+- 🏠 **Local ComfyUI Support**: Execute workflows on ComfyUI installed on your host machine (NEW!)
 - 📦 **Resource Manager**: Browse and install workflows, models, and assets to VastAI instances
 - 🐳 **Docker Ready**: Containerized for easy deployment on QNAP NAS
 - 🌐 **Web API**: REST endpoints for web interface
@@ -244,6 +245,60 @@ The library includes:
 - 2 upscalers (RealESRGAN)
 - 1 checkpoint (SDXL base)
 - 1 VAE (SDXL)
+
+## Local ComfyUI Support (NEW!)
+
+Execute workflows on a ComfyUI installation that's local to your Docker host machine - no cloud GPUs needed!
+
+### Why Use Local Support?
+
+- 💰 **Free**: No cloud GPU rental costs
+- 🚀 **Fast**: No network latency to remote servers
+- 🔒 **Private**: Your data never leaves your machine
+- 🎯 **Convenient**: Use your existing ComfyUI setup
+
+### Quick Setup
+
+**Linux:**
+```bash
+sudo ./scripts/setup-local-host-linux.sh --comfyui-path /home/user/ComfyUI
+```
+
+**Windows:**
+```powershell
+.\scripts\setup-local-host-windows.bat -ComfyUIPath "C:\Users\username\ComfyUI"
+```
+
+The script will:
+1. ✅ Install and configure SSH server
+2. ✅ Create dedicated user with secure access
+3. ✅ Generate SSH keys
+4. ✅ Configure firewall rules
+5. ✅ Generate configuration files
+
+Then just mount the config in your `docker-compose.yml`:
+```yaml
+volumes:
+  - ./local-support-config.yml:/app/local-support-config.yml:ro
+  - ./local_host_key:/root/.ssh/local_host_key:ro
+```
+
+Restart the container and your local instance appears in the connection toolbar! 🎉
+
+### Documentation
+
+- 📖 **Quick Start Guide**: [docs/LOCAL_COMFYUI_QUICK_START.md](docs/LOCAL_COMFYUI_QUICK_START.md)
+- 📋 **Full Proposal**: [docs/LOCAL_COMFYUI_SUPPORT_PROPOSAL.md](docs/LOCAL_COMFYUI_SUPPORT_PROPOSAL.md)
+- ⚙️ **Config Example**: [local-support-config.yml.example](local-support-config.yml.example)
+
+### Features
+
+- ✅ Workflow execution on local GPU
+- ✅ Resource installation (models, custom nodes, etc.)
+- ✅ Output syncing back to container
+- ✅ Appears alongside VastAI instances in UI
+- ✅ Secure SSH-based communication
+- ✅ Automated setup scripts for Linux and Windows
 
 ## Troubleshooting
 
