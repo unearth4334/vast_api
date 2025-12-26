@@ -1083,6 +1083,165 @@ def get_history_record(record_id):
         }), 500
 
 
+def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs, 
+                                    process_images=False, ssh_connection=None, host=None, port=None):
+    """
+    Generate workflow JSON from flat UI inputs using WorkflowInterpreter
+    
+    Args:
+        workflow_id: Workflow identifier
+        workflow_config: WorkflowConfig object
+        flat_inputs: Flat dictionary of UI inputs
+        process_images: If True, upload images to remote and replace with filenames
+        ssh_connection: SSH connection string (required if process_images=True)
+        host: Remote host (required if process_images=True)
+        port: Remote port (required if process_images=True)
+    
+    Returns:
+        Tuple of (workflow_json, inputs_json)
+    """
+    import json
+    from app.create.interpreter_adapter import InterpreterAdapter
+    from app.create.workflow_interpreter import WorkflowInterpreter
+    
+    # Convert flat inputs to nested format
+    adapter = InterpreterAdapter(workflow_id, Path(f'workflows/{workflow_id}.webui.yml'))
+    nested_inputs = adapter.convert_ui_inputs_to_interpreter_format(flat_inputs)
+    
+    # Process images if needed
+    processed_flat_inputs = flat_inputs.copy()
+    if process_images:
+        image_fields = [f for f in workflow_config.inputs if f.type == 'image']
+        for field in image_fields:
+            field_value = flat_inputs.get(field.id)
+            if field_value and isinstance(field_value, str):
+                if field_value.startswith('data:image/'):
+                    # Upload image and replace with filename
+                    filename = _upload_image_to_remote(field_value, ssh_connection, host, port)
+                    processed_flat_inputs[field.id] = filename
+                    logger.info(f"Uploaded image for {field.id}: {filename}")
+                    
+                    # Update nested inputs too
+                    if field.id in nested_inputs.get('inputs', {}).get('basic_settings', {}):
+                        nested_inputs['inputs']['basic_settings'][field.id] = filename
+                else:
+                    logger.info(f"Using existing image file: {field_value}")
+    
+    # Create inputs JSON structure
+    inputs_json = {
+        "description": f"Input values for {workflow_config.name} workflow",
+        "version": workflow_config.version,
+        "workflow_file": f"workflows/{workflow_id}.json",
+        "base_hash": workflow_config.__dict__.get('base_hash', ''),
+        **nested_inputs
+    }
+    
+    # Save inputs to temporary file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='_inputs.json', delete=False) as tmp_inputs:
+        json.dump(inputs_json, tmp_inputs, indent=2)
+        inputs_file_path = tmp_inputs.name
+    
+    try:
+        # Initialize interpreter
+        wrapper_path = Path(f'workflows/{workflow_id}.webui.yml')
+        interpreter = WorkflowInterpreter(str(wrapper_path))
+        
+        # Load inputs from file
+        with open(inputs_file_path) as f:
+            inputs_data = json.load(f)
+        
+        # Load original workflow
+        workflow_path = wrapper_path.parent / f"{workflow_id}.json"
+        with open(workflow_path) as f:
+            original_workflow = json.load(f)
+        
+        logger.info(f"Generating workflow using interpreter for {workflow_id}")
+        
+        # Generate actions from inputs
+        actions = interpreter.generate_actions(inputs_data)
+        logger.info(f"Generated {len(actions)} actions")
+        
+        # Apply actions to get modified workflow
+        modified_workflow = interpreter.apply_actions(original_workflow, actions)
+        logger.info(f"Applied actions to workflow")
+        
+        return modified_workflow, inputs_json
+        
+    finally:
+        # Clean up temporary inputs file
+        Path(inputs_file_path).unlink(missing_ok=True)
+
+
+@bp.route('/export-workflow', methods=['POST'])
+def export_workflow():
+    """
+    Export workflow JSON with user inputs for download
+    
+    Request JSON:
+        {
+            "workflow_id": "IMG_to_VIDEO_canvas",
+            "inputs": {  // Flat UI inputs
+                "input_image": "data:image/jpeg;base64,...",
+                "positive_prompt": "...",
+                ...
+            }
+        }
+        
+    Returns:
+        Workflow JSON file download
+    """
+    data = request.get_json()
+    
+    workflow_id = data.get('workflow_id')
+    inputs = data.get('inputs', {})
+    
+    if not workflow_id:
+        return jsonify({
+            'success': False,
+            'message': 'workflow_id is required'
+        }), 400
+    
+    try:
+        # Load workflow config
+        workflow_config = WorkflowLoader.load_workflow(workflow_id)
+        
+        # Process inputs and generate workflow (keep base64 images for export)
+        workflow_json, inputs_json = _generate_workflow_from_inputs(
+            workflow_id, 
+            workflow_config, 
+            inputs,
+            process_images=False
+        )
+        
+        # Generate filename
+        timestamp = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
+        filename = f"{workflow_id}_{timestamp}.json"
+        
+        # Write workflow to temporary file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
+            import json
+            json.dump(workflow_json, tmp_file, indent=2)
+            tmp_path = tmp_file.name
+        
+        try:
+            return send_file(
+                tmp_path,
+                mimetype='application/json',
+                as_attachment=True,
+                download_name=filename
+            )
+        finally:
+            # Clean up after sending
+            Path(tmp_path).unlink(missing_ok=True)
+            
+    except Exception as e:
+        logger.error(f"Error exporting workflow: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Failed to export workflow: {str(e)}'
+        }), 500
+
+
 @bp.route('/queue-workflow', methods=['POST'])
 def queue_workflow_with_browseragent():
     """
@@ -1156,44 +1315,32 @@ def queue_workflow_with_browseragent():
         # Parse SSH connection details
         host, port = _parse_ssh_connection(ssh_connection)
         
-        # Load workflow template and config
+        # Load workflow config
         workflow_config = WorkflowLoader.load_workflow(workflow_id)
-        workflow_template = WorkflowLoader.load_workflow_json(workflow_id)
         
-        # Process image inputs - upload to remote and replace with filenames
-        image_fields = [f for f in workflow_config.inputs if f.type == 'image']
-        processed_inputs = inputs.copy()
-        thumbnail_saved = False
+        # Process inputs, upload images, and generate workflow
+        workflow_json, inputs_json = _generate_workflow_from_inputs(
+            workflow_id,
+            workflow_config,
+            inputs,
+            process_images=True,
+            ssh_connection=ssh_connection,
+            host=host,
+            port=port
+        )
+        
+        # Save thumbnail from first image input
         thumbnail_filename = None
-        
+        image_fields = [f for f in workflow_config.inputs if f.type == 'image']
         for field in image_fields:
             field_value = inputs.get(field.id)
-            if field_value and isinstance(field_value, str):
-                if field_value.startswith('data:image/'):
-                    # This is a base64 image - upload it and replace with filename
-                    filename = _upload_image_to_remote(field_value, ssh_connection, host, port)
-                    processed_inputs[field.id] = filename
-                    logger.info(f"Uploaded image for {field.id}: {filename}")
-                    
-                    # Save thumbnail from first image input
-                    if not thumbnail_saved:
-                        thumbnail_filename = _save_thumbnail(field_value)
-                        thumbnail_saved = True
-                        logger.info(f"Saved thumbnail: {thumbnail_filename}")
-                else:
-                    # This is a filename - verify it exists on remote
-                    logger.info(f"Using existing image file: {field_value}")
-        
-        # Generate workflow JSON using interpreter
-        from app.create.interpreter_adapter import InterpreterAdapter
-        from pathlib import Path
-        
-        wrapper_path = Path(f'workflows/{workflow_id}.webui.yml')
-        adapter = InterpreterAdapter(workflow_id, wrapper_path)
-        generated_workflow = adapter.generate(processed_inputs)
+            if field_value and isinstance(field_value, str) and field_value.startswith('data:image/'):
+                thumbnail_filename = _save_thumbnail(field_value)
+                logger.info(f"Saved thumbnail: {thumbnail_filename}")
+                break  # Only save first image as thumbnail
         
         # Upload workflow JSON to remote instance workflows directory
-        workflow_remote_path = _upload_workflow_to_browseragent(generated_workflow, ssh_connection, host, port)
+        workflow_remote_path = _upload_workflow_to_browseragent(workflow_json, ssh_connection, host, port)
         logger.info(f"Uploaded workflow to: {workflow_remote_path}")
         
         # Queue workflow using BrowserAgent
