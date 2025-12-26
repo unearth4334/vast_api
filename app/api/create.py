@@ -1141,6 +1141,8 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
         json.dump(inputs_json, tmp_inputs, indent=2)
         inputs_file_path = tmp_inputs.name
     
+    logger.info(f"📄 Created temporary input JSON file: {inputs_file_path}")
+    
     try:
         # Initialize interpreter
         wrapper_path = Path(f'workflows/{workflow_id}.webui.yml')
@@ -1213,6 +1215,8 @@ def export_workflow():
             process_images=False
         )
         
+        logger.info(f"📊 Input JSON structure for export: {json.dumps(inputs_json, indent=2)}")
+        
         # Generate filename
         timestamp = datetime.now().strftime('%Y-%m-%dT%H-%M-%S')
         filename = f"{workflow_id}_{timestamp}.json"
@@ -1223,16 +1227,22 @@ def export_workflow():
             json.dump(workflow_json, tmp_file, indent=2)
             tmp_path = tmp_file.name
         
-        try:
-            return send_file(
-                tmp_path,
-                mimetype='application/json',
-                as_attachment=True,
-                download_name=filename
-            )
-        finally:
-            # Clean up after sending
-            Path(tmp_path).unlink(missing_ok=True)
+        # Add input JSON to response headers for debugging
+        response = send_file(
+            tmp_path,
+            mimetype='application/json',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+        # Add custom header with input JSON info (sanitized for headers)
+        response.headers['X-Input-JSON-Keys'] = ','.join(inputs_json.get('inputs', {}).keys())
+        response.headers['X-Workflow-Version'] = inputs_json.get('version', 'unknown')
+        
+        # Clean up after sending
+        Path(tmp_path).unlink(missing_ok=True)
+        
+        return response
             
     except Exception as e:
         logger.error(f"Error exporting workflow: {e}", exc_info=True)
@@ -1329,6 +1339,8 @@ def queue_workflow_with_browseragent():
             port=port
         )
         
+        logger.info(f"📊 Input JSON structure for queue: {json.dumps(inputs_json, indent=2)}")
+        
         # Save thumbnail from first image input
         thumbnail_filename = None
         image_fields = [f for f in workflow_config.inputs if f.type == 'image']
@@ -1380,7 +1392,12 @@ def queue_workflow_with_browseragent():
             'success': True,
             'task_id': task_id,
             'prompt_id': prompt_id,
-            'message': 'Workflow queued successfully via BrowserAgent'
+            'message': 'Workflow queued successfully via BrowserAgent',
+            'input_json_info': {
+                'version': inputs_json.get('version'),
+                'workflow_file': inputs_json.get('workflow_file'),
+                'input_sections': list(inputs_json.get('inputs', {}).keys())
+            }
         })
         
     except Exception as e:

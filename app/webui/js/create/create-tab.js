@@ -835,6 +835,15 @@ async function executeWorkflow() {
             console.log('✅ Workflow queued successfully!');
             console.log('   Prompt ID:', data.prompt_id);
             
+            // Log input JSON information
+            if (data.input_json_info) {
+                console.log('📄 Input JSON Information:');
+                console.log('   Workflow Version:', data.input_json_info.version);
+                console.log('   Workflow File:', data.input_json_info.workflow_file);
+                console.log('   Input Sections:', data.input_json_info.input_sections);
+                console.log('   Form Values:', CreateTabState.formValues);
+            }
+            
             CreateTabState.taskId = data.prompt_id;
             showCreateSuccess(data.message || `Workflow queued! Prompt ID: ${data.prompt_id}`);
             
@@ -1496,8 +1505,8 @@ async function exportWorkflowJSON() {
         // Log form values for debugging
         console.log('Form values being sent:', CreateTabState.formValues);
         
-        // Generate the workflow JSON with current form values
-        const response = await fetch('/create/generate-workflow', {
+        // Use the new export endpoint that creates temporary input JSON
+        const response = await fetch('/create/export-workflow', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1508,14 +1517,19 @@ async function exportWorkflowJSON() {
             })
         });
 
-        const data = await response.json();
-
-        if (data.success && data.workflow) {
-            // Create a blob from the workflow JSON
-            const blob = new Blob([JSON.stringify(data.workflow, null, 2)], {
-                type: 'application/json'
-            });
-
+        if (response.ok) {
+            // Log input JSON info from headers
+            const inputSections = response.headers.get('X-Input-JSON-Keys');
+            const workflowVersion = response.headers.get('X-Workflow-Version');
+            
+            console.log('📄 Input JSON Information:');
+            console.log('   Workflow Version:', workflowVersion);
+            console.log('   Input Sections:', inputSections);
+            console.log('   Form Values:', CreateTabState.formValues);
+            
+            // Get the blob from response
+            const blob = await response.blob();
+            
             // Create download link
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1535,6 +1549,8 @@ async function exportWorkflowJSON() {
             
             showCreateSuccess('Workflow JSON exported successfully!');
         } else {
+            // Handle error response
+            const data = await response.json();
             // Log detailed validation errors for debugging
             if (data.errors && Array.isArray(data.errors)) {
                 console.error('Validation errors:');
