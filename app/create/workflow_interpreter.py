@@ -88,7 +88,15 @@ class WorkflowInterpreter:
         """
         self.wrapper_path = Path(wrapper_path)
         self.config = self._load_wrapper()
-        self.workflow_path = Path(self.config["workflow_file"])
+        
+        # Handle workflow_file path - if relative, resolve from wrapper directory
+        workflow_file = self.config["workflow_file"]
+        workflow_path = Path(workflow_file)
+        if not workflow_path.is_absolute():
+            # Resolve relative to wrapper file's directory
+            workflow_path = self.wrapper_path.parent / workflow_path
+        self.workflow_path = workflow_path
+        
         self.node_mapping = self.config.get("node_mapping", {})
         
     def _load_wrapper(self) -> Dict:
