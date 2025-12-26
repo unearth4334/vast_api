@@ -1223,7 +1223,6 @@ def export_workflow():
         
         # Write workflow to temporary file
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp_file:
-            import json
             json.dump(workflow_json, tmp_file, indent=2)
             tmp_path = tmp_file.name
         
