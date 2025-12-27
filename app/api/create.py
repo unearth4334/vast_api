@@ -1141,7 +1141,7 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
         "version": workflow_config.version,
         "workflow_file": f"workflows/{workflow_id}.json",
         "base_hash": workflow_config.__dict__.get('base_hash', ''),
-        **nested_inputs
+        "inputs": nested_inputs  # Wrap nested inputs under 'inputs' key
     }
     
     # Save inputs to temporary file
