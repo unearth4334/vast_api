@@ -1100,11 +1100,7 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
     from app.create.interpreter_adapter import InterpreterAdapter
     from app.create.workflow_interpreter import WorkflowInterpreter
     
-    # Convert flat inputs to nested format
-    adapter = InterpreterAdapter(workflow_id, Path(f'workflows/{workflow_id}.webui.yml'))
-    nested_inputs = adapter.convert_ui_inputs_to_interpreter_format(flat_inputs)
-    
-    # Process images if needed
+    # Process images FIRST before converting to nested format
     processed_flat_inputs = flat_inputs.copy()
     if process_images:
         image_fields = [f for f in workflow_config.inputs if f.type == 'image']
@@ -1122,10 +1118,6 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
                 filename = _upload_image_to_remote(base64_data, ssh_connection, host, port)
                 processed_flat_inputs[field.id] = filename
                 logger.info(f"Uploaded image for {field.id}: {filename}")
-                
-                # Update nested inputs too (correct path structure)
-                if field.id in nested_inputs.get('basic_settings', {}):
-                    nested_inputs['basic_settings'][field.id] = filename
             elif field_value:
                 logger.info(f"Using existing image file: {field_value}")
     else:
@@ -1144,9 +1136,11 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
                 # Use placeholder filename that will be replaced when workflow is executed
                 placeholder = "input_image.jpg"  # Generic placeholder
                 processed_flat_inputs[field.id] = placeholder
-                if field.id in nested_inputs.get('basic_settings', {}):
-                    nested_inputs['basic_settings'][field.id] = placeholder
                 logger.info(f"Replaced base64 with placeholder for {field.id}: {placeholder}")
+    
+    # NOW convert processed flat inputs to nested format (without base64)
+    adapter = InterpreterAdapter(workflow_id, Path(f'workflows/{workflow_id}.webui.yml'))
+    nested_inputs = adapter.convert_ui_inputs_to_interpreter_format(processed_flat_inputs)
     
     # Create inputs JSON structure
     inputs_json = {
