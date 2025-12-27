@@ -1792,7 +1792,6 @@ window.onHistoryRecordSelected = onHistoryRecordSelected;
 window.handleMaxSizeChange = handleMaxSizeChange;
 window.handleMaxSizeInputChange = handleMaxSizeInputChange;
 window.handleApplyMaxSize = handleApplyMaxSize;
-window.handleAutoSizeToggle = handleAutoSizeToggle;
 window.storeImageDimensions = storeImageDimensions;
 
 // Auto-initialize if Create tab is already visible when module loads
