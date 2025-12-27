@@ -1110,26 +1110,39 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
         image_fields = [f for f in workflow_config.inputs if f.type == 'image']
         for field in image_fields:
             field_value = flat_inputs.get(field.id)
-            if field_value and isinstance(field_value, str):
-                if field_value.startswith('data:image/'):
-                    # Upload image and replace with filename
-                    filename = _upload_image_to_remote(field_value, ssh_connection, host, port)
-                    processed_flat_inputs[field.id] = filename
-                    logger.info(f"Uploaded image for {field.id}: {filename}")
-                    
-                    # Update nested inputs too (correct path structure)
-                    if field.id in nested_inputs.get('basic_settings', {}):
-                        nested_inputs['basic_settings'][field.id] = filename
-                else:
-                    logger.info(f"Using existing image file: {field_value}")
+            # Handle both string base64 and dict with base64
+            base64_data = None
+            if isinstance(field_value, str) and field_value.startswith('data:image/'):
+                base64_data = field_value
+            elif isinstance(field_value, dict) and field_value.get('base64', '').startswith('data:image/'):
+                base64_data = field_value['base64']
+            
+            if base64_data:
+                # Upload image and replace with filename
+                filename = _upload_image_to_remote(base64_data, ssh_connection, host, port)
+                processed_flat_inputs[field.id] = filename
+                logger.info(f"Uploaded image for {field.id}: {filename}")
+                
+                # Update nested inputs too (correct path structure)
+                if field.id in nested_inputs.get('basic_settings', {}):
+                    nested_inputs['basic_settings'][field.id] = filename
+            elif field_value:
+                logger.info(f"Using existing image file: {field_value}")
     else:
         # For export (not uploading), replace base64 with placeholder filename
         image_fields = [f for f in workflow_config.inputs if f.type == 'image']
         for field in image_fields:
             field_value = flat_inputs.get(field.id)
-            if field_value and isinstance(field_value, str) and field_value.startswith('data:image/'):
+            # Handle both string base64 and dict with base64
+            has_base64 = False
+            if isinstance(field_value, str) and field_value.startswith('data:image/'):
+                has_base64 = True
+            elif isinstance(field_value, dict) and field_value.get('base64', '').startswith('data:image/'):
+                has_base64 = True
+            
+            if has_base64:
                 # Use placeholder filename that will be replaced when workflow is executed
-                placeholder = f"input_image.jpg"  # Generic placeholder
+                placeholder = "input_image.jpg"  # Generic placeholder
                 processed_flat_inputs[field.id] = placeholder
                 if field.id in nested_inputs.get('basic_settings', {}):
                     nested_inputs['basic_settings'][field.id] = placeholder
