@@ -1230,9 +1230,14 @@ def export_workflow():
             download_name=filename
         )
         
-        # Add custom header with input JSON info (sanitized for headers)
+        # Add custom headers with input JSON info
         response.headers['X-Input-JSON-Keys'] = ','.join(inputs_json.get('inputs', {}).keys())
         response.headers['X-Workflow-Version'] = inputs_json.get('version', 'unknown')
+        
+        # Add full transformed inputs as JSON header (for console logging)
+        # Note: HTTP headers have size limits, but this is for debugging only
+        transformed_inputs = inputs_json.get('inputs', {})
+        response.headers['X-Transformed-Inputs'] = json.dumps(transformed_inputs)
         
         # Clean up after sending
         Path(tmp_path).unlink(missing_ok=True)
@@ -1392,7 +1397,8 @@ def queue_workflow_with_browseragent():
                 'version': inputs_json.get('version'),
                 'workflow_file': inputs_json.get('workflow_file'),
                 'input_sections': list(inputs_json.get('inputs', {}).keys())
-            }
+            },
+            'transformed_inputs': inputs_json.get('inputs', {})
         })
         
     except Exception as e:

@@ -860,7 +860,13 @@ async function executeWorkflow() {
                 console.log('   Workflow Version:', data.input_json_info.version);
                 console.log('   Workflow File:', data.input_json_info.workflow_file);
                 console.log('   Input Sections:', data.input_json_info.input_sections);
-                console.log('   Form Values:', displayInputs);
+                console.log('   Form Values (UI):', displayInputs);
+            }
+            
+            // Log transformed inputs (ready for interpreter)
+            if (data.transformed_inputs) {
+                console.log('📋 Transformed Inputs (Interpreter Format):');
+                console.log(JSON.stringify(data.transformed_inputs, null, 2));
             }
             
             CreateTabState.taskId = data.prompt_id;
@@ -1555,11 +1561,23 @@ async function exportWorkflowJSON() {
             // Log input JSON info from headers
             const inputSections = response.headers.get('X-Input-JSON-Keys');
             const workflowVersion = response.headers.get('X-Workflow-Version');
+            const transformedInputsJson = response.headers.get('X-Transformed-Inputs');
             
             console.log('📄 Input JSON Information:');
             console.log('   Workflow Version:', workflowVersion);
             console.log('   Input Sections:', inputSections);
-            console.log('   Form Values:', displayInputs);
+            console.log('   Form Values (UI):', displayInputs);
+            
+            // Log transformed inputs (ready for interpreter)
+            if (transformedInputsJson) {
+                try {
+                    const transformedInputs = JSON.parse(transformedInputsJson);
+                    console.log('📋 Transformed Inputs (Interpreter Format):');
+                    console.log(JSON.stringify(transformedInputs, null, 2));
+                } catch (e) {
+                    console.warn('Could not parse transformed inputs:', e);
+                }
+            }
             
             // Get the blob from response
             const blob = await response.blob();
