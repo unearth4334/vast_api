@@ -680,8 +680,12 @@ function handleImageUpload(fieldId, input) {
                 fileInput.click();
             };
             
-            // Store scaled base64 data
-            updateFormValue(fieldId, scaledDataUrl);
+            // Store image data with both base64 (for upload) and filename (for display)
+            // The backend expects base64 for upload, but we show filename in input JSON
+            updateFormValue(fieldId, {
+                base64: scaledDataUrl,
+                filename: file.name
+            });
             
             // Get actual image dimensions and trigger auto-sizing
             const dimensionImg = new Image();
@@ -811,10 +815,25 @@ async function executeWorkflow() {
     updateExecuteButton(true);
     
     try {
+        // Prepare form values for API - convert image objects to base64
+        const apiInputs = {};
+        const displayInputs = {};
+        
+        for (const [key, value] of Object.entries(CreateTabState.formValues)) {
+            if (value && typeof value === 'object' && value.base64 && value.filename) {
+                // This is an image field - send base64 to API, show filename in console
+                apiInputs[key] = value.base64;
+                displayInputs[key] = value.filename;
+            } else {
+                apiInputs[key] = value;
+                displayInputs[key] = value;
+            }
+        }
+        
         console.log('🚀 Queueing workflow via BrowserAgent...');
         console.log('   Workflow ID:', workflowId);
         console.log('   SSH Connection:', sshConnection);
-        console.log('   Form inputs:', CreateTabState.formValues);
+        console.log('   Form inputs:', displayInputs);
         
         // Use new BrowserAgent-based queueing endpoint
         const response = await fetch('/create/queue-workflow', {
@@ -825,7 +844,7 @@ async function executeWorkflow() {
             body: JSON.stringify({
                 ssh_connection: sshConnection,
                 workflow_id: workflowId,
-                inputs: CreateTabState.formValues
+                inputs: apiInputs
             })
         });
         
@@ -841,7 +860,7 @@ async function executeWorkflow() {
                 console.log('   Workflow Version:', data.input_json_info.version);
                 console.log('   Workflow File:', data.input_json_info.workflow_file);
                 console.log('   Input Sections:', data.input_json_info.input_sections);
-                console.log('   Form Values:', CreateTabState.formValues);
+                console.log('   Form Values:', displayInputs);
             }
             
             CreateTabState.taskId = data.prompt_id;
@@ -1502,8 +1521,23 @@ async function exportWorkflowJSON() {
     }
 
     try {
-        // Log form values for debugging
-        console.log('Form values being sent:', CreateTabState.formValues);
+        // Prepare form values for API - convert image objects to base64
+        const apiInputs = {};
+        const displayInputs = {};
+        
+        for (const [key, value] of Object.entries(CreateTabState.formValues)) {
+            if (value && typeof value === 'object' && value.base64 && value.filename) {
+                // This is an image field - send base64 to API, show filename in console
+                apiInputs[key] = value.base64;
+                displayInputs[key] = value.filename;
+            } else {
+                apiInputs[key] = value;
+                displayInputs[key] = value;
+            }
+        }
+        
+        // Log form values for debugging (with filenames instead of base64)
+        console.log('Form values being sent:', displayInputs);
         
         // Use the new export endpoint that creates temporary input JSON
         const response = await fetch('/create/export-workflow', {
@@ -1513,7 +1547,7 @@ async function exportWorkflowJSON() {
             },
             body: JSON.stringify({
                 workflow_id: workflowId,
-                inputs: CreateTabState.formValues
+                inputs: apiInputs
             })
         });
 
@@ -1525,7 +1559,7 @@ async function exportWorkflowJSON() {
             console.log('📄 Input JSON Information:');
             console.log('   Workflow Version:', workflowVersion);
             console.log('   Input Sections:', inputSections);
-            console.log('   Form Values:', CreateTabState.formValues);
+            console.log('   Form Values:', displayInputs);
             
             // Get the blob from response
             const blob = await response.blob();
