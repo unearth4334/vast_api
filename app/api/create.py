@@ -1117,11 +1117,23 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
                     processed_flat_inputs[field.id] = filename
                     logger.info(f"Uploaded image for {field.id}: {filename}")
                     
-                    # Update nested inputs too
-                    if field.id in nested_inputs.get('inputs', {}).get('basic_settings', {}):
-                        nested_inputs['inputs']['basic_settings'][field.id] = filename
+                    # Update nested inputs too (correct path structure)
+                    if field.id in nested_inputs.get('basic_settings', {}):
+                        nested_inputs['basic_settings'][field.id] = filename
                 else:
                     logger.info(f"Using existing image file: {field_value}")
+    else:
+        # For export (not uploading), replace base64 with placeholder filename
+        image_fields = [f for f in workflow_config.inputs if f.type == 'image']
+        for field in image_fields:
+            field_value = flat_inputs.get(field.id)
+            if field_value and isinstance(field_value, str) and field_value.startswith('data:image/'):
+                # Use placeholder filename that will be replaced when workflow is executed
+                placeholder = f"input_image.jpg"  # Generic placeholder
+                processed_flat_inputs[field.id] = placeholder
+                if field.id in nested_inputs.get('basic_settings', {}):
+                    nested_inputs['basic_settings'][field.id] = placeholder
+                logger.info(f"Replaced base64 with placeholder for {field.id}: {placeholder}")
     
     # Create inputs JSON structure
     inputs_json = {
@@ -1234,16 +1246,9 @@ def export_workflow():
         response.headers['X-Input-JSON-Keys'] = ','.join(inputs_json.get('inputs', {}).keys())
         response.headers['X-Workflow-Version'] = inputs_json.get('version', 'unknown')
         
-        # Sanitize transformed inputs for header (replace base64 with placeholder)
-        # HTTP headers have size limits (~8KB), so we can't include large base64 data
-        transformed_inputs = inputs_json.get('inputs', {}).copy() if inputs_json.get('inputs') else {}
-        if 'basic_settings' in transformed_inputs and isinstance(transformed_inputs['basic_settings'], dict):
-            basic = transformed_inputs['basic_settings'].copy()
-            if 'input_image' in basic and isinstance(basic['input_image'], str) and basic['input_image'].startswith('data:image'):
-                # Replace base64 with placeholder indicating data was truncated
-                basic['input_image'] = '<base64 image data truncated for header>'
-            transformed_inputs['basic_settings'] = basic
-        
+        # Get transformed inputs for header
+        # Note: base64 data should already be converted to filename by this point
+        transformed_inputs = inputs_json.get('inputs', {}) if inputs_json.get('inputs') else {}
         response.headers['X-Transformed-Inputs'] = json.dumps(transformed_inputs)
         
         # Clean up after sending
@@ -1395,14 +1400,9 @@ def queue_workflow_with_browseragent():
         except Exception as e:
             logger.error(f"Failed to save workflow history: {e}", exc_info=True)
         
-        # Sanitize transformed inputs for JSON response (replace base64 with placeholder)
-        transformed_inputs = inputs_json.get('inputs', {}).copy() if inputs_json.get('inputs') else {}
-        if 'basic_settings' in transformed_inputs and isinstance(transformed_inputs['basic_settings'], dict):
-            basic = transformed_inputs['basic_settings'].copy()
-            if 'input_image' in basic and isinstance(basic['input_image'], str) and basic['input_image'].startswith('data:image'):
-                # Replace base64 with placeholder
-                basic['input_image'] = '<base64 image data truncated for response>'
-            transformed_inputs['basic_settings'] = basic
+        # Get transformed inputs for response
+        # Note: base64 data should already be converted to filename by this point
+        transformed_inputs = inputs_json.get('inputs', {}) if inputs_json.get('inputs') else {}
         
         return jsonify({
             'success': True,
