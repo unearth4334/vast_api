@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 import uuid
 import base64
+import json
 import tempfile
 import subprocess
 import re
@@ -605,8 +606,6 @@ def _get_execution_outputs(prompt_id, ssh_connection, host, port):
     
     Returns list of output file objects with filename, path, type, etc.
     """
-    import json
-    
     # Get history for specific prompt_id
     history_cmd = [
         'ssh',
@@ -698,8 +697,6 @@ def _get_comfyui_queue_status(ssh_connection, host, port):
     - queue_pending: list of pending workflows
     - recent_history: list of recently completed workflows
     """
-    import json
-    
     # Get queue status
     queue_cmd = [
         'ssh',
@@ -1100,7 +1097,6 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
     Returns:
         Tuple of (workflow_json, inputs_json)
     """
-    import json
     from app.create.interpreter_adapter import InterpreterAdapter
     from app.create.workflow_interpreter import WorkflowInterpreter
     
@@ -1413,8 +1409,6 @@ def _upload_workflow_to_browseragent(workflow_json, ssh_connection, host, port):
     
     Returns: remote path to workflow file
     """
-    import json
-    
     # Generate unique workflow filename
     filename = f"workflow_{uuid.uuid4().hex[:8]}.json"
     
