@@ -1234,9 +1234,16 @@ def export_workflow():
         response.headers['X-Input-JSON-Keys'] = ','.join(inputs_json.get('inputs', {}).keys())
         response.headers['X-Workflow-Version'] = inputs_json.get('version', 'unknown')
         
-        # Add full transformed inputs as JSON header (for console logging)
-        # Note: HTTP headers have size limits, but this is for debugging only
-        transformed_inputs = inputs_json.get('inputs', {})
+        # Sanitize transformed inputs for header (replace base64 with placeholder)
+        # HTTP headers have size limits (~8KB), so we can't include large base64 data
+        transformed_inputs = inputs_json.get('inputs', {}).copy() if inputs_json.get('inputs') else {}
+        if 'basic_settings' in transformed_inputs and isinstance(transformed_inputs['basic_settings'], dict):
+            basic = transformed_inputs['basic_settings'].copy()
+            if 'input_image' in basic and isinstance(basic['input_image'], str) and basic['input_image'].startswith('data:image'):
+                # Replace base64 with placeholder indicating data was truncated
+                basic['input_image'] = '<base64 image data truncated for header>'
+            transformed_inputs['basic_settings'] = basic
+        
         response.headers['X-Transformed-Inputs'] = json.dumps(transformed_inputs)
         
         # Clean up after sending
@@ -1388,6 +1395,15 @@ def queue_workflow_with_browseragent():
         except Exception as e:
             logger.error(f"Failed to save workflow history: {e}", exc_info=True)
         
+        # Sanitize transformed inputs for JSON response (replace base64 with placeholder)
+        transformed_inputs = inputs_json.get('inputs', {}).copy() if inputs_json.get('inputs') else {}
+        if 'basic_settings' in transformed_inputs and isinstance(transformed_inputs['basic_settings'], dict):
+            basic = transformed_inputs['basic_settings'].copy()
+            if 'input_image' in basic and isinstance(basic['input_image'], str) and basic['input_image'].startswith('data:image'):
+                # Replace base64 with placeholder
+                basic['input_image'] = '<base64 image data truncated for response>'
+            transformed_inputs['basic_settings'] = basic
+        
         return jsonify({
             'success': True,
             'task_id': task_id,
@@ -1398,7 +1414,7 @@ def queue_workflow_with_browseragent():
                 'workflow_file': inputs_json.get('workflow_file'),
                 'input_sections': list(inputs_json.get('inputs', {}).keys())
             },
-            'transformed_inputs': inputs_json.get('inputs', {})
+            'transformed_inputs': transformed_inputs
         })
         
     except Exception as e:
