@@ -46,7 +46,6 @@ def dumps_with_floats(obj, **kwargs):
     Custom json.dumps that preserves float notation for whole numbers.
     Converts 5.0 -> "5.0" instead of "5" in JSON output.
     """
-    import re
     
     # First, mark all float values in the object
     def mark_floats(obj):
@@ -66,7 +65,8 @@ def dumps_with_floats(obj, **kwargs):
     json_str = json.dumps(marked_obj, **kwargs)
     
     # Replace markers with proper float notation
-    # Pattern: {"__float__": 5} -> 5.0 or {"__float__": 5.5} -> 5.5
+    # Pattern matches: {"__float__": 5.0} or {"__float__": 5}
+    # The pattern needs to handle whitespace from pretty printing
     def replace_float(match):
         num_str = match.group(1)
         num = float(num_str)
@@ -75,7 +75,8 @@ def dumps_with_floats(obj, **kwargs):
             return f"{int(num)}.0"
         return num_str
     
-    json_str = re.sub(r'\{"__float__":\s*([0-9.eE+-]+)\}', replace_float, json_str)
+    # This pattern handles both compact and pretty-printed JSON
+    json_str = re.sub(r'\{\s*"__float__"\s*:\s*([0-9.eE+-]+)\s*\}', replace_float, json_str)
     
     return json_str
 
