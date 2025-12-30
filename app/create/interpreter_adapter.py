@@ -186,22 +186,35 @@ class InterpreterAdapter:
         Returns:
             Generated workflow dictionary
         """
-        logger.info(f"Generating workflow for {self.workflow_id}")
+        logger.info(f"📋 InterpreterAdapter.generate() called for {self.workflow_id}")
+        logger.info(f"📥 Received {len(ui_inputs)} UI input fields")
         
         # Convert UI inputs to interpreter format
+        logger.info(f"🔄 Converting UI inputs to interpreter format...")
         interpreter_inputs = self.convert_ui_inputs_to_interpreter_format(ui_inputs)
-        logger.debug(f"Converted inputs: {list(interpreter_inputs.get('inputs', {}).keys())}")
+        input_sections = list(interpreter_inputs.get('inputs', {}).keys())
+        logger.info(f"✅ Converted to {len(input_sections)} sections: {input_sections}")
+        
+        # Log field counts per section
+        for section, fields in interpreter_inputs.get('inputs', {}).items():
+            if isinstance(fields, dict):
+                logger.info(f"   • {section}: {len(fields)} field(s)")
         
         # Generate actions from inputs
+        logger.info(f"⚙️  Calling interpreter.generate_actions()...")
         actions = self.interpreter.generate_actions(interpreter_inputs)
-        logger.info(f"Generated {len(actions)} actions")
+        logger.info(f"✅ Generated {len(actions)} actions from interpreter")
         
         # Load base workflow
+        logger.info(f"📂 Loading base workflow...")
         workflow = self.interpreter._load_workflow()
+        logger.info(f"✅ Loaded base workflow with {len(workflow.get('nodes', []))} nodes")
         
         # Apply actions to workflow
+        logger.info(f"🔧 Applying {len(actions)} actions to workflow...")
         modified_workflow = self.interpreter.apply_actions(workflow, actions)
-        logger.info(f"Applied actions to workflow")
+        logger.info(f"✅ Successfully applied all actions to workflow")
+        logger.info(f"📊 Final workflow has {len(modified_workflow.get('nodes', []))} nodes")
         
         return modified_workflow
     

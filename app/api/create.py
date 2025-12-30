@@ -1222,30 +1222,76 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
         inputs_file_path = tmp_inputs.name
     
     logger.info(f"📄 Created temporary input JSON file: {inputs_file_path}")
+    logger.info(f"\n{'='*80}")
+    logger.info(f"🔧 WORKFLOW INTERPRETER - Starting generation for: {workflow_id}")
+    logger.info(f"{'='*80}")
     
     try:
         # Initialize interpreter
         wrapper_path = Path(f'workflows/{workflow_id}.webui.yml')
+        logger.info(f"📂 Wrapper path: {wrapper_path}")
+        logger.info(f"📂 Wrapper exists: {wrapper_path.exists()}")
+        
         interpreter = WorkflowInterpreter(str(wrapper_path))
+        logger.info(f"✅ Interpreter initialized successfully")
+        logger.info(f"📋 Node mapping entries: {len(interpreter.node_mapping)}")
         
         # Load inputs from file
+        logger.info(f"\n📥 Loading input JSON from temporary file...")
         with open(inputs_file_path) as f:
             inputs_data = json.load(f)
+        logger.info(f"✅ Loaded inputs with {len(inputs_data.get('inputs', {}))} top-level sections")
+        logger.info(f"📊 Input sections: {list(inputs_data.get('inputs', {}).keys())}")
         
         # Load original workflow
         workflow_path = wrapper_path.parent / f"{workflow_id}.json"
+        logger.info(f"\n📂 Loading base workflow from: {workflow_path}")
+        logger.info(f"📂 Base workflow exists: {workflow_path.exists()}")
         with open(workflow_path) as f:
             original_workflow = json.load(f)
+        logger.info(f"✅ Loaded base workflow with {len(original_workflow.get('nodes', []))} nodes")
         
-        logger.info(f"Generating workflow using interpreter for {workflow_id}")
+        logger.info(f"\n🔄 Generating workflow using interpreter for {workflow_id}")
         
         # Generate actions from inputs
+        logger.info(f"\n⚙️  STEP 1: Generating actions from inputs...")
         actions = interpreter.generate_actions(inputs_data)
-        logger.info(f"Generated {len(actions)} actions")
+        logger.info(f"✅ Generated {len(actions)} actions")
+        
+        # Log action details
+        if actions:
+            logger.info(f"\n📋 Action Summary:")
+            action_types = {}
+            for action in actions:
+                action_type = action.action_type
+                action_types[action_type] = action_types.get(action_type, 0) + 1
+            for action_type, count in action_types.items():
+                logger.info(f"   • {action_type}: {count} action(s)")
+            
+            # Log first few actions as examples
+            logger.info(f"\n📝 Action Details (first 5):")
+            for i, action in enumerate(actions[:5]):
+                if action.action_type == "modify_widget":
+                    logger.info(f"   {i+1}. ModifyWidget: Node {action.node_id} ({action.node_type}) = {action.value}")
+                elif action.action_type == "toggle_node_mode":
+                    mode = "enabled" if action.enabled else "disabled"
+                    logger.info(f"   {i+1}. ToggleMode: Nodes {action.node_ids} → {mode}")
+                elif action.action_type == "add_lora_pair":
+                    logger.info(f"   {i+1}. AddLoRA: {action.lora_path} (strength={action.strength})")
+                elif action.action_type == "modify_vector_widget":
+                    logger.info(f"   {i+1}. ModifyVector: Node {action.node_id} X={action.x_value}, Y={action.y_value}")
+        else:
+            logger.warning(f"⚠️  No actions generated from inputs!")
         
         # Apply actions to get modified workflow
+        logger.info(f"\n⚙️  STEP 2: Applying {len(actions)} actions to base workflow...")
         modified_workflow = interpreter.apply_actions(original_workflow, actions)
-        logger.info(f"Applied actions to workflow")
+        logger.info(f"✅ Applied all actions successfully")
+        logger.info(f"📊 Modified workflow has {len(modified_workflow.get('nodes', []))} nodes")
+        
+        logger.info(f"\n{'='*80}")
+        logger.info(f"🎉 WORKFLOW INTERPRETER - Generation complete!")
+        logger.info(f"{'='*80}\n")
         
         return modified_workflow, inputs_json
         
