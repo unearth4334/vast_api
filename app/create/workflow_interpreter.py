@@ -43,6 +43,7 @@ class ToggleNodeModeAction:
     enabled: bool
     enabled_mode: int = 0  # 0 = enabled
     disabled_mode: int = 2  # 2 = bypassed, 4 = muted
+    save_node_id: Optional[int] = None  # Optional: VHS_VideoCombine node to toggle save_output
     action_type: str = "toggle_node_mode"
 
 
@@ -263,6 +264,7 @@ class WorkflowInterpreter:
         node_ids = mapping.get("node_ids", [])
         enabled_mode = mapping.get("enabled_mode", 0)
         disabled_mode = mapping.get("disabled_mode", 2)
+        save_node_id = mapping.get("save_node_id")  # Optional VHS_VideoCombine node
         
         if not node_ids:
             logger.warning(f"No node_ids in mapping for '{input_id}'")
@@ -273,7 +275,8 @@ class WorkflowInterpreter:
             node_ids=node_ids,
             enabled=bool(value),
             enabled_mode=enabled_mode,
-            disabled_mode=disabled_mode
+            disabled_mode=disabled_mode,
+            save_node_id=save_node_id
         )
     
     def _make_add_lora_action(
@@ -409,6 +412,20 @@ class WorkflowInterpreter:
             old_mode = node.get("mode", 0)
             node["mode"] = target_mode
             logger.debug(f"Node {node_id} mode: {old_mode} -> {target_mode}")
+        
+        # If save_node_id is specified, also toggle save_output in widgets_values
+        if action.save_node_id is not None:
+            save_node = nodes_by_id.get(action.save_node_id)
+            if save_node:
+                widgets_values = save_node.get("widgets_values")
+                if isinstance(widgets_values, dict) and "save_output" in widgets_values:
+                    old_save = widgets_values["save_output"]
+                    widgets_values["save_output"] = action.enabled
+                    logger.debug(f"Node {action.save_node_id} save_output: {old_save} -> {action.enabled}")
+                else:
+                    logger.warning(f"Node {action.save_node_id} has no save_output in widgets_values")
+            else:
+                logger.warning(f"Save node {action.save_node_id} not found")
     
     def _apply_add_lora(
         self, 
