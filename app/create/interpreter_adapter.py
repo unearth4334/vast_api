@@ -83,7 +83,13 @@ class InterpreterAdapter:
             
         interpreter_inputs["basic_settings"]["positive_prompt"] = ui_inputs.get('positive_prompt', '')
         interpreter_inputs["basic_settings"]["negative_prompt"] = ui_inputs.get('negative_prompt', '')
-        interpreter_inputs["basic_settings"]["seed"] = int(ui_inputs.get('seed', -1))
+        
+        # Seed handling: -1 means random, so generate a random seed
+        seed_value = int(ui_inputs.get('seed', -1))
+        if seed_value == -1:
+            import random
+            seed_value = random.randint(0, 2**32 - 1)  # Generate random 32-bit seed
+        interpreter_inputs["basic_settings"]["seed"] = seed_value
         
         # === MODEL SELECTION ===
         # Main model - transform keys
