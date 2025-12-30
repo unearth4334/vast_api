@@ -53,6 +53,13 @@ class InterpreterAdapter:
                 return obj.get("path")
             return obj
         
+        def ensure_float(value, default=0.0):
+            """Convert value to float with proper handling"""
+            try:
+                return float(value) if value is not None else default
+            except (ValueError, TypeError):
+                return default
+        
         # Initialize structure
         interpreter_inputs = {
             "basic_settings": {},
@@ -103,7 +110,7 @@ class InterpreterAdapter:
                 converted_loras.append({
                     "high_noise": lora.get('highNoisePath', ''),
                     "low_noise": lora.get('lowNoisePath', ''),
-                    "strength": float(lora.get('strength', 1.0))
+                    "strength": ensure_float(lora.get('strength', 1.0))
                 })
         interpreter_inputs["model_selection"]["loras"] = converted_loras
         
@@ -115,12 +122,12 @@ class InterpreterAdapter:
         # === GENERATION PARAMETERS ===
         interpreter_inputs["generation_parameters"]["size_x"] = int(ui_inputs.get('size_x', 896))
         interpreter_inputs["generation_parameters"]["size_y"] = int(ui_inputs.get('size_y', 1120))
-        interpreter_inputs["generation_parameters"]["duration"] = float(ui_inputs.get('duration', 5.0))
+        interpreter_inputs["generation_parameters"]["duration"] = ensure_float(ui_inputs.get('duration', 5.0))
         interpreter_inputs["generation_parameters"]["steps"] = int(ui_inputs.get('steps', 20))
-        interpreter_inputs["generation_parameters"]["cfg"] = float(ui_inputs.get('cfg', 3.5))
-        interpreter_inputs["generation_parameters"]["frame_rate"] = float(ui_inputs.get('frame_rate', 16.0))
-        interpreter_inputs["generation_parameters"]["speed"] = float(ui_inputs.get('speed', 7.0))
-        interpreter_inputs["generation_parameters"]["upscale_ratio"] = float(ui_inputs.get('upscale_ratio', 2.0))
+        interpreter_inputs["generation_parameters"]["cfg"] = ensure_float(ui_inputs.get('cfg', 3.5))
+        interpreter_inputs["generation_parameters"]["frame_rate"] = ensure_float(ui_inputs.get('frame_rate', 16.0))
+        interpreter_inputs["generation_parameters"]["speed"] = ensure_float(ui_inputs.get('speed', 7.0))
+        interpreter_inputs["generation_parameters"]["upscale_ratio"] = ensure_float(ui_inputs.get('upscale_ratio', 2.0))
         
         # === ADVANCED FEATURES ===
         # Output enhancement

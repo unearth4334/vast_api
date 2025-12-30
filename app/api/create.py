@@ -3,7 +3,7 @@ Create Tab API Blueprint
 Handles workflow listing, generation, and execution endpoints
 """
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, Response
 import logging
 from datetime import datetime
 import uuid
@@ -23,6 +23,62 @@ from app.create.workflow_validator import WorkflowValidator
 from app.create.workflow_history import WorkflowHistory
 
 logger = logging.getLogger(__name__)
+
+
+class FloatKeepingEncoder(json.JSONEncoder):
+    """Custom JSON encoder that ensures floats keep decimal notation (5.0 not 5)"""
+    def iterencode(self, o, _one_shot=False):
+        """Encode the object and post-process to keep .0 on whole number floats"""
+        for chunk in super().iterencode(o, _one_shot):
+            yield chunk
+    
+    def encode(self, o):
+        """Override encode to handle float formatting"""
+        # Get the default JSON encoding
+        result = super().encode(o)
+        # Post-process: this won't work on the full JSON string
+        # We need a different approach
+        return result
+
+
+def dumps_with_floats(obj, **kwargs):
+    """
+    Custom json.dumps that preserves float notation for whole numbers.
+    Converts 5.0 -> "5.0" instead of "5" in JSON output.
+    """
+    import re
+    
+    # First, mark all float values in the object
+    def mark_floats(obj):
+        if isinstance(obj, dict):
+            return {k: mark_floats(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [mark_floats(item) for item in obj]
+        elif isinstance(obj, float):
+            # Mark floats by wrapping in a custom marker dict
+            return {"__float__": obj}
+        return obj
+    
+    # Mark the floats
+    marked_obj = mark_floats(obj)
+    
+    # Serialize normally
+    json_str = json.dumps(marked_obj, **kwargs)
+    
+    # Replace markers with proper float notation
+    # Pattern: {"__float__": 5} -> 5.0 or {"__float__": 5.5} -> 5.5
+    def replace_float(match):
+        num_str = match.group(1)
+        num = float(num_str)
+        # If it's a whole number, ensure .0 suffix
+        if num % 1 == 0:
+            return f"{int(num)}.0"
+        return num_str
+    
+    json_str = re.sub(r'\{"__float__":\s*([0-9.eE+-]+)\}', replace_float, json_str)
+    
+    return json_str
+
 
 # Create blueprint
 bp = Blueprint('create', __name__, url_prefix='/create')
@@ -1151,9 +1207,11 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
         "inputs": nested_inputs  # Wrap nested inputs under 'inputs' key
     }
     
-    # Save inputs to temporary file
+    # Save inputs to temporary file with float notation preserved
     with tempfile.NamedTemporaryFile(mode='w', suffix='_inputs.json', delete=False) as tmp_inputs:
-        json.dump(inputs_json, tmp_inputs, indent=2)
+        # Use custom dumps function to ensure floats keep decimal notation
+        json_str = dumps_with_floats(inputs_json, indent=2)
+        tmp_inputs.write(json_str)
         inputs_file_path = tmp_inputs.name
     
     logger.info(f"📄 Created temporary input JSON file: {inputs_file_path}")
@@ -1256,7 +1314,7 @@ def export_workflow():
         # Get transformed inputs for header
         # Note: base64 data should already be converted to filename by this point
         transformed_inputs = inputs_json.get('inputs', {}) if inputs_json.get('inputs') else {}
-        response.headers['X-Transformed-Inputs'] = json.dumps(transformed_inputs)
+        response.headers['X-Transformed-Inputs'] = dumps_with_floats(transformed_inputs)
         
         # Clean up after sending
         Path(tmp_path).unlink(missing_ok=True)
@@ -1411,7 +1469,8 @@ def queue_workflow_with_browseragent():
         # Note: base64 data should already be converted to filename by this point
         transformed_inputs = inputs_json.get('inputs', {}) if inputs_json.get('inputs') else {}
         
-        return jsonify({
+        # Build response dict
+        response_data = {
             'success': True,
             'task_id': task_id,
             'prompt_id': prompt_id,
@@ -1422,7 +1481,12 @@ def queue_workflow_with_browseragent():
                 'input_sections': list(inputs_json.get('inputs', {}).keys())
             },
             'transformed_inputs': transformed_inputs
-        })
+        }
+        
+        # Use our custom dumps function to preserve float notation
+        response_json = dumps_with_floats(response_data, indent=2)
+        
+        return Response(response_json, mimetype='application/json')
         
     except Exception as e:
         logger.error(f"Error queueing workflow: {e}", exc_info=True)
