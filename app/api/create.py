@@ -1199,14 +1199,20 @@ def _generate_workflow_from_inputs(workflow_id, workflow_config, flat_inputs,
     adapter = InterpreterAdapter(workflow_id, Path(f'workflows/{workflow_id}.webui.yml'))
     nested_inputs = adapter.convert_ui_inputs_to_interpreter_format(processed_flat_inputs)
     
-    # Create inputs JSON structure
+    # Create inputs JSON structure per WorkflowInterpreter specification
+    # Generate test_id from workflow name and timestamp
+    from datetime import datetime
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    test_id = f"{workflow_id}_{timestamp}"
+    
+    # nested_inputs already contains {"inputs": {...}} from adapter
     inputs_json = {
         "description": f"Input values for {workflow_config.name} workflow",
-        "version": workflow_config.version,
-        "workflow_file": f"workflows/{workflow_id}.json",
-        "base_hash": workflow_config.__dict__.get('base_hash', ''),
-        "inputs": nested_inputs  # Wrap nested inputs under 'inputs' key
+        "test_id": test_id,
+        "notes": f"Generated from WebUI. Workflow version: {workflow_config.version}"
     }
+    # Merge the nested inputs structure
+    inputs_json.update(nested_inputs)
     
     # Save inputs to temporary file with float notation preserved
     with tempfile.NamedTemporaryFile(mode='w', suffix='_inputs.json', delete=False) as tmp_inputs:
