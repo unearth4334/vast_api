@@ -140,12 +140,17 @@ class InterpreterAdapter:
         # 1. save_interpoled_output: Standalone Interpolation (nodes 431 + 433)
         # 2. save_upscaled_output: Standalone Upscaler (nodes 385 + 419)
         # 3. save_upint_output: Combined UPINT (nodes 442 + 437 + 443)
+        
+        # Map old UI field names to new structure
+        # Old: enable_interpolation -> New: save_interpoled_output
+        # Old: use_upscaler -> New: save_upscaled_output
+        # Old: enable_upscale_interpolation -> New: save_upint_output
         interpreter_inputs["advanced_features"]["output_enhancement"] = {
             "save_last_frame": mode_to_bool(ui_inputs.get('save_last_frame', 2)),
             "save_original_output": True,  # Always enabled in base workflow
-            "save_interpoled_output": mode_to_bool(ui_inputs.get('save_interpoled_output', 2)),
-            "save_upscaled_output": mode_to_bool(ui_inputs.get('save_upscaled_output', 2)),
-            "save_upint_output": mode_to_bool(ui_inputs.get('save_upint_output', 2))
+            "save_interpoled_output": mode_to_bool(ui_inputs.get('enable_interpolation', 2)),
+            "save_upscaled_output": mode_to_bool(ui_inputs.get('use_upscaler', 2)),
+            "save_upint_output": mode_to_bool(ui_inputs.get('enable_upscale_interpolation', 2))
         }
         
         # Quality enhancements
