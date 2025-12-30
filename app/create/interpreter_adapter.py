@@ -136,22 +136,16 @@ class InterpreterAdapter:
         interpreter_inputs["generation_parameters"]["upscale_ratio"] = ensure_float(ui_inputs.get('upscale_ratio', 2.0))
         
         # === ADVANCED FEATURES ===
-        # Output enhancement - CRITICAL: Field ordering matters!
-        # enable_upscale_interpolation MUST be first to prevent action conflicts
-        enable_interpolation = mode_to_bool(ui_inputs.get('enable_interpolation', 0))
-        use_upscaler = mode_to_bool(ui_inputs.get('use_upscaler', 2))
-        enable_upscale_interpolation = mode_to_bool(ui_inputs.get('enable_upscale_interpolation', 2))
-        
-        # Use OrderedDict or dict with Python 3.7+ insertion order guarantee
+        # Output enhancement - Three independent output pipelines:
+        # 1. save_interpoled_output: Standalone Interpolation (nodes 431 + 433)
+        # 2. save_upscaled_output: Standalone Upscaler (nodes 385 + 419)
+        # 3. save_upint_output: Combined UPINT (nodes 442 + 437 + 443)
         interpreter_inputs["advanced_features"]["output_enhancement"] = {
-            "enable_upscale_interpolation": enable_upscale_interpolation,  # MUST BE FIRST
             "save_last_frame": mode_to_bool(ui_inputs.get('save_last_frame', 2)),
             "save_original_output": True,  # Always enabled in base workflow
-            "save_interpoled_output": enable_interpolation,
-            "save_upscaled_output": use_upscaler,
-            "save_upint_output": enable_upscale_interpolation,
-            "enable_interpolation": enable_interpolation,
-            "use_upscaler": use_upscaler
+            "save_interpoled_output": mode_to_bool(ui_inputs.get('save_interpoled_output', 2)),
+            "save_upscaled_output": mode_to_bool(ui_inputs.get('save_upscaled_output', 2)),
+            "save_upint_output": mode_to_bool(ui_inputs.get('save_upint_output', 2))
         }
         
         # Quality enhancements
