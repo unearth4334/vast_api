@@ -9,7 +9,7 @@ tags:
   - 14B-model
 
 # Workflow JSON file reference (canvas format)
-workflow_file: "outputs/workflows/WAN2.2_IMG_to_VIDEO_Base_47e91030.json"
+workflow_file: "workflows/IMG_to_VIDEO_canvas.json"
 base_hash: "47e91030"  # Original workflow hash for validation
 
 # Node mapping for programmatic workflow modification
