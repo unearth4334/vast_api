@@ -1318,9 +1318,9 @@ def export_workflow():
         response.headers['X-Input-JSON-Keys'] = ','.join(inputs_json.get('inputs', {}).keys())
         response.headers['X-Workflow-Version'] = inputs_json.get('version', 'unknown')
         
-        # Get transformed inputs for header
+        # Get transformed inputs for header (keep wrapped structure)
         # Note: base64 data should already be converted to filename by this point
-        transformed_inputs = inputs_json.get('inputs', {}) if inputs_json.get('inputs') else {}
+        transformed_inputs = {'inputs': inputs_json.get('inputs', {})} if inputs_json.get('inputs') else {'inputs': {}}
         response.headers['X-Transformed-Inputs'] = dumps_with_floats(transformed_inputs)
         
         # Clean up after sending
@@ -1472,9 +1472,9 @@ def queue_workflow_with_browseragent():
         except Exception as e:
             logger.error(f"Failed to save workflow history: {e}", exc_info=True)
         
-        # Get transformed inputs for response
+        # Get transformed inputs for response (keep wrapped structure)
         # Note: base64 data should already be converted to filename by this point
-        transformed_inputs = inputs_json.get('inputs', {}) if inputs_json.get('inputs') else {}
+        transformed_inputs = {'inputs': inputs_json.get('inputs', {})} if inputs_json.get('inputs') else {'inputs': {}}
         
         # Build response dict
         response_data = {
