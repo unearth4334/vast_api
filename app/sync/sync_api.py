@@ -4718,7 +4718,10 @@ except Exception as e:
 # --- Resource Management Routes ---
 
 # Initialize resource management
-resources_path = '/app/resources'
+# Get the absolute path to resources directory
+import os
+current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+resources_path = os.path.join(os.path.dirname(current_dir), 'resources')
 resource_manager = None
 resource_installer = None
 
@@ -4726,7 +4729,11 @@ try:
     from ..resources import ResourceManager, ResourceInstaller
     resource_manager = ResourceManager(resources_path)
     resource_installer = ResourceInstaller()
-    logger.info("Resource management initialized")
+    logger.info(f"Resource management initialized with path: {resources_path}")
+    
+    # Test that it works
+    test_resources = resource_manager.list_resources()
+    logger.info(f"Resource manager test: found {len(test_resources)} resources at startup")
 except Exception as e:
     logger.warning(f"Failed to initialize resource management: {e}")
 
@@ -4737,6 +4744,7 @@ def resources_list():
         return ("", 204)
     
     if not resource_manager:
+        logger.error("Resource manager is None!")
         return jsonify({
             'success': False,
             'message': 'Resource management not available'
@@ -4748,6 +4756,8 @@ def resources_list():
     tags = [t.strip() for t in tags_str.split(',') if t.strip()] if tags_str else None
     search = request.args.get('search')
     
+    logger.info(f"Listing resources with filters - type: {resource_type}, ecosystem: {ecosystem}, tags: {tags}, search: {search}")
+    
     try:
         resources = resource_manager.list_resources(
             resource_type=resource_type,
@@ -4756,13 +4766,15 @@ def resources_list():
             search=search
         )
         
+        logger.info(f"Found {len(resources)} resources matching filters")
+        
         return jsonify({
             'success': True,
             'count': len(resources),
             'resources': resources
         })
     except Exception as e:
-        logger.error(f"Error listing resources: {e}")
+        logger.error(f"Error listing resources: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'message': str(e)
