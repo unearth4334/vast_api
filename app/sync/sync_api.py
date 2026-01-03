@@ -301,8 +301,16 @@ def index():
 def assets_page():
     """Asset catalog standalone page"""
     try:
-        assets_html_path = os.path.join(os.path.dirname(__file__), '..', 'webui', 'assets.html')
-        with open(assets_html_path, 'r') as f:
+        base_dir = os.path.dirname(__file__)
+        assets_html_path = os.path.abspath(os.path.join(base_dir, '..', 'webui', 'assets.html'))
+        
+        # Validate path is within expected directory
+        expected_dir = os.path.abspath(os.path.join(base_dir, '..', 'webui'))
+        if not assets_html_path.startswith(expected_dir):
+            logger.error(f"Invalid path: {assets_html_path}")
+            return "Invalid path", 403
+            
+        with open(assets_html_path, 'r', encoding='utf-8') as f:
             return f.read()
     except Exception as e:
         logger.error(f"Error serving assets page: {e}")
