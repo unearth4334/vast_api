@@ -1,64 +1,49 @@
 /**
- * Asset Catalog
- * 
- * Browse and view the complete library of assets with category filtering
+ * Asset Catalog (TileView-style)
+ *
+ * - Category dropdown (toolbar-btn / toolbar-dropdown)
+ * - Tile grid based on TileView.md concepts
+ * - Click tile opens rendered markdown in a popover
  */
 
-// State management
-let catalogState = {
-    assets: [],
-    selectedCategory: 'all',
-    loading: false
+const CATEGORIES = [
+    { key: 'checkpoints', label: 'Checkpoints' },
+    { key: 'loras', label: 'LoRAs' },
+    { key: 'encoders', label: 'Encoders' },
+    { key: 'embeddings', label: 'Embeddings' },
+    { key: 'upscalers', label: 'Upscalers' },
+    { key: 'adetailers', label: 'ADetailers' },
+    { key: 'workflows', label: 'Workflows' }
+];
+
+const catalogState = {
+    selectedCategory: 'checkpoints',
+    items: [],
+    loading: false,
+    mediaObserver: null,
+    playing: new Set(),
+    maxConcurrentVideos: 2
 };
 
 /**
  * Initialize the catalog when the page loads
  */
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Initializing Asset Catalog');
-    
-    // Set up event listeners
-    const categorySelect = document.getElementById('catalog-category-select');
-    if (categorySelect) {
-        categorySelect.addEventListener('change', handleCategoryChange);
-        
-        // Load saved category from server or localStorage
-        loadSavedCategory();
-    }
-    
-    // Load assets immediately on page load (for standalone page)
-    // Or when tab becomes active (for tab view)
-    const catalogTab = document.getElementById('catalog-tab');
-    if (catalogTab) {
-        // This is a tab - use observer
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                    if (catalogTab.classList.contains('active') && catalogState.assets.length === 0) {
-                        loadAssets();
-                    }
-                }
-            });
-        });
-        
-        observer.observe(catalogTab, { attributes: true });
-        
-        // Store observer for cleanup
-        catalogState.observer = observer;
-    } else {
-        // This is a standalone page - load immediately
-        loadAssets();
-    }
+    initCatalog();
 });
 
 /**
  * Cleanup function (can be called when needed)
  */
 function cleanupCatalog() {
-    if (catalogState.observer) {
-        catalogState.observer.disconnect();
-        catalogState.observer = null;
+    if (catalogState.mediaObserver) {
+        catalogState.mediaObserver.disconnect();
+        catalogState.mediaObserver = null;
     }
+    for (const v of Array.from(catalogState.playing)) {
+        try { v.pause(); } catch {}
+    }
+    catalogState.playing.clear();
 }
 
 /**
@@ -72,7 +57,7 @@ async function loadSavedCategory() {
             const state = await response.json();
             if (state.selectedCategory) {
                 catalogState.selectedCategory = state.selectedCategory;
-                document.getElementById('catalog-category-select').value = state.selectedCategory;
+                setCategoryLabel(catalogState.selectedCategory);
             }
         }
     } catch (error) {
@@ -81,7 +66,7 @@ async function loadSavedCategory() {
         const savedCategory = localStorage.getItem('catalog-selected-category');
         if (savedCategory) {
             catalogState.selectedCategory = savedCategory;
-            document.getElementById('catalog-category-select').value = savedCategory;
+            setCategoryLabel(catalogState.selectedCategory);
         }
     }
 }
@@ -104,173 +89,280 @@ async function saveCategoryPreference(category) {
         });
     } catch (error) {
         console.log('Could not save category to server:', error);
-    }
-}
 
-/**
- * Handle category dropdown change
- */
-function handleCategoryChange(event) {
-    const category = event.target.value;
-    catalogState.selectedCategory = category;
-    saveCategoryPreference(category);
-    filterAssets();
-}
-
-/**
- * Load assets from the API
- */
-async function loadAssets() {
-    if (catalogState.loading) return;
-    
-    catalogState.loading = true;
-    const gridContainer = document.getElementById('catalog-grid');
-    
-    try {
-        console.log('Loading assets from API...');
-        const response = await fetch('/resources/list');
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        function initCatalog() {
+            setupCategoryDropdown();
+            loadSavedCategory().finally(() => {
+                // Default if saved category is invalid
+                if (!CATEGORIES.some(c => c.key === catalogState.selectedCategory)) {
+                    catalogState.selectedCategory = 'checkpoints';
+                }
+                setCategoryLabel(catalogState.selectedCategory);
+                loadCategory(catalogState.selectedCategory);
+            });
         }
-        
-        const data = await response.json();
-        catalogState.assets = data.resources || [];
-        
-        console.log(`Loaded ${catalogState.assets.length} assets`);
-        
-        // Display assets
-        filterAssets();
-        
-    } catch (error) {
-        console.error('Error loading assets:', error);
-        gridContainer.innerHTML = `
-            <div class="catalog-error">
-                <div class="error-icon">⚠️</div>
-                <h3>Failed to load assets</h3>
-                <p>${error.message}</p>
-                <button class="retry-button" onclick="loadAssets()">Retry</button>
-            </div>
-        `;
-    } finally {
-        catalogState.loading = false;
-    }
-}
 
-/**
- * Filter and display assets based on selected category
- */
-function filterAssets() {
-    const category = catalogState.selectedCategory;
-    let filteredAssets = catalogState.assets;
-    
-    // Filter by category
-    if (category !== 'all') {
-        filteredAssets = catalogState.assets.filter(asset => 
-            asset.metadata && asset.metadata.type === category
-        );
-    }
-    
-    // Update count
-    const countEl = document.getElementById('catalog-count');
-    if (countEl) {
-        countEl.textContent = `${filteredAssets.length} asset${filteredAssets.length !== 1 ? 's' : ''}`;
-    }
-    
-    // Render assets
-    renderAssets(filteredAssets);
-}
-
-/**
- * Render assets in the grid
- */
-function renderAssets(assets) {
-    const gridContainer = document.getElementById('catalog-grid');
-    
-    if (assets.length === 0) {
-        gridContainer.innerHTML = `
-            <div class="catalog-empty">
-                <div class="empty-icon">📭</div>
-                <h3>No assets found</h3>
-                <p>Try selecting a different category</p>
-            </div>
-        `;
-        return;
-    }
-    
-    // Create asset tiles
-    const tilesHTML = assets.map(asset => createAssetTile(asset)).join('');
-    gridContainer.innerHTML = tilesHTML;
-    
-    // Add click handlers
-    assets.forEach((asset, index) => {
-        const tile = gridContainer.children[index];
-        if (tile) {
-            tile.addEventListener('click', () => showAssetDetail(asset));
+        function setCategoryLabel(categoryKey) {
+            const category = CATEGORIES.find(c => c.key === categoryKey);
+            const label = category ? category.label : categoryKey;
+            const el = document.getElementById('catalog-category-text');
+            if (el) el.textContent = `Category: ${label}`;
         }
-    });
-}
 
-/**
- * Create HTML for an asset tile
- */
-function createAssetTile(asset) {
-    const metadata = asset.metadata || {};
-    const title = metadata.title || asset.filename || 'Untitled';
-    const type = metadata.type || 'unknown';
-    const ecosystem = metadata.ecosystem || 'other';
-    const version = metadata.version || '';
-    const size = formatSize(metadata.size);
-    const image = metadata.image ? `/resources/images/${metadata.image}` : null;
-    
-    // Type emoji mapping
-    const typeEmoji = {
-        checkpoint: '🎯',
-        lora: '✨',
-        vae: '🔧',
-        upscaler: '📐',
-        workflow: '🔄'
-    };
-    
-    // Ecosystem color mapping
-    const ecosystemColors = {
-        wan: '#00f5ff',
-        flux: '#ff00ff',
-        ltxv: '#00ff88',
-        sd15: '#bf00ff',
-        sdxl: '#ff6600',
-        realesrgan: '#ff0099',
-        other: '#a0a0a0'
-    };
-    
-    const emoji = typeEmoji[type] || '📦';
-    const color = ecosystemColors[ecosystem] || ecosystemColors.other;
-    
-    return `
-        <div class="catalog-tile" data-type="${type}" data-ecosystem="${ecosystem}">
-            ${image ? `
-                <div class="catalog-tile-image" style="background-image: url('${image}')">
-                    <div class="catalog-tile-badge" style="background: ${color}">
-                        ${emoji} ${type}
+        function setupCategoryDropdown() {
+            const btn = document.getElementById('catalog-category-btn');
+            const menu = document.getElementById('catalog-category-menu');
+            if (!btn || !menu) return;
+
+            const toggleMenu = (show) => {
+                const isOpen = show ?? (menu.style.display === 'none');
+                menu.style.display = isOpen ? 'block' : 'none';
+                btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            };
+
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleMenu();
+            });
+
+            document.addEventListener('click', () => toggleMenu(false));
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    toggleMenu(false);
+                    closeAssetDetailModal();
+                }
+            });
+
+            menu.addEventListener('click', (e) => {
+                const target = e.target;
+                if (!(target instanceof HTMLElement)) return;
+                const key = target.dataset.category;
+                if (!key) return;
+                catalogState.selectedCategory = key;
+                saveCategoryPreference(key);
+                setCategoryLabel(key);
+                toggleMenu(false);
+                loadCategory(key);
+            });
+        }
+
+        async function loadCategory(categoryKey) {
+            if (catalogState.loading) return;
+            catalogState.loading = true;
+
+            const grid = document.getElementById('catalog-grid');
+            if (!grid) return;
+            grid.innerHTML = `
+                <div class="catalog-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading assets…</p>
+                </div>
+            `;
+
+            try {
+                const resp = await fetch(`/catalog/list?category=${encodeURIComponent(categoryKey)}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.message || 'Failed to load');
+                catalogState.items = data.items || [];
+                updateCount(catalogState.items.length);
+                renderTileGrid(catalogState.items);
+            } catch (e) {
+                console.error('Catalog load error:', e);
+                updateCount(0);
+                grid.innerHTML = `
+                    <div class="catalog-error">
+                        <div class="error-icon">⚠️</div>
+                        <h3>Failed to load catalog</h3>
+                        <p>${String(e.message || e)}</p>
+                        <button class="retry-button" id="catalog-retry">Retry</button>
+                    </div>
+                `;
+                const retry = document.getElementById('catalog-retry');
+                retry?.addEventListener('click', () => loadCategory(categoryKey));
+            } finally {
+                catalogState.loading = false;
+            }
+        }
+
+        function updateCount(n) {
+            const el = document.getElementById('catalog-count');
+            if (el) el.textContent = `${n} item${n === 1 ? '' : 's'}`;
+        }
+
+        function startVideo(v) {
+            if (!v) return;
+            if (!catalogState.playing.has(v) && catalogState.playing.size >= catalogState.maxConcurrentVideos) {
+                const first = catalogState.playing.values().next().value;
+                stopVideo(first);
+            }
+            v.muted = true;
+            v.playsInline = true;
+            v.setAttribute('playsinline', '');
+            const p = v.play();
+            if (p?.catch) p.catch(() => {});
+            catalogState.playing.add(v);
+        }
+
+        function stopVideo(v) {
+            if (!v) return;
+            try { v.pause(); } catch {}
+            catalogState.playing.delete(v);
+        }
+
+        function setupMediaObserver() {
+            if (catalogState.mediaObserver) catalogState.mediaObserver.disconnect();
+
+            catalogState.mediaObserver = new IntersectionObserver((entries) => {
+                for (const entry of entries) {
+                    const mediaBox = entry.target;
+                    const card = mediaBox.closest('.tv-card');
+                    const ctx = card?._ctx;
+                    if (!ctx) continue;
+
+                    if (entry.isIntersecting) {
+                        if (!ctx.mediaAttached) {
+                            if (ctx.isVideo) {
+                                const v = mediaBox.querySelector('video');
+                                if (v) {
+                                    v.preload = 'metadata';
+                                    v.src = ctx.mediaUrl || '';
+                                    v.load();
+                                    v.addEventListener('loadedmetadata', () => startVideo(v), { once: true });
+                                }
+                            } else {
+                                const img = mediaBox.querySelector('img');
+                                if (img) img.src = ctx.mediaUrl || '';
+                            }
+                            ctx.mediaAttached = true;
+                        } else if (ctx.isVideo) {
+                            const v = mediaBox.querySelector('video');
+                            if (v && v.paused) startVideo(v);
+                        }
+                    } else {
+                        if (ctx.mediaAttached) {
+                            if (ctx.isVideo) {
+                                const v = mediaBox.querySelector('video');
+                                stopVideo(v);
+                                if (v) {
+                                    v.removeAttribute('src');
+                                    v.load();
+                                }
+                            } else {
+                                const img = mediaBox.querySelector('img');
+                                img?.removeAttribute('src');
+                            }
+                            ctx.mediaAttached = false;
+                        }
+                    }
+                }
+            }, { root: null, rootMargin: '600px 0px', threshold: 0.01 });
+        }
+
+        function renderTileGrid(items) {
+            const grid = document.getElementById('catalog-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            if (!items.length) {
+                grid.innerHTML = `
+                    <div class="catalog-empty">
+                        <div class="empty-icon">📭</div>
+                        <h3>No items found</h3>
+                        <p>No markdown files were found for this category.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            setupMediaObserver();
+
+            const frag = document.createDocumentFragment();
+            for (const item of items) {
+                frag.appendChild(makeCard(item));
+            }
+            grid.appendChild(frag);
+        }
+
+        function makeCard(item) {
+            const a = document.createElement('a');
+            a.className = 'tv-cardlink';
+            a.href = '#';
+
+            const title = item.title || item.file || 'Untitled';
+            const subtitle = item.subtitle || '';
+            const mediaUrl = item.mediaUrl || '';
+            const isVideo = !!item.isVideo;
+
+            a.innerHTML = `
+                <div class="tv-card">
+                    <div class="tv-media">
+                        ${isVideo
+                            ? `<video muted playsinline loop preload="metadata"></video>`
+                            : `<img loading="lazy" decoding="async" alt="" />`
+                        }
+                        <div class="tv-badges"></div>
+                    </div>
+                    <div class="tv-footer">
+                        <span class="tv-title"></span>
+                        ${subtitle ? `<span class="tv-subtitle"></span>` : ''}
                     </div>
                 </div>
-            ` : `
-                <div class="catalog-tile-placeholder" style="border-color: ${color}">
-                    <div class="catalog-tile-emoji">${emoji}</div>
-                    <div class="catalog-tile-badge" style="background: ${color}">
-                        ${type}
-                    </div>
-                </div>
-            `}
-            <div class="catalog-tile-content">
-                <h3 class="catalog-tile-title">${escapeHtml(title)}</h3>
-                <div class="catalog-tile-meta">
-                    <span class="catalog-tile-ecosystem" style="color: ${color}">
-                        ${ecosystem.toUpperCase()}
-                    </span>
-                    ${version ? `<span class="catalog-tile-version">${escapeHtml(version)}</span>` : ''}
-                </div>
-                ${size ? `<div class="catalog-tile-size">${size}</div>` : ''}
+            `;
+
+            const card = a.querySelector('.tv-card');
+            card._ctx = {
+                mediaAttached: false,
+                isVideo,
+                mediaUrl,
+                file: item.file
+            };
+
+            a.querySelector('.tv-title').textContent = title;
+            const sub = a.querySelector('.tv-subtitle');
+            if (sub) sub.textContent = subtitle;
+
+            const mediaBox = a.querySelector('.tv-media');
+            catalogState.mediaObserver.observe(mediaBox);
+
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openAssetMarkdown(item);
+            });
+
+            return a;
+        }
+
+        async function openAssetMarkdown(item) {
+            const modal = document.getElementById('assetDetailModal');
+            const titleEl = document.getElementById('assetModalTitle');
+            const contentEl = document.getElementById('assetModalContent');
+
+            if (!modal || !titleEl || !contentEl) return;
+            modal.style.display = 'flex';
+            titleEl.textContent = item.title || item.file || 'Asset';
+            contentEl.innerHTML = `<div class="catalog-loading"><div class="loading-spinner"></div><p>Loading…</p></div>`;
+
+            try {
+                const resp = await fetch(`/catalog/render?category=${encodeURIComponent(catalogState.selectedCategory)}&file=${encodeURIComponent(item.file)}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.message || 'Failed to render');
+                titleEl.textContent = data.title || titleEl.textContent;
+                contentEl.innerHTML = `<div class="asset-description catalog-markdown">${data.html || ''}</div>`;
+            } catch (e) {
+                contentEl.innerHTML = `<div class="catalog-error"><div class="error-icon">⚠️</div><h3>Failed to load page</h3><p>${String(e.message || e)}</p></div>`;
+            }
+        }
+
+        function closeAssetDetailModal() {
+            const modal = document.getElementById('assetDetailModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        window.closeAssetDetailModal = closeAssetDetailModal;
             </div>
         </div>
     `;

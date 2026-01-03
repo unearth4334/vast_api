@@ -6,7 +6,9 @@
     <title>Asset Catalog - Media Sync Tool</title>
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/vastai-connection-toolbar.css">
     <link rel="stylesheet" href="/css/catalog.css">
+    <link rel="stylesheet" href="/css/tileview.css">
 </head>
 <body>
     <div class="container">
@@ -20,29 +22,35 @@
         </div>
         
         <div id="catalog-container">
-            <!-- Category Dropdown -->
-            <div class="catalog-controls">
-                <div class="catalog-filter-section">
-                    <label for="catalog-category-select" class="catalog-label">
-                        <span class="catalog-label-icon">📁</span>
-                        Category:
-                    </label>
-                    <select id="catalog-category-select" class="catalog-category-select">
-                        <option value="all">All Categories</option>
-                        <option value="checkpoint">Checkpoints</option>
-                        <option value="lora">LoRAs</option>
-                        <option value="vae">Encoders / VAEs</option>
-                        <option value="upscaler">Upscalers</option>
-                    </select>
+            <!-- Toolbar -->
+            <div class="vastai-connection-toolbar catalog-toolbar">
+                <div class="toolbar-dropdown-container" id="catalog-category-container">
+                    <button id="catalog-category-btn" class="toolbar-btn toolbar-instance-btn" type="button" aria-haspopup="true" aria-expanded="false">
+                        <span id="catalog-category-text" class="toolbar-instance-text">Category: Checkpoints</span>
+                        <span class="toolbar-btn-text">▾</span>
+                    </button>
+                    <div id="catalog-category-menu" class="toolbar-dropdown" style="display: none;">
+                        <div class="toolbar-dropdown-content">
+                            <div class="catalog-category-list" role="menu">
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="checkpoints">Checkpoints</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="loras">LoRAs</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="encoders">Encoders</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="embeddings">Embeddings</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="upscalers">Upscalers</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="adetailers">ADetailers</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="workflows">Workflows</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
+
                 <div class="catalog-stats">
-                    <span id="catalog-count" class="catalog-count">Loading...</span>
+                    <span id="catalog-count" class="catalog-count">Loading…</span>
                 </div>
             </div>
             
-            <!-- Asset Grid -->
-            <div id="catalog-grid" class="catalog-grid">
+            <!-- TileView Grid -->
+            <div id="catalog-grid" class="tv-grid">
                 <div class="catalog-loading">
                     <div class="loading-spinner"></div>
                     <p>Loading assets...</p>
@@ -51,9 +59,9 @@
         </div>
     </div>
     
-    <!-- Asset Detail Modal -->
+    <!-- Asset Detail Popover -->
     <div id="assetDetailModal" class="log-overlay" style="display: none;">
-        <div class="asset-modal">
+        <div class="asset-modal catalog-popover">
             <div class="log-modal-header">
                 <h3 id="assetModalTitle" class="log-modal-title">Asset Details</h3>
                 <button class="close-modal-btn" onclick="closeAssetDetailModal()">✕</button>

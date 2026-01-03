@@ -1,0 +1,119 @@
+/* ================= TileView — Generic Styles ================= */
+
+/* Theme via existing app variables */
+:root {
+    --tv-gap: var(--size-4-4);
+    --tv-card-radius: var(--radius-m);
+    --tv-shadow: 0 4px 12px var(--background-modifier-box-shadow);
+
+    --tv-footer-bg: rgba(0, 0, 0, 0.65);
+    --tv-footer-fg: var(--text-normal);
+    --tv-footer-muted: var(--text-muted);
+
+    --tv-badge-bg: var(--interactive-normal);
+    --tv-badge-fg: var(--text-normal);
+
+    --tv-accent: var(--color-accent);
+
+    /* Tile dimensions - 4:3 aspect ratio */
+    --tv-tile-width: 300px;
+    --tv-tile-height: 225px;
+}
+
+/* Grid */
+.tv-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--tv-gap);
+    margin-top: var(--size-4-4);
+}
+
+/* Link wrapper */
+.tv-cardlink {
+    display: inline-block;
+    text-decoration: none;
+    color: inherit;
+}
+
+/* Card */
+.tv-card {
+    position: relative;
+    border-radius: var(--tv-card-radius);
+    overflow: hidden;
+    box-shadow: var(--tv-shadow);
+    width: var(--tv-tile-width);
+    height: var(--tv-tile-height);
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+}
+
+/* Media */
+.tv-media {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.tv-media img,
+.tv-media video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Footer */
+.tv-footer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: var(--size-4-2) var(--size-4-3);
+    background: var(--tv-footer-bg);
+    color: var(--tv-footer-fg);
+    display: flex;
+    align-items: baseline;
+    gap: var(--size-4-2);
+}
+
+.tv-title {
+    font-weight: 700;
+    font-size: var(--font-ui-medium);
+}
+
+.tv-subtitle {
+    font-weight: 500;
+    font-size: var(--font-ui-smallest);
+    color: var(--tv-footer-muted);
+}
+
+/* Badge layer (optional) */
+.tv-badges {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.tv-badges-corner {
+    position: absolute;
+    display: flex;
+    align-items: flex-start;
+}
+
+.tv-badges-tl { top: var(--size-4-2); left: var(--size-4-2); }
+.tv-badges-tr { top: var(--size-4-2); right: var(--size-4-2); align-items: flex-end; }
+.tv-badges-bl { bottom: var(--size-4-2); left: var(--size-4-2); }
+.tv-badges-br { bottom: var(--size-4-2); right: var(--size-4-2); align-items: flex-end; }
+
+.tv-badge {
+    background: var(--tv-badge-bg);
+    color: var(--tv-badge-fg);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: var(--font-ui-smallest);
+    text-transform: uppercase;
+    font-weight: 600;
+    pointer-events: auto;
+}
