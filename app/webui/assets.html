@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Catalog - Media Sync Tool</title>
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/vastai-connection-toolbar.css">
+    <link rel="stylesheet" href="/css/catalog.css">
+    <link rel="stylesheet" href="/css/tileview.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span>📚</span>
+                Asset Catalog
+            </h1>
+            <p>Browse the complete library of models, encoders, and assets</p>
+            <a href="/" class="back-link">← Back to Dashboard</a>
+        </div>
+        
+        <div id="catalog-container">
+            <!-- Toolbar -->
+            <div class="vastai-connection-toolbar catalog-toolbar">
+                <div class="toolbar-dropdown-container" id="catalog-category-container">
+                    <button id="catalog-category-btn" class="toolbar-btn toolbar-instance-btn" type="button" aria-haspopup="true" aria-expanded="false">
+                        <span id="catalog-category-text" class="toolbar-instance-text">Category: Checkpoints</span>
+                        <span class="toolbar-btn-text">▾</span>
+                    </button>
+                    <div id="catalog-category-menu" class="toolbar-dropdown" style="display: none;">
+                        <div class="toolbar-dropdown-content">
+                            <div class="catalog-category-list" role="menu">
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="checkpoints">Checkpoints</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="loras">LoRAs</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="encoders">Encoders</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="embeddings">Embeddings</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="upscalers">Upscalers</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="adetailers">ADetailers</button>
+                                <button class="catalog-category-item" type="button" role="menuitem" data-category="workflows">Workflows</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="catalog-stats">
+                    <span id="catalog-count" class="catalog-count">Loading…</span>
+                </div>
+            </div>
+            
+            <!-- TileView Grid -->
+            <div id="catalog-grid" class="tv-grid">
+                <div class="catalog-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading assets...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Asset Detail Popover -->
+    <div id="assetDetailModal" class="log-overlay" style="display: none;">
+        <div class="asset-modal catalog-popover">
+            <div class="log-modal-header">
+                <h3 id="assetModalTitle" class="log-modal-title">Asset Details</h3>
+                <button class="close-modal-btn" onclick="closeAssetDetailModal()">✕</button>
+            </div>
+            <div id="assetModalContent" class="asset-modal-content">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript files -->
+    <script src="/js/catalog.js?v=20260103-v1"></script>
+</body>
+</html>

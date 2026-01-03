@@ -11,7 +11,10 @@ import time
 import uuid
 import re
 import json
-from flask import Flask, jsonify, request, send_from_directory
+from urllib.parse import unquote
+
+import yaml
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 
 # Import our refactored modules
@@ -296,6 +299,25 @@ def _get_cached_vastai_status():
 def index():
     """Web interface for testing"""
     return get_index_template()
+
+@app.route('/assets')
+def assets_page():
+    """Asset catalog standalone page"""
+    try:
+        base_dir = os.path.dirname(__file__)
+        assets_html_path = os.path.abspath(os.path.join(base_dir, '..', 'webui', 'assets.html'))
+        
+        # Validate path is within expected directory
+        expected_dir = os.path.abspath(os.path.join(base_dir, '..', 'webui'))
+        if not assets_html_path.startswith(expected_dir):
+            logger.error(f"Invalid path: {assets_html_path}")
+            return "Invalid path", 403
+            
+        with open(assets_html_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"Error serving assets page: {e}")
+        return f"Error loading assets page: {e}", 500
 
 @app.route('/css/<path:filename>')
 def serve_css(filename):
@@ -4718,7 +4740,9 @@ except Exception as e:
 # --- Resource Management Routes ---
 
 # Initialize resource management
-resources_path = '/app/resources'
+# Get the absolute path to resources directory
+current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+resources_path = os.path.join(os.path.dirname(current_dir), 'resources')
 resource_manager = None
 resource_installer = None
 
@@ -4726,7 +4750,11 @@ try:
     from ..resources import ResourceManager, ResourceInstaller
     resource_manager = ResourceManager(resources_path)
     resource_installer = ResourceInstaller()
-    logger.info("Resource management initialized")
+    logger.info(f"Resource management initialized with path: {resources_path}")
+    
+    # Test that it works
+    test_resources = resource_manager.list_resources()
+    logger.info(f"Resource manager test: found {len(test_resources)} resources at startup")
 except Exception as e:
     logger.warning(f"Failed to initialize resource management: {e}")
 
@@ -4737,6 +4765,7 @@ def resources_list():
         return ("", 204)
     
     if not resource_manager:
+        logger.error("Resource manager is None!")
         return jsonify({
             'success': False,
             'message': 'Resource management not available'
@@ -4748,6 +4777,8 @@ def resources_list():
     tags = [t.strip() for t in tags_str.split(',') if t.strip()] if tags_str else None
     search = request.args.get('search')
     
+    logger.info(f"Listing resources with filters - type: {resource_type}, ecosystem: {ecosystem}, tags: {tags}, search: {search}")
+    
     try:
         resources = resource_manager.list_resources(
             resource_type=resource_type,
@@ -4756,13 +4787,15 @@ def resources_list():
             search=search
         )
         
+        logger.info(f"Found {len(resources)} resources matching filters")
+        
         return jsonify({
             'success': True,
             'count': len(resources),
             'resources': resources
         })
     except Exception as e:
-        logger.error(f"Error listing resources: {e}")
+        logger.error(f"Error listing resources: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'message': str(e)
@@ -4980,6 +5013,305 @@ def resources_search():
         })
     except Exception as e:
         logger.error(f"Error searching resources: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+# --- Catalog State Management Routes ---
+
+# Simple in-memory storage for catalog state (could be moved to a database or file)
+catalog_states = {}
+
+
+# --- Asset Catalog Routes ---
+
+ASSET_CATALOG_DIR = os.environ.get('ASSET_CATALOG_DIR', '/media/assets')
+
+_CATALOG_CATEGORIES = {
+    # UI key -> (folder name, markdown subfolder)
+    'checkpoints': ('Checkpoints', 'checkpoints'),
+    'loras': ('LoRAs', 'loras'),
+    'encoders': ('Encoders', 'encoders'),
+    'embeddings': ('Embeddings', 'embeddings'),
+    'upscalers': ('Upscalers', 'upscalers'),
+    'adetailers': ('ADetailer', 'adetailer'),
+    'workflows': ('Workflows', 'workflows'),
+}
+
+
+def _catalog_category_config(category_key: str):
+    if not category_key:
+        raise ValueError('Missing category')
+    if category_key not in _CATALOG_CATEGORIES:
+        raise ValueError(f'Unknown category: {category_key}')
+    return _CATALOG_CATEGORIES[category_key]
+
+
+def _safe_abs_path(base_dir: str, rel_path: str) -> str:
+    rel_path = (rel_path or '').lstrip('/').replace('\\', '/')
+    abs_path = os.path.abspath(os.path.join(base_dir, rel_path))
+    base_abs = os.path.abspath(base_dir)
+    if not abs_path.startswith(base_abs + os.sep) and abs_path != base_abs:
+        raise ValueError('Invalid path')
+    return abs_path
+
+
+_FRONTMATTER_RE = re.compile(r'\A---\s*\n(.*?)\n---\s*\n', re.DOTALL)
+
+
+def _parse_markdown_frontmatter(md_text: str):
+    """Parse YAML frontmatter (--- ... ---) if present; returns (meta_dict, body_text)."""
+    try:
+        m = _FRONTMATTER_RE.match(md_text or '')
+        if not m:
+            return {}, md_text
+        yaml_text = m.group(1)
+        meta = yaml.safe_load(yaml_text) or {}
+        if not isinstance(meta, dict):
+            meta = {}
+        body = (md_text or '')[m.end():]
+        return meta, body
+    except Exception:
+        return {}, md_text
+
+
+def _first_h1(md_body: str):
+    for line in (md_body or '').splitlines():
+        line = line.strip()
+        if line.startswith('# '):
+            return line[2:].strip() or None
+    return None
+
+
+def _is_video_path(path: str) -> bool:
+    return bool(path) and bool(re.search(r'\.(mp4|webm|mov)$', path, re.IGNORECASE))
+
+
+@app.route('/catalog/list', methods=['GET', 'OPTIONS'])
+def catalog_list():
+    """List assets for a category from ASSET_CATALOG_DIR (/media/assets by default)."""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+
+    category_key = (request.args.get('category') or '').strip().lower()
+    try:
+        category_dirname, markdown_subdir = _catalog_category_config(category_key)
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    category_root = os.path.join(ASSET_CATALOG_DIR, category_dirname)
+    md_dir = os.path.join(category_root, markdown_subdir)
+
+    if not os.path.isdir(md_dir):
+        return jsonify({
+            'success': True,
+            'category': category_key,
+            'count': 0,
+            'items': [],
+            'message': f'No directory: {md_dir}'
+        })
+
+    items = []
+    try:
+        for entry in sorted(os.listdir(md_dir)):
+            if not entry.lower().endswith('.md'):
+                continue
+            rel_md_path = f"{markdown_subdir}/{entry}"
+            abs_md_path = _safe_abs_path(category_root, rel_md_path)
+            try:
+                with open(abs_md_path, 'r', encoding='utf-8') as f:
+                    raw = f.read()
+            except UnicodeDecodeError:
+                with open(abs_md_path, 'r', encoding='latin-1') as f:
+                    raw = f.read()
+
+            meta, body = _parse_markdown_frontmatter(raw)
+            title = meta.get('title') or meta.get('name') or _first_h1(body) or os.path.splitext(entry)[0]
+            subtitle = meta.get('subtitle') or meta.get('version') or meta.get('variant') or ''
+
+            media = meta.get('image') or meta.get('cover') or meta.get('thumbnail')
+            if isinstance(media, list) and media:
+                media = media[0]
+            if media and isinstance(media, str):
+                media = media.strip()
+            else:
+                media = None
+
+            media_url = None
+            is_video = False
+            if media:
+                is_video = _is_video_path(media)
+                media_url = f"/catalog/media/{category_key}/" + media.lstrip('/').replace('\\', '/')
+
+            st = os.stat(abs_md_path)
+            items.append({
+                'file': entry,
+                'path': rel_md_path,
+                'title': title,
+                'subtitle': subtitle,
+                'mediaPath': media,
+                'mediaUrl': media_url,
+                'isVideo': is_video,
+                'mtime': int(st.st_mtime),
+                'size': int(st.st_size),
+            })
+
+        return jsonify({
+            'success': True,
+            'category': category_key,
+            'count': len(items),
+            'items': items,
+        })
+    except Exception as e:
+        logger.error(f"Error listing catalog items for {category_key}: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/catalog/media/<category>/<path:relpath>', methods=['GET'])
+def catalog_media(category, relpath):
+    """Serve media referenced by markdown (images/videos) from /media/assets."""
+    category_key = (category or '').strip().lower()
+    try:
+        category_dirname, _ = _catalog_category_config(category_key)
+    except ValueError:
+        return "Not found", 404
+
+    category_root = os.path.join(ASSET_CATALOG_DIR, category_dirname)
+    try:
+        abs_path = _safe_abs_path(category_root, unquote(relpath))
+    except ValueError:
+        return "Invalid path", 400
+
+    if not os.path.isfile(abs_path):
+        return "Not found", 404
+
+    return send_file(abs_path)
+
+
+def _rewrite_relative_urls(html: str, category_key: str) -> str:
+    """Rewrite relative src/href URLs to go through /catalog/media/<category>/..."""
+    if not html:
+        return html
+
+    def repl(match):
+        attr = match.group(1)
+        url = match.group(2)
+        if not url:
+            return match.group(0)
+        u = url.strip()
+        if re.match(r'^(https?:|/|data:|#)', u, re.IGNORECASE):
+            return match.group(0)
+        u = u.lstrip('./').replace('\\', '/')
+        return f'{attr}="/catalog/media/{category_key}/{u}"'
+
+    html = re.sub(r'(src)="([^"]+)"', repl, html, flags=re.IGNORECASE)
+    html = re.sub(r'(href)="([^"]+)"', repl, html, flags=re.IGNORECASE)
+    return html
+
+
+@app.route('/catalog/render', methods=['GET', 'OPTIONS'])
+def catalog_render():
+    """Render a markdown file to HTML for the catalog popover."""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+
+    category_key = (request.args.get('category') or '').strip().lower()
+    file_name = request.args.get('file') or ''
+    try:
+        category_dirname, markdown_subdir = _catalog_category_config(category_key)
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    if '/' in file_name or '\\' in file_name:
+        return jsonify({'success': False, 'message': 'Invalid file'}), 400
+    if not file_name.lower().endswith('.md'):
+        return jsonify({'success': False, 'message': 'Invalid file'}), 400
+
+    category_root = os.path.join(ASSET_CATALOG_DIR, category_dirname)
+    rel_md_path = f"{markdown_subdir}/{file_name}"
+    try:
+        abs_md_path = _safe_abs_path(category_root, rel_md_path)
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid path'}), 400
+
+    if not os.path.isfile(abs_md_path):
+        return jsonify({'success': False, 'message': 'Not found'}), 404
+
+    try:
+        try:
+            with open(abs_md_path, 'r', encoding='utf-8') as f:
+                raw = f.read()
+        except UnicodeDecodeError:
+            with open(abs_md_path, 'r', encoding='latin-1') as f:
+                raw = f.read()
+
+        meta, body = _parse_markdown_frontmatter(raw)
+        title = meta.get('title') or meta.get('name') or _first_h1(body) or os.path.splitext(file_name)[0]
+
+        try:
+            import markdown as md
+        except Exception as e:
+            return jsonify({'success': False, 'message': f"Markdown renderer not installed: {e}"}), 500
+
+        html = md.markdown(
+            body,
+            extensions=['extra', 'tables', 'fenced_code', 'sane_lists'],
+            output_format='html5'
+        )
+        html = _rewrite_relative_urls(html, category_key)
+
+        return jsonify({
+            'success': True,
+            'title': title,
+            'html': html,
+        })
+    except Exception as e:
+        logger.error(f"Error rendering catalog markdown {category_key}/{file_name}: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/catalog/state', methods=['GET', 'OPTIONS'])
+def catalog_state_get():
+    """Get catalog state (selected category)"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # For now, we'll use a simple in-memory store
+        # In production, this could be stored in a database or file
+        state = catalog_states.get('default', {'selectedCategory': 'checkpoints'})
+        return jsonify(state)
+    except Exception as e:
+        logger.error(f"Error getting catalog state: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/catalog/state', methods=['POST'])
+def catalog_state_save():
+    """Save catalog state (selected category)"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No data provided'
+            }), 400
+        
+        # Save the state
+        catalog_states['default'] = {
+            'selectedCategory': data.get('selectedCategory', 'all')
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'State saved successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error saving catalog state: {e}")
         return jsonify({
             'success': False,
             'message': str(e)
