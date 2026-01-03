@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/progress-indicators.css">
     <link rel="stylesheet" href="css/resources.css">
+    <link rel="stylesheet" href="css/catalog.css">
     <link rel="stylesheet" href="css/create.css">
     <link rel="stylesheet" href="css/vastai-connection-toolbar.css">
 </head>
@@ -30,6 +31,9 @@
             </button>
             <button class="tab-button" onclick="showTab('resources', event)">
                 📦 Resource Manager
+            </button>
+            <button class="tab-button" onclick="showTab('catalog', event)">
+                📚 Asset Catalog
             </button>
             <button class="tab-button" onclick="showTab('create', event)">
                 🎨 Create
@@ -258,6 +262,58 @@
         </div>
     </div>
     
+    <!-- Catalog Tab -->
+    <div id="catalog-tab" class="tab-content">
+        <div id="catalog-container">
+            <div class="catalog-header">
+                <h2>📚 Asset Catalog</h2>
+                <p>Browse the complete library of models, encoders, and assets</p>
+            </div>
+            
+            <!-- Category Dropdown -->
+            <div class="catalog-controls">
+                <div class="catalog-filter-section">
+                    <label for="catalog-category-select" class="catalog-label">
+                        <span class="catalog-label-icon">📁</span>
+                        Category:
+                    </label>
+                    <select id="catalog-category-select" class="catalog-category-select">
+                        <option value="all">All Categories</option>
+                        <option value="checkpoint">Checkpoints</option>
+                        <option value="lora">LoRAs</option>
+                        <option value="vae">Encoders / VAEs</option>
+                        <option value="upscaler">Upscalers</option>
+                    </select>
+                </div>
+                
+                <div class="catalog-stats">
+                    <span id="catalog-count" class="catalog-count">Loading...</span>
+                </div>
+            </div>
+            
+            <!-- Asset Grid -->
+            <div id="catalog-grid" class="catalog-grid">
+                <div class="catalog-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading assets...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Asset Detail Modal -->
+    <div id="assetDetailModal" class="log-overlay" style="display: none;">
+        <div class="asset-modal">
+            <div class="log-modal-header">
+                <h3 id="assetModalTitle" class="log-modal-title">Asset Details</h3>
+                <button class="close-modal-btn" onclick="closeAssetDetailModal()">✕</button>
+            </div>
+            <div id="assetModalContent" class="asset-modal-content">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
     <!-- Create Tab -->
     <div id="create-tab" class="tab-content">
         <h3>🎨 Create with ComfyUI Workflows</h3>
@@ -470,6 +526,9 @@
     
     <!-- Resource Manager -->
     <script src="js/resources/resource-browser.js?v=20251118-v1" type="module"></script>
+    
+    <!-- Catalog Tab -->
+    <script src="js/catalog.js?v=20260103-v1"></script>
     
     <!-- Create Tab Services -->
     <script src="js/create/services/modelScannerService.js?v=20251208-v1"></script>

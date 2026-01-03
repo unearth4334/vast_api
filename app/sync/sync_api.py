@@ -4986,6 +4986,58 @@ def resources_search():
         }), 500
 
 
+# --- Catalog State Management Routes ---
+
+# Simple in-memory storage for catalog state (could be moved to a database or file)
+catalog_states = {}
+
+@app.route('/catalog/state', methods=['GET', 'OPTIONS'])
+def catalog_state_get():
+    """Get catalog state (selected category)"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        # For now, we'll use a simple in-memory store
+        # In production, this could be stored in a database or file
+        state = catalog_states.get('default', {'selectedCategory': 'all'})
+        return jsonify(state)
+    except Exception as e:
+        logger.error(f"Error getting catalog state: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/catalog/state', methods=['POST'])
+def catalog_state_save():
+    """Save catalog state (selected category)"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No data provided'
+            }), 400
+        
+        # Save the state
+        catalog_states['default'] = {
+            'selectedCategory': data.get('selectedCategory', 'all')
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'State saved successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error saving catalog state: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
 # --- Workflow Execution Routes ---
 
 @app.route('/workflow/start', methods=['POST', 'OPTIONS'])
