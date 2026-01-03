@@ -40,8 +40,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         observer.observe(catalogTab, { attributes: true });
+        
+        // Store observer for cleanup
+        catalogState.observer = observer;
     }
 });
+
+/**
+ * Cleanup function (can be called when needed)
+ */
+function cleanupCatalog() {
+    if (catalogState.observer) {
+        catalogState.observer.disconnect();
+        catalogState.observer = null;
+    }
+}
 
 /**
  * Load saved category preference
@@ -383,7 +396,7 @@ function formatMarkdown(markdown) {
     
     // Convert lists
     html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    html = html.replace(/(<li>[\s\S]*?<\/li>)/gim, '<ul>$1</ul>');
     
     // Convert bold
     html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');

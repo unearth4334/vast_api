@@ -4719,7 +4719,6 @@ except Exception as e:
 
 # Initialize resource management
 # Get the absolute path to resources directory
-import os
 current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 resources_path = os.path.join(os.path.dirname(current_dir), 'resources')
 resource_manager = None
