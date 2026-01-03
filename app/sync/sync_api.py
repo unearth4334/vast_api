@@ -297,6 +297,17 @@ def index():
     """Web interface for testing"""
     return get_index_template()
 
+@app.route('/assets')
+def assets_page():
+    """Asset catalog standalone page"""
+    try:
+        assets_html_path = os.path.join(os.path.dirname(__file__), '..', 'webui', 'assets.html')
+        with open(assets_html_path, 'r') as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"Error serving assets page: {e}")
+        return f"Error loading assets page: {e}", 500
+
 @app.route('/css/<path:filename>')
 def serve_css(filename):
     """Serve CSS files"""

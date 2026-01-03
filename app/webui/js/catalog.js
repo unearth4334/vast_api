@@ -26,9 +26,11 @@ document.addEventListener('DOMContentLoaded', function() {
         loadSavedCategory();
     }
     
-    // Load assets when catalog tab is opened
+    // Load assets immediately on page load (for standalone page)
+    // Or when tab becomes active (for tab view)
     const catalogTab = document.getElementById('catalog-tab');
     if (catalogTab) {
+        // This is a tab - use observer
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
@@ -43,6 +45,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Store observer for cleanup
         catalogState.observer = observer;
+    } else {
+        // This is a standalone page - load immediately
+        loadAssets();
     }
 });
 

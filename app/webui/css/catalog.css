@@ -34,6 +34,25 @@
     font-size: 14px;
 }
 
+.back-link {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 8px 16px;
+    color: var(--neon-cyan, #00f5ff);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    border: 1px solid var(--neon-cyan, #00f5ff);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.back-link:hover {
+    background: var(--neon-cyan, #00f5ff);
+    color: #000;
+    box-shadow: 0 0 20px rgba(0, 245, 255, 0.5);
+}
+
 /* Catalog Controls */
 .catalog-controls {
     display: flex;

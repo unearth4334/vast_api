@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Catalog - Media Sync Tool</title>
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/catalog.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span>📚</span>
+                Asset Catalog
+            </h1>
+            <p>Browse the complete library of models, encoders, and assets</p>
+            <a href="/" class="back-link">← Back to Dashboard</a>
+        </div>
+        
+        <div id="catalog-container">
+            <!-- Category Dropdown -->
+            <div class="catalog-controls">
+                <div class="catalog-filter-section">
+                    <label for="catalog-category-select" class="catalog-label">
+                        <span class="catalog-label-icon">📁</span>
+                        Category:
+                    </label>
+                    <select id="catalog-category-select" class="catalog-category-select">
+                        <option value="all">All Categories</option>
+                        <option value="checkpoint">Checkpoints</option>
+                        <option value="lora">LoRAs</option>
+                        <option value="vae">Encoders / VAEs</option>
+                        <option value="upscaler">Upscalers</option>
+                    </select>
+                </div>
+                
+                <div class="catalog-stats">
+                    <span id="catalog-count" class="catalog-count">Loading...</span>
+                </div>
+            </div>
+            
+            <!-- Asset Grid -->
+            <div id="catalog-grid" class="catalog-grid">
+                <div class="catalog-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading assets...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Asset Detail Modal -->
+    <div id="assetDetailModal" class="log-overlay" style="display: none;">
+        <div class="asset-modal">
+            <div class="log-modal-header">
+                <h3 id="assetModalTitle" class="log-modal-title">Asset Details</h3>
+                <button class="close-modal-btn" onclick="closeAssetDetailModal()">✕</button>
+            </div>
+            <div id="assetModalContent" class="asset-modal-content">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript files -->
+    <script src="/js/catalog.js?v=20260103-v1"></script>
+</body>
+</html>
