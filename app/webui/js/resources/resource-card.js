@@ -91,11 +91,13 @@ export function createResourceCard(resource, viewMode = 'grid') {
     const hasDeps = metadata.dependencies && metadata.dependencies.length > 0;
     const isVideo = isVideoFile(imagePath);
     
-    // Determine status badge
+    // Determine selection state
     const isSelected = window.resourceBrowser?.selectedResources?.has(resource.filepath);
-    const statusBadge = isSelected ? 
-        '<span class="status-badge status-selected">Selected</span>' : 
-        '<span class="status-badge status-available">Available</span>';
+
+    // Secondary action button (right-end), intentionally large tap target
+    const statusToggleBtn = isSelected
+        ? '<button class="resource-status-btn resource-status-btn--selected" data-action="toggle-select" type="button" aria-label="Selected (tap to unselect)" title="Selected (tap to unselect)">☑</button>'
+        : '<button class="resource-status-btn resource-status-btn--available" data-action="toggle-select" type="button" aria-label="Available (tap to select)" title="Available (tap to select)">☐</button>';
     
     // Create media element with lazy loading support
     const mediaHtml = isVideo
@@ -112,7 +114,6 @@ export function createResourceCard(resource, viewMode = 'grid') {
                 <div class="list-content">
                     <div class="list-header">
                         <h3 class="list-title">${title}</h3>
-                        ${statusBadge}
                     </div>
                     <div class="list-meta">
                         <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
@@ -140,7 +141,7 @@ export function createResourceCard(resource, viewMode = 'grid') {
             <div class="resource-card-compact">
                 <div class="compact-header">
                     <h3 class="compact-title">${title}</h3>
-                    ${statusBadge}
+                    ${statusToggleBtn}
                 </div>
                 <div class="compact-meta">
                     <span class="compact-type">${metadata.type}</span>
@@ -179,8 +180,8 @@ export function createResourceCard(resource, viewMode = 'grid') {
             return;
         }
         
-        // Toggle selection if clicking the status badge
-        if (e.target.closest('.status-badge')) {
+        // Toggle selection if clicking the right-end status button
+        if (e.target.closest('.resource-status-btn')) {
             e.stopPropagation();
             window.resourceBrowser?.toggleSelection(resource.filepath);
             return;
@@ -208,15 +209,19 @@ export function updateCardSelection(card, selected) {
     const selectBtn = card.querySelector('.btn-select');
     const icon = selectBtn?.querySelector('.icon');
     
-    // Update compact view status badge
-    const compactStatus = card.querySelector('.status-badge');
-    if (compactStatus) {
+    // Update compact view status toggle button (grid view)
+    const compactStatusBtn = card.querySelector('.resource-status-btn');
+    if (compactStatusBtn) {
         if (selected) {
-            compactStatus.className = 'status-badge status-selected';
-            compactStatus.textContent = 'Selected';
+            compactStatusBtn.className = 'resource-status-btn resource-status-btn--selected';
+            compactStatusBtn.textContent = '☑';
+            compactStatusBtn.setAttribute('aria-label', 'Selected (tap to unselect)');
+            compactStatusBtn.setAttribute('title', 'Selected (tap to unselect)');
         } else {
-            compactStatus.className = 'status-badge status-available';
-            compactStatus.textContent = 'Available';
+            compactStatusBtn.className = 'resource-status-btn resource-status-btn--available';
+            compactStatusBtn.textContent = '☐';
+            compactStatusBtn.setAttribute('aria-label', 'Available (tap to select)');
+            compactStatusBtn.setAttribute('title', 'Available (tap to select)');
         }
     }
     
