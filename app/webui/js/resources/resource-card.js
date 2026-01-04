@@ -188,9 +188,9 @@ export function createResourceCard(resource, viewMode = 'grid') {
     }
     
     // Add status badge click listener for selection
-    const statusBadge = card.querySelector('.status-badge');
-    if (statusBadge) {
-        statusBadge.addEventListener('click', (e) => {
+    const statusBadgeElement = card.querySelector('.status-badge');
+    if (statusBadgeElement) {
+        statusBadgeElement.addEventListener('click', (e) => {
             e.stopPropagation();
             window.resourceBrowser?.toggleSelection(resource.filepath);
         });
