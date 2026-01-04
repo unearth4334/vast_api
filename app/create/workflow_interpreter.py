@@ -390,8 +390,12 @@ class WorkflowInterpreter:
         for idx in action.widget_indices:
             if idx < len(widgets_values):
                 old_value = widgets_values[idx]
-                widgets_values[idx] = action.value
-                logger.debug(f"Node {action.node_id}[{idx}]: {old_value} -> {action.value}")
+                # For mxSlider nodes, ensure numeric values are floats
+                value = action.value
+                if action.node_type == "mxSlider" and isinstance(value, (int, float)):
+                    value = float(value)
+                widgets_values[idx] = value
+                logger.debug(f"Node {action.node_id}[{idx}]: {old_value} -> {value}")
             else:
                 logger.warning(f"Widget index {idx} out of range for node {action.node_id}")
     
