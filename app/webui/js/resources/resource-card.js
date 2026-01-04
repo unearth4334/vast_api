@@ -91,13 +91,11 @@ export function createResourceCard(resource, viewMode = 'grid') {
     const hasDeps = metadata.dependencies && metadata.dependencies.length > 0;
     const isVideo = isVideoFile(imagePath);
     
-    // Determine selection state
+    // Determine status badge
     const isSelected = window.resourceBrowser?.selectedResources?.has(resource.filepath);
-
-    // Secondary action button (right-end), intentionally large tap target
-    const statusToggleBtn = isSelected
-        ? '<button class="resource-status-btn resource-status-btn--selected" data-action="toggle-select" type="button" aria-label="Selected (tap to unselect)" title="Selected (tap to unselect)">☑</button>'
-        : '<button class="resource-status-btn resource-status-btn--available" data-action="toggle-select" type="button" aria-label="Available (tap to select)" title="Available (tap to select)">☐</button>';
+    const statusBadge = isSelected ? 
+        '<span class="status-badge status-selected">Selected</span>' : 
+        '<span class="status-badge status-available">Available</span>';
     
     // Create media element with lazy loading support
     const mediaHtml = isVideo
@@ -114,6 +112,7 @@ export function createResourceCard(resource, viewMode = 'grid') {
                 <div class="list-content">
                     <div class="list-header">
                         <h3 class="list-title">${title}</h3>
+                        ${statusBadge}
                     </div>
                     <div class="list-meta">
                         <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
@@ -131,64 +130,71 @@ export function createResourceCard(resource, viewMode = 'grid') {
             </div>
         `;
     } else {
-        // Grid view layout (tile design)
+        // Grid view layout (split tile design)
         // Create expanded media HTML with src for immediate loading when expanded
         const expandedMediaHtml = isVideo
             ? createVideoElement(imageUrl, false)
             : createImageElement(imageUrl, title, false);
         
         card.innerHTML = `
-            <div class="resource-card-compact">
-                <div class="compact-header">
-                    <h3 class="compact-title">${title}</h3>
-                    ${statusToggleBtn}
-                </div>
-                <div class="compact-meta">
-                    <span class="compact-type">${metadata.type}</span>
-                    <span class="compact-ecosystem">${metadata.ecosystem}</span>
-                </div>
-            </div>
-            <div class="resource-card-expanded" style="display: none;">
-                <div class="resource-card-header">
-                    ${expandedMediaHtml}
-                </div>
-                <div class="resource-card-body">
-                    <h3 class="resource-title">${title}</h3>
-                    <div class="resource-tags">
-                        <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
-                        <span class="tag tag-type">${metadata.type}</span>
+            <div class="resource-card-tile">
+                <div class="resource-card-compact">
+                    <div class="compact-header">
+                        <h3 class="compact-title">${title}</h3>
                     </div>
-                    ${shortDesc ? `<p class="resource-description">${shortDesc}</p>` : ''}
-                    ${sizeStr ? `<div class="resource-size">Size: ${sizeStr}</div>` : ''}
-                    ${hasDeps ? `<div class="resource-deps">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+                    <div class="compact-meta">
+                        <span class="compact-type">${metadata.type}</span>
+                        <span class="compact-ecosystem">${metadata.ecosystem}</span>
+                    </div>
                 </div>
-                <div class="resource-card-footer">
-                    <button class="btn-select" data-action="select">
-                        <span class="icon">☐</span> Select
-                    </button>
+                <div class="resource-card-expanded" style="display: none;">
+                    <div class="resource-card-header">
+                        ${expandedMediaHtml}
+                    </div>
+                    <div class="resource-card-body">
+                        <h3 class="resource-title">${title}</h3>
+                        <div class="resource-tags">
+                            <span class="tag tag-ecosystem">${metadata.ecosystem}</span>
+                            <span class="tag tag-type">${metadata.type}</span>
+                        </div>
+                        ${shortDesc ? `<p class="resource-description">${shortDesc}</p>` : ''}
+                        ${sizeStr ? `<div class="resource-size">Size: ${sizeStr}</div>` : ''}
+                        ${hasDeps ? `<div class="resource-deps">⚠ ${metadata.dependencies.length} dependencies</div>` : ''}
+                    </div>
+                    <div class="resource-card-footer">
+                        <button class="btn-select" data-action="select">
+                            <span class="icon">☐</span> Select
+                        </button>
+                    </div>
                 </div>
             </div>
+            ${statusBadge}
         `;
     }
     
-    // Add click listener to expand/collapse
-    card.addEventListener('click', (e) => {
-        // Don't expand if clicking the select button
-        if (e.target.closest('.btn-select')) {
+    // Add click listener to expand/collapse (only on tile)
+    const cardTile = card.querySelector('.resource-card-tile');
+    if (cardTile) {
+        cardTile.addEventListener('click', (e) => {
+            // Don't expand if clicking the select button
+            if (e.target.closest('.btn-select')) {
+                e.stopPropagation();
+                window.resourceBrowser?.toggleSelection(resource.filepath);
+                return;
+            }
+            
+            window.resourceBrowser?.expandCard(resource.filepath);
+        });
+    }
+    
+    // Add status badge click listener for selection
+    const statusBadge = card.querySelector('.status-badge');
+    if (statusBadge) {
+        statusBadge.addEventListener('click', (e) => {
             e.stopPropagation();
             window.resourceBrowser?.toggleSelection(resource.filepath);
-            return;
-        }
-        
-        // Toggle selection if clicking the right-end status button
-        if (e.target.closest('.resource-status-btn')) {
-            e.stopPropagation();
-            window.resourceBrowser?.toggleSelection(resource.filepath);
-            return;
-        }
-        
-        window.resourceBrowser?.expandCard(resource.filepath);
-    });
+        });
+    }
     
     // Add select button listener in expanded view
     const selectBtn = card.querySelector('.btn-select');
@@ -209,19 +215,15 @@ export function updateCardSelection(card, selected) {
     const selectBtn = card.querySelector('.btn-select');
     const icon = selectBtn?.querySelector('.icon');
     
-    // Update compact view status toggle button (grid view)
-    const compactStatusBtn = card.querySelector('.resource-status-btn');
-    if (compactStatusBtn) {
+    // Update compact view status badge
+    const compactStatus = card.querySelector('.status-badge');
+    if (compactStatus) {
         if (selected) {
-            compactStatusBtn.className = 'resource-status-btn resource-status-btn--selected';
-            compactStatusBtn.textContent = '☑';
-            compactStatusBtn.setAttribute('aria-label', 'Selected (tap to unselect)');
-            compactStatusBtn.setAttribute('title', 'Selected (tap to unselect)');
+            compactStatus.className = 'status-badge status-selected';
+            compactStatus.textContent = 'Selected';
         } else {
-            compactStatusBtn.className = 'resource-status-btn resource-status-btn--available';
-            compactStatusBtn.textContent = '☐';
-            compactStatusBtn.setAttribute('aria-label', 'Available (tap to select)');
-            compactStatusBtn.setAttribute('title', 'Available (tap to select)');
+            compactStatus.className = 'status-badge status-available';
+            compactStatus.textContent = 'Available';
         }
     }
     

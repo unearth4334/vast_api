@@ -629,29 +629,39 @@
     box-shadow: var(--glow-green);
 }
 
-/* Resource Card - Dark Neon */
+/* Resource Card - Dark Neon - Split Design */
 .resource-card {
-    background: var(--dark-bg-card);
-    border: 1px solid var(--dark-border);
-    border-radius: 12px;
-    overflow: hidden;
+    display: flex;
+    align-items: stretch;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
 }
 
-.resource-card:hover {
+.resource-card-tile {
+    flex: 1;
+    background: var(--dark-bg-card);
+    border: 1px solid var(--dark-border);
+    border-radius: 12px 0 0 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.resource-card-tile:hover {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 30px rgba(0, 245, 255, 0.15);
     border-color: rgba(0, 245, 255, 0.3);
     transform: translateY(-2px);
 }
 
-.resource-card.selected {
+.resource-card.selected .resource-card-tile {
     border-color: var(--neon-green);
     box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
 }
 
 .resource-card.expanded {
     grid-column: span 2;
+}
+
+.resource-card.expanded .resource-card-tile {
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 245, 255, 0.2);
 }
 
@@ -768,7 +778,7 @@
 
 .compact-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     margin-bottom: 8px;
 }
@@ -784,54 +794,48 @@
     white-space: nowrap;
 }
 
-/* Right-end secondary button (selection toggle) */
-.resource-status-btn {
-    background: var(--dark-bg-tertiary);
-    color: var(--dark-text-secondary);
-    border: 1px solid var(--dark-border);
-    border-radius: 8px;
-    padding: 0;
+.status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 12px 20px;
+    border-radius: 0 12px 12px 0;
+    text-transform: uppercase;
+    white-space: nowrap;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--dark-border);
+    border-left: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 100px;
     flex-shrink: 0;
-    margin-left: 10px;
-    font-size: 16px;
-    line-height: 1;
 }
 
-.resource-status-btn:hover {
-    transform: translateY(-1px);
+.status-badge:hover {
+    transform: translateX(2px) translateY(-2px);
 }
 
-.resource-status-btn:active {
-    transform: translateY(0);
-}
-
-.resource-status-btn--available {
-    background: rgba(0, 245, 255, 0.12);
+.status-badge.status-available {
+    background: rgba(0, 245, 255, 0.15);
     color: var(--neon-cyan);
-    border: 1px solid rgba(0, 245, 255, 0.3);
+    border-color: rgba(0, 245, 255, 0.3);
 }
 
-.resource-status-btn--available:hover {
-    background: rgba(0, 245, 255, 0.2);
-    box-shadow: 0 0 10px rgba(0, 245, 255, 0.25);
+.status-badge.status-available:hover {
+    background: rgba(0, 245, 255, 0.25);
+    box-shadow: 0 0 15px rgba(0, 245, 255, 0.4);
 }
 
-.resource-status-btn--selected {
-    background: rgba(0, 255, 136, 0.12);
+.status-badge.status-selected {
+    background: rgba(0, 255, 136, 0.15);
     color: var(--neon-green);
-    border: 1px solid rgba(0, 255, 136, 0.3);
+    border-color: rgba(0, 255, 136, 0.3);
 }
 
-.resource-status-btn--selected:hover {
-    background: rgba(0, 255, 136, 0.2);
-    box-shadow: 0 0 10px rgba(0, 255, 136, 0.25);
+.status-badge.status-selected:hover {
+    background: rgba(0, 255, 136, 0.25);
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
 }
 
 .compact-meta {
