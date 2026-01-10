@@ -89,27 +89,29 @@ async function saveCategoryPreference(category) {
         });
     } catch (error) {
         console.log('Could not save category to server:', error);
+    }
+}
 
-        function initCatalog() {
-            setupCategoryDropdown();
-            loadSavedCategory().finally(() => {
-                // Default if saved category is invalid
-                if (!CATEGORIES.some(c => c.key === catalogState.selectedCategory)) {
-                    catalogState.selectedCategory = 'checkpoints';
-                }
-                setCategoryLabel(catalogState.selectedCategory);
-                loadCategory(catalogState.selectedCategory);
-            });
+function initCatalog() {
+    setupCategoryDropdown();
+    loadSavedCategory().finally(() => {
+        // Default if saved category is invalid
+        if (!CATEGORIES.some(c => c.key === catalogState.selectedCategory)) {
+            catalogState.selectedCategory = 'checkpoints';
         }
+        setCategoryLabel(catalogState.selectedCategory);
+        loadCategory(catalogState.selectedCategory);
+    });
+}
 
-        function setCategoryLabel(categoryKey) {
-            const category = CATEGORIES.find(c => c.key === categoryKey);
-            const label = category ? category.label : categoryKey;
-            const el = document.getElementById('catalog-category-text');
-            if (el) el.textContent = `Category: ${label}`;
-        }
+function setCategoryLabel(categoryKey) {
+    const category = CATEGORIES.find(c => c.key === categoryKey);
+    const label = category ? category.label : categoryKey;
+    const el = document.getElementById('catalog-category-text');
+    if (el) el.textContent = `Category: ${label}`;
+}
 
-        function setupCategoryDropdown() {
+function setupCategoryDropdown() {
             const btn = document.getElementById('catalog-category-btn');
             const menu = document.getElementById('catalog-category-menu');
             if (!btn || !menu) return;
@@ -181,114 +183,114 @@ async function saveCategoryPreference(category) {
                 `;
                 const retry = document.getElementById('catalog-retry');
                 retry?.addEventListener('click', () => loadCategory(categoryKey));
-            } finally {
-                catalogState.loading = false;
-            }
+        } finally {
+            catalogState.loading = false;
         }
+    }
 
-        function updateCount(n) {
-            const el = document.getElementById('catalog-count');
-            if (el) el.textContent = `${n} item${n === 1 ? '' : 's'}`;
+    function updateCount(n) {
+        const el = document.getElementById('catalog-count');
+        if (el) el.textContent = `${n} item${n === 1 ? '' : 's'}`;
+    }
+
+    function startVideo(v) {
+        if (!v) return;
+        if (!catalogState.playing.has(v) && catalogState.playing.size >= catalogState.maxConcurrentVideos) {
+            const first = catalogState.playing.values().next().value;
+            stopVideo(first);
         }
+        v.muted = true;
+        v.playsInline = true;
+        v.setAttribute('playsinline', '');
+        const p = v.play();
+        if (p?.catch) p.catch(() => {});
+        catalogState.playing.add(v);
+    }
 
-        function startVideo(v) {
-            if (!v) return;
-            if (!catalogState.playing.has(v) && catalogState.playing.size >= catalogState.maxConcurrentVideos) {
-                const first = catalogState.playing.values().next().value;
-                stopVideo(first);
-            }
-            v.muted = true;
-            v.playsInline = true;
-            v.setAttribute('playsinline', '');
-            const p = v.play();
-            if (p?.catch) p.catch(() => {});
-            catalogState.playing.add(v);
-        }
+    function stopVideo(v) {
+        if (!v) return;
+        try { v.pause(); } catch {}
+        catalogState.playing.delete(v);
+    }
 
-        function stopVideo(v) {
-            if (!v) return;
-            try { v.pause(); } catch {}
-            catalogState.playing.delete(v);
-        }
+    function setupMediaObserver() {
+        if (catalogState.mediaObserver) catalogState.mediaObserver.disconnect();
 
-        function setupMediaObserver() {
-            if (catalogState.mediaObserver) catalogState.mediaObserver.disconnect();
+        catalogState.mediaObserver = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                const mediaBox = entry.target;
+                const card = mediaBox.closest('.tv-card');
+                const ctx = card?._ctx;
+                if (!ctx) continue;
 
-            catalogState.mediaObserver = new IntersectionObserver((entries) => {
-                for (const entry of entries) {
-                    const mediaBox = entry.target;
-                    const card = mediaBox.closest('.tv-card');
-                    const ctx = card?._ctx;
-                    if (!ctx) continue;
-
-                    if (entry.isIntersecting) {
-                        if (!ctx.mediaAttached) {
-                            if (ctx.isVideo) {
-                                const v = mediaBox.querySelector('video');
-                                if (v) {
-                                    v.preload = 'metadata';
-                                    v.src = ctx.mediaUrl || '';
-                                    v.load();
-                                    v.addEventListener('loadedmetadata', () => startVideo(v), { once: true });
-                                }
-                            } else {
-                                const img = mediaBox.querySelector('img');
-                                if (img) img.src = ctx.mediaUrl || '';
-                            }
-                            ctx.mediaAttached = true;
-                        } else if (ctx.isVideo) {
+                if (entry.isIntersecting) {
+                    if (!ctx.mediaAttached) {
+                        if (ctx.isVideo) {
                             const v = mediaBox.querySelector('video');
-                            if (v && v.paused) startVideo(v);
-                        }
-                    } else {
-                        if (ctx.mediaAttached) {
-                            if (ctx.isVideo) {
-                                const v = mediaBox.querySelector('video');
-                                stopVideo(v);
-                                if (v) {
-                                    v.removeAttribute('src');
-                                    v.load();
-                                }
-                            } else {
-                                const img = mediaBox.querySelector('img');
-                                img?.removeAttribute('src');
+                            if (v) {
+                                v.preload = 'metadata';
+                                v.src = ctx.mediaUrl || '';
+                                v.load();
+                                v.addEventListener('loadedmetadata', () => startVideo(v), { once: true });
                             }
-                            ctx.mediaAttached = false;
+                        } else {
+                            const img = mediaBox.querySelector('img');
+                            if (img) img.src = ctx.mediaUrl || '';
                         }
+                        ctx.mediaAttached = true;
+                    } else if (ctx.isVideo) {
+                        const v = mediaBox.querySelector('video');
+                        if (v && v.paused) startVideo(v);
+                    }
+                } else {
+                    if (ctx.mediaAttached) {
+                        if (ctx.isVideo) {
+                            const v = mediaBox.querySelector('video');
+                            stopVideo(v);
+                            if (v) {
+                                v.removeAttribute('src');
+                                v.load();
+                            }
+                        } else {
+                            const img = mediaBox.querySelector('img');
+                            img?.removeAttribute('src');
+                        }
+                        ctx.mediaAttached = false;
                     }
                 }
-            }, { root: null, rootMargin: '600px 0px', threshold: 0.01 });
+            }
+        }, { root: null, rootMargin: '600px 0px', threshold: 0.01 });
+    }
+
+    function renderTileGrid(items) {
+        const grid = document.getElementById('catalog-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        if (!items.length) {
+            grid.innerHTML = `
+                <div class="catalog-empty">
+                    <div class="empty-icon">📭</div>
+                    <h3>No items found</h3>
+                    <p>No markdown files were found for this category.</p>
+                </div>
+            `;
+            return;
         }
 
-        function renderTileGrid(items) {
-            const grid = document.getElementById('catalog-grid');
-            if (!grid) return;
-            grid.innerHTML = '';
+        setupMediaObserver();
 
-            if (!items.length) {
-                grid.innerHTML = `
-                    <div class="catalog-empty">
-                        <div class="empty-icon">📭</div>
-                        <h3>No items found</h3>
-                        <p>No markdown files were found for this category.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            setupMediaObserver();
-
-            const frag = document.createDocumentFragment();
-            for (const item of items) {
-                frag.appendChild(makeCard(item));
-            }
-            grid.appendChild(frag);
+        const frag = document.createDocumentFragment();
+        for (const item of items) {
+            frag.appendChild(makeCard(item));
         }
+        grid.appendChild(frag);
+    }
 
-        function makeCard(item) {
-            const a = document.createElement('a');
-            a.className = 'tv-cardlink';
-            a.href = '#';
+function makeCard(item) {
+        const a = document.createElement('a');
+        a.className = 'tv-cardlink';
+        a.href = '#';
 
             const title = item.title || item.file || 'Untitled';
             const subtitle = item.subtitle || '';
@@ -357,168 +359,9 @@ async function saveCategoryPreference(category) {
             }
         }
 
-        function closeAssetDetailModal() {
-            const modal = document.getElementById('assetDetailModal');
-            if (modal) modal.style.display = 'none';
-        }
-
-        window.closeAssetDetailModal = closeAssetDetailModal;
-            </div>
-        </div>
-    `;
-}
-
-/**
- * Show asset detail modal
- */
-async function showAssetDetail(asset) {
-    const modal = document.getElementById('assetDetailModal');
-    const title = document.getElementById('assetModalTitle');
-    const content = document.getElementById('assetModalContent');
-    
-    const metadata = asset.metadata || {};
-    const assetTitle = metadata.title || asset.filename || 'Asset Details';
-    
-    title.textContent = assetTitle;
-    
-    // Show loading state
-    content.innerHTML = `
-        <div class="loading-container">
-            <div class="loading-spinner"></div>
-            <p>Loading details...</p>
-        </div>
-    `;
-    
-    modal.style.display = 'flex';
-    
-    try {
-        // Fetch full asset details including markdown description
-        const response = await fetch(`/resources/get/${encodeURIComponent(asset.filepath)}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const fullAsset = await response.json();
-        
-        // Render asset details
-        renderAssetDetail(fullAsset);
-        
-    } catch (error) {
-        console.error('Error loading asset details:', error);
-        content.innerHTML = `
-            <div class="error-container">
-                <div class="error-icon">⚠️</div>
-                <h3>Failed to load details</h3>
-                <p>${error.message}</p>
-            </div>
-        `;
+    function closeAssetDetailModal() {
+        const modal = document.getElementById('assetDetailModal');
+        if (modal) modal.style.display = 'none';
     }
-}
 
-/**
- * Render asset detail in modal
- */
-function renderAssetDetail(asset) {
-    const content = document.getElementById('assetModalContent');
-    const metadata = asset.metadata || {};
-    
-    // Format metadata display
-    const metadataHTML = `
-        <div class="asset-metadata">
-            ${metadata.type ? `<div class="meta-item"><strong>Type:</strong> ${escapeHtml(metadata.type)}</div>` : ''}
-            ${metadata.ecosystem ? `<div class="meta-item"><strong>Ecosystem:</strong> ${escapeHtml(metadata.ecosystem)}</div>` : ''}
-            ${metadata.basemodel ? `<div class="meta-item"><strong>Base Model:</strong> ${escapeHtml(metadata.basemodel)}</div>` : ''}
-            ${metadata.version ? `<div class="meta-item"><strong>Version:</strong> ${escapeHtml(metadata.version)}</div>` : ''}
-            ${metadata.size ? `<div class="meta-item"><strong>Size:</strong> ${formatSize(metadata.size)}</div>` : ''}
-            ${metadata.creator ? `<div class="meta-item"><strong>Creator:</strong> ${escapeHtml(metadata.creator)}</div>` : ''}
-            ${metadata.license ? `<div class="meta-item"><strong>License:</strong> ${escapeHtml(metadata.license)}</div>` : ''}
-            ${metadata.published ? `<div class="meta-item"><strong>Published:</strong> ${metadata.published}</div>` : ''}
-        </div>
-    `;
-    
-    // Format description (convert markdown to basic HTML)
-    const descriptionHTML = asset.description ? 
-        `<div class="asset-description">${formatMarkdown(asset.description)}</div>` : 
-        '<p>No description available.</p>';
-    
-    // Show download command
-    const downloadHTML = asset.download_command ? 
-        `<div class="asset-download">
-            <h4>Download Command</h4>
-            <pre class="download-command"><code>${escapeHtml(asset.download_command)}</code></pre>
-        </div>` : '';
-    
-    content.innerHTML = `
-        ${metadataHTML}
-        ${descriptionHTML}
-        ${downloadHTML}
-    `;
-}
-
-/**
- * Close asset detail modal
- */
-function closeAssetDetailModal() {
-    const modal = document.getElementById('assetDetailModal');
-    modal.style.display = 'none';
-}
-
-// Make function globally available
-window.closeAssetDetailModal = closeAssetDetailModal;
-
-/**
- * Format file size in human-readable format
- */
-function formatSize(bytes) {
-    if (!bytes || bytes === 0) return '';
-    
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const k = 1024;
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${units[i]}`;
-}
-
-/**
- * Basic markdown to HTML conversion
- */
-function formatMarkdown(markdown) {
-    let html = markdown;
-    
-    // Convert headers
-    html = html.replace(/^### (.*$)/gim, '<h4>$1</h4>');
-    html = html.replace(/^## (.*$)/gim, '<h3>$1</h3>');
-    html = html.replace(/^# (.*$)/gim, '<h2>$1</h2>');
-    
-    // Convert lists
-    html = html.replace(/^\- (.*$)/gim, '<li>$1</li>');
-    html = html.replace(/(<li>[\s\S]*?<\/li>)/gim, '<ul>$1</ul>');
-    
-    // Convert bold
-    html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
-    
-    // Convert italic
-    html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
-    
-    // Convert inline code
-    html = html.replace(/`(.*?)`/gim, '<code>$1</code>');
-    
-    // Convert links
-    html = html.replace(/\[(.*?)\]\((.*?)\)/gim, '<a href="$2" target="_blank">$1</a>');
-    
-    // Convert line breaks
-    html = html.replace(/\n\n/g, '</p><p>');
-    html = `<p>${html}</p>`;
-    
-    return html;
-}
-
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+    window.closeAssetDetailModal = closeAssetDetailModal;
