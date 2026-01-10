@@ -5143,7 +5143,11 @@ def catalog_list():
             is_video = False
             if media:
                 is_video = _is_video_path(media)
-                media_url = f"/catalog/media/{category_key}/" + media.lstrip('/').replace('\\', '/')
+                # Strip category dirname prefix if media path already contains it
+                media_normalized = media.lstrip('/').replace('\\', '/')
+                if media_normalized.startswith(category_dirname + '/'):
+                    media_normalized = media_normalized[len(category_dirname) + 1:]
+                media_url = f"/catalog/media/{category_key}/{media_normalized}"
 
             st = os.stat(abs_md_path)
             items.append({
