@@ -5145,8 +5145,17 @@ def catalog_list():
                 is_video = _is_video_path(media)
                 # Strip category dirname prefix if media path already contains it
                 media_normalized = media.lstrip('/').replace('\\', '/')
-                if media_normalized.startswith(category_dirname + '/'):
-                    media_normalized = media_normalized[len(category_dirname) + 1:]
+                
+                # Check for both "Checkpoints/" and "Visual/Checkpoints/" prefixes
+                prefixes_to_strip = [
+                    f"Visual/{category_dirname}/",
+                    f"{category_dirname}/"
+                ]
+                for prefix in prefixes_to_strip:
+                    if media_normalized.startswith(prefix):
+                        media_normalized = media_normalized[len(prefix):]
+                        break
+                
                 media_url = f"/catalog/media/{category_key}/{media_normalized}"
 
             st = os.stat(abs_md_path)
