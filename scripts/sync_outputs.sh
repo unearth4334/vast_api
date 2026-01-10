@@ -155,12 +155,13 @@ XMP_SCRIPT="${XMP_SCRIPT:-$DEFAULT_XMP_SCRIPT}"
 VENV_PY="$XMP_VENV/bin/python"
 
 # Safer rsync flags for QNAP/eCryptfs:
-# - Do NOT preserve perms/owner/group/times; those caused "Bad address (14)" in the past
+# - Do NOT preserve perms/owner/group; those caused "Bad address (14)" in the past
+# - Preserve modification times (--times/-t) to retain original file dates
 # - Use --itemize-changes so we can detect newly-created files (>f+++++++++)
 # - Add --stats so summary lines are guaranteed
 # - Avoid --human-readable so bytes are raw numbers for easy parsing
 # NOTE: --delete removed - we only delete on source (remote), never destination (NAS)
-RSYNC_FLAGS=(-rltD --no-perms --no-owner --no-group --omit-dir-times --no-times --info=stats2 --itemize-changes --stats)
+RSYNC_FLAGS=(-rltD --no-perms --no-owner --no-group --omit-dir-times --info=stats2 --itemize-changes --stats)
 if rsync --help 2>&1 | grep -q -- '--mkpath'; then
   RSYNC_FLAGS+=(--mkpath)
 fi
