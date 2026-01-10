@@ -22,30 +22,52 @@
         </div>
         
         <div id="catalog-container">
-            <!-- Toolbar -->
-            <div class="vastai-connection-toolbar catalog-toolbar">
-                <div class="toolbar-dropdown-container" id="catalog-category-container">
-                    <button id="catalog-category-btn" class="toolbar-btn toolbar-instance-btn" type="button" aria-haspopup="true" aria-expanded="false">
-                        <span id="catalog-category-text" class="toolbar-instance-text">Category: Checkpoints</span>
-                        <span class="toolbar-btn-text">▾</span>
-                    </button>
-                    <div id="catalog-category-menu" class="toolbar-dropdown" style="display: none;">
-                        <div class="toolbar-dropdown-content">
-                            <div class="catalog-category-list" role="menu">
-                                <button class="catalog-category-item" type="button" role="menuitem" data-category="checkpoints">Checkpoints</button>
-                                <button class="catalog-category-item" type="button" role="menuitem" data-category="loras">LoRAs</button>
-                                <button class="catalog-category-item" type="button" role="menuitem" data-category="encoders">Encoders</button>
-                                <button class="catalog-category-item" type="button" role="menuitem" data-category="embeddings">Embeddings</button>
-                                <button class="catalog-category-item" type="button" role="menuitem" data-category="upscalers">Upscalers</button>
-                                <button class="catalog-category-item" type="button" role="menuitem" data-category="adetailers">ADetailers</button>
-                                <button class="catalog-category-item" type="button" role="menuitem" data-category="workflows">Workflows</button>
+            <!-- TileView-style Filter Panel -->
+            <div class="callout tv-filter-callout" data-callout="filter">
+                <div class="callout-title">
+                    <div class="callout-icon">🔎</div>
+                    <div class="callout-title-inner">Asset Filters</div>
+                    <div class="tv-callout-actions">
+                        <button id="tv-apply" class="tv-btn">Apply</button>
+                        <button id="tv-reset" class="tv-btn tv-btn-secondary">Reset</button>
+                    </div>
+                </div>
+                <div class="callout-content">
+                    <div class="tv-filterbar" id="tv-filterbar">
+                        <!-- Category Selection -->
+                        <div class="tv-filtergroup">
+                            <strong>Category:</strong>
+                            <div class="tv-filteroptions" id="tv-category-options"></div>
+                        </div>
+                        
+                        <!-- Sort Controls -->
+                        <div class="tv-filtergroup">
+                            <strong>Sort By:</strong>
+                            <div class="tv-filteroptions">
+                                <select id="tv-sort-field" class="tv-sort-select">
+                                    <option value="title" selected>Title</option>
+                                    <option value="date">Date</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="tv-filtergroup">
+                            <strong>Sort Order:</strong>
+                            <div class="tv-filteroptions">
+                                <select id="tv-sort-order" class="tv-sort-select">
+                                    <option value="asc" selected>A-Z</option>
+                                    <option value="desc">Z-A</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Stats Display -->
+                        <div class="tv-filtergroup">
+                            <strong>Items:</strong>
+                            <div class="tv-filteroptions">
+                                <span id="catalog-count" class="catalog-count">Loading…</span>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="catalog-stats">
-                    <span id="catalog-count" class="catalog-count">Loading…</span>
                 </div>
             </div>
             

@@ -13,6 +13,158 @@
     min-height: 100vh;
 }
 
+/* TileView Filter Callout */
+.tv-filter-callout {
+    margin-bottom: 24px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.callout-title {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--background-modifier-hover);
+    border-bottom: 1px solid var(--background-modifier-border);
+    gap: 10px;
+}
+
+.callout-icon {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.callout-title-inner {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-normal);
+}
+
+.tv-callout-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+}
+
+.tv-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--color-accent);
+    background: var(--color-accent);
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.tv-btn:hover {
+    filter: brightness(1.1);
+}
+
+.tv-btn:active {
+    transform: translateY(1px);
+}
+
+.tv-btn-secondary {
+    background: transparent;
+    color: var(--color-accent);
+}
+
+.tv-btn-secondary:hover {
+    background: var(--background-modifier-hover);
+}
+
+.callout-content {
+    padding: 16px;
+}
+
+.tv-filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.tv-filtergroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 150px;
+}
+
+.tv-filtergroup strong {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tv-filteroptions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tv-filteroption {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-normal);
+    cursor: pointer;
+    user-select: none;
+}
+
+.tv-filteroption input[type="checkbox"],
+.tv-filteroption input[type="radio"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-accent);
+}
+
+.tv-selection-links {
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+.tv-select-link {
+    color: var(--color-accent);
+    cursor: pointer;
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+.tv-select-link:hover {
+    text-decoration: none;
+    opacity: 0.8;
+}
+
+.tv-link-separator {
+    color: var(--text-muted);
+    font-weight: normal;
+}
+
+.tv-sort-select {
+    padding: 6px 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    min-width: 120px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.tv-sort-select:focus {
+    outline: 1px solid var(--color-accent);
+    outline-offset: 1px;
+}
+
 /* Catalog Header */
 .catalog-header {
     margin-bottom: 24px;

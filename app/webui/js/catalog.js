@@ -1,7 +1,9 @@
 /**
- * Asset Catalog (TileView-style)
+ * Asset Catalog (TileView-style with Callout Filters)
  *
- * - Category dropdown (toolbar-btn / toolbar-dropdown)
+ * - Category selection via radio buttons in callout filter panel
+ * - Apply/Reset buttons for filter changes
+ * - Sort controls (field and order)
  * - Tile grid based on TileView.md concepts
  * - Click tile opens rendered markdown in a popover
  */
@@ -19,10 +21,13 @@ const CATEGORIES = [
 const catalogState = {
     selectedCategory: 'checkpoints',
     items: [],
+    allCards: [],
     loading: false,
     mediaObserver: null,
     playing: new Set(),
-    maxConcurrentVideos: 2
+    maxConcurrentVideos: 2,
+    sortField: 'title',
+    sortOrder: 'asc'
 };
 
 /**
@@ -46,28 +51,125 @@ function cleanupCatalog() {
     catalogState.playing.clear();
 }
 
+function initCatalog() {
+    setupCategoryFilters();
+    setupSortControls();
+    setupApplyResetButtons();
+    loadSavedCategory().finally(() => {
+        // Default if saved category is invalid
+        if (!CATEGORIES.some(c => c.key === catalogState.selectedCategory)) {
+            catalogState.selectedCategory = 'checkpoints';
+        }
+        loadCategory(catalogState.selectedCategory);
+    });
+}
+
+/**
+ * Setup category filter options (radio buttons)
+ */
+function setupCategoryFilters() {
+    const container = document.getElementById('tv-category-options');
+    if (!container) return;
+
+    container.innerHTML = CATEGORIES.map(cat => `
+        <label class="tv-filteroption">
+            <input type="radio" name="catalog-category" value="${cat.key}" 
+                   ${cat.key === catalogState.selectedCategory ? 'checked' : ''}>
+            ${cat.label}
+        </label>
+    `).join('') + `
+        <div class="tv-selection-links">
+            <span class="tv-select-link" data-action="first">first</span>
+        </div>
+    `;
+
+    // Add click handler for "first" link
+    const firstLink = container.querySelector('[data-action="first"]');
+    if (firstLink) {
+        firstLink.addEventListener('click', () => {
+            const firstRadio = container.querySelector('input[type="radio"]');
+            if (firstRadio) firstRadio.checked = true;
+        });
+    }
+}
+
+/**
+ * Setup sort controls
+ */
+function setupSortControls() {
+    const sortField = document.getElementById('tv-sort-field');
+    const sortOrder = document.getElementById('tv-sort-order');
+
+    if (sortField) {
+        sortField.value = catalogState.sortField;
+        sortField.addEventListener('change', () => {
+            catalogState.sortField = sortField.value;
+            reSortAndRender();
+        });
+    }
+
+    if (sortOrder) {
+        sortOrder.value = catalogState.sortOrder;
+        sortOrder.addEventListener('change', () => {
+            catalogState.sortOrder = sortOrder.value;
+            reSortAndRender();
+        });
+    }
+}
+
+/**
+ * Setup Apply and Reset buttons
+ */
+function setupApplyResetButtons() {
+    const applyBtn = document.getElementById('tv-apply');
+    const resetBtn = document.getElementById('tv-reset');
+
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            const selected = document.querySelector('input[name="catalog-category"]:checked');
+            if (selected && selected.value !== catalogState.selectedCategory) {
+                catalogState.selectedCategory = selected.value;
+                saveCategoryPreference(catalogState.selectedCategory);
+                loadCategory(catalogState.selectedCategory);
+            }
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            // Reset to first category
+            catalogState.selectedCategory = CATEGORIES[0].key;
+            const firstRadio = document.querySelector('input[name="catalog-category"]');
+            if (firstRadio) firstRadio.checked = true;
+            
+            // Reset sort
+            catalogState.sortField = 'title';
+            catalogState.sortOrder = 'asc';
+            const sortField = document.getElementById('tv-sort-field');
+            const sortOrder = document.getElementById('tv-sort-order');
+            if (sortField) sortField.value = 'title';
+            if (sortOrder) sortOrder.value = 'asc';
+
+            saveCategoryPreference(catalogState.selectedCategory);
+            loadCategory(catalogState.selectedCategory);
+        });
+    }
+}
+
 /**
  * Load saved category preference
  */
 async function loadSavedCategory() {
     try {
-        // Try to load from server first
-        const response = await fetch('/catalog/state');
-        if (response.ok) {
-            const state = await response.json();
-            if (state.selectedCategory) {
-                catalogState.selectedCategory = state.selectedCategory;
-                setCategoryLabel(catalogState.selectedCategory);
-            }
-        }
-    } catch (error) {
-        console.log('Could not load saved category from server, using localStorage');
-        // Fallback to localStorage
         const savedCategory = localStorage.getItem('catalog-selected-category');
         if (savedCategory) {
             catalogState.selectedCategory = savedCategory;
-            setCategoryLabel(catalogState.selectedCategory);
+            // Update the radio button
+            const radio = document.querySelector(`input[name="catalog-category"][value="${savedCategory}"]`);
+            if (radio) radio.checked = true;
         }
+    } catch (error) {
+        console.log('Could not load saved category:', error);
     }
 }
 
@@ -77,121 +179,88 @@ async function loadSavedCategory() {
 async function saveCategoryPreference(category) {
     // Save to localStorage
     localStorage.setItem('catalog-selected-category', category);
-    
-    // Try to save to server
+}
+
+async function loadCategory(categoryKey) {
+    if (catalogState.loading) return;
+    catalogState.loading = true;
+
+    const grid = document.getElementById('catalog-grid');
+    if (!grid) return;
+    grid.innerHTML = `
+        <div class="catalog-loading">
+            <div class="loading-spinner"></div>
+            <p>Loading assets…</p>
+        </div>
+    `;
+
     try {
-        await fetch('/catalog/state', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ selectedCategory: category })
-        });
-    } catch (error) {
-        console.log('Could not save category to server:', error);
+        const resp = await fetch(`/catalog/list?category=${encodeURIComponent(categoryKey)}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message || 'Failed to load');
+        catalogState.items = data.items || [];
+        updateCount(catalogState.items.length);
+        catalogState.allCards = catalogState.items.map(item => makeCard(item));
+        reSortAndRender();
+    } catch (e) {
+        console.error('Catalog load error:', e);
+        updateCount(0);
+        grid.innerHTML = `
+            <div class="catalog-error">
+                <div class="error-icon">⚠️</div>
+                <h3>Failed to load catalog</h3>
+                <p>${String(e.message || e)}</p>
+                <button class="retry-button" id="catalog-retry">Retry</button>
+            </div>
+        `;
+        const retry = document.getElementById('catalog-retry');
+        retry?.addEventListener('click', () => loadCategory(categoryKey));
+    } finally {
+        catalogState.loading = false;
     }
 }
 
-function initCatalog() {
-    setupCategoryDropdown();
-    loadSavedCategory().finally(() => {
-        // Default if saved category is invalid
-        if (!CATEGORIES.some(c => c.key === catalogState.selectedCategory)) {
-            catalogState.selectedCategory = 'checkpoints';
+function updateCount(n) {
+    const el = document.getElementById('catalog-count');
+    if (el) el.textContent = `${n} item${n === 1 ? '' : 's'}`;
+}
+
+/**
+ * Sort cards and re-render grid
+ */
+function reSortAndRender() {
+    const grid = document.getElementById('catalog-grid');
+    if (!grid) return;
+
+    // Sort cards
+    const sorted = catalogState.allCards.slice().sort((a, b) => {
+        const aItem = a._item;
+        const bItem = b._item;
+        
+        let aVal, bVal;
+        if (catalogState.sortField === 'title') {
+            aVal = aItem.title || '';
+            bVal = bItem.title || '';
+            const comparison = aVal.localeCompare(bVal);
+            return catalogState.sortOrder === 'desc' ? -comparison : comparison;
+        } else if (catalogState.sortField === 'date') {
+            aVal = aItem.mtime || 0;
+            bVal = bItem.mtime || 0;
+            return catalogState.sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
         }
-        setCategoryLabel(catalogState.selectedCategory);
-        loadCategory(catalogState.selectedCategory);
+        return 0;
     });
+
+    // Clear and render
+    grid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    sorted.forEach(card => frag.appendChild(card));
+    grid.appendChild(frag);
+
+    // Setup media observer
+    setupMediaObserver();
 }
-
-function setCategoryLabel(categoryKey) {
-    const category = CATEGORIES.find(c => c.key === categoryKey);
-    const label = category ? category.label : categoryKey;
-    const el = document.getElementById('catalog-category-text');
-    if (el) el.textContent = `Category: ${label}`;
-}
-
-function setupCategoryDropdown() {
-            const btn = document.getElementById('catalog-category-btn');
-            const menu = document.getElementById('catalog-category-menu');
-            if (!btn || !menu) return;
-
-            const toggleMenu = (show) => {
-                const isOpen = show ?? (menu.style.display === 'none');
-                menu.style.display = isOpen ? 'block' : 'none';
-                btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-            };
-
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                toggleMenu();
-            });
-
-            document.addEventListener('click', () => toggleMenu(false));
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    toggleMenu(false);
-                    closeAssetDetailModal();
-                }
-            });
-
-            menu.addEventListener('click', (e) => {
-                const target = e.target;
-                if (!(target instanceof HTMLElement)) return;
-                const key = target.dataset.category;
-                if (!key) return;
-                catalogState.selectedCategory = key;
-                saveCategoryPreference(key);
-                setCategoryLabel(key);
-                toggleMenu(false);
-                loadCategory(key);
-            });
-        }
-
-        async function loadCategory(categoryKey) {
-            if (catalogState.loading) return;
-            catalogState.loading = true;
-
-            const grid = document.getElementById('catalog-grid');
-            if (!grid) return;
-            grid.innerHTML = `
-                <div class="catalog-loading">
-                    <div class="loading-spinner"></div>
-                    <p>Loading assets…</p>
-                </div>
-            `;
-
-            try {
-                const resp = await fetch(`/catalog/list?category=${encodeURIComponent(categoryKey)}`);
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const data = await resp.json();
-                if (!data.success) throw new Error(data.message || 'Failed to load');
-                catalogState.items = data.items || [];
-                updateCount(catalogState.items.length);
-                renderTileGrid(catalogState.items);
-            } catch (e) {
-                console.error('Catalog load error:', e);
-                updateCount(0);
-                grid.innerHTML = `
-                    <div class="catalog-error">
-                        <div class="error-icon">⚠️</div>
-                        <h3>Failed to load catalog</h3>
-                        <p>${String(e.message || e)}</p>
-                        <button class="retry-button" id="catalog-retry">Retry</button>
-                    </div>
-                `;
-                const retry = document.getElementById('catalog-retry');
-                retry?.addEventListener('click', () => loadCategory(categoryKey));
-        } finally {
-            catalogState.loading = false;
-        }
-    }
-
-    function updateCount(n) {
-        const el = document.getElementById('catalog-count');
-        if (el) el.textContent = `${n} item${n === 1 ? '' : 's'}`;
-    }
 
     function startVideo(v) {
         if (!v) return;
@@ -262,40 +331,16 @@ function setupCategoryDropdown() {
         }, { root: null, rootMargin: '600px 0px', threshold: 0.01 });
     }
 
-    function renderTileGrid(items) {
-        const grid = document.getElementById('catalog-grid');
-        if (!grid) return;
-        grid.innerHTML = '';
-
-        if (!items.length) {
-            grid.innerHTML = `
-                <div class="catalog-empty">
-                    <div class="empty-icon">📭</div>
-                    <h3>No items found</h3>
-                    <p>No markdown files were found for this category.</p>
-                </div>
-            `;
-            return;
-        }
-
-        setupMediaObserver();
-
-        const frag = document.createDocumentFragment();
-        for (const item of items) {
-            frag.appendChild(makeCard(item));
-        }
-        grid.appendChild(frag);
-    }
-
 function makeCard(item) {
-        const a = document.createElement('a');
-        a.className = 'tv-cardlink';
-        a.href = '#';
+    const a = document.createElement('a');
+    a.className = 'tv-cardlink';
+    a.href = '#';
+    a._item = item;  // Store item reference for sorting
 
-            const title = item.title || item.file || 'Untitled';
-            const subtitle = item.subtitle || '';
-            const mediaUrl = item.mediaUrl || '';
-            const isVideo = !!item.isVideo;
+    const title = item.title || item.file || 'Untitled';
+    const subtitle = item.subtitle || '';
+    const mediaUrl = item.mediaUrl || '';
+    const isVideo = !!item.isVideo;
 
             a.innerHTML = `
                 <div class="tv-card">
