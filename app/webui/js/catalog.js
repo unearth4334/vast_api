@@ -201,6 +201,10 @@ async function loadCategory(categoryKey) {
         if (!data.success) throw new Error(data.message || 'Failed to load');
         catalogState.items = data.items || [];
         updateCount(catalogState.items.length);
+        
+        // Setup media observer before creating cards
+        setupMediaObserver();
+        
         catalogState.allCards = catalogState.items.map(item => makeCard(item));
         reSortAndRender();
     } catch (e) {
@@ -257,9 +261,6 @@ function reSortAndRender() {
     const frag = document.createDocumentFragment();
     sorted.forEach(card => frag.appendChild(card));
     grid.appendChild(frag);
-
-    // Setup media observer
-    setupMediaObserver();
 }
 
     function startVideo(v) {
