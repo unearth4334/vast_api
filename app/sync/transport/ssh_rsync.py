@@ -128,6 +128,7 @@ class SSHRsyncAdapter(TransportAdapter):
         cmd = [
             "rsync",
             "-rlD",  # recursive, links, devices
+            "--times",  # preserve modification times (retain original file dates)
             "--compress",
             "--compress-level=6",
             "--whole-file",
@@ -137,7 +138,7 @@ class SSHRsyncAdapter(TransportAdapter):
             "--info=stats2",
             "--itemize-changes",
             "--no-perms", "--no-owner", "--no-group",
-            "--no-times", "--omit-dir-times",
+            "--omit-dir-times",
             "--partial",
             "--partial-dir=.rsync-tmp",
             "-e", f"ssh -p {self.port} -i {self.ssh_key} -o StrictHostKeyChecking=no",
