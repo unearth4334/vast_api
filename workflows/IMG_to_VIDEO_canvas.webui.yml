@@ -9,7 +9,7 @@ tags:
   - 14B-model
 
 # Workflow JSON file reference (canvas format)
-workflow_file: "IMG_to_VIDEO_canvas.json"
+workflow_file: "outputs/workflows/WAN2.2_IMG_to_VIDEO_Base_47e91030.json"
 base_hash: "47e91030"  # Original workflow hash for validation
 
 # Node mapping for programmatic workflow modification
@@ -34,7 +34,7 @@ node_mapping:
     node_id: 85
     node_type: "mxSlider"
     node_title: "CFG"
-    widget_indices: [0, 1]
+    widget_indices: [1]  # Only set index 1 (max value), preserve min at index 0
     action_type: "modify_widget"
     
   frame_rate:
@@ -114,7 +114,7 @@ node_mapping:
     save_node_id: 433  # VHS_VideoCombine node that needs save_output toggled
   
   save_upscaled_output:
-    node_ids: [385, 419]
+    node_ids: [385, 418, 419, 422, 423]
     node_type: "Standalone Upscaler Pipeline (Upscaler + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
@@ -122,7 +122,7 @@ node_mapping:
     save_node_id: 419  # VHS_VideoCombine node that needs save_output toggled
     
   save_upint_output:
-    node_ids: [440, 441, 442, 437, 443]
+    node_ids: [440, 441, 442, 437, 443, 438, 439]
     node_type: "UPINT Pipeline (RIFE + Upscaler + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
