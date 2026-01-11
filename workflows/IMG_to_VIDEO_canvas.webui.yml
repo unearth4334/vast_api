@@ -98,7 +98,7 @@ node_mapping:
     
   # === FEATURE TOGGLES (mode-based) ===
   save_last_frame:
-    node_ids: [447]
+    node_ids: [444, 447]
     node_type: "SaveImage"
     action_type: "toggle_node_mode"
     enabled_mode: 0
