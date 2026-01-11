@@ -4428,15 +4428,24 @@ echo "=== Step 5: Install Playwright Chromium browser ==="
 echo "✓ Chromium browser installed"
 
 echo ""
-echo "=== Step 6: Verify installation ==="
+echo "=== Step 6: Install Playwright system dependencies ==="
+./.venv/bin/python -m playwright install-deps chromium
+echo "✓ Playwright system dependencies installed"
+
+echo ""
+echo "=== Step 7: Verify installation ==="
 cd /root/BrowserAgent && ./.venv/bin/python -c "import browser_agent; from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
 
 echo ""
-echo "=== Step 7: Check Playwright version ==="
+echo "=== Step 7: Verify installation ==="
+cd /root/BrowserAgent && ./.venv/bin/python -c "import browser_agent; from browser_agent.agent.core import Agent; print('✓ BrowserAgent import successful')"
+
+echo ""
+echo "=== Step 8: Check Playwright version ==="
 ./.venv/bin/python -m playwright --version
 
 echo ""
-echo "=== Step 8: Verify Chromium executable ==="
+echo "=== Step 9: Verify Chromium executable ==="
 if ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1; then
     echo "✓ Chromium executable verified"
 else
@@ -4444,7 +4453,7 @@ else
 fi
 
 echo ""
-echo "=== Step 9: Run unit tests (optional) ==="
+echo "=== Step 10: Run unit tests (optional) ==="
 cd /root/BrowserAgent
 set +e  # Allow tests to fail without stopping script
 ./.venv/bin/python -m pytest tests/ --ignore=tests/integration/ -v --tb=short 2>&1
