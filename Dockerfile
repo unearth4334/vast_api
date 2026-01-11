@@ -27,6 +27,7 @@ RUN .venv/bin/pip install --no-cache-dir --trusted-host pypi.org --trusted-host 
 COPY app/ ./app/
 COPY scripts/ ./scripts/
 COPY resources/ ./resources/
+COPY workflows/ ./workflows/
 COPY config.yaml ./ 
 
 # Make scripts executable
