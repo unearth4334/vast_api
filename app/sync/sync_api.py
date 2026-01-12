@@ -5094,6 +5094,19 @@ def _first_h1(md_body: str):
     return None
 
 
+def _first_alias(meta: dict):
+    """Extract the first alias from the metadata if present."""
+    aliases = meta.get('aliases')
+    if aliases:
+        if isinstance(aliases, list) and len(aliases) > 0:
+            first = aliases[0]
+            if isinstance(first, str) and first.strip():
+                return first.strip()
+        elif isinstance(aliases, str) and aliases.strip():
+            return aliases.strip()
+    return None
+
+
 def _is_video_path(path: str) -> bool:
     return bool(path) and bool(re.search(r'\.(mp4|webm|mov)$', path, re.IGNORECASE))
 
@@ -5137,7 +5150,7 @@ def catalog_list():
                     raw = f.read()
 
             meta, body = _parse_markdown_frontmatter(raw)
-            title = meta.get('title') or meta.get('name') or _first_h1(body) or os.path.splitext(entry)[0]
+            title = _first_alias(meta) or meta.get('title') or meta.get('name') or _first_h1(body) or os.path.splitext(entry)[0]
             subtitle = meta.get('subtitle') or meta.get('version') or meta.get('variant') or ''
 
             media = meta.get('image') or meta.get('cover') or meta.get('thumbnail')
@@ -5270,7 +5283,7 @@ def catalog_render():
                 raw = f.read()
 
         meta, body = _parse_markdown_frontmatter(raw)
-        title = meta.get('title') or meta.get('name') or _first_h1(body) or os.path.splitext(file_name)[0]
+        title = _first_alias(meta) or meta.get('title') or meta.get('name') or _first_h1(body) or os.path.splitext(file_name)[0]
 
         try:
             import markdown as md
