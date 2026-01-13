@@ -18,6 +18,31 @@ const CATEGORIES = [
     { key: 'workflows', label: 'Workflows' }
 ];
 
+// Badge configuration - define what badges to show and where
+const BADGE_CONFIG = {
+    badges: [
+        { field: 'type', corner: 'tr', order: 0, styleMapKey: 'type' },
+        { field: 'basemodel', corner: 'tr', order: 1 },
+        { field: 'ecosystem', corner: 'tl', order: 0, styleMapKey: 'ecosystem' },
+    ],
+    cornerStack: { tl: 'down', tr: 'down', bl: 'up', br: 'up' },
+    badgeGap: 4,
+    styleMaps: {
+        type: {
+            positive: { background: '#2196f3', color: '#fff' },
+            negative: { background: '#f44336', color: '#fff' },
+            checkpoint: { background: '#9c27b0', color: '#fff' },
+            lora: { background: '#ff9800', color: '#fff' },
+        },
+        ecosystem: {
+            sd15: { background: '#4caf50', color: '#fff' },
+            sdxl: { background: '#00bcd4', color: '#fff' },
+            flux: { background: '#e91e63', color: '#fff' },
+            comfyui: { background: '#3f51b5', color: '#fff' },
+        },
+    },
+};
+
 const catalogState = {
     selectedCategory: 'checkpoints',
     items: [],
@@ -283,6 +308,64 @@ function reSortAndRender() {
         catalogState.playing.delete(v);
     }
 
+    /**
+     * Create badge HTML for a corner
+     */
+    function createCornerBadges(corner, badgeItems) {
+        if (!badgeItems.length) return '';
+        const direction = BADGE_CONFIG.cornerStack[corner] === 'up' ? 'column-reverse' : 'column';
+        const badgesHtml = badgeItems.map(badge => {
+            const styleAttr = [];
+            if (badge.style.background) styleAttr.push(`background:${badge.style.background}`);
+            if (badge.style.color) styleAttr.push(`color:${badge.style.color}`);
+            const styleStr = styleAttr.length ? ` style="${styleAttr.join(';')}"` : '';
+            return `<div class="tv-badge"${styleStr}>${badge.label}</div>`;
+        }).join('');
+        return `<div class="tv-badges-corner tv-badges-${corner}" style="flex-direction:${direction};row-gap:${BADGE_CONFIG.badgeGap}px;">${badgesHtml}</div>`;
+    }
+
+    /**
+     * Get style for a badge value from style map
+     */
+    function getStyleForValue(styleMap, value) {
+        if (!value || !styleMap) return {};
+        const v = String(value).toLowerCase();
+        for (const [needle, style] of Object.entries(styleMap)) {
+            if (v.includes(needle.toLowerCase())) return style;
+        }
+        return {};
+    }
+
+    /**
+     * Generate badges for an item based on configuration
+     */
+    function generateBadges(item) {
+        const byCorner = { tl: [], tr: [], bl: [], br: [] };
+        
+        for (const badgeCfg of BADGE_CONFIG.badges) {
+            const rawVal = item[badgeCfg.field];
+            if (rawVal == null || rawVal === '') continue;
+            
+            const val = Array.isArray(rawVal) ? rawVal.join(', ') : rawVal;
+            const label = String(val).toUpperCase();
+            const styleMap = BADGE_CONFIG.styleMaps[badgeCfg.styleMapKey || badgeCfg.field];
+            const style = getStyleForValue(styleMap, val);
+            
+            byCorner[badgeCfg.corner].push({ 
+                order: badgeCfg.order || 0, 
+                label, 
+                style 
+            });
+        }
+        
+        // Sort badges in each corner by order
+        for (const corner of Object.keys(byCorner)) {
+            byCorner[corner].sort((a, b) => a.order - b.order);
+        }
+        
+        return byCorner;
+    }
+
     function setupMediaObserver() {
         if (catalogState.mediaObserver) catalogState.mediaObserver.disconnect();
 
@@ -342,6 +425,15 @@ function makeCard(item) {
     const subtitle = item.subtitle || '';
     const mediaUrl = item.mediaUrl || '';
     const isVideo = !!item.isVideo;
+    
+    // Generate badges
+    const badgesByCorner = generateBadges(item);
+    const badgesHtml = [
+        createCornerBadges('tl', badgesByCorner.tl),
+        createCornerBadges('tr', badgesByCorner.tr),
+        createCornerBadges('bl', badgesByCorner.bl),
+        createCornerBadges('br', badgesByCorner.br),
+    ].join('');
 
             a.innerHTML = `
                 <div class="tv-card">
@@ -350,7 +442,7 @@ function makeCard(item) {
                             ? `<video muted playsinline loop preload="metadata"></video>`
                             : `<img loading="lazy" decoding="async" alt="" />`
                         }
-                        <div class="tv-badges"></div>
+                        <div class="tv-badges">${badgesHtml}</div>
                     </div>
                     <div class="tv-footer">
                         <span class="tv-title"></span>

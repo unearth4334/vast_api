@@ -5191,6 +5191,11 @@ def catalog_list():
                 'isVideo': is_video,
                 'mtime': int(st.st_mtime),
                 'size': int(st.st_size),
+                # Badge metadata
+                'type': meta.get('type'),
+                'basemodel': meta.get('basemodel'),
+                'ecosystem': meta.get('ecosystem'),
+                'tags': meta.get('tags', []) if isinstance(meta.get('tags'), list) else [],
             })
 
         return jsonify({

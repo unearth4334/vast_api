@@ -89,31 +89,36 @@
     color: var(--tv-footer-muted);
 }
 
-/* Badge layer (optional) */
+/* Badge layer */
 .tv-badges {
     position: absolute;
     inset: 0;
-    pointer-events: none;
+    pointer-events: none; /* pass clicks through */
 }
 
+/* Corner containers: stacked columns with gap (set by inline style) */
 .tv-badges-corner {
     position: absolute;
     display: flex;
-    align-items: flex-start;
+    align-items: flex-start; /* overridden for right corners below */
 }
 
-.tv-badges-tl { top: var(--size-4-2); left: var(--size-4-2); }
-.tv-badges-tr { top: var(--size-4-2); right: var(--size-4-2); align-items: flex-end; }
-.tv-badges-bl { bottom: var(--size-4-2); left: var(--size-4-2); }
-.tv-badges-br { bottom: var(--size-4-2); right: var(--size-4-2); align-items: flex-end; }
+/* Corner anchors */
+.tv-badges-tl { top: 8px; left: 8px; }
+.tv-badges-tr { top: 8px; right: 8px; align-items: flex-end; }
+.tv-badges-bl { bottom: 8px; left: 8px; }
+.tv-badges-br { bottom: 8px; right: 8px; align-items: flex-end; }
 
+/* Individual badge */
 .tv-badge {
-    background: var(--tv-badge-bg);
-    color: var(--tv-badge-fg);
+    background: var(--tv-badge-bg, #444);
+    color: var(--tv-badge-fg, #fff);
     padding: 2px 8px;
     border-radius: 999px;
-    font-size: var(--font-ui-smallest);
+    font-size: 0.75em;
     text-transform: uppercase;
     font-weight: 600;
-    pointer-events: auto;
+    pointer-events: auto; /* enable hover if you add titles/tooltips later */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
 }
