@@ -351,6 +351,12 @@ function reSortAndRender() {
             const styleMap = BADGE_CONFIG.styleMaps[badgeCfg.styleMapKey || badgeCfg.field];
             const style = getStyleForValue(styleMap, val);
             
+            // Ensure default styling if no style map matched
+            if (!style.background) {
+                style.background = '#444';
+                style.color = '#fff';
+            }
+            
             byCorner[badgeCfg.corner].push({ 
                 order: badgeCfg.order || 0, 
                 label, 
@@ -361,6 +367,11 @@ function reSortAndRender() {
         // Sort badges in each corner by order
         for (const corner of Object.keys(byCorner)) {
             byCorner[corner].sort((a, b) => a.order - b.order);
+        }
+        
+        // Debug logging
+        if (Object.values(byCorner).some(arr => arr.length > 0)) {
+            console.log('Generated badges for item:', item.title, byCorner);
         }
         
         return byCorner;

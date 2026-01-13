@@ -94,6 +94,7 @@
     position: absolute;
     inset: 0;
     pointer-events: none; /* pass clicks through */
+    z-index: 2; /* Above media */
 }
 
 /* Corner containers: stacked columns with gap (set by inline style) */
@@ -106,8 +107,8 @@
 /* Corner anchors */
 .tv-badges-tl { top: 8px; left: 8px; }
 .tv-badges-tr { top: 8px; right: 8px; align-items: flex-end; }
-.tv-badges-bl { bottom: 8px; left: 8px; }
-.tv-badges-br { bottom: 8px; right: 8px; align-items: flex-end; }
+.tv-badges-bl { bottom: 48px; left: 8px; } /* Above footer */
+.tv-badges-br { bottom: 48px; right: 8px; align-items: flex-end; } /* Above footer */
 
 /* Individual badge */
 .tv-badge {
