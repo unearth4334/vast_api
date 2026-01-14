@@ -560,7 +560,7 @@ function makeCard(item, cardId) {
                 }
                 e.preventDefault();
                 e.stopPropagation();
-                openAssetMarkdown(item);
+                openAssetMarkdown(a._item);
             });
 
             return a;
