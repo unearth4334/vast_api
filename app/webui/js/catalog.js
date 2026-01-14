@@ -52,7 +52,9 @@ const catalogState = {
     playing: new Set(),
     maxConcurrentVideos: 2,
     sortField: 'title',
-    sortOrder: 'asc'
+    sortOrder: 'asc',
+    versionGroups: {}, // Map of base title -> array of items
+    currentVersionIndex: {} // Map of card ID -> current version index
 };
 
 /**
@@ -227,10 +229,13 @@ async function loadCategory(categoryKey) {
         catalogState.items = data.items || [];
         updateCount(catalogState.items.length);
         
+        // Group items by base title (without version info)
+        groupItemsByBaseTitle();
+        
         // Setup media observer before creating cards
         setupMediaObserver();
         
-        catalogState.allCards = catalogState.items.map(item => makeCard(item));
+        catalogState.allCards = catalogState.items.map((item, index) => makeCard(item, `card-${index}`));
         reSortAndRender();
     } catch (e) {
         console.error('Catalog load error:', e);
@@ -337,6 +342,29 @@ function reSortAndRender() {
     }
 
     /**
+     * Extract base title from item (removing version info)
+     */
+    function getBaseTitle(item) {
+        const title = item.title || item.file || 'Untitled';
+        // Remove version patterns like (v1.0), [v2], etc.
+        return title.replace(/[\(\[]v?\d+\.?\d*[\)\]]/gi, '').trim();
+    }
+
+    /**
+     * Group items by base title to identify multi-version assets
+     */
+    function groupItemsByBaseTitle() {
+        catalogState.versionGroups = {};
+        for (const item of catalogState.items) {
+            const baseTitle = getBaseTitle(item);
+            if (!catalogState.versionGroups[baseTitle]) {
+                catalogState.versionGroups[baseTitle] = [];
+            }
+            catalogState.versionGroups[baseTitle].push(item);
+        }
+    }
+
+    /**
      * Generate badges for an item based on configuration
      */
     function generateBadges(item) {
@@ -426,25 +454,49 @@ function reSortAndRender() {
         }, { root: null, rootMargin: '600px 0px', threshold: 0.01 });
     }
 
-function makeCard(item) {
+function makeCard(item, cardId) {
+    const baseTitle = getBaseTitle(item);
+    const versions = catalogState.versionGroups[baseTitle] || [item];
+    const hasMultipleVersions = versions.length > 1;
+    const currentIndex = catalogState.currentVersionIndex[cardId] || 0;
+    const currentItem = versions[currentIndex];
+    
     const a = document.createElement('a');
     a.className = 'tv-cardlink';
     a.href = '#';
-    a._item = item;  // Store item reference for sorting
+    a._item = currentItem;  // Store item reference for sorting
+    a._cardId = cardId;
+    a._versions = versions;
+    a._currentIndex = currentIndex;
 
-    const title = item.title || item.file || 'Untitled';
-    const subtitle = item.subtitle || '';
-    const mediaUrl = item.mediaUrl || '';
-    const isVideo = !!item.isVideo;
+    const title = currentItem.title || currentItem.file || 'Untitled';
+    const subtitle = currentItem.subtitle || '';
+    const mediaUrl = currentItem.mediaUrl || '';
+    const isVideo = !!currentItem.isVideo;
     
     // Generate badges
-    const badgesByCorner = generateBadges(item);
+    const badgesByCorner = generateBadges(currentItem);
     const badgesHtml = [
         createCornerBadges('tl', badgesByCorner.tl),
         createCornerBadges('tr', badgesByCorner.tr),
         createCornerBadges('bl', badgesByCorner.bl),
         createCornerBadges('br', badgesByCorner.br),
     ].join('');
+
+    // Version navigation controls
+    const versionNavHtml = hasMultipleVersions ? `
+        <button class="tv-version-nav tv-version-prev" aria-label="Previous version">
+            <svg class="octicon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06Z"></path>
+            </svg>
+        </button>
+        <button class="tv-version-nav tv-version-next" aria-label="Next version">
+            <svg class="octicon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"></path>
+            </svg>
+        </button>
+        <div class="tv-version-indicator">${currentIndex + 1}/${versions.length}</div>
+    ` : '';
 
             a.innerHTML = `
                 <div class="tv-card">
@@ -454,6 +506,7 @@ function makeCard(item) {
                             : `<img loading="lazy" decoding="async" alt="" />`
                         }
                         <div class="tv-badges">${badgesHtml}</div>
+                        ${versionNavHtml}
                     </div>
                     <div class="tv-footer">
                         <span class="tv-title"></span>
@@ -467,7 +520,7 @@ function makeCard(item) {
                 mediaAttached: false,
                 isVideo,
                 mediaUrl,
-                file: item.file
+                file: currentItem.file
             };
 
             a.querySelector('.tv-title').textContent = title;
@@ -477,13 +530,153 @@ function makeCard(item) {
             const mediaBox = a.querySelector('.tv-media');
             catalogState.mediaObserver.observe(mediaBox);
 
+            // Version navigation handlers
+            if (hasMultipleVersions) {
+                setupVersionNavigation(a, versions, cardId);
+            }
+
             a.addEventListener('click', (e) => {
+                // Don't open modal if clicking on version nav buttons
+                if (e.target.closest('.tv-version-nav')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
                 e.preventDefault();
                 e.stopPropagation();
                 openAssetMarkdown(item);
             });
 
             return a;
+        }
+
+        function setupVersionNavigation(cardElement, versions, cardId) {
+            const prevBtn = cardElement.querySelector('.tv-version-prev');
+            const nextBtn = cardElement.querySelector('.tv-version-next');
+            const indicator = cardElement.querySelector('.tv-version-indicator');
+            const mediaBox = cardElement.querySelector('.tv-media');
+            const badgesContainer = cardElement.querySelector('.tv-badges');
+            const titleEl = cardElement.querySelector('.tv-title');
+            const subtitleEl = cardElement.querySelector('.tv-subtitle');
+
+            function updateVersion(newIndex) {
+                if (newIndex < 0 || newIndex >= versions.length) return;
+                
+                catalogState.currentVersionIndex[cardId] = newIndex;
+                const newItem = versions[newIndex];
+                
+                // Update stored references
+                cardElement._item = newItem;
+                cardElement._currentIndex = newIndex;
+                
+                // Update indicator
+                indicator.textContent = `${newIndex + 1}/${versions.length}`;
+                
+                // Update media
+                const card = cardElement.querySelector('.tv-card');
+                const ctx = card._ctx;
+                const newIsVideo = !!newItem.isVideo;
+                const newMediaUrl = newItem.mediaUrl || '';
+                
+                // If media type changed, replace the element
+                if (ctx.isVideo !== newIsVideo) {
+                    const oldMedia = mediaBox.querySelector(ctx.isVideo ? 'video' : 'img');
+                    const newMedia = newIsVideo
+                        ? document.createElement('video')
+                        : document.createElement('img');
+                    
+                    if (newIsVideo) {
+                        newMedia.muted = true;
+                        newMedia.playsInline = true;
+                        newMedia.loop = true;
+                        newMedia.preload = 'metadata';
+                    } else {
+                        newMedia.loading = 'lazy';
+                        newMedia.decoding = 'async';
+                        newMedia.alt = '';
+                    }
+                    
+                    oldMedia.replaceWith(newMedia);
+                    ctx.isVideo = newIsVideo;
+                    ctx.mediaAttached = false;
+                }
+                
+                // Update media URL and context
+                ctx.mediaUrl = newMediaUrl;
+                ctx.file = newItem.file;
+                
+                // Trigger media reload if in viewport
+                if (ctx.mediaAttached) {
+                    const media = mediaBox.querySelector(ctx.isVideo ? 'video' : 'img');
+                    if (ctx.isVideo) {
+                        media.src = newMediaUrl;
+                        media.load();
+                        media.play().catch(() => {});
+                    } else {
+                        media.src = newMediaUrl;
+                    }
+                }
+                
+                // Update badges
+                const badgesByCorner = generateBadges(newItem);
+                badgesContainer.innerHTML = [
+                    createCornerBadges('tl', badgesByCorner.tl),
+                    createCornerBadges('tr', badgesByCorner.tr),
+                    createCornerBadges('bl', badgesByCorner.bl),
+                    createCornerBadges('br', badgesByCorner.br),
+                ].join('');
+                
+                // Update text
+                titleEl.textContent = newItem.title || newItem.file || 'Untitled';
+                if (subtitleEl) {
+                    subtitleEl.textContent = newItem.subtitle || '';
+                }
+            }
+
+            // Button click handlers
+            prevBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const currentIndex = catalogState.currentVersionIndex[cardId] || 0;
+                updateVersion(currentIndex - 1);
+            });
+
+            nextBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const currentIndex = catalogState.currentVersionIndex[cardId] || 0;
+                updateVersion(currentIndex + 1);
+            });
+
+            // Swipe gesture support
+            let touchStartX = 0;
+            let touchEndX = 0;
+            
+            mediaBox.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+            
+            mediaBox.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, { passive: true });
+            
+            function handleSwipe() {
+                const swipeThreshold = 50;
+                const diff = touchStartX - touchEndX;
+                
+                if (Math.abs(diff) > swipeThreshold) {
+                    const currentIndex = catalogState.currentVersionIndex[cardId] || 0;
+                    
+                    if (diff > 0) {
+                        // Swiped left - next version
+                        updateVersion(currentIndex + 1);
+                    } else {
+                        // Swiped right - previous version
+                        updateVersion(currentIndex - 1);
+                    }
+                }
+            }
         }
 
         async function openAssetMarkdown(item) {
