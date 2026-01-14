@@ -235,7 +235,19 @@ async function loadCategory(categoryKey) {
         // Setup media observer before creating cards
         setupMediaObserver();
         
-        catalogState.allCards = catalogState.items.map((item, index) => makeCard(item, `card-${index}`));
+        // Create cards: only one per version group (use first item in each group)
+        const seenBaseTitles = new Set();
+        catalogState.allCards = catalogState.items
+            .map((item, index) => {
+                const baseTitle = getBaseTitle(item);
+                if (seenBaseTitles.has(baseTitle)) {
+                    return null; // Skip duplicate versions
+                }
+                seenBaseTitles.add(baseTitle);
+                return makeCard(item, `card-${baseTitle}`);
+            })
+            .filter(card => card !== null);
+        
         reSortAndRender();
     } catch (e) {
         console.error('Catalog load error:', e);
