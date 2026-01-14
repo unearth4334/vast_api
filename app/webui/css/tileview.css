@@ -35,8 +35,8 @@
     text-decoration: none;
     color: inherit;
     position: relative;
-    /* Minimal padding since buttons are now minimal */
-    padding: 0 24px;
+    /* Padding provides space between version nav buttons and tile */
+    padding: 0 36px;
 }
 
 /* Card */
