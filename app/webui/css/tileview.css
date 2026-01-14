@@ -159,11 +159,11 @@
 }
 
 .tv-version-prev {
-    left: 4px; /* Positioned at the edge of the card */
+    left: 4px; /* Positioned near the left edge of the card */
 }
 
 .tv-version-next {
-    right: 4px; /* Positioned at the edge of the card */
+    right: 4px; /* Positioned near the right edge of the card */
 }
 
 .tv-version-nav .octicon {
