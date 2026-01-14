@@ -769,22 +769,59 @@ function makeCard(item, cardId) {
                     }, 2000);
                 } catch (err) {
                     console.error('Failed to copy code:', err);
-                    // Fallback for browsers without clipboard API
-                    button.innerHTML = `
-                        <svg class="octicon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M2.343 13.657A8 8 0 1 1 13.657 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-0 1.05L7.94 8 6.03 9.98a.751.751 0 1 0 1.042 1.08L8.99 8l-1.918-3.03a.751.751 0 0 0-1.042 0Zm3.97 4.99h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5Z"></path>
-                        </svg>
-                        <span>Failed</span>
-                    `;
-                    setTimeout(() => {
+                    // Fallback for browsers without clipboard API - use textarea selection
+                    try {
+                        const textArea = document.createElement('textarea');
+                        textArea.value = code;
+                        textArea.style.position = 'fixed';
+                        textArea.style.left = '-999999px';
+                        textArea.style.top = '-999999px';
+                        document.body.appendChild(textArea);
+                        textArea.focus();
+                        textArea.select();
+                        const successful = document.execCommand('copy');
+                        textArea.remove();
+                        
+                        if (successful) {
+                            // Show success feedback
+                            button.classList.add('copied');
+                            button.innerHTML = `
+                                <svg class="octicon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path>
+                                </svg>
+                                <span>Copied!</span>
+                            `;
+                            setTimeout(() => {
+                                button.classList.remove('copied');
+                                button.innerHTML = `
+                                    <svg class="octicon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path>
+                                        <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
+                                    </svg>
+                                    <span>Copy</span>
+                                `;
+                            }, 2000);
+                        } else {
+                            throw new Error('execCommand failed');
+                        }
+                    } catch (fallbackErr) {
+                        console.error('Fallback copy also failed:', fallbackErr);
                         button.innerHTML = `
                             <svg class="octicon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path>
-                                <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
+                                <path d="M2.343 13.657A8 8 0 1 1 13.657 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-0 1.05L7.94 8 6.03 9.98a.751.751 0 1 0 1.042 1.08L8.99 8l-1.918-3.03a.751.751 0 0 0-1.042 0Zm3.97 4.99h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1 0-1.5Z"></path>
                             </svg>
-                            <span>Copy</span>
+                            <span>Failed</span>
                         `;
-                    }, 2000);
+                        setTimeout(() => {
+                            button.innerHTML = `
+                                <svg class="octicon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path>
+                                    <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
+                                </svg>
+                                <span>Copy</span>
+                            `;
+                        }, 2000);
+                    }
                 }
             });
             
