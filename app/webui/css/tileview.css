@@ -24,7 +24,7 @@
 .tv-grid {
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-start;
+    justify-content: center;
     gap: var(--tv-gap);
     margin-top: var(--size-4-4);
 }
@@ -35,8 +35,8 @@
     text-decoration: none;
     color: inherit;
     position: relative;
-    /* Add padding to accommodate external buttons */
-    padding: 0 40px;
+    /* Minimal padding since buttons are now minimal */
+    padding: 0 24px;
 }
 
 /* Card */
@@ -134,12 +134,11 @@
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    background: rgba(0, 0, 0, 0.7);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    color: #fff;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.85);
+    min-width: 24px;
+    min-height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -147,14 +146,12 @@
     transition: all 0.2s ease;
     z-index: 3;
     pointer-events: auto;
-    padding: 0;
+    padding: 10px; /* 24px min + 20px padding = 44px total touch target */
 }
 
 .tv-version-nav:hover {
-    background: rgba(0, 0, 0, 0.9);
-    border-color: rgba(255, 255, 255, 0.6);
-    transform: translateY(-50%) scale(1.15);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    color: rgba(255, 255, 255, 1);
+    transform: translateY(-50%) scale(1.2);
 }
 
 .tv-version-nav:active {
@@ -162,11 +159,11 @@
 }
 
 .tv-version-prev {
-    left: -4px; /* Positioned outside the card, overlapping slightly */
+    left: 4px; /* Positioned near the left edge of the card */
 }
 
 .tv-version-next {
-    right: -4px; /* Positioned outside the card, overlapping slightly */
+    right: 4px; /* Positioned near the right edge of the card */
 }
 
 .tv-version-nav .octicon {
