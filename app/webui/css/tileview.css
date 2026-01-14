@@ -146,7 +146,7 @@
     transition: all 0.2s ease;
     z-index: 3;
     pointer-events: auto;
-    padding: 10px; /* Ensures 44x44px minimum touch target */
+    padding: 10px; /* 24px min + 20px padding = 44px total touch target */
 }
 
 .tv-version-nav:hover {
