@@ -198,7 +198,8 @@ class VastAIConnectionToolbar {
      * Render the toolbar HTML
      */
     renderToolbar() {
-        // Define insertion strategies in priority order (lazy evaluation)
+        // Define insertion strategies in priority order
+        // DOM queries are performed lazily (only when checking each strategy)
         const insertionStrategies = [
             { selector: '.tab-navigation', position: 'beforebegin', name: 'tab navigation' },
             { selector: '#catalog-container', position: 'beforebegin', name: 'catalog container' },
@@ -218,7 +219,7 @@ class VastAIConnectionToolbar {
             }
         }
         
-        if (!insertionPoint || !referenceElement) {
+        if (!referenceElement) {
             console.error('❌ Could not find suitable insertion point for toolbar');
             return;
         }
