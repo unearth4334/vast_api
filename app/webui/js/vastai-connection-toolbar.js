@@ -198,29 +198,27 @@ class VastAIConnectionToolbar {
      * Render the toolbar HTML
      */
     renderToolbar() {
-        // Find insertion point - try tab navigation first, then catalog container, then header
-        const container = document.querySelector('.container');
-        const tabNav = document.querySelector('.tab-navigation');
-        const catalogContainer = document.querySelector('#catalog-container');
-        const header = document.querySelector('.header');
+        // Define insertion strategies in priority order (lazy evaluation)
+        const insertionStrategies = [
+            { selector: '.tab-navigation', position: 'beforebegin', name: 'tab navigation' },
+            { selector: '#catalog-container', position: 'beforebegin', name: 'catalog container' },
+            { selector: '.header', position: 'afterend', name: 'header fallback' }
+        ];
         
-        // Determine insertion point and reference element
+        // Find first valid insertion point
         let insertionPoint = null;
         let referenceElement = null;
         
-        if (container && tabNav) {
-            // Main page with tab navigation
-            insertionPoint = 'beforebegin';
-            referenceElement = tabNav;
-        } else if (container && catalogContainer) {
-            // Catalog page - insert before catalog container
-            insertionPoint = 'beforebegin';
-            referenceElement = catalogContainer;
-        } else if (container && header) {
-            // Fallback - insert after header
-            insertionPoint = 'afterend';
-            referenceElement = header;
-        } else {
+        for (const strategy of insertionStrategies) {
+            referenceElement = document.querySelector(strategy.selector);
+            if (referenceElement) {
+                insertionPoint = strategy.position;
+                console.log(`📍 Using insertion strategy: ${strategy.name}`);
+                break;
+            }
+        }
+        
+        if (!insertionPoint || !referenceElement) {
             console.error('❌ Could not find suitable insertion point for toolbar');
             return;
         }
