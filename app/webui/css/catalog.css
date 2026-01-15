@@ -46,6 +46,46 @@
     margin-left: auto;
     display: flex;
     gap: 8px;
+    align-items: center;
+}
+
+/* View Toggle */
+.catalog-view-toggle {
+    display: flex;
+    background: var(--background-primary);
+    border-radius: 6px;
+    padding: 2px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.catalog-view-toggle .view-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.catalog-view-toggle .view-btn:hover {
+    color: var(--interactive-accent);
+    background: var(--background-modifier-hover);
+}
+
+.catalog-view-toggle .view-btn.active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.catalog-view-toggle .view-btn .octicon {
+    display: block;
+    flex-shrink: 0;
 }
 
 .tv-btn {

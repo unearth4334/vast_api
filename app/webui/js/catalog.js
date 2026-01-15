@@ -54,7 +54,8 @@ const catalogState = {
     sortField: 'title',
     sortOrder: 'asc',
     versionGroups: {}, // Map of base title -> array of items
-    currentVersionIndex: {} // Map of card ID -> current version index
+    currentVersionIndex: {}, // Map of card ID -> current version index
+    viewMode: 'detailed' // 'detailed' or 'compact'
 };
 
 /**
@@ -82,6 +83,7 @@ function initCatalog() {
     setupCategoryFilters();
     setupSortControls();
     setupApplyResetButtons();
+    setupViewToggle();
     loadSavedCategory().finally(() => {
         // Default if saved category is invalid
         if (!CATEGORIES.some(c => c.key === catalogState.selectedCategory)) {
@@ -180,6 +182,67 @@ function setupApplyResetButtons() {
             saveCategoryPreference(catalogState.selectedCategory);
             loadCategory(catalogState.selectedCategory);
         });
+    }
+}
+
+/**
+ * Setup view toggle buttons
+ */
+function setupViewToggle() {
+    // Load saved view preference
+    const savedView = localStorage.getItem('catalog-view-mode');
+    if (savedView) {
+        catalogState.viewMode = savedView;
+    }
+    
+    const viewButtons = document.querySelectorAll('.catalog-view-toggle .view-btn');
+    
+    // Set initial active state
+    viewButtons.forEach(btn => {
+        const view = btn.dataset.view;
+        if (view === catalogState.viewMode) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // Apply initial view mode to grid
+    applyViewMode();
+    
+    // Add click handlers
+    viewButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const view = btn.dataset.view;
+            if (view === catalogState.viewMode) return; // Already active
+            
+            // Update state
+            catalogState.viewMode = view;
+            
+            // Update button states
+            viewButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Save preference
+            localStorage.setItem('catalog-view-mode', view);
+            
+            // Apply view mode
+            applyViewMode();
+        });
+    });
+}
+
+/**
+ * Apply the current view mode to the grid
+ */
+function applyViewMode() {
+    const grid = document.getElementById('catalog-grid');
+    if (!grid) return;
+    
+    if (catalogState.viewMode === 'compact') {
+        grid.classList.add('compact-view');
+    } else {
+        grid.classList.remove('compact-view');
     }
 }
 
@@ -303,6 +366,9 @@ function reSortAndRender() {
     const frag = document.createDocumentFragment();
     sorted.forEach(card => frag.appendChild(card));
     grid.appendChild(frag);
+    
+    // Re-apply view mode
+    applyViewMode();
 }
 
     function startVideo(v) {
