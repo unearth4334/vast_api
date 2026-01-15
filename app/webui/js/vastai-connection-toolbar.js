@@ -198,12 +198,29 @@ class VastAIConnectionToolbar {
      * Render the toolbar HTML
      */
     renderToolbar() {
-        // Find insertion point (before tab navigation)
-        const container = document.querySelector('.container');
-        const tabNav = document.querySelector('.tab-navigation');
+        // Define insertion strategies in priority order
+        // DOM queries are performed lazily (only when checking each strategy)
+        const insertionStrategies = [
+            { selector: '.tab-navigation', position: 'beforebegin', name: 'tab navigation' },
+            { selector: '#catalog-container', position: 'beforebegin', name: 'catalog container' },
+            { selector: '.header', position: 'afterend', name: 'header fallback' }
+        ];
         
-        if (!container || !tabNav) {
-            console.error('❌ Could not find container or tab navigation');
+        // Find first valid insertion point
+        let insertionPoint = null;
+        let referenceElement = null;
+        
+        for (const strategy of insertionStrategies) {
+            referenceElement = document.querySelector(strategy.selector);
+            if (referenceElement) {
+                insertionPoint = strategy.position;
+                console.log(`📍 Using insertion strategy: ${strategy.name}`);
+                break;
+            }
+        }
+        
+        if (!referenceElement) {
+            console.error('❌ Could not find suitable insertion point for toolbar');
             return;
         }
         
@@ -235,8 +252,8 @@ class VastAIConnectionToolbar {
             </div>
         `;
         
-        // Insert toolbar before tab navigation
-        tabNav.insertAdjacentHTML('beforebegin', toolbarHTML);
+        // Insert toolbar at determined position
+        referenceElement.insertAdjacentHTML(insertionPoint, toolbarHTML);
         
         console.log('✅ Toolbar HTML rendered');
     }
