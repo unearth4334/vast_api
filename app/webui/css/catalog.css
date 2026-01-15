@@ -42,6 +42,7 @@
     color: var(--text-normal);
 }
 
+/* Callout Actions Section - includes buttons and view toggle */
 .tv-callout-actions {
     margin-left: auto;
     display: flex;

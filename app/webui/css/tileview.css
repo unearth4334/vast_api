@@ -195,7 +195,7 @@
 .tv-grid.compact-view {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: calc(var(--tv-gap) / 3); /* Use smaller gap for compact view */
 }
 
 /* Compact view card link - horizontal layout with minimal padding */
