@@ -239,15 +239,8 @@ function applyViewMode() {
     const grid = document.getElementById('catalog-grid');
     if (!grid) return;
     
-    const isCompact = grid.classList.contains('compact-view');
-    const shouldBeCompact = catalogState.viewMode === 'compact';
-    
-    // Only modify DOM if state changed
-    if (shouldBeCompact && !isCompact) {
-        grid.classList.add('compact-view');
-    } else if (!shouldBeCompact && isCompact) {
-        grid.classList.remove('compact-view');
-    }
+    // Use toggle with boolean for cleaner state management
+    grid.classList.toggle('compact-view', catalogState.viewMode === 'compact');
 }
 
 /**
