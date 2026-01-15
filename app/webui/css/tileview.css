@@ -188,3 +188,68 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     white-space: nowrap;
 }
+
+/* ================= Compact View Mode ================= */
+
+/* Compact view grid - vertical list layout */
+.tv-grid.compact-view {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--tv-gap) / 3); /* Use smaller gap for compact view */
+}
+
+/* Compact view card link - horizontal layout with minimal padding */
+.tv-grid.compact-view .tv-cardlink {
+    padding: 0;
+    width: 100%;
+}
+
+/* Compact view card - horizontal layout without thumbnails */
+.tv-grid.compact-view .tv-card {
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 16px;
+}
+
+/* Hide media in compact view */
+.tv-grid.compact-view .tv-media {
+    display: none;
+}
+
+/* Compact view footer - horizontal layout, not absolute */
+.tv-grid.compact-view .tv-footer {
+    position: static;
+    padding: 0;
+    background: transparent;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Compact view title */
+.tv-grid.compact-view .tv-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 600;
+}
+
+/* Compact view subtitle */
+.tv-grid.compact-view .tv-subtitle {
+    font-size: var(--font-ui-small);
+}
+
+/* Hide version navigation buttons in compact view */
+.tv-grid.compact-view .tv-version-nav {
+    display: none;
+}
+
+/* Adjust version indicator for compact view */
+.tv-grid.compact-view .tv-version-indicator {
+    position: static;
+    transform: none;
+    margin-left: auto;
+    font-size: 0.75em;
+}
