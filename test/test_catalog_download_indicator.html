@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catalog Download Indicator Test</title>
+    <style>
+        :root {
+            --size-4-4: 20px;
+            --radius-m: 8px;
+            --background-modifier-box-shadow: rgba(0, 0, 0, 0.3);
+            --text-normal: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --background-secondary: #1a1a2e;
+            --background-modifier-border: #2a2a3a;
+            --tv-footer-bg: rgba(0, 0, 0, 0.65);
+            --tv-tile-width: 300px;
+            --tv-tile-height: 225px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0f;
+            color: var(--text-normal);
+            margin: 0;
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #00f5ff;
+            margin-bottom: 40px;
+        }
+
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .test-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--size-4-4);
+            margin-top: var(--size-4-4);
+        }
+
+        .tv-cardlink {
+            display: inline-block;
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+            padding: 0 36px;
+        }
+
+        .tv-card {
+            position: relative;
+            border-radius: var(--radius-m);
+            overflow: hidden;
+            box-shadow: 0 4px 12px var(--background-modifier-box-shadow);
+            width: var(--tv-tile-width);
+            height: var(--tv-tile-height);
+            border: 1px solid var(--background-modifier-border);
+            background: var(--background-secondary);
+        }
+
+        .tv-media {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2a2a3e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+        }
+
+        .tv-footer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 12px 16px;
+            background: var(--tv-footer-bg);
+            color: var(--text-normal);
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .tv-title {
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        /* Download Indicator - positioned on title banner */
+        .tv-download-indicator {
+            position: absolute;
+            bottom: 14px; /* Vertically centered in title banner */
+            right: 12px; /* Right side of title banner */
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            z-index: 4;
+            transition: all 0.3s ease;
+            display: none;
+        }
+
+        /* Show only when downloaded - glowing green circle */
+        .tv-download-indicator.downloaded {
+            display: block;
+            background: #4caf50;
+            box-shadow: 0 0 8px #4caf50,
+                        0 0 16px #4caf50,
+                        0 0 24px rgba(76, 175, 80, 0.5);
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        /* Pulse glow animation */
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 8px #4caf50,
+                            0 0 16px #4caf50,
+                            0 0 24px rgba(76, 175, 80, 0.5);
+                opacity: 1;
+            }
+            50% {
+                box-shadow: 0 0 12px #4caf50,
+                            0 0 24px #4caf50,
+                            0 0 36px rgba(76, 175, 80, 0.7);
+                opacity: 0.9;
+            }
+        }
+
+        /* Hover effect */
+        .tv-download-indicator.downloaded:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 12px #4caf50,
+                        0 0 24px #4caf50,
+                        0 0 36px rgba(76, 175, 80, 0.8);
+        }
+
+        .description {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .test-section {
+            margin-bottom: 40px;
+        }
+
+        .test-section h2 {
+            color: #00f5ff;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>📚 Catalog Download Indicator Test</h1>
+        
+        <div class="description">
+            <p>Testing the glowing green circle indicator that appears on the right side of the title banner</p>
+            <p>when an asset has been downloaded to the selected instance.</p>
+        </div>
+
+        <div class="test-section">
+            <h2>✅ Assets with Download Status (showing glowing indicator)</h2>
+            <div class="test-grid">
+                <a href="#" class="tv-cardlink">
+                    <div class="tv-card">
+                        <div class="tv-media">
+                            🎨
+                        </div>
+                        <div class="tv-footer">
+                            <span class="tv-title">Realistic Vision v5.1</span>
+                        </div>
+                        <div class="tv-download-indicator downloaded" title="Downloaded to instance"></div>
+                    </div>
+                </a>
+
+                <a href="#" class="tv-cardlink">
+                    <div class="tv-card">
+                        <div class="tv-media">
+                            🌟
+                        </div>
+                        <div class="tv-footer">
+                            <span class="tv-title">DreamShaper XL</span>
+                        </div>
+                        <div class="tv-download-indicator downloaded" title="Downloaded to instance"></div>
+                    </div>
+                </a>
+
+                <a href="#" class="tv-cardlink">
+                    <div class="tv-card">
+                        <div class="tv-media">
+                            ✨
+                        </div>
+                        <div class="tv-footer">
+                            <span class="tv-title">Epic Realism LoRA</span>
+                        </div>
+                        <div class="tv-download-indicator downloaded" title="Downloaded to instance"></div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>⭕ Assets without Download Status (no indicator)</h2>
+            <div class="test-grid">
+                <a href="#" class="tv-cardlink">
+                    <div class="tv-card">
+                        <div class="tv-media">
+                            🎭
+                        </div>
+                        <div class="tv-footer">
+                            <span class="tv-title">Art Nouveau Style</span>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="#" class="tv-cardlink">
+                    <div class="tv-card">
+                        <div class="tv-media">
+                            🖼️
+                        </div>
+                        <div class="tv-footer">
+                            <span class="tv-title">Cyberpunk Encoder</span>
+                        </div>
+                    </div>
+                </a>
+
+                <a href="#" class="tv-cardlink">
+                    <div class="tv-card">
+                        <div class="tv-media">
+                            🌈
+                        </div>
+                        <div class="tv-footer">
+                            <span class="tv-title">Color Grading LoRA</span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
