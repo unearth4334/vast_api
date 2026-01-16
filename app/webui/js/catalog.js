@@ -947,6 +947,11 @@ function makeCard(item, cardId) {
 async function checkDownloadStatus() {
     // Get selected instance from VastAI toolbar
     const toolbar = window.vastAIConnectionToolbar;
+    
+    console.log('🔍 Toolbar object:', toolbar);
+    console.log('🔍 Toolbar state:', toolbar?.state);
+    console.log('🔍 SSH connection string:', toolbar?.state?.ssh_connection_string);
+    
     if (!toolbar || !toolbar.state || !toolbar.state.ssh_connection_string) {
         console.warn('No instance selected in VastAI toolbar');
         return;
