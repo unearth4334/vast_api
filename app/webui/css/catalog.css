@@ -826,36 +826,49 @@
     }
 }
 
-/* Download Indicator */
+/* Download Indicator - positioned on right side of title banner */
 .tv-download-indicator {
     position: absolute;
-    bottom: 8px;
-    left: 8px;
-    width: 28px;
-    height: 28px;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
+    bottom: 14px; /* Vertically centered within title banner area */
+    right: 12px; /* Right side of title banner */
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3;
-    transition: all 0.2s ease;
+    z-index: 4; /* Above footer and badges */
+    transition: all 0.3s ease;
+    display: none; /* Hidden by default, shown only when status is known */
 }
 
+/* Show only when downloaded - glowing green circle */
 .tv-download-indicator.downloaded {
-    color: #4caf50;
+    display: block;
+    background: #4caf50;
+    box-shadow: 0 0 8px #4caf50,
+                0 0 16px #4caf50,
+                0 0 24px rgba(76, 175, 80, 0.5);
+    animation: pulse-glow 2s ease-in-out infinite;
 }
 
-.tv-download-indicator.not-downloaded {
-    color: #ff9800;
+/* Pulse glow animation */
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 8px #4caf50,
+                    0 0 16px #4caf50,
+                    0 0 24px rgba(76, 175, 80, 0.5);
+        opacity: 1;
+    }
+    50% {
+        box-shadow: 0 0 12px #4caf50,
+                    0 0 24px #4caf50,
+                    0 0 36px rgba(76, 175, 80, 0.7);
+        opacity: 0.9;
+    }
 }
 
-.tv-download-indicator:hover {
-    transform: scale(1.1);
-    background: rgba(0, 0, 0, 0.85);
-}
-
-.tv-download-indicator svg {
-    flex-shrink: 0;
+/* Hover effect */
+.tv-download-indicator.downloaded:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 12px #4caf50,
+                0 0 24px #4caf50,
+                0 0 36px rgba(76, 175, 80, 0.8);
 }

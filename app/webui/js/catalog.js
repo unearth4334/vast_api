@@ -599,16 +599,11 @@ function makeCard(item, cardId) {
         <div class="tv-version-indicator">${currentIndex + 1}/${versions.length}</div>
     ` : '';
 
-    // Download indicator (initially hidden, will be shown after check)
+    // Download indicator (only show glowing circle when downloaded)
     const downloadStatus = catalogState.downloadStatus[currentItem.path];
-    const downloadIndicatorHtml = downloadStatus ? `
-        <div class="tv-download-indicator ${downloadStatus.downloaded ? 'downloaded' : 'not-downloaded'}" 
-             title="${downloadStatus.downloaded ? 'Downloaded to instance' : 'Not downloaded'}">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                ${downloadStatus.downloaded 
-                    ? '<path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path>'
-                    : '<path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"></path><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path>'}
-            </svg>
+    const downloadIndicatorHtml = downloadStatus && downloadStatus.downloaded ? `
+        <div class="tv-download-indicator downloaded" 
+             title="Downloaded to instance">
         </div>
     ` : '';
 
