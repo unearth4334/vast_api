@@ -522,7 +522,7 @@ class VastAIConnectionToolbar {
         document.querySelectorAll('.toolbar-connect-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const instanceId = parseInt(btn.dataset.instanceId);
+                const instanceId = btn.dataset.instanceId; // Keep as string or number
                 this.connectToInstance(instanceId);
             });
         });
