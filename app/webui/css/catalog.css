@@ -826,11 +826,11 @@
     }
 }
 
-/* Download Indicator - positioned on title banner */
+/* Download Indicator - positioned on title banner/footer */
 .tv-download-indicator {
     position: absolute;
-    bottom: 14px; /* Vertically centered in title banner */
-    right: 12px; /* Right side of title banner */
+    bottom: 14px; /* Vertically centered in footer */
+    right: 12px; /* Right side of footer */
     width: 16px;
     height: 16px;
     border-radius: 50%;
@@ -863,11 +863,6 @@
                     0 0 36px rgba(76, 175, 80, 0.7);
         opacity: 0.9;
     }
-}
-
-/* Hide SVG content, we only want the circle */
-.tv-download-indicator svg {
-    display: none;
 }
 
 /* Hover effect */
