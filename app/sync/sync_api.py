@@ -5489,11 +5489,8 @@ def catalog_check_downloads():
                 # Clean up any remaining quotes at start/end of path
                 target_path = target_path.strip().strip('"').strip("'")
                 
-                # Expand $UI_HOME if present - keep variable for remote shell expansion
-                if '$UI_HOME' in target_path:
-                    search_path = target_path.replace('$UI_HOME', '\\$UI_HOME')
-                else:
-                    search_path = target_path
+                # Use target_path directly - let remote shell expand $UI_HOME
+                search_path = target_path
                 
                 # Generate filename patterns
                 if download_type == 'civitdl':
