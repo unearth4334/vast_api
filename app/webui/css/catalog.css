@@ -826,11 +826,11 @@
     }
 }
 
-/* Download Indicator - positioned on title banner/footer */
+/* Download Indicator - positioned on right side of title banner */
 .tv-download-indicator {
     position: absolute;
-    bottom: 14px; /* Vertically centered in footer */
-    right: 12px; /* Right side of footer */
+    bottom: 14px; /* Vertically centered within title banner area */
+    right: 12px; /* Right side of title banner */
     width: 16px;
     height: 16px;
     border-radius: 50%;
