@@ -947,14 +947,14 @@ function makeCard(item, cardId) {
 async function checkDownloadStatus() {
     // Get selected instance from VastAI toolbar
     const toolbar = window.vastAIConnectionToolbar;
-    if (!toolbar || !toolbar.state || !toolbar.state.sshConnectionString) {
+    if (!toolbar || !toolbar.state || !toolbar.state.ssh_connection_string) {
         console.warn('No instance selected in VastAI toolbar');
         return;
     }
     
     // Parse SSH connection string to get host and port
-    const sshConnection = toolbar.state.sshConnectionString;
-    const match = sshConnection.match(/ssh -p (\\d+) root@([\\d\\.]+)/);
+    const sshConnection = toolbar.state.ssh_connection_string;
+    const match = sshConnection.match(/ssh -p (\d+) root@([\d\.]+)/);
     if (!match) {
         console.error('Could not parse SSH connection string:', sshConnection);
         return;
