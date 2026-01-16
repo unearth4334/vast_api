@@ -5483,11 +5483,9 @@ def catalog_check_downloads():
                     results[file_path] = {'downloaded': False, 'reason': 'No download command found'}
                     continue
                 
-                # Expand $UI_HOME if present
+                # Expand $UI_HOME if present - keep variable for remote shell expansion
                 if '$UI_HOME' in target_path:
                     search_path = target_path.replace('$UI_HOME', '\\$UI_HOME')
-                    if download_type == 'civitdl':
-                        search_path += '/models/Lora'
                 else:
                     search_path = target_path
                 
