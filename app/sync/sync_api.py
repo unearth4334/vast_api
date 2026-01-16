@@ -5483,6 +5483,9 @@ def catalog_check_downloads():
                     results[file_path] = {'downloaded': False, 'reason': 'No download command found'}
                     continue
                 
+                # Remove quotes from target_path if present
+                target_path = target_path.strip('"')
+                
                 # Expand $UI_HOME if present - keep variable for remote shell expansion
                 if '$UI_HOME' in target_path:
                     search_path = target_path.replace('$UI_HOME', '\\$UI_HOME')
