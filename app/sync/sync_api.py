@@ -5416,8 +5416,28 @@ def catalog_check_downloads():
                 civitai_id = air_match.group(1)
                 version_id = air_match.group(2)
                 
+                # Map the file path using category config
+                # file_path is like "checkpoints/CHKPT-..." or "loras/LoRA-..."
+                # Need to map to "Checkpoints/checkpoints/CHKPT-..." or "LoRAs/loras/LoRA-..."
+                try:
+                    path_parts = file_path.split('/', 1)
+                    if len(path_parts) != 2:
+                        results[file_path] = {'downloaded': False, 'reason': 'Invalid file path format'}
+                        continue
+                    
+                    category_key, filename = path_parts
+                    if category_key not in _CATALOG_CATEGORIES:
+                        results[file_path] = {'downloaded': False, 'reason': f'Unknown category: {category_key}'}
+                        continue
+                    
+                    category_dirname, markdown_subdir = _CATALOG_CATEGORIES[category_key]
+                    mapped_path = f"{category_dirname}/{markdown_subdir}/{filename}"
+                except Exception as e:
+                    results[file_path] = {'downloaded': False, 'reason': f'Path mapping error: {e}'}
+                    continue
+                
                 # Read the markdown file to extract download command
-                abs_md_path = os.path.join(ASSET_CATALOG_DIR, file_path)
+                abs_md_path = os.path.join(ASSET_CATALOG_DIR, mapped_path)
                 
                 if not os.path.isfile(abs_md_path):
                     results[file_path] = {'downloaded': False, 'reason': 'Markdown file not found'}
