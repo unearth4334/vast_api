@@ -5457,10 +5457,13 @@ def catalog_check_downloads():
                 download_type = None
                 
                 for block in code_blocks:
-                    # Check for civitdl
-                    civitdl_match = re.search(r'civitdl\s+(?:")?[^"\s]+(?:")?\s+"([^"]+)"', block)
+                    # Check for civitdl - capture full path after URL (handles "$UI_HOME"/path/to/dir format)
+                    civitdl_match = re.search(r'civitdl\s+\S+\s+(.+?)(?:\s*$)', block, re.MULTILINE)
                     if civitdl_match:
-                        target_path = civitdl_match.group(1)
+                        # Get the full path argument, strip quotes from beginning/end and clean up
+                        target_path = civitdl_match.group(1).strip()
+                        # Remove quotes around $UI_HOME if present: "$UI_HOME"/path -> $UI_HOME/path
+                        target_path = re.sub(r'"(\$UI_HOME)"', r'\1', target_path)
                         download_type = 'civitdl'
                         break
                     
@@ -5483,8 +5486,8 @@ def catalog_check_downloads():
                     results[file_path] = {'downloaded': False, 'reason': 'No download command found'}
                     continue
                 
-                # Remove quotes from target_path if present
-                target_path = target_path.strip('"')
+                # Clean up any remaining quotes at start/end of path
+                target_path = target_path.strip().strip('"').strip("'")
                 
                 # Expand $UI_HOME if present - keep variable for remote shell expansion
                 if '$UI_HOME' in target_path:
