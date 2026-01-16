@@ -55,7 +55,10 @@ const catalogState = {
     sortOrder: 'asc',
     versionGroups: {}, // Map of base title -> array of items
     currentVersionIndex: {}, // Map of card ID -> current version index
-    viewMode: 'detailed' // 'detailed' or 'compact'
+    viewMode: 'detailed', // 'detailed' or 'compact'
+    selectedInstance: null, // Selected VastAI instance for download checks
+    downloadStatus: {}, // Map of file_path -> download status
+    checkingDownloads: false
 };
 
 /**
@@ -152,6 +155,7 @@ function setupSortControls() {
 function setupApplyResetButtons() {
     const applyBtn = document.getElementById('tv-apply');
     const resetBtn = document.getElementById('tv-reset');
+    const checkDownloadsBtn = document.getElementById('tv-check-downloads');
 
     if (applyBtn) {
         applyBtn.addEventListener('click', () => {
@@ -181,6 +185,25 @@ function setupApplyResetButtons() {
 
             saveCategoryPreference(catalogState.selectedCategory);
             loadCategory(catalogState.selectedCategory);
+        });
+    }
+    
+    if (checkDownloadsBtn) {
+        checkDownloadsBtn.addEventListener('click', async () => {
+            checkDownloadsBtn.disabled = true;
+            checkDownloadsBtn.textContent = 'Checking...';
+            try {
+                await checkDownloadStatus();
+            } finally {
+                checkDownloadsBtn.disabled = false;
+                checkDownloadsBtn.innerHTML = `
+                    <svg class="octicon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 4px;">
+                        <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"></path>
+                        <path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path>
+                    </svg>
+                    Check Downloads
+                `;
+            }
         });
     }
 }
@@ -576,6 +599,19 @@ function makeCard(item, cardId) {
         <div class="tv-version-indicator">${currentIndex + 1}/${versions.length}</div>
     ` : '';
 
+    // Download indicator (initially hidden, will be shown after check)
+    const downloadStatus = catalogState.downloadStatus[currentItem.path];
+    const downloadIndicatorHtml = downloadStatus ? `
+        <div class="tv-download-indicator ${downloadStatus.downloaded ? 'downloaded' : 'not-downloaded'}" 
+             title="${downloadStatus.downloaded ? 'Downloaded to instance' : 'Not downloaded'}">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                ${downloadStatus.downloaded 
+                    ? '<path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path>'
+                    : '<path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"></path><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path>'}
+            </svg>
+        </div>
+    ` : '';
+
             a.innerHTML = `
                 ${versionNavHtml}
                 <div class="tv-card">
@@ -586,6 +622,7 @@ function makeCard(item, cardId) {
                         }
                         <div class="tv-badges">${badgesHtml}</div>
                         ${versionIndicatorHtml}
+                        ${downloadIndicatorHtml}
                     </div>
                     <div class="tv-footer">
                         <span class="tv-title"></span>
@@ -903,3 +940,78 @@ function makeCard(item, cardId) {
     }
 
     window.closeAssetDetailModal = closeAssetDetailModal;
+
+/**
+ * Check download status for all items against selected instance
+ */
+async function checkDownloadStatus() {
+    // Get selected instance from VastAI toolbar
+    const toolbar = window.vastAIConnectionToolbar;
+    if (!toolbar || !toolbar.state || !toolbar.state.sshConnectionString) {
+        console.warn('No instance selected in VastAI toolbar');
+        return;
+    }
+    
+    // Parse SSH connection string to get host and port
+    const sshConnection = toolbar.state.sshConnectionString;
+    const match = sshConnection.match(/ssh -p (\\d+) root@([\\d\\.]+)/);
+    if (!match) {
+        console.error('Could not parse SSH connection string:', sshConnection);
+        return;
+    }
+    
+    const ssh_port = match[1];
+    const ssh_host = match[2];
+    
+    catalogState.selectedInstance = { ssh_host, ssh_port };
+    catalogState.checkingDownloads = true;
+    
+    // Collect items with AIR identifiers
+    const itemsToCheck = catalogState.items
+        .filter(item => item.air && item.path) // Only items with AIR and file paths
+        .map(item => ({
+            file_path: item.path,
+            air: item.air
+        }));
+    
+    if (itemsToCheck.length === 0) {
+        console.log('No items with AIR identifiers to check');
+        catalogState.checkingDownloads = false;
+        return;
+    }
+    
+    console.log(`Checking ${itemsToCheck.length} items on ${ssh_host}:${ssh_port}`);
+    
+    try {
+        const resp = await fetch('/catalog/check-downloads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ssh_host,
+                ssh_port,
+                items: itemsToCheck
+            })
+        });
+        
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        
+        if (!data.success) throw new Error(data.message || 'Failed to check downloads');
+        
+        // Update download status
+        catalogState.downloadStatus = data.results;
+        
+        // Re-render cards to show download indicators
+        reSortAndRender();
+        
+        console.log('Download status updated:', data.results);
+        
+    } catch (e) {
+        console.error('Error checking downloads:', e);
+    } finally {
+        catalogState.checkingDownloads = false;
+    }
+}
+
+// Export for use by toolbar and other scripts
+window.catalogCheckDownloadStatus = checkDownloadStatus;

@@ -12,6 +12,7 @@ import uuid
 import re
 import json
 from urllib.parse import unquote
+from pathlib import Path
 
 import yaml
 from flask import Flask, jsonify, request, send_from_directory, send_file
@@ -5181,6 +5182,13 @@ def catalog_list():
                 media_url = f"/catalog/media/{category_key}/{media_normalized}"
 
             st = os.stat(abs_md_path)
+            
+            # Extract AIR identifier if present
+            air = None
+            air_match = re.search(r'AIR:\s*(.+)', raw)
+            if air_match:
+                air = air_match.group(1).strip()
+            
             items.append({
                 'file': entry,
                 'path': rel_md_path,
@@ -5196,6 +5204,8 @@ def catalog_list():
                 'basemodel': meta.get('basemodel'),
                 'ecosystem': meta.get('ecosystem'),
                 'tags': meta.get('tags', []) if isinstance(meta.get('tags'), list) else [],
+                # AIR identifier for download checking
+                'air': air,
             })
 
         return jsonify({
@@ -5352,6 +5362,171 @@ def catalog_state_save():
         })
     except Exception as e:
         logger.error(f"Error saving catalog state: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@app.route('/catalog/check-downloads', methods=['POST', 'OPTIONS'])
+def catalog_check_downloads():
+    """Check if assets are downloaded to a specific instance"""
+    if request.method == 'OPTIONS':
+        return ("", 204)
+    
+    try:
+        data = request.get_json() if request.is_json else {}
+        
+        # Required parameters
+        ssh_host = data.get('ssh_host')
+        ssh_port = data.get('ssh_port')
+        items = data.get('items', [])  # List of {air, file_path} objects
+        
+        if not ssh_host or not ssh_port:
+            return jsonify({
+                'success': False,
+                'message': 'SSH host and port are required'
+            }), 400
+        
+        if not items:
+            return jsonify({
+                'success': True,
+                'results': {}
+            })
+        
+        logger.info(f"Checking {len(items)} items on {ssh_host}:{ssh_port}")
+        
+        # Process each item
+        results = {}
+        
+        for item in items:
+            file_path = item.get('file_path')
+            air = item.get('air')
+            
+            if not file_path or not air:
+                continue
+            
+            try:
+                # Parse AIR identifier to extract version ID
+                air_match = re.search(r'civitai:(\d+)@(\d+)', air)
+                if not air_match:
+                    results[file_path] = {'downloaded': False, 'reason': 'Invalid AIR format'}
+                    continue
+                
+                civitai_id = air_match.group(1)
+                version_id = air_match.group(2)
+                
+                # Read the markdown file to extract download command
+                abs_md_path = os.path.join(ASSET_CATALOG_DIR, file_path)
+                
+                if not os.path.isfile(abs_md_path):
+                    results[file_path] = {'downloaded': False, 'reason': 'Markdown file not found'}
+                    continue
+                
+                try:
+                    with open(abs_md_path, 'r', encoding='utf-8') as f:
+                        md_content = f.read()
+                except UnicodeDecodeError:
+                    with open(abs_md_path, 'r', encoding='latin-1') as f:
+                        md_content = f.read()
+                
+                # Extract download command to get target path
+                code_blocks = re.findall(r'```(?:bash)?\n(.*?)\n```', md_content, re.DOTALL)
+                
+                target_path = None
+                download_type = None
+                
+                for block in code_blocks:
+                    # Check for civitdl
+                    civitdl_match = re.search(r'civitdl\s+(?:")?[^"\s]+(?:")?\s+"([^"]+)"', block)
+                    if civitdl_match:
+                        target_path = civitdl_match.group(1)
+                        download_type = 'civitdl'
+                        break
+                    
+                    # Check for wget with -P flag
+                    wget_p_match = re.search(r'wget\s+-P\s+"([^"]+)"', block)
+                    if wget_p_match:
+                        target_path = wget_p_match.group(1)
+                        download_type = 'wget'
+                        break
+                    
+                    # Check for wget with -O flag
+                    wget_o_match = re.search(r'wget.*-O\s+"([^"]+)"', block)
+                    if wget_o_match:
+                        full_path = wget_o_match.group(1)
+                        target_path = str(Path(full_path).parent)
+                        download_type = 'wget'
+                        break
+                
+                if not target_path:
+                    results[file_path] = {'downloaded': False, 'reason': 'No download command found'}
+                    continue
+                
+                # Expand $UI_HOME if present
+                if '$UI_HOME' in target_path:
+                    search_path = target_path.replace('$UI_HOME', '\\$UI_HOME')
+                    if download_type == 'civitdl':
+                        search_path += '/models/Lora'
+                else:
+                    search_path = target_path
+                
+                # Generate filename patterns
+                if download_type == 'civitdl':
+                    patterns = [f"*{version_id}*.safetensors", f"*{version_id}*.ckpt", f"*{version_id}*.pth"]
+                else:
+                    patterns = [f"*{version_id}*"]
+                
+                # Check if file exists on remote instance
+                found = False
+                found_path = None
+                ssh_key = os.path.expanduser('~/.ssh/id_rsa')  # Default SSH key
+                
+                for pattern in patterns:
+                    ssh_cmd = [
+                        'ssh',
+                        '-p', str(ssh_port),
+                        '-i', ssh_key,
+                        '-o', 'ConnectTimeout=5',
+                        '-o', 'StrictHostKeyChecking=yes',
+                        '-o', 'UserKnownHostsFile=/root/.ssh/known_hosts',
+                        '-o', 'IdentitiesOnly=yes',
+                        f'root@{ssh_host}',
+                        f'find {search_path} -maxdepth 2 -name "{pattern}" 2>/dev/null | head -1'
+                    ]
+                    
+                    try:
+                        result = subprocess.run(
+                            ssh_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=10
+                        )
+                        
+                        if result.returncode == 0 and result.stdout.strip():
+                            found = True
+                            found_path = result.stdout.strip()
+                            break
+                    except Exception as e:
+                        logger.warning(f"Error checking pattern {pattern}: {e}")
+                        continue
+                
+                results[file_path] = {
+                    'downloaded': found,
+                    'path': found_path if found else None
+                }
+                
+            except Exception as e:
+                logger.error(f"Error checking {file_path}: {e}")
+                results[file_path] = {'downloaded': False, 'reason': str(e)}
+        
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in check-downloads: {e}")
         return jsonify({
             'success': False,
             'message': str(e)

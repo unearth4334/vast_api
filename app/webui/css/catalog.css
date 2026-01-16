@@ -825,3 +825,37 @@
         max-height: 90vh;
     }
 }
+
+/* Download Indicator */
+.tv-download-indicator {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    width: 28px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    transition: all 0.2s ease;
+}
+
+.tv-download-indicator.downloaded {
+    color: #4caf50;
+}
+
+.tv-download-indicator.not-downloaded {
+    color: #ff9800;
+}
+
+.tv-download-indicator:hover {
+    transform: scale(1.1);
+    background: rgba(0, 0, 0, 0.85);
+}
+
+.tv-download-indicator svg {
+    flex-shrink: 0;
+}
