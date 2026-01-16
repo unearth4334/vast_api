@@ -5498,7 +5498,9 @@ def catalog_check_downloads():
                 # Check if file exists on remote instance
                 found = False
                 found_path = None
-                ssh_key = os.path.expanduser('~/.ssh/id_rsa')  # Default SSH key
+                ssh_key = os.path.expanduser('~/.ssh/id_ed25519')  # Use ed25519 key
+                
+                logger.info(f"Searching for {file_path} with version_id={version_id}, search_path={search_path}")
                 
                 for pattern in patterns:
                     ssh_cmd = [
@@ -5513,6 +5515,8 @@ def catalog_check_downloads():
                         f'find {search_path} -maxdepth 2 -name "{pattern}" 2>/dev/null | head -1'
                     ]
                     
+                    logger.debug(f"Running SSH command: {' '.join(ssh_cmd)}")
+                    
                     try:
                         result = subprocess.run(
                             ssh_cmd,
@@ -5521,9 +5525,12 @@ def catalog_check_downloads():
                             timeout=10
                         )
                         
+                        logger.debug(f"SSH result: returncode={result.returncode}, stdout='{result.stdout.strip()}', stderr='{result.stderr.strip()}'")
+                        
                         if result.returncode == 0 and result.stdout.strip():
                             found = True
                             found_path = result.stdout.strip()
+                            logger.info(f"Found file for {file_path}: {found_path}")
                             break
                     except Exception as e:
                         logger.warning(f"Error checking pattern {pattern}: {e}")
