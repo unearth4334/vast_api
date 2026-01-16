@@ -946,7 +946,7 @@ function makeCard(item, cardId) {
  */
 async function checkDownloadStatus() {
     // Get selected instance from VastAI toolbar
-    const toolbar = window.vastAIConnectionToolbar;
+    const toolbar = window.VastAIConnectionToolbar;
     
     console.log('🔍 Toolbar object:', toolbar);
     console.log('🔍 Toolbar state:', toolbar?.state);
