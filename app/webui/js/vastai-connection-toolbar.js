@@ -15,6 +15,48 @@ class VastAIConnectionToolbar {
         this.instancesData = [];
         this.dropdownOpen = false;
         this.connectionTester = null;
+        
+        // Local instances configuration
+        this.localInstances = [
+            {
+                id: 'local-forge',
+                instance_id: 'local-forge',
+                instanceId: 'local-forge',
+                gpu_name: 'Local Forge',
+                gpu: 'Local Forge',
+                num_gpus: 1,
+                public_ipaddr: '10.0.78.108',
+                public_ip: '10.0.78.108',
+                ip_address: '10.0.78.108',
+                actual_status: 'running',
+                status: 'running',
+                dph_total: 0,
+                cost_per_hour: 0,
+                ports: {'22/tcp': [{'HostPort': '2222'}]},
+                is_local: true,
+                display_name: 'Local Forge',
+                service_type: 'forge'
+            },
+            {
+                id: 'local-comfyui',
+                instance_id: 'local-comfyui',
+                instanceId: 'local-comfyui',
+                gpu_name: 'Local ComfyUI',
+                gpu: 'Local ComfyUI',
+                num_gpus: 1,
+                public_ipaddr: '10.0.78.108',
+                public_ip: '10.0.78.108',
+                ip_address: '10.0.78.108',
+                actual_status: 'running',
+                status: 'running',
+                dph_total: 0,
+                cost_per_hour: 0,
+                ports: {'22/tcp': [{'HostPort': '2223'}]},
+                is_local: true,
+                display_name: 'Local ComfyUI',
+                service_type: 'comfyui'
+            }
+        ];
     }
 
     /**
@@ -149,7 +191,7 @@ class VastAIConnectionToolbar {
     }
     
     /**
-     * Load VastAI instances from API
+     * Load VastAI instances from API and merge with local instances
      */
     async loadInstances() {
         try {
@@ -159,7 +201,11 @@ class VastAIConnectionToolbar {
             const data = await response.json();
             
             if (data.success) {
-                this.instancesData = data.instances || [];
+                const vastaiInstances = data.instances || [];
+                
+                // Merge VastAI instances with local instances
+                // Local instances appear first
+                this.instancesData = [...this.localInstances, ...vastaiInstances];
                 
                 // Update last refresh timestamp
                 await this.updateState({
@@ -182,15 +228,25 @@ class VastAIConnectionToolbar {
                 // Update toolbar display
                 this.updateToolbarDisplay();
                 
-                console.log(`✅ Loaded ${this.instancesData.length} instances`);
+                console.log(`✅ Loaded ${this.instancesData.length} instances (${this.localInstances.length} local, ${vastaiInstances.length} VastAI)`);
                 return this.instancesData;
             } else {
                 console.error('❌ Failed to load instances:', data.message);
-                return [];
+                // Still show local instances even if VastAI API fails
+                this.instancesData = [...this.localInstances];
+                if (this.dropdownOpen) {
+                    this.renderDropdown();
+                }
+                return this.instancesData;
             }
         } catch (error) {
             console.error('❌ Error loading instances:', error);
-            return [];
+            // Still show local instances even if VastAI API fails
+            this.instancesData = [...this.localInstances];
+            if (this.dropdownOpen) {
+                this.renderDropdown();
+            }
+            return this.instancesData;
         }
     }
     
@@ -342,9 +398,41 @@ class VastAIConnectionToolbar {
         const sshPort = this._resolveSshPort(instance);
         const costPerHr = instance.dph_total || instance.cost_per_hour || 0;
         const sshConnection = this._buildSSHConnectionString(instance);
+        const isLocal = instance.is_local || false;
+        const displayName = instance.display_name || `#${instanceId}`;
         
         const isSelected = this.state.selected_instance_id === instanceId;
         const isRunning = status === 'running';
+        
+        // For local instances, show a simplified tile
+        if (isLocal) {
+            return `
+                <div class="toolbar-instance-tile toolbar-instance-local ${isSelected ? 'selected' : ''}" data-instance-id="${instanceId}">
+                    <div class="toolbar-instance-info">
+                        <div class="toolbar-instance-header">
+                            <span class="toolbar-instance-id">🏠 ${displayName}</span>
+                            <span class="instance-status status-${status}">${status}</span>
+                        </div>
+                        <div class="toolbar-instance-gpu">
+                            <strong>${gpuName}</strong>
+                        </div>
+                        <div class="toolbar-instance-details">
+                            <div>📡 ${publicIp}:${sshPort}</div>
+                            <div>💰 Local (Free)</div>
+                        </div>
+                    </div>
+                    <div class="toolbar-instance-actions">
+                        <button class="toolbar-action-btn toolbar-connect-btn" 
+                                data-instance-id="${instanceId}"
+                                ${!isRunning ? 'disabled' : ''}>
+                            🔗 Connect
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // For VastAI instances, show full tile with all controls
         const obTokenHtml = (sshConnection && isRunning)
             ? `<a href="#" class="toolbar-fetch-token" data-action="fetch-token" data-instance-id="${instanceId}" data-ssh="${this._escapeAttr(sshConnection)}">fetch</a>`
             : 'N/A';
@@ -507,10 +595,11 @@ class VastAIConnectionToolbar {
     async selectInstance(instanceId) {
         console.log(`📌 Selecting instance ${instanceId}...`);
         
-        // Find instance data
-        const instance = this.instancesData.find(i => 
-            (i.id || i.instance_id || i.instanceId) === parseInt(instanceId, 10)
-        );
+        // Find instance data - handle both numeric IDs and string IDs (for local instances)
+        const instance = this.instancesData.find(i => {
+            const iid = i.id || i.instance_id || i.instanceId;
+            return iid === instanceId || iid === parseInt(instanceId, 10);
+        });
         
         if (!instance) {
             console.error('❌ Instance not found');
@@ -523,8 +612,9 @@ class VastAIConnectionToolbar {
         const sshConnectionString = `ssh -p ${sshPort} root@${publicIp} -L 8080:localhost:8080`;
         
         // Update state (no connection testing)
+        // Keep instance ID as-is (can be string for local instances or number for VastAI)
         await this.updateState({
-            selected_instance_id: parseInt(instanceId, 10),
+            selected_instance_id: instanceId,
             ssh_connection_string: sshConnectionString,
             ssh_host: publicIp,
             ssh_port: sshPort,
@@ -534,7 +624,8 @@ class VastAIConnectionToolbar {
         });
         
         // Set global instance ID for legacy compatibility (workflow executor needs this)
-        window.currentInstanceId = parseInt(instanceId, 10);
+        // For numeric instances, use integer; for string instances (local), keep as string
+        window.currentInstanceId = typeof instanceId === 'string' ? instanceId : parseInt(instanceId, 10);
         
         // Update display
         this.updateToolbarDisplay();

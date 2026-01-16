@@ -218,6 +218,20 @@
     background: rgba(124, 58, 237, 0.1);
 }
 
+/* Local instances styling */
+.toolbar-instance-tile.toolbar-instance-local {
+    border-left: 3px solid var(--color-green);
+}
+
+.toolbar-instance-tile.toolbar-instance-local:hover {
+    border-color: var(--color-green);
+}
+
+.toolbar-instance-tile.toolbar-instance-local.selected {
+    border-color: var(--color-green);
+    background: rgba(34, 197, 94, 0.1);
+}
+
 .toolbar-instance-info {
     flex: 1;
     min-width: 0;
