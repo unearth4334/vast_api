@@ -391,6 +391,27 @@ function reSortAndRender() {
     applyViewMode();
 }
 
+/**
+ * Rebuild all cards (e.g., after download status changes)
+ */
+function rebuildAllCards() {
+    // Recreate all cards with updated state
+    const seenBaseTitles = new Set();
+    catalogState.allCards = catalogState.items
+        .map((item) => {
+            const baseTitle = getBaseTitle(item);
+            if (seenBaseTitles.has(baseTitle)) {
+                return null; // Skip duplicate versions
+            }
+            seenBaseTitles.add(baseTitle);
+            return makeCard(item, `card-${baseTitle}`);
+        })
+        .filter(card => card !== null);
+    
+    // Re-sort and render the new cards
+    reSortAndRender();
+}
+
     function startVideo(v) {
         if (!v) return;
         if (!catalogState.playing.has(v) && catalogState.playing.size >= catalogState.maxConcurrentVideos) {
@@ -1002,8 +1023,8 @@ async function checkDownloadStatus() {
         // Update download status
         catalogState.downloadStatus = data.results;
         
-        // Re-render cards to show download indicators
-        reSortAndRender();
+        // Rebuild all cards to show download indicators
+        rebuildAllCards();
         
         console.log('Download status updated:', data.results);
         
