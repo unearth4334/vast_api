@@ -601,9 +601,10 @@ function makeCard(item, cardId) {
 
     // Download indicator (only show glowing circle when downloaded)
     const downloadStatus = catalogState.downloadStatus[currentItem.path];
+    console.log(`[Download Status] Looking up '${currentItem.path}':`, downloadStatus);
     const downloadIndicatorHtml = downloadStatus && downloadStatus.downloaded ? `
         <div class="tv-download-indicator downloaded" 
-             title="Downloaded to instance">
+             title="Downloaded to instance: ${downloadStatus.path || 'found'}">
         </div>
     ` : '';
 
